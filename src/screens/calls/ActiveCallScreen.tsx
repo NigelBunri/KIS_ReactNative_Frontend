@@ -9,6 +9,7 @@ import React, {
 import {
   Alert,
   Animated,
+  AppState,
   DeviceEventEmitter,
   Easing,
   Modal,
@@ -28,8 +29,9 @@ import { useResponsiveLayout } from '@/theme/responsive';
 
 import type { CallSession, CallLayout } from '@/services/calls/callTypes';
 import { hasVideo, isGroupCall, REACTION_EMOJIS, callTypeLabel } from '@/services/calls/callTypes';
-import { RTCView } from '@/services/calls/webRTCService';
+import { RTCView, RTCPIPView, startIOSPIP, stopIOSPIP } from '@/services/calls/webRTCService';
 import { audioRouteManager } from '@/services/calls/audioRouteManager';
+import { addCallPiPModeChangeListener } from '@/services/calls/callPiPService';
 
 import CallControls from './components/CallControls';
 import VideoGrid from './components/VideoGrid';
@@ -246,6 +248,17 @@ export default function ActiveCallScreen({ session, actions }: Props) {
     return () => { if (hideTimer.current) clearTimeout(hideTimer.current); };
   }, [session?.state]);
 
+  // Native PiP mode (Android auto-enter on background, iOS's automatic
+  // video-call PiP, or the user tapping the PiP window to return to full
+  // screen) fires this same event on entry AND exit - both directions need
+  // handling here since there's no separate "returned to foreground" signal
+  // to rely on instead. While in PiP the normal modal chrome (header,
+  // controls, sheets) has no room to render legibly, so the minimal
+  // full-bleed video branch below takes over instead of trying to scale the
+  // full UI down.
+  const [isInPictureInPicture, setIsInPictureInPicture] = useState(false);
+  useEffect(() => addCallPiPModeChangeListener(setIsInPictureInPicture), []);
+
   const localParticipant = useMemo(
     () => session?.participants.find(p => p.isLocal) ?? null,
     [session?.participants],
@@ -350,6 +363,16 @@ export default function ActiveCallScreen({ session, actions }: Props) {
     root: {
       flex: 1,
       backgroundColor: palette.royalInk,
+    },
+    // Native OS Picture-in-Picture window content — deliberately plain
+    // (no palette-driven chrome, no safe-area padding) since the PiP window
+    // itself is sized and positioned entirely by the OS, not this app.
+    pipRoot: {
+      flex: 1,
+      backgroundColor: '#000',
+    },
+    pipVideo: {
+      flex: 1,
     },
     content: {
       flex: 1,
@@ -493,6 +516,29 @@ export default function ActiveCallScreen({ session, actions }: Props) {
   }), [palette, PIP_W, PIP_H]);
 
   if (!session) return null;
+
+  // ─── NATIVE PICTURE-IN-PICTURE ───────────────────────────────────────────
+  // The OS has shrunk this screen into its floating PiP window (Android's
+  // auto-enter-on-background, or iOS's automatic video-call PiP) - the
+  // normal modal chrome (header, CallControls, sheets) has no room to
+  // render legibly at that size, and none of it is interactive from inside
+  // a PiP window on either platform anyway. Show just the remote video,
+  // full-bleed, exactly like every other PiP-supporting video app. Not
+  // gated on withVideo/isGroup - isInPictureInPicture can only ever be true
+  // when the native side already decided this was eligible (SocketProvider
+  // only calls setCallPiPActive(true, ...) for a connected video call), so
+  // by the time this branch can render, there's guaranteed to be a real
+  // video call to show.
+  if (isInPictureInPicture) {
+    const pipStream = remoteParticipants[0]?.stream ?? localParticipant?.stream ?? null;
+    return (
+      <View style={styles.pipRoot}>
+        {pipStream && RTCView ? (
+          <RTCView streamURL={pipStream.toURL()} style={styles.pipVideo} objectFit="cover" zOrder={1} />
+        ) : null}
+      </View>
+    );
+  }
 
   const stateLabel = (() => {
     switch (session.state) {
@@ -912,15 +958,44 @@ function VideoOneOnOneLayout({ session, remoteParticipants, isConnecting, localS
 }) {
   const remote = remoteParticipants[0] ?? null;
 
+  // iOS Picture-in-Picture: react-native-webrtc ships this fully built
+  // (RTCPIPView + startIOSPIP/stopIOSPIP, backed by its own PIPController +
+  // AVPictureInPictureController natively) - there is no equivalent to
+  // Android's "minimal render swap" needed here, because iOS PiP is a
+  // genuinely separate floating system window showing whatever the video
+  // view's sample buffer layer publishes, not a transformation of this
+  // app's own window the way Android's enterPictureInPictureMode() is. This
+  // screen keeps rendering completely normally underneath/behind it.
+  const pipRef = useRef<any>(null);
+  useEffect(() => {
+    const start = startIOSPIP;
+    const stop = stopIOSPIP;
+    if (Platform.OS !== 'ios' || !RTCPIPView || !start || !stop) return;
+    const sub = AppState.addEventListener('change', (state) => {
+      if (session.state !== 'active') return;
+      if (state === 'background') start(pipRef);
+      else if (state === 'active') stop(pipRef);
+    });
+    return () => sub.remove();
+  }, [session.state]);
+
+  const RemoteVideoView = RTCPIPView ?? RTCView;
+  // Only RTCPIPView (iOS) understands iosPIP - spreading it onto the plain
+  // RTCView fallback (Android, or any build without RTCPIPView) would hand
+  // an unrecognized prop to a native component that isn't expecting it.
+  const remoteVideoExtraProps = RTCPIPView ? { iosPIP: { enabled: true } } : {};
+
   return (
     <View style={StyleSheet.absoluteFill}>
       {/* Remote video — full screen */}
-      {remote?.stream && RTCView ? (
-        <RTCView
+      {remote?.stream && RemoteVideoView ? (
+        <RemoteVideoView
+          ref={pipRef}
           streamURL={remote.stream.toURL()}
           style={StyleSheet.absoluteFill}
           objectFit="cover"
           zOrder={1}
+          {...remoteVideoExtraProps}
         />
       ) : (
         <View style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center' }]}>

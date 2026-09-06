@@ -81,6 +81,7 @@
         android:windowSoftInputMode="adjustResize"
         android:showOnLockScreen="true"
         android:turnScreenOn="true"
+        android:supportsPictureInPicture="true"
         android:exported="true">
         <!-- Launcher -->
         <intent-filter>

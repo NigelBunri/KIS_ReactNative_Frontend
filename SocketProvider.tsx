@@ -51,6 +51,7 @@ import {
   setMuted as callKitSetMuted,
 } from '@/services/calls/callKitService';
 import { sfuService, sfuAvailable } from '@/services/calls/sfuService';
+import { setCallPiPActive } from '@/services/calls/callPiPService';
 import { toggleScreenShare as callServiceToggleScreenShare } from '@/services/calls/callService';
 import { saveConversationCallHistory, loadConversationCallHistory } from '@/services/calls/callHistoryStorage';
 import { logCallDiagnostic } from '@/services/calls/callDiagnostics';
@@ -1561,6 +1562,25 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  /* ─── Video-call Picture-in-Picture ──────────────────────────────────────── */
+  //
+  // A single reactive effect rather than a call inserted at every relevant
+  // call-state transition, deliberately: PiP eligibility depends on *two*
+  // independently-changing things (is the call actually connected, and does
+  // it currently have video - a voice call can turn video on mid-call, and
+  // vice versa), and Phase 1 of this same feature found three real bugs
+  // from exactly that scattered-call-site approach (state transitions whose
+  // OS-facing side effect was missed). Re-deriving both from the current
+  // session on every relevant change and telling the native side the
+  // current truth is much harder to get wrong than trying to enumerate
+  // every place either fact could change.
+  useEffect(() => {
+    const isVideo = !!activeCall && hasVideo(activeCall.callType);
+    const isCallActive = activeCall?.state === 'active';
+    setCallPiPActive(isCallActive, isVideo);
+    return () => setCallPiPActive(false, false);
+  }, [activeCall]);
+
   /* ─── Socket connection ──────────────────────────────────────────────────── */
 
   useEffect(() => {
@@ -1884,6 +1904,18 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           // ── Caller side ──────────────────────────────────────────────────────
           // Someone answered. Stop the ringback, transition to active, and
           // create the WebRTC peer offer to the person who just joined.
+          //
+          // reportCallAnswered here is what was missing on the caller's side:
+          // startOutgoingCall (in startCall, above) only registers the call
+          // with CallKit/ConnectionService as "dialing" — the OS never learns
+          // the call actually connected unless setCurrentCallActive is called
+          // once the callee picks up. Without it, the outgoing side's call
+          // never properly transitions to "active" in CallKit's own model, so
+          // the OS-level ongoing-call indicator (iOS's in-call status bar /
+          // Android's foreground-service notification) that the app is
+          // reporting today never showed for calls *this device initiated* —
+          // only for calls it received (answerCall already does this).
+          reportCallAnswered(callId);
           audioRouteManager.stopRingback();
           if (_ringTimeoutRef.current) { clearTimeout(_ringTimeoutRef.current); _ringTimeoutRef.current = null; }
           setActiveCall(prev => {
@@ -2095,6 +2127,18 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         if (sessionSnapshot && sessionSnapshot.callId === callId) {
           persistCallEndRef.current?.(sessionSnapshot, resolvedState);
         }
+        // This is the remote party ending the call (they hung up, declined,
+        // or a host ended it for everyone) — every *locally*-initiated end
+        // path (endCall/leaveCall/endCallForAll) already reports this to
+        // CallKit/ConnectionService, but this listener never did. Without
+        // it, whenever the other side hangs up first, this device's OS-level
+        // call session is never torn down: on iOS the in-call status bar
+        // indicator keeps showing a call that's actually over, and the next
+        // real incoming call can be refused or behave oddly because CallKit
+        // still thinks one is active. Same class of fix as the caller-side
+        // reportCallAnswered above — an OS-facing state transition that had
+        // no corresponding CallKit call.
+        reportCallEnded(callId, resolvedState === 'missed' ? 'rejected' : 'ended');
         setActiveCall(prev => {
           if (!prev || prev.callId !== callId) return prev;
           return {
@@ -2410,6 +2454,10 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       s.on('call.knock.denied', (payload: any) => {
         const callId = String(payload?.callId ?? '');
         if (!callId) return;
+        // Same ghost-call risk as the call.end listener above: this ends the
+        // call from this device's perspective without ever having gone
+        // through endCall/leaveCall, so nothing had told CallKit yet.
+        reportCallEnded(callId, 'rejected');
         setActiveCall(prev => {
           if (!prev || prev.callId !== callId) return prev;
           return { ...prev, state: 'ended', reason: 'denied' };

@@ -11,6 +11,18 @@ try {
 export const webRTCAvailable = !!RNW;
 export const RTCView = RNW?.RTCView ?? null;
 
+// iOS-only native video-call Picture-in-Picture, shipped by react-native-webrtc
+// itself (RTCPIPView wraps RTCView with an iosPIP prop; startIOSPIP/stopIOSPIP
+// dispatch native view-manager commands backed by the library's own
+// PIPController + SampleBufferVideoCallView, i.e. a full AVPictureInPictureController
+// integration that already exists in this dependency - no custom native module
+// needed for iOS PiP, unlike Android (see callPiPService.ts's CallPiPModule).
+// Undefined/no-op on Android and whenever react-native-webrtc isn't installed;
+// callers must not assume these exist without checking webRTCAvailable first.
+export const RTCPIPView = RNW?.RTCPIPView ?? null;
+export const startIOSPIP: ((ref: { current: any }) => void) | null = RNW?.startIOSPIP ?? null;
+export const stopIOSPIP: ((ref: { current: any }) => void) | null = RNW?.stopIOSPIP ?? null;
+
 // Public STUN servers only as fallback. TURN servers should be injected at
 // runtime via setIceServers() once fetched from the backend.
 const DEFAULT_ICE_SERVERS = [

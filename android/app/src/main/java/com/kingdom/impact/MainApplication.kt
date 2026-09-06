@@ -18,6 +18,7 @@ class MainApplication : Application(), ReactApplication {
           add(SimInfoPackage())
           add(DeviceIdPackage())
           add(RestoreCredentialPackage())
+          add(CallPiPPackage())
         },
     )
   }
