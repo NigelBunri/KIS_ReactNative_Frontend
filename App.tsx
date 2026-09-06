@@ -1274,6 +1274,20 @@ function AppContent() {
         {/* Same bridge shape as above, for the chat/community overlays -
             see DetachedChatOverlayContext.tsx. */}
         <DetachedChatOverlayProvider>
+        {/* Wraps BOTH the normal NavigationContainer subtree below AND
+            DetachedChatOverlayOutlet further down — not just the former.
+            ChatRoomPage/MessageBubble (and therefore every
+            useVoiceMessagePlayer() call) render exclusively through that
+            detached outlet, a sibling of NavigationContainer rather than a
+            descendant (see DetachedChatOverlayContext.tsx) — this provider
+            was originally nested inside NavigationContainer instead,
+            alongside MiniPlayerProvider, which left every chat bubble
+            reading the context's no-op default value (play() a no-op,
+            isActive() always false) instead of the real provider. That was
+            the root cause of a full live regression: voice notes silently
+            not playing and the play button showing zero visual feedback on
+            tap, since nothing the bubble read ever actually changed. */}
+        <VoiceMessagePlayerProvider>
         <View style={{ flex: 1 }}>
           <StatusBar
             animated
@@ -1339,7 +1353,6 @@ function AppContent() {
               },
             }}
           >
-            <VoiceMessagePlayerProvider>
             <MiniPlayerProvider>
             <GlobalProfilePreviewProvider>
               <RootStack.Navigator screenOptions={{ headerShown: false }}>
@@ -1987,8 +2000,6 @@ function AppContent() {
             </GlobalProfilePreviewProvider>
             <MiniPlayer />
             </MiniPlayerProvider>
-            <VoiceMessageMiniBadge />
-            </VoiceMessagePlayerProvider>
           </NavigationContainer>
             </View>
           {/* Sibling of the content column above, not nested inside it — see
@@ -2027,7 +2038,15 @@ function AppContent() {
               lastActiveAtRef.current = Date.now();
             }} />
           ) : null}
+          {/* Must be a descendant of VoiceMessagePlayerProvider (opened
+              above, alongside DetachedChatOverlayProvider) to read its real
+              state rather than the context's no-op default — see that
+              provider's placement comment. Rendered here, after
+              DetachedChatOverlayOutlet, so it floats correctly regardless
+              of which (if any) chat overlay is currently open. */}
+          <VoiceMessageMiniBadge />
         </View>
+        </VoiceMessagePlayerProvider>
         </DetachedChatOverlayProvider>
         </DetachedTabBarProvider>
       </SocketProvider>
