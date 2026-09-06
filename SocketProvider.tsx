@@ -74,6 +74,7 @@ import type { VirtualBgOption } from '@/screens/calls/components/VirtualBackgrou
 // persisted call duration would jump back to 0 mid-call.
 const CALL_STATES_BEFORE_CONNECT = new Set<CallState>([
   'dialing',
+  'ringing',
   'incoming',
   'connecting',
   'lobby',
@@ -685,10 +686,16 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     // while backgrounded) blocks every retry to this conversation with
     // CALL_ALREADY_ACTIVE until the backend's own stale-call fallback
     // kicks in. Only meaningful when there's actually someone to ring.
+    // Also fires from 'ringing' (not just 'dialing') — the callee's device
+    // confirming it's alerting them doesn't mean they're going to answer;
+    // without 'ringing' here, a call that got this far would silently stop
+    // being auto-ended after 45s, breaking this safety net for exactly the
+    // calls that got further along than ones that never reached anyone.
     if (invitees.length > 0) {
       _ringTimeoutRef.current = setTimeout(() => {
         _ringTimeoutRef.current = null;
-        if (activeCallRef.current?.callId === callId && activeCallRef.current.state === 'dialing') {
+        const state = activeCallRef.current?.state;
+        if (activeCallRef.current?.callId === callId && (state === 'dialing' || state === 'ringing')) {
           endCallRef.current?.('no_answer');
         }
       }, 45000);
@@ -1868,6 +1875,24 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           callId,
           callType,
         });
+
+        // Tell the caller we're actually alerting the user now, so their
+        // screen can show "Ringing…" instead of a plain "Calling…" that
+        // never changes until answered/timed out. Deliberately NOT gated on
+        // `displayed` — IncomingCallScreen mounts (via setActiveCall above)
+        // and starts its own ringtone regardless of whether the native
+        // CallKit/ConnectionService UI also succeeded, so this device IS
+        // alerting the user either way. Gating this on native CallKit
+        // success specifically would make the whole "ringing" state
+        // permanently unreachable on any build where CallKit is unavailable
+        // — including every iOS build with __DEV__ true (see
+        // callKitService.ts's CALLKIT_ENABLED gate), which is exactly the
+        // environment in active use for testing this feature today. Scoped
+        // to 1:1 calls only (not useLobby) — a group/broadcast pre-join
+        // preview isn't "ringing" the way a direct call recipient is.
+        if (!useLobby) {
+          s.emit('call.ringing', { conversationId, callId });
+        }
       });
 
       // Remote answered — broadcast by backend to the entire conv room.
@@ -1983,6 +2008,22 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         // arrives separately, and the lobby count refreshes from that.
 
         DeviceEventEmitter.emit('calls.refresh');
+      });
+
+      // Callee's device is actually alerting them now — see the matching
+      // emit in the call.offer handler above for why this isn't gated on
+      // native CallKit success. Only meaningful while still 'dialing': if
+      // this arrives late (after the callee already answered, or after we
+      // gave up and ended the call), there's a more current state that must
+      // not be clobbered back to 'ringing'.
+      s.on('call.ringing', (payload: any) => {
+        const callId = String(payload?.callId ?? '');
+        if (!callId) return;
+        setActiveCall(prev =>
+          (prev && prev.callId === callId && prev.state === 'dialing')
+            ? { ...prev, state: 'ringing' }
+            : prev,
+        );
       });
 
       // WebRTC SDP offer from remote
@@ -2117,6 +2158,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         const weNeverAnswered = activeCallRef.current?.state === 'incoming' ||
           activeCallRef.current?.state === 'lobby' ||
           activeCallRef.current?.state === 'dialing' ||
+          activeCallRef.current?.state === 'ringing' ||
           activeCallRef.current?.state === 'connecting';
         const resolvedState =
           reason === 'missed' || reason === 'busy' || reason === 'rejected' ||
