@@ -1,6 +1,7 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
+  Animated,
   DeviceEventEmitter,
   Modal,
   Pressable,
@@ -58,6 +59,24 @@ type Props = {
   filterDuration?: 'short' | 'medium' | 'long' | 'any';
 };
 
+// Plain RN Animated (not react-native-reanimated - the entering/exiting
+// layout-animation API pulls in react-native-worklets at import time, which
+// isn't initialized in this project's Jest environment and broke every test
+// that imports this screen) fade-in for whichever branch of the
+// limitReached ternary below just mounted. Only fades the incoming content
+// in (RN's Animated has no equivalent to Reanimated's `exiting` for
+// animating an unmounting subtree), but that alone turns the previous hard,
+// instant cut into something soft - the actual "really bad" moment being
+// fixed is the abrupt full-feed unmount with zero transition at all, not
+// the lack of a true cross-dissolve.
+function FadeInView({ children }: { children: React.ReactNode }) {
+  const opacity = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.timing(opacity, { toValue: 1, duration: 240, useNativeDriver: true }).start();
+  }, [opacity]);
+  return <Animated.View style={{ opacity }}>{children}</Animated.View>;
+}
+
 export default function FeedsDiscoverPage({
   searchTerm = '',
   searchContext = '',
@@ -74,6 +93,18 @@ export default function FeedsDiscoverPage({
     useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const isFocused = useIsFocused();
   const { status: feedLimitStatus } = useResponsibleFeedLimit(isFocused);
+  // The moment limitReached flips true, the ternary below swaps this whole
+  // feed's content (potentially hundreds of loaded item cards, scrolled
+  // arbitrarily deep) for one small block. Without scrolling back to the top
+  // first, a plain ScrollView just clamps the now-invalid contentOffset to
+  // whatever's left, which reads as a hard, uncontrolled snap on top of the
+  // content swap itself.
+  const feedScrollRef = useRef<ScrollView>(null);
+  useEffect(() => {
+    if (feedLimitStatus?.limitReached) {
+      feedScrollRef.current?.scrollTo({ y: 0, animated: true });
+    }
+  }, [feedLimitStatus?.limitReached]);
   const [showTrendingOnly, setShowTrendingOnly] = useState(false);
   // Use controlled props when provided, else fall back to local state
   const [activeCategoryLocal, setActiveCategoryLocal] = useState<FeedCategory>('for_you');
@@ -463,6 +494,7 @@ export default function FeedsDiscoverPage({
 
   return (
     <ScrollView
+      ref={feedScrollRef}
       contentContainerStyle={{ paddingBottom: 120 }}
       refreshControl={
         <RefreshControl
@@ -552,10 +584,17 @@ export default function FeedsDiscoverPage({
 
         <FeedTimeLimitBanner status={feedLimitStatus} />
 
+        {/* FadeInView softens this swap instead of the hard, instant cut it
+            was before - the "false" branch here is the entire rest of this
+            feed (every loaded item card), so unmounting it with no
+            transition at all was the single worst moment in this screen's
+            whole scroll experience. */}
         {feedLimitStatus?.limitReached ? (
-          <FeedTimeLimitBlock status={feedLimitStatus} onGoBack={() => navigation.goBack()} />
+          <FadeInView key="feed-limit-block">
+            <FeedTimeLimitBlock status={feedLimitStatus} onGoBack={() => navigation.goBack()} />
+          </FadeInView>
         ) : (
-          <>
+          <FadeInView key="feed-content">
         {/* Live items banner */}
         {liveItems.length > 0 && activeCategory !== 'live' && !showTrendingOnly && (
           <Pressable
@@ -683,7 +722,7 @@ export default function FeedsDiscoverPage({
             await runToggle();
           }}
         />
-          </>
+          </FadeInView>
         )}
       </View>
 
