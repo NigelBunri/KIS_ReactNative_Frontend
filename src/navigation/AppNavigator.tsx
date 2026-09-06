@@ -909,7 +909,22 @@ export function MainTabs() {
           tabBar={(p) => (
             <DetachedTabBarBridge
               {...p}
-              hidNav={hidNav || shellMode !== 'phone' || !mainTabsFocused}
+              // chat room / sub-room / community overlays are rendered as
+              // TabletDialogOverlay siblings below (zIndex 1000-1003), local
+              // to MainTabs' own View. AnimatedKISTabBar no longer shares
+              // that stacking context - it renders detached, as a sibling of
+              // the whole NavigationContainer one level up in App.tsx (see
+              // DetachedTabBarContext.tsx) - so its zIndex:10 there beats
+              // NavigationContainer's outer zIndex:1 regardless of what's
+              // nested inside it, and these overlays' local zIndex can never
+              // reach far enough to paint over it. Same fix as
+              // mainTabsFocused above: hide the bar explicitly instead of
+              // relying on stacking order, reusing the exact overlay-visible
+              // signal useGoldenSectionSuppression already uses below.
+              hidNav={
+                hidNav || shellMode !== 'phone' || !mainTabsFocused
+                || chatVisible || subRoomVisible || infoVisible || communityVisible || communityInfoVisible
+              }
               badgeCounts={badgeCounts}
               onTabBarState={setTabBarState}
             />
