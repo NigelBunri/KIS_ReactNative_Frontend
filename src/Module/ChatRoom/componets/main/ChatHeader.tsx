@@ -407,14 +407,14 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
           )}
           <Pressable style={styles.headerIconButton} onPress={onStartVideoCall}>
             <KISIcon
-              name="camera"
+              name="video"
               size={20}
               color={palette.onHeader ?? palette.text}
             />
           </Pressable>
           <Pressable style={styles.headerIconButton} onPress={onStartVoiceCall}>
             <KISIcon
-              name="mic"
+              name="phone"
               size={20}
               color={palette.onHeader ?? palette.text}
             />
