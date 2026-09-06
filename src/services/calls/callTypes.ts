@@ -8,7 +8,8 @@ export type CallType =
   | 'broadcast';
 
 export type CallState =
-  | 'dialing'
+  | 'dialing'   // caller has sent the offer; nothing confirmed reached the other side yet
+  | 'ringing'   // callee's device has processed the offer and is actually alerting them
   | 'incoming'
   | 'connecting'
   | 'active'

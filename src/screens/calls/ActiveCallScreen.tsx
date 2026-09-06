@@ -205,10 +205,10 @@ export default function ActiveCallScreen({ session, actions }: Props) {
     }),
   ).current;
 
-  // Pulsing animation for 'dialing' state
+  // Pulsing animation for 'dialing'/'ringing' state
   const pulseAnim = useRef(new Animated.Value(1)).current;
   useEffect(() => {
-    if (session?.state === 'dialing' || session?.state === 'connecting') {
+    if (session?.state === 'dialing' || session?.state === 'ringing' || session?.state === 'connecting') {
       const loop = Animated.loop(
         Animated.sequence([
           Animated.timing(pulseAnim, { toValue: 1.1, duration: 800, useNativeDriver: true }),
@@ -220,9 +220,14 @@ export default function ActiveCallScreen({ session, actions }: Props) {
     }
   }, [session?.state]);
 
-  // Ringback tone: plays on the caller's side while waiting for remote to answer
+  // Ringback tone: plays on the caller's side while waiting for remote to
+  // answer — continues through 'ringing' (the callee's device confirmed
+  // it's alerting them), not just 'dialing', since the caller is still
+  // waiting for an answer either way. Stopping it the instant state moved
+  // from 'dialing' to 'ringing' would leave the caller in dead silence right
+  // as the other phone actually starts ringing.
   useEffect(() => {
-    if (session?.state === 'dialing') {
+    if (session?.state === 'dialing' || session?.state === 'ringing') {
       audioRouteManager.startRingback();
       return () => audioRouteManager.stopRingback();
     }
@@ -272,7 +277,7 @@ export default function ActiveCallScreen({ session, actions }: Props) {
   const isGroup = session ? isGroupCall(session.callType) : false;
   const isBroadcast = session?.callType === 'broadcast';
   const isActive = session?.state === 'active';
-  const isConnecting = session?.state === 'connecting' || session?.state === 'dialing' || session?.state === 'reconnecting';
+  const isConnecting = session?.state === 'connecting' || session?.state === 'dialing' || session?.state === 'ringing' || session?.state === 'reconnecting';
 
   const handleControlAction = useCallback((action: string) => {
     revealControls();
@@ -543,6 +548,7 @@ export default function ActiveCallScreen({ session, actions }: Props) {
   const stateLabel = (() => {
     switch (session.state) {
       case 'dialing': return 'Calling…';
+      case 'ringing': return 'Ringing…';
       case 'connecting': return 'Connecting…';
       case 'reconnecting': return 'Reconnecting…';
       case 'ended': return session.reason ? `Call ended · ${session.reason}` : 'Call ended';
