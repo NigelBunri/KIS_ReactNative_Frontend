@@ -623,11 +623,22 @@ export default function ProfileScreen() {
   const [familyAccessibilitySaving, setFamilyAccessibilitySaving] = useState(false);
   const [pinEnabled, setPinEnabled] = useState(false);
   const [lockTimeoutMinutes, setLockTimeoutMinutes] = useState(5);
+  // Falls back to a stable, real "not yet verified" object instead of
+  // null/undefined while c.profile is still loading - VerificationBadgeRow
+  // (rendered compact in the Golden Section hero, see
+  // ProfileDashboardBlocks.tsx) early-returns null whenever summary is
+  // absent, so a null-then-real transition once the profile fetch resolves
+  // was a genuine 0-to-content height change in the gold header. A synthetic
+  // {verified:false, badges:[]} produces the exact same neutral "Unverified"
+  // pill VerificationBadgeRow already renders for any real unverified user -
+  // same shape from frame one, just swapped for the real value once it
+  // loads, instead of the row's presence toggling.
   const userVerificationSummary = useMemo(
     () =>
       normalizeVerificationSummary(c.profile?.user) ||
       normalizeVerificationSummary(c.profile?.profile) ||
-      normalizeVerificationSummary(c.profile),
+      normalizeVerificationSummary(c.profile) ||
+      { verified: false, badges: [] },
     [c.profile],
   );
   const profileUserAny = c.profile?.user as any;

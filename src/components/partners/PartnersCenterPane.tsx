@@ -196,7 +196,19 @@ export default function PartnersCenterPane({
 
   const { onScroll, onHeaderLayout, collapseStyle } = useCollapsingGoldHeader(140);
 
-  useGoldenSectionContent({
+  // Gated on selectedPartner?.id (not registered unconditionally) - this
+  // header's own content (tagline, the verified pill vs. "Verify this
+  // partner" prompt) depends on selectedPartner/partnerVerificationSummary,
+  // both null until the partners fetch resolves. Registering unconditionally
+  // meant the header rendered once with all of that absent, then again once
+  // real data arrived - a genuine height change in the gold header, same
+  // shape as the "chatVisible ? null : {...}" pattern MessagesScreen.tsx
+  // already uses for its own header. Deferring registration until there's a
+  // real partner to show means the header appears exactly once, already in
+  // its final, settled shape (PartnerCenterPaneSkeleton below covers the gap
+  // while nothing is registered yet) - one clean appearance instead of a
+  // partial-then-full correction.
+  useGoldenSectionContent(!selectedPartner?.id ? null : {
     content: (
       <>
         <PartnerCompactGoldBar

@@ -69,6 +69,22 @@ import { normalizeChatDisplayText, resolveChatPreviewText } from '@/Module/ChatR
 import { getCurrentAuthUserId } from '@/storage/userScopedProfileCache';
 
 const Tab = createMaterialTopTabNavigator();
+
+// In-memory (not AsyncStorage-level - just a JS module variable, cleared on
+// app restart) cache of the last-loaded custom filters, seeded into
+// customFilters' initial state below instead of always starting from [].
+// customFilters used to always start empty and get repopulated from an
+// async AsyncStorage.getItem after mount - fine on a cold app launch (one-
+// time, unavoidable since AsyncStorage has no synchronous read API), but on
+// every subsequent mount of this screen within the same session (switching
+// tabs away and back), the same async round-trip repeated for data that was
+// already known a moment ago, popping the same chips in again and changing
+// styles.chipsRow's (flexWrap) wrap state - a real, visible Golden Section
+// height change on every tab revisit, not just once at cold boot. Seeding
+// from this cache means every mount after the first one this session
+// already has the right answer before first paint.
+let cachedCustomFilters: CustomFilter[] | null = null;
+
 type MessagesScreenProps = {
   onOpenChat: (chat: Chat) => void;
   onOpenInfo?: (payload: { chat: Chat; currentUserId: string | null }) => void;
@@ -165,7 +181,7 @@ export default function MessagesScreen({ onOpenChat, onOpenInfo, appName, header
   const [activeQuick, setActiveQuick] = useState<Set<LocalQuick>>(new Set());
 
   // Custom filters
-  const [customFilters, setCustomFilters] = useState<CustomFilter[]>([]);
+  const [customFilters, setCustomFilters] = useState<CustomFilter[]>(() => cachedCustomFilters ?? []);
   const [activeCustom, setActiveCustom] = useState<string | null>(null);
   const [filterMgrOpen, setFilterMgrOpen] = useState(false);
 
@@ -1547,13 +1563,18 @@ const handleSelectAllChats = useCallback(() => {
     (async () => {
       try {
         const raw = await AsyncStorage.getItem(CUSTOM_FILTERS_KEY);
-        if (raw) setCustomFilters(JSON.parse(raw));
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          cachedCustomFilters = parsed;
+          setCustomFilters(parsed);
+        }
       } catch (e) {
         console.warn('Failed to load custom filters', e);
       }
     })();
   }, []);
   async function persistFilters(next: CustomFilter[]) {
+    cachedCustomFilters = next;
     setCustomFilters(next);
     try {
       await AsyncStorage.setItem(CUSTOM_FILTERS_KEY, JSON.stringify(next));
