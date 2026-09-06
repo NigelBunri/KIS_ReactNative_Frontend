@@ -219,6 +219,22 @@ export const handleSendVoice = async ({
 
   let attachment: AttachmentMeta | null = null;
 
+  // Nest's /uploads/initiate rejects size_bytes <= 0 outright — this is a
+  // real, unconditional rejection of every single voice note sent via the
+  // direct-to-S3 flow, not just long ones, since nothing along this path
+  // (HoldToLockComposer.tsx's onSendVoice only ever passes { uri,
+  // durationMs }) ever computed the recorded file's actual size. Stat it
+  // here, right before upload — the one place a voice message's file
+  // object gets built — same pattern buildVoiceAttachment/uploadFileToBackend
+  // already use elsewhere for "verify the file still exists" checks.
+  const stat = await RNFS.stat(stripFileScheme(uri)).catch(() => null);
+  const fileSize = stat ? Number(stat.size) : 0;
+  if (!fileSize) {
+    onUploadStatus?.('failed');
+    Alert.alert('Could not send voice message', 'The recording could not be read. Please try recording again.');
+    return;
+  }
+
   try {
     attachment = await uploadFileToBackend({
       file: {
@@ -231,6 +247,7 @@ export const handleSendVoice = async ({
         // pass Django's prefix-based validation but is a worse hint for
         // players sniffing by declared type than the real registered MIME.
         type: 'audio/mp4',
+        size: fileSize,
       },
       // Direct-to-S3, same as every other chat attachment — voice notes
       // used to omit baseUrl and fall through to Django's legacy multipart
@@ -322,12 +339,24 @@ export const handleSendSticker = async ({
 
   let attachment: AttachmentMeta | null = null;
 
+  // Same size_bytes<=0 rejection as handleSendVoice above, same root cause
+  // (file object built here never carried a size) — sticker.uri is always
+  // a real local file:// PNG on disk (see StickerEditor.tsx's finalImageUri),
+  // so stat it the same way.
+  const stickerStat = await RNFS.stat(stripFileScheme(sticker.uri)).catch(() => null);
+  const stickerFileSize = stickerStat ? Number(stickerStat.size) : 0;
+  if (!stickerFileSize) {
+    Alert.alert('Could not send sticker', 'The sticker image could not be read. Please try again.');
+    return;
+  }
+
   try {
     attachment = await uploadFileToBackend({
       file: {
         uri: sticker.uri,
         name: `${sticker.id}.png`,
         type: 'image/png',
+        size: stickerFileSize,
       },
       // Direct-to-S3 — see the matching comment in handleSendVoice above.
       baseUrl: NEST_API_BASE_URL,
