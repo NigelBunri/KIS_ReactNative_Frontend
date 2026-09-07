@@ -28,6 +28,7 @@ import BibleLessonsPanel from '../../components/Bible/BibleLessonsPanel';
 import BibleSettingsPanel from '../../components/Bible/BibleSettingsPanel';
 import BibleBooksPanel from '../../components/Bible/BibleBooksPanel';
 import BibleMessagesPanel from '../../components/Bible/BibleMessagesPanel';
+import BibleGamesPanel from '../../components/Bible/BibleGamesPanel';
 import { KISIcon } from '../../constants/kisIcons';
 import { markMainTabNotificationSourceRead } from '@/services/mainTabNotificationBadges';
 import ConsumerSpiritualRevenuePreviewCard from '@/components/profitability/ConsumerSpiritualRevenuePreviewCard';
@@ -78,6 +79,7 @@ export default function BibleScreen() {
   const tabs = useMemo(
     () => [
       { key: 'read', label: 'Read', icon: 'book' },
+      { key: 'games', label: 'Games', icon: 'game-controller' },
       { key: 'daily', label: 'Daily', icon: 'calendar' },
       { key: 'meditations', label: 'Meditations', icon: 'sparkles' },
       { key: 'prayer-calendar', label: 'Prayer Calendar', icon: 'heart' },
@@ -194,6 +196,8 @@ export default function BibleScreen() {
         return <BibleLessonsPanel />;
       case 'books':
         return <BibleBooksPanel />;
+      case 'games':
+        return <BibleGamesPanel />;
       case 'messages':
         return <BibleMessagesPanel />;
       case 'settings':
@@ -375,7 +379,15 @@ export default function BibleScreen() {
     <View style={[styles.wrap, { backgroundColor: palette.bg}]}>
       {/* ══ Content area ═══════════════════════════════════════════════════ */}
       <View style={[styles.contentWrap, { marginTop: compactBible ? 8 : 12 }]}>
-        {activeTab === 'read' ? (
+        {activeTab === 'read' || activeTab === 'games' ? (
+          // 'games' gets the same full-height, self-scrolling treatment as
+          // 'read' rather than being nested in the page ScrollView below —
+          // once a game is active, GameShell's own flex:1 layout (flashcard
+          // area, footer action bar) needs a bounded height to fill, which
+          // it can't get as a flex:1 child inside another ScrollView's
+          // content container. BibleGamesPanel's own hub grid (no active
+          // game yet) scrolls itself internally for the same reason 'read'
+          // does — see BibleGamesPanel.tsx.
           <View style={styles.readContent}>{renderTab()}</View>
         ) : (
           <ScrollView

@@ -143,6 +143,14 @@ export type KISIconName =
   | 'arrow-up-right'    // outgoing call direction arrow
   | 'refresh-cw'        // refresh (calls tab, call controls)
   | 'briefcase'         // jobs (broadcast jobs tab)
+  // ── Bible Games ────────────────────────────────────────────────────────
+  | 'game-controller'   // Games tab
+  | 'trophy'            // scores / streaks
+  | 'shuffle'           // Word Weave / shuffle actions
+  | 'puzzle'            // Verse Match
+  | 'checkmark-circle'  // correct-answer feedback
+  | 'close-circle'      // wrong-answer feedback
+  | 'timer'             // timed game modes
   // Allow forward-compatible icon names from feature modules.
   | (string & {});
 
@@ -312,6 +320,13 @@ const ion: IonMap = {
   message: { filled: 'chatbubble-ellipses', outline: 'chatbubble-ellipses-outline' },
   lock: { filled: 'lock-closed', outline: 'lock-closed-outline' },
   list: { filled: 'list', outline: 'list-outline' },
+  'game-controller': { filled: 'game-controller', outline: 'game-controller-outline' },
+  trophy: { filled: 'trophy', outline: 'trophy-outline' },
+  shuffle: { filled: 'shuffle', outline: 'shuffle-outline' },
+  puzzle: { filled: 'extension-puzzle', outline: 'extension-puzzle-outline' },
+  'checkmark-circle': { filled: 'checkmark-circle', outline: 'checkmark-circle-outline' },
+  'close-circle': { filled: 'close-circle', outline: 'close-circle-outline' },
+  timer: { filled: 'timer', outline: 'timer-outline' },
   plus: { filled: 'add', outline: 'add-outline' },
   bookmark: { filled: 'bookmark', outline: 'bookmark-outline' },
   bolt: { filled: 'flash', outline: 'flash-outline' },
