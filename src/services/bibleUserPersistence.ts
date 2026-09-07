@@ -158,6 +158,11 @@ const upsertLibraryItem = async (key: string, item: LocalBibleLibraryItem) => {
   return item;
 };
 
+const deleteLibraryItem = async (key: string, id: string) => {
+  const list = await readLibrary(key);
+  await writeJson(key, list.filter((entry) => String(entry.id) !== String(id)));
+};
+
 export const buildLocalLibraryItem = (input: {
   serverItem?: any;
   verse: BibleVerse;
@@ -185,6 +190,14 @@ export const buildLocalLibraryItem = (input: {
 export const upsertLocalBibleHighlight = (item: LocalBibleLibraryItem) => upsertLibraryItem(HIGHLIGHTS_KEY, item);
 export const upsertLocalBibleNote = (item: LocalBibleLibraryItem) => upsertLibraryItem(NOTES_KEY, item);
 export const upsertLocalBibleBookmark = (item: LocalBibleLibraryItem) => upsertLibraryItem(BOOKMARKS_KEY, item);
+
+export const readLocalBibleHighlights = () => readLibrary(HIGHLIGHTS_KEY);
+export const readLocalBibleNotes = () => readLibrary(NOTES_KEY);
+export const readLocalBibleBookmarks = () => readLibrary(BOOKMARKS_KEY);
+
+export const deleteLocalBibleHighlight = (id: string) => deleteLibraryItem(HIGHLIGHTS_KEY, id);
+export const deleteLocalBibleNote = (id: string) => deleteLibraryItem(NOTES_KEY, id);
+export const deleteLocalBibleBookmark = (id: string) => deleteLibraryItem(BOOKMARKS_KEY, id);
 
 export const mergeBibleLibraryWithLocal = async (input: {
   highlights: LocalBibleLibraryItem[];

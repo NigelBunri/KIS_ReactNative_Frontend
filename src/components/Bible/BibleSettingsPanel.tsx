@@ -112,9 +112,19 @@ export default function BibleSettingsPanel({ translations, spiritualGrowthSummar
       if (syncRes?.success) {
         const synced = await writeLocalBiblePreference({ ...syncRes.data, ...local, sync_status: 'synced' });
         setPreference(synced);
-        setLoadingPreference(false);
-        return;
+      } else {
+        // `res` was fetched before this sync attempt, so it reflects the
+        // server's pre-change state — falling through to the res?.success
+        // branch below would overwrite the still-unsynced local change with
+        // that stale server copy and mark it 'synced' even though it never
+        // actually reached the server, silently discarding the user's
+        // change with no way to retry. Keep local as the source of truth
+        // (already set via setPreference(local) above) and leave
+        // sync_status as 'local_pending' so the next load retries.
+        setMessage(syncRes?.message || 'Unable to sync Bible settings — will retry next time.');
       }
+      setLoadingPreference(false);
+      return;
     }
     if (res?.success) {
       const synced = await writeLocalBiblePreference({ ...res.data, sync_status: 'synced' });
