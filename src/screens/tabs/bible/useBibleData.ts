@@ -269,6 +269,7 @@ export function useBibleData() {
   const [meditations, setMeditations] = useState<MeditationEntry[]>([]);
   const [loadingReader, setLoadingReader] = useState(false);
   const reloadCallbackRef = useRef<(() => void) | null>(null);
+  const readRequestSeqRef = useRef(0);
   const [loadingDaily, setLoadingDaily] = useState(false);
   const [loadingMeditations, setLoadingMeditations] = useState(false);
   const [spiritualGrowthSummary, setSpiritualGrowthSummary] =
@@ -331,12 +332,24 @@ export function useBibleData() {
       endVerse?: number,
     ) => {
     reloadCallbackRef.current = () => loadReader(translation, book, chapter, reference, startVerse, endVerse);
+    // Every call claims the next sequence number; a response is only
+    // allowed to update state if it's still the most recently *started*
+    // call by the time it resolves. Without this, nothing cancelled or
+    // ordered the underlying requests — swiping through chapters faster
+    // than a slow response can return (most commonly the very first,
+    // mount-time restore-position load, which is the slowest one since it
+    // races cold cache/cold network) let that stale response land last and
+    // silently overwrite whatever chapter the user had already correctly
+    // navigated to, snapping the reader back to it (in practice: back to
+    // Genesis 1, since that's what the initial load requests).
+    const requestId = ++readRequestSeqRef.current;
+    const isStale = () => requestId !== readRequestSeqRef.current;
     setLoadingReader(true);
     setReaderError(null);
     try {
       if (translation && book && chapter && !reference && !startVerse && !endVerse && offlineManifest[translation]) {
         const cached = await readCachedBibleChapter(translation, book, chapter);
-        if (cached) setReader(cached);
+        if (cached && !isStale()) setReader(cached);
       }
 
       const query = new URLSearchParams();
@@ -349,6 +362,7 @@ export function useBibleData() {
       const res = await getRequest(`${ROUTES.bible.reader}?${query.toString()}`, {
         errorMessage: 'Unable to load passage.',
       });
+      if (isStale()) return;
       if (res?.success) {
         setReader(res.data);
         setReaderError(null);
@@ -363,6 +377,7 @@ export function useBibleData() {
         }
       } else if (translation && book && chapter && !reference && !startVerse && !endVerse) {
         const cached = await readCachedBibleChapter(translation, book, chapter);
+        if (isStale()) return;
         if (cached) {
           setReader(cached);
           setReaderError(null);
@@ -381,8 +396,10 @@ export function useBibleData() {
         setReaderError('server-unreachable');
       }
     } catch {
+      if (isStale()) return;
       if (translation && book && chapter && !reference && !startVerse && !endVerse) {
         const cached = await readCachedBibleChapter(translation, book, chapter).catch(() => null);
+        if (isStale()) return;
         if (cached) {
           setReader(cached);
           setReaderError(null);
@@ -397,7 +414,7 @@ export function useBibleData() {
       }
       setReaderError('server-unreachable');
     } finally {
-      setLoadingReader(false);
+      if (!isStale()) setLoadingReader(false);
     }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
