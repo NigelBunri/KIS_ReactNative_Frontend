@@ -92,6 +92,11 @@ const socialRoutes = {
     reply: (id: string) => `${API_BASE_URL}/api/v1/statuses/${id}/reply/`,
     mute: `${API_BASE_URL}/api/v1/statuses/mute/`,
     unmute: `${API_BASE_URL}/api/v1/statuses/unmute/`,
+    // Standard DRF detail route - StatusViewSet is a plain ModelViewSet
+    // (apps/statuses/views.py), so PATCH/DELETE here already work and are
+    // scoped to the owner via get_queryset(); no separate backend change
+    // needed to support removing/editing a status item.
+    detail: (id: string) => `${API_BASE_URL}/api/v1/statuses/${id}/`,
     // Fresh short-lived presigned GET for a status's media — visibility is
     // re-checked server-side on every call (same rules as list/view). See
     // apps/statuses/views.py's media_url action.
