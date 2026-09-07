@@ -205,7 +205,7 @@ const { socket, isConnected, typingByConversation, currentUserId, presenceByUser
 const { user: contextPanelUser } = useAuth();
 const [authCacheUserId, setAuthCacheUserId] = useState<string | null>(null);
 const effectiveCurrentUserId = currentUserId || authCacheUserId || null;
-const [statusByUserId, _setStatusByUserId] = useState<Record<string, { hasStatus: boolean; hasUnseen: boolean }>>({});
+const [statusByUserId, setStatusByUserId] = useState<Record<string, { hasStatus: boolean; hasUnseen: boolean }>>({});
 const [avatarPreview, setAvatarPreview] = useState<{ uri: string; chat?: Chat; userId?: string | null } | null>(null);
 const [avatarPreviewFull, setAvatarPreviewFull] = useState(false);
 const [_isOffline, setIsOffline] = useState(false);
@@ -680,6 +680,24 @@ useEffect(() => {
   const sub = DeviceEventEmitter.addListener('status.open', () => {
     tabRef.current?.navigate?.('Updates');
   });
+  return () => {
+    sub.remove();
+  };
+}, []);
+
+useEffect(() => {
+  // UpdatesTab.tsx emits this every time it loads statuses, but nothing
+  // was ever listening - statusByUserId stayed permanently {} (its setter
+  // was even underscore-prefixed as "intentionally unused"), so the
+  // conversation list's story-ring indicator (passed to ChatsTab below)
+  // never actually showed which contacts have an unseen status, even
+  // though the UI for it already existed.
+  const sub = DeviceEventEmitter.addListener(
+    'status.loaded',
+    (statusMap: Record<string, { hasStatus: boolean; hasUnseen: boolean }>) => {
+      setStatusByUserId(statusMap ?? {});
+    },
+  );
   return () => {
     sub.remove();
   };

@@ -376,10 +376,20 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
     setStatusComposerOpen(true);
   }, [resetStatusDraft]);
 
-  const loadStatuses = useCallback(async () => {
+  const loadStatuses = useCallback(async (force = false) => {
     const now = Date.now();
     if (statusesLoadInFlightRef.current) return;
-    if (now - statusesLastLoadAtRef.current < 15000) return;
+    // The 15s throttle exists to stop e.g. focus-triggered background
+    // refreshes from hammering the endpoint - but it was also silently
+    // swallowing the explicit refresh right after posting a new status
+    // (almost always well within 15s of the tab's initial mount-time
+    // load), so the newly created status never made it into statusUsers.
+    // The next tap on "My status" then still saw items.length === 0 and
+    // routed back to the composer instead of the viewer - "not even able
+    // to see their own status without being taken to the create page."
+    // `force` lets a call that just did something (create, delete, pull-
+    // to-refresh) always go through.
+    if (!force && now - statusesLastLoadAtRef.current < 15000) return;
     statusesLoadInFlightRef.current = true;
     statusesLastLoadAtRef.current = now;
     setStatusesLoading(true);
@@ -678,7 +688,7 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
             },
           );
           if (!res?.success) return;
-          await loadStatuses();
+          await loadStatuses(true);
           if (activeUser.isMuted) {
             return;
           }
@@ -709,7 +719,7 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
           );
           if (!res?.success) return;
           closeViewer();
-          await loadStatuses();
+          await loadStatuses(true);
         },
       },
       { text: 'Cancel', style: 'cancel' },
@@ -868,30 +878,39 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
     markViewed();
   }, [viewerOpen, currentItem?.id, activeUser?.id]);
 
+  // Same story-ring convention on every thumb below: a bold accent ring
+  // means there's something new to see, a plain divider ring means it's
+  // already been seen (or, for 'me' with no status yet, that there's
+  // nothing there at all) - this distinction existed in the data
+  // (hasUnseen/viewed) but nothing was actually rendering it before.
   const renderStatusThumb = (user: StatusUser) => {
+    const addBadge = (
+      <Pressable
+        onPress={() => {
+          suppressMyOpenRef.current = true;
+          setSuppressMyOpen(true);
+          openStatusComposer();
+        }}
+        hitSlop={10}
+        accessibilityRole="button"
+        accessibilityLabel="Add to status"
+        style={[
+          styles.statusAddBadge,
+          { backgroundColor: palette.primaryStrong, borderColor: palette.bg },
+        ]}
+      >
+        <KISIcon name="add" size={16} color={palette.onPrimary} />
+      </Pressable>
+    );
     if (user.id === 'me') {
       const latest = user.items[user.items.length - 1];
       if (latest) {
+        const ringColor = user.hasUnseen ? palette.primaryStrong : palette.divider;
         if (latest.type === 'image' && latest.uri) {
           return (
-            <View
-              style={[styles.statusThumb, { borderColor: palette.divider }]}
-            >
+            <View style={[styles.statusThumb, { borderColor: ringColor }]}>
               <Image source={{ uri: latest.uri }} style={styles.statusThumb} />
-              <Pressable
-                onPress={() => {
-                  suppressMyOpenRef.current = true;
-                  setSuppressMyOpen(true);
-                  openStatusComposer();
-                }}
-                hitSlop={10}
-                style={[
-                  styles.statusAddBadge,
-                  { backgroundColor: palette.primarySoft },
-                ]}
-              >
-                <KISIcon name="add" size={16} color={palette.primaryStrong} />
-              </Pressable>
+              {addBadge}
             </View>
           );
         }
@@ -901,7 +920,7 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
             style={[
               styles.statusThumb,
               {
-                borderColor: palette.divider,
+                borderColor: ringColor,
                 backgroundColor: textStyle.bgColor,
               },
             ]}
@@ -916,20 +935,7 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
             >
               {latest.text ?? 'My status'}
             </Text>
-            <Pressable
-              onPress={() => {
-                suppressMyOpenRef.current = true;
-                setSuppressMyOpen(true);
-                openStatusComposer();
-              }}
-              hitSlop={10}
-              style={[
-                styles.statusAddBadge,
-                { backgroundColor: palette.primarySoft },
-              ]}
-            >
-              <KISIcon name="add" size={16} color={palette.primaryStrong} />
-            </Pressable>
+            {addBadge}
           </View>
         );
       }
@@ -943,6 +949,7 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
         </View>
       );
     }
+    const ringColor = user.hasUnseen ? palette.primaryStrong : palette.divider;
     const lastViewed = viewedMap[user.id] ?? 0;
     const pickIndex = lastViewed < user.items.length ? lastViewed : 0;
     const item = user.items[pickIndex];
@@ -950,7 +957,7 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
       return (
         <Image
           source={{ uri: item.uri }}
-          style={[styles.statusThumb, { borderColor: palette.divider }]}
+          style={[styles.statusThumb, { borderColor: ringColor }]}
         />
       );
     }
@@ -959,7 +966,7 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
         <View
           style={[
             styles.statusThumb,
-            { borderColor: palette.divider, backgroundColor: palette.card },
+            { borderColor: ringColor, backgroundColor: palette.card },
           ]}
         >
           <KISIcon name="video" size={18} color={palette.text} />
@@ -971,7 +978,7 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
         <View
           style={[
             styles.statusThumb,
-            { borderColor: palette.divider, backgroundColor: palette.card },
+            { borderColor: ringColor, backgroundColor: palette.card },
           ]}
         >
           <KISIcon name="mic" size={18} color={palette.text} />
@@ -983,7 +990,7 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
       <View
         style={[
           styles.statusThumb,
-          { borderColor: palette.divider, backgroundColor: textStyle.bgColor },
+          { borderColor: ringColor, backgroundColor: textStyle.bgColor },
         ]}
       >
         <Text
@@ -1322,7 +1329,12 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
               color={palette.text}
               style={styles.composerTitle}
             >
-              Create status
+              {/* "Create" only makes sense the first time - once the user
+                  already has an active status, this same composer is really
+                  posting another update to it, not starting from scratch. */}
+              {(statusUsers.find(u => u.id === 'me')?.items.length ?? 0) > 0
+                ? 'Add to status'
+                : 'Create status'}
             </KISText>
 
             <View style={styles.composerRow}>
@@ -1748,7 +1760,7 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
                     }
                     setStatusComposerOpen(false);
                     resetStatusDraft();
-                    await loadStatuses();
+                    await loadStatuses(true);
                     openViewer('me');
                   } finally {
                     setIsPublishingStatus(false);
@@ -2170,8 +2182,14 @@ const styles = StyleSheet.create({
     width: 34,
     height: 34,
     borderRadius: 17,
+    borderWidth: 3,
     alignItems: 'center',
     justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOpacity: 0.18,
+    shadowRadius: 3,
+    shadowOffset: { width: 0, height: 1 },
+    elevation: 3,
   },
   channelCard: {
     marginHorizontal: 16,
