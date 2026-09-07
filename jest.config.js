@@ -52,6 +52,14 @@ module.exports = {
   setupFiles: ['react-native-gesture-handler/jestSetup'],
   testPathIgnorePatterns: [
     '/node_modules/',
+    // Each entry under .claude/worktrees/ is a full git-worktree checkout
+    // of this same repo (used to isolate parallel feature branches before
+    // merge) - without this, running jest from the real repo root also
+    // discovers and re-runs every test file inside every worktree's own
+    // nested copy, multiplying the suite (1529 "tests" instead of the real
+    // 180) and surfacing failures that are just stale/mid-flight state in
+    // someone else's in-progress worktree, not real regressions.
+    '/\\.claude/worktrees/',
     '/__tests__/phase5\\.jest\\.setup\\.ts$',
     '/__tests__/mocks/',
     // App.test.tsx: excluded, not just skipped — see the comment at the
