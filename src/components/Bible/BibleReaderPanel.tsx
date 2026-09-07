@@ -55,6 +55,7 @@ import {
   resumeBibleOfflineDownload,
   resumePausedBibleDownloadsWhenOnline,
   runBibleOfflineDownloadQueue,
+  deleteOfflineBibleTranslation,
 } from '@/services/bibleOfflineCache';
 import {
   BIBLE_PREFERENCES_UPDATED_EVENT,
@@ -968,6 +969,24 @@ const BibleReaderPanel = forwardRef<BibleReaderPanelHandle, Props>(function Bibl
     setMessage(`${translation.name} download resumed.`);
   };
 
+  const deleteOfflineDownload = (translation: BibleTranslation) => {
+    Alert.alert(
+      `Remove ${translation.name} from offline?`,
+      'You can download it again later — this only removes the copy saved on this device.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Remove',
+          style: 'destructive',
+          onPress: async () => {
+            await deleteOfflineBibleTranslation(translation.code);
+            setMessage(`${translation.name} removed from offline downloads.`);
+          },
+        },
+      ],
+    );
+  };
+
   const toggleVerse = (verseId: string) => {
     setSelectedVerses(prev => {
       const next = new Set(prev);
@@ -1554,6 +1573,10 @@ const BibleReaderPanel = forwardRef<BibleReaderPanelHandle, Props>(function Bibl
                             job?.status === 'downloading' ||
                             job?.status === 'queued';
                           const paused = job?.status === 'paused';
+                          const progressPercent =
+                            job && job.totalChapters
+                              ? Math.round((job.completedChapters / job.totalChapters) * 100)
+                              : 0;
                           const progressLabel =
                             job && job.totalChapters
                               ? `${job.completedChapters}/${job.totalChapters} chapters`
@@ -1591,40 +1614,59 @@ const BibleReaderPanel = forwardRef<BibleReaderPanelHandle, Props>(function Bibl
                                   {translation.code}
                                 </Text>
                                 {downloaded ? (
-                                  <Text
-                                    style={{
-                                      color: palette.primaryStrong,
-                                      marginTop: 2,
-                                      fontWeight: '700',
-                                    }}
-                                  >
-                                    Offline ready ·{' '}
-                                    {offlineManifest[translation.code]
-                                      ?.chapterCount || 0}{' '}
-                                    chapters
-                                  </Text>
+                                  <View style={[styles.offlineBadge, { backgroundColor: palette.primarySoft }]}>
+                                    <KISIcon name="check" size={12} color={palette.primaryStrong} />
+                                    <Text
+                                      style={{
+                                        color: palette.primaryStrong,
+                                        fontWeight: '800',
+                                        fontSize: 12,
+                                      }}
+                                    >
+                                      Offline ·{' '}
+                                      {offlineManifest[translation.code]
+                                        ?.chapterCount || 0}{' '}
+                                      chapters
+                                    </Text>
+                                  </View>
                                 ) : null}
                                 {!downloaded && job ? (
-                                  <Text
-                                    style={{
-                                      color: paused
-                                        ? palette.subtext
-                                        : palette.primaryStrong,
-                                      marginTop: 2,
-                                      fontWeight: '700',
-                                    }}
-                                  >
-                                    {job.status} ·{' '}
-                                    {progressLabel || 'Preparing'}
-                                  </Text>
+                                  <>
+                                    <Text
+                                      style={{
+                                        color: paused
+                                          ? palette.subtext
+                                          : palette.primaryStrong,
+                                        marginTop: 2,
+                                        fontWeight: '700',
+                                      }}
+                                    >
+                                      {job.status} ·{' '}
+                                      {progressLabel || 'Preparing'}
+                                      {job.totalChapters ? ` · ${progressPercent}%` : ''}
+                                    </Text>
+                                    {job.totalChapters ? (
+                                      <View style={[styles.downloadProgressTrack, { backgroundColor: palette.divider }]}>
+                                        <View
+                                          style={[
+                                            styles.downloadProgressFill,
+                                            {
+                                              width: `${progressPercent}%`,
+                                              backgroundColor: paused ? palette.subtext : palette.primaryStrong,
+                                            },
+                                          ]}
+                                        />
+                                      </View>
+                                    ) : null}
+                                  </>
                                 ) : null}
                               </TouchableOpacity>
                               {downloaded ? (
                                 <KISButton
-                                  title="Saved"
+                                  title="Delete"
                                   size="xs"
-                                  variant="secondary"
-                                  disabled
+                                  variant="danger"
+                                  onPress={() => deleteOfflineDownload(translation)}
                                 />
                               ) : downloading ? (
                                 <KISButton
@@ -1679,35 +1721,75 @@ const BibleReaderPanel = forwardRef<BibleReaderPanelHandle, Props>(function Bibl
                         again.
                       </Text>
                       {currentTranslation &&
-                      offlineJobs[currentTranslation.code] ? (
-                        <Text
-                          style={{
-                            color: palette.primaryStrong,
-                            marginTop: 6,
-                            fontWeight: '700',
-                          }}
-                        >
-                          {offlineJobs[currentTranslation.code].currentLabel ||
-                            offlineJobs[currentTranslation.code].status}{' '}
-                          ·{' '}
-                          {
-                            offlineJobs[currentTranslation.code]
-                              .completedChapters
-                          }
-                          /
-                          {offlineJobs[currentTranslation.code].totalChapters ||
-                            '?'}{' '}
-                          chapters
-                        </Text>
+                      offlineJobs[currentTranslation.code] &&
+                      !offlineManifest[currentTranslation.code] ? (
+                        <>
+                          <Text
+                            style={{
+                              color: palette.primaryStrong,
+                              marginTop: 6,
+                              fontWeight: '700',
+                            }}
+                          >
+                            {offlineJobs[currentTranslation.code].currentLabel ||
+                              offlineJobs[currentTranslation.code].status}{' '}
+                            ·{' '}
+                            {
+                              offlineJobs[currentTranslation.code]
+                                .completedChapters
+                            }
+                            /
+                            {offlineJobs[currentTranslation.code].totalChapters ||
+                              '?'}{' '}
+                            chapters
+                            {offlineJobs[currentTranslation.code].totalChapters
+                              ? ` · ${Math.round(
+                                  (offlineJobs[currentTranslation.code].completedChapters /
+                                    offlineJobs[currentTranslation.code].totalChapters) *
+                                    100,
+                                )}%`
+                              : ''}
+                          </Text>
+                          {offlineJobs[currentTranslation.code].totalChapters ? (
+                            <View style={[styles.downloadProgressTrack, { backgroundColor: palette.divider }]}>
+                              <View
+                                style={[
+                                  styles.downloadProgressFill,
+                                  {
+                                    width: `${Math.round(
+                                      (offlineJobs[currentTranslation.code].completedChapters /
+                                        offlineJobs[currentTranslation.code].totalChapters) *
+                                        100,
+                                    )}%`,
+                                    backgroundColor:
+                                      offlineJobs[currentTranslation.code].status === 'paused'
+                                        ? palette.subtext
+                                        : palette.primaryStrong,
+                                  },
+                                ]}
+                              />
+                            </View>
+                          ) : null}
+                        </>
+                      ) : null}
+                      {currentTranslation && offlineManifest[currentTranslation.code] ? (
+                        <View style={[styles.offlineBadge, { backgroundColor: palette.primarySoft, marginTop: 6 }]}>
+                          <KISIcon name="check" size={12} color={palette.primaryStrong} />
+                          <Text style={{ color: palette.primaryStrong, fontWeight: '800', fontSize: 12 }}>
+                            Offline ·{' '}
+                            {offlineManifest[currentTranslation.code]?.chapterCount || 0}{' '}
+                            chapters
+                          </Text>
+                        </View>
                       ) : null}
                     </View>
                     {currentTranslation ? (
                       offlineManifest[currentTranslation.code] ? (
                         <KISButton
-                          title="Saved"
+                          title="Delete"
                           size="xs"
-                          variant="secondary"
-                          disabled
+                          variant="danger"
+                          onPress={() => deleteOfflineDownload(currentTranslation)}
                         />
                       ) : offlineJobs[currentTranslation.code]?.status ===
                           'downloading' ||
@@ -2515,30 +2597,6 @@ const BibleReaderPanel = forwardRef<BibleReaderPanelHandle, Props>(function Bibl
                 </Text>
               ) : null}
             </TouchableOpacity>
-            <TouchableOpacity
-              activeOpacity={0.85}
-              onPress={reloadCurrentPassage}
-              disabled={!canReloadCurrentPassage}
-              style={[
-                styles.reloadIconButton,
-                {
-                  backgroundColor: palette.goldDeep,
-                  borderColor: palette.goldLight,
-                  opacity: canReloadCurrentPassage ? 1 : 0.55,
-                },
-              ]}
-            >
-              {loading ? (
-                <ActivityIndicator size="small" color={palette.ivory} />
-              ) : (
-                <KISIcon name="refresh" size={17} color={palette.ivory} />
-              )}
-              {!tinyReader ? (
-                <Text style={[styles.reloadIconButtonText, { color: palette.ivory }]}>
-                  Reload
-                </Text>
-              ) : null}
-            </TouchableOpacity>
           </View>
 
           {/* Always-visible tap alternative to the pull-gesture chapter
@@ -3186,6 +3244,26 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
+  },
+  offlineBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: 4,
+    marginTop: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 999,
+  },
+  downloadProgressTrack: {
+    height: 4,
+    borderRadius: 999,
+    marginTop: 6,
+    overflow: 'hidden',
+  },
+  downloadProgressFill: {
+    height: 4,
+    borderRadius: 999,
   },
   offlinePanel: {
     borderWidth: 1,

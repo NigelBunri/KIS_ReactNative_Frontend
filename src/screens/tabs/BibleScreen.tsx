@@ -1,6 +1,7 @@
 // src/screens/tabs/BibleScreen.tsx
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
+  ActivityIndicator,
   DeviceEventEmitter,
   Pressable,
   RefreshControl,
@@ -299,10 +300,31 @@ export default function BibleScreen() {
             </View>
           </View>
 
-          {/* Right: settings only (streak is shown inside the collapsing section; the Read
+          {/* Right: reload + settings (streak is shown inside the collapsing section; the Read
               tab's filter button now floats bottom-right over the content instead — see
-              the floating filter button rendered near the end of this component). */}
+              the floating filter button rendered near the end of this component). Reload
+              moved here from the reader panel's own Listen/Share/Reload button row so it's
+              one consistent, always-visible control regardless of which Bible tab is open. */}
           <View style={styles.headerActions}>
+            {/* Reload current passage/tab data */}
+            <Pressable
+              onPress={handleBibleRefresh}
+              disabled={bibleRefreshing}
+              style={[styles.headerIconBtn, {
+                backgroundColor: 'rgba(23,17,31,0.28)',
+                borderColor: 'rgba(255,244,184,0.30)',
+                opacity: bibleRefreshing ? 0.6 : 1,
+              }]}
+              hitSlop={6}
+              accessibilityLabel="Reload"
+              accessibilityRole="button"
+            >
+              {bibleRefreshing ? (
+                <ActivityIndicator size="small" color={palette.onGold} />
+              ) : (
+                <KISIcon name="refresh" size={17} color={palette.onGold} />
+              )}
+            </Pressable>
             {/* Settings shortcut */}
             <Pressable
               onPress={() => setActiveTab('settings')}
