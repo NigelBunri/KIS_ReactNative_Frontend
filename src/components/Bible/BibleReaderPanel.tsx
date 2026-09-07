@@ -35,7 +35,9 @@ import { KISIcon } from '@/constants/kisIcons';
 import { getRequest } from '@/network/get';
 import { postRequest } from '@/network/post';
 import { patchRequest } from '@/network/patch';
+import { deleteRequest } from '@/network/delete';
 import ROUTES from '@/network';
+import { GestureHandlerRootView, Swipeable } from 'react-native-gesture-handler';
 import type {
   BibleBook,
   BibleReaderPayload,
@@ -137,6 +139,9 @@ type LibraryItem = {
   updated_at?: string;
   sync_status?: 'synced' | 'local_pending';
 };
+
+type LibraryItemKind = 'highlight' | 'note' | 'bookmark';
+type DisplayLibraryItem = LibraryItem & { kind: LibraryItemKind };
 
 const listFromResponse = (data: any) => {
   const payload = data?.results ?? data ?? [];
@@ -408,14 +413,17 @@ const BibleReaderPanel = forwardRef<BibleReaderPanelHandle, Props>(function Bibl
     });
     return map;
   }, [highlights]);
-  const displayedLibraryItems = useMemo(() => {
-    if (libraryView === 'highlights') return highlights;
-    if (libraryView === 'comments') return notes;
-    if (libraryView === 'bookmarks') return bookmarks;
-    return [...highlights, ...notes, ...bookmarks].sort((a, b) =>
-      String(b.updated_at || b.created_at || '').localeCompare(
-        String(a.updated_at || a.created_at || ''),
-      ),
+  const displayedLibraryItems = useMemo((): DisplayLibraryItem[] => {
+    const tag = (list: LibraryItem[], kind: LibraryItemKind): DisplayLibraryItem[] =>
+      list.map(item => ({ ...item, kind }));
+    if (libraryView === 'highlights') return tag(highlights, 'highlight');
+    if (libraryView === 'comments') return tag(notes, 'note');
+    if (libraryView === 'bookmarks') return tag(bookmarks, 'bookmark');
+    return [...tag(highlights, 'highlight'), ...tag(notes, 'note'), ...tag(bookmarks, 'bookmark')].sort(
+      (a, b) =>
+        String(b.updated_at || b.created_at || '').localeCompare(
+          String(a.updated_at || a.created_at || ''),
+        ),
     );
   }, [bookmarks, highlights, libraryView, notes]);
 
@@ -809,6 +817,61 @@ const BibleReaderPanel = forwardRef<BibleReaderPanelHandle, Props>(function Bibl
     onLoad(currentTranslationCode, undefined, undefined, referenceInput.trim());
     setFilterOpen(false);
   };
+
+  const libraryEndpointForKind = (kind: LibraryItemKind) =>
+    kind === 'highlight' ? ROUTES.bible.highlights : kind === 'note' ? ROUTES.bible.notes : ROUTES.bible.bookmarks;
+  const deleteLocalForKind = (kind: LibraryItemKind) =>
+    kind === 'highlight' ? deleteLocalBibleHighlight : kind === 'note' ? deleteLocalBibleNote : deleteLocalBibleBookmark;
+  const libraryKindLabel = (kind: LibraryItemKind) => (kind === 'note' ? 'comment' : kind);
+
+  const deleteLibraryItem = useCallback(
+    async (item: DisplayLibraryItem) => {
+      if (item.sync_status === 'local_pending') {
+        // Never reached the server (created offline or the create POST
+        // failed) — nothing to delete remotely, it only exists as a local
+        // placeholder.
+        await deleteLocalForKind(item.kind)(String(item.id));
+        await loadLibraries(filterColor);
+        return;
+      }
+      const res = await deleteRequest(`${libraryEndpointForKind(item.kind)}${item.id}/`, {
+        errorMessage: `Unable to delete ${libraryKindLabel(item.kind)}.`,
+      });
+      // A 404 here means it's already gone server-side (e.g. deleted from
+      // another device) — treat that as success rather than surfacing an
+      // error for a delete that, from the user's point of view, already
+      // happened.
+      if (res?.success || res?.status === 404) {
+        await deleteLocalForKind(item.kind)(String(item.id));
+        await loadLibraries(filterColor);
+      } else {
+        Alert.alert('Delete failed', res?.message || `Unable to delete this ${libraryKindLabel(item.kind)}. Please try again.`);
+      }
+    },
+    [filterColor, loadLibraries],
+  );
+
+  const confirmDeleteLibraryItem = useCallback(
+    (item: DisplayLibraryItem, swipeableRef?: Swipeable | null) => {
+      Alert.alert(
+        `Delete ${libraryKindLabel(item.kind)}?`,
+        'This cannot be undone.',
+        [
+          { text: 'Cancel', style: 'cancel', onPress: () => swipeableRef?.close() },
+          {
+            text: 'Delete',
+            style: 'destructive',
+            onPress: () => {
+              swipeableRef?.close();
+              deleteLibraryItem(item);
+            },
+          },
+        ],
+        { onDismiss: () => swipeableRef?.close() },
+      );
+    },
+    [deleteLibraryItem],
+  );
 
   const openSavedLibraryVerse = useCallback(
     (item: LibraryItem) => {
@@ -1279,7 +1342,13 @@ const BibleReaderPanel = forwardRef<BibleReaderPanelHandle, Props>(function Bibl
       animationType="slide"
       onRequestClose={() => setFilterOpen(false)}
     >
-      <View style={styles.modalOverlay}>
+      {/* RN's Modal renders into its own native root, separate from
+          wherever the app might mount GestureHandlerRootView elsewhere —
+          the swipe-to-delete library rows (Swipeable, below) need their own
+          gesture root inside this Modal or their pan gesture won't be
+          recognized. Same locally-scoped pattern already used for the
+          whiteboard's gesture-handler usage (InCallWhiteboardSheet.tsx). */}
+      <GestureHandlerRootView style={styles.modalOverlay}>
         <Pressable
           style={styles.modalBackdrop}
           onPress={() => setFilterOpen(false)}
@@ -2033,69 +2102,87 @@ const BibleReaderPanel = forwardRef<BibleReaderPanelHandle, Props>(function Bibl
                 </View>
               ) : null}
               {displayedLibraryItems.slice(0, 40).map(item => (
-                <TouchableOpacity
+                <Swipeable
                   key={`${item.id}-${item.color || item.text || 'bookmark'}`}
-                  activeOpacity={0.78}
-                  onPress={() => openSavedLibraryVerse(item)}
-                  style={[styles.libraryItem, { borderColor: palette.divider }]}
+                  overshootRight={false}
+                  renderRightActions={(_progress, _drag, swipeable) => (
+                    <TouchableOpacity
+                      activeOpacity={0.85}
+                      onPress={() => confirmDeleteLibraryItem(item, swipeable)}
+                      style={[styles.libraryDeleteAction, { backgroundColor: palette.error }]}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Delete ${libraryKindLabel(item.kind)}`}
+                    >
+                      <KISIcon name="trash" size={18} color={palette.ivory} />
+                      <Text style={{ color: palette.ivory, fontWeight: '900', fontSize: 12, marginTop: 2 }}>
+                        Delete
+                      </Text>
+                    </TouchableOpacity>
+                  )}
                 >
-                  <View style={[styles.headerRow, compactReader && styles.wrapHeaderRow]}>
+                  <TouchableOpacity
+                    activeOpacity={0.78}
+                    onPress={() => openSavedLibraryVerse(item)}
+                    style={[styles.libraryItem, { borderColor: palette.divider, backgroundColor: palette.bg }]}
+                  >
+                    <View style={[styles.headerRow, compactReader && styles.wrapHeaderRow]}>
+                      <Text
+                        style={{
+                          color: palette.primaryStrong,
+                          fontWeight: '800',
+                          flex: 1,
+                        }}
+                      >
+                        {item.verse_ref ?? 'Saved verse'}
+                      </Text>
+                      {item.sync_status === 'local_pending' ? (
+                        <View
+                          style={[
+                            styles.localBadge,
+                            { backgroundColor: palette.primarySoft },
+                          ]}
+                        >
+                          <Text
+                            style={{
+                              color: palette.primaryStrong,
+                              fontSize: 11,
+                              fontWeight: '900',
+                            }}
+                          >
+                            LOCAL
+                          </Text>
+                        </View>
+                      ) : null}
+                    </View>
+                    {item.color ? (
+                      <View
+                        style={[
+                          styles.libraryColor,
+                          { backgroundColor: item.color },
+                        ]}
+                      />
+                    ) : null}
+                    {item.text ? (
+                      <Text style={{ color: palette.text, marginTop: 4 }}>
+                        {item.text}
+                      </Text>
+                    ) : null}
+                    {item.verse_text ? (
+                      <Text style={{ color: palette.subtext, marginTop: 4 }}>
+                        {item.verse_text}
+                      </Text>
+                    ) : null}
                     <Text
                       style={{
                         color: palette.primaryStrong,
                         fontWeight: '800',
-                        flex: 1,
+                        marginTop: 4,
                       }}
                     >
-                      {item.verse_ref ?? 'Saved verse'}
+                      Open in reader · swipe left to delete
                     </Text>
-                    {item.sync_status === 'local_pending' ? (
-                      <View
-                        style={[
-                          styles.localBadge,
-                          { backgroundColor: palette.primarySoft },
-                        ]}
-                      >
-                        <Text
-                          style={{
-                            color: palette.primaryStrong,
-                            fontSize: 11,
-                            fontWeight: '900',
-                          }}
-                        >
-                          LOCAL
-                        </Text>
-                      </View>
-                    ) : null}
-                  </View>
-                  {item.color ? (
-                    <View
-                      style={[
-                        styles.libraryColor,
-                        { backgroundColor: item.color },
-                      ]}
-                    />
-                  ) : null}
-                  {item.text ? (
-                    <Text style={{ color: palette.text, marginTop: 4 }}>
-                      {item.text}
-                    </Text>
-                  ) : null}
-                  {item.verse_text ? (
-                    <Text style={{ color: palette.subtext, marginTop: 4 }}>
-                      {item.verse_text}
-                    </Text>
-                  ) : null}
-                  <Text
-                    style={{
-                      color: palette.primaryStrong,
-                      fontWeight: '800',
-                      marginTop: 4,
-                    }}
-                  >
-                    Open in reader
-                  </Text>
-                </TouchableOpacity>
+                  </TouchableOpacity>
+                </Swipeable>
               ))}
             </View>
 
@@ -2148,7 +2235,7 @@ const BibleReaderPanel = forwardRef<BibleReaderPanelHandle, Props>(function Bibl
             </View>
           </ScrollView>
         </View>
-      </View>
+      </GestureHandlerRootView>
     </Modal>
   );
 
@@ -3034,6 +3121,13 @@ const styles = StyleSheet.create({
   libraryItem: { borderWidth: 2, borderRadius: 12, padding: 10, gap: 4 },
   libraryColor: { width: 28, height: 8, borderRadius: 999, marginTop: 4 },
   localBadge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 999 },
+  libraryDeleteAction: {
+    width: 76,
+    borderRadius: 12,
+    marginLeft: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   modalOverlay: { flex: 1, justifyContent: 'flex-end' },
   modalBackdrop: {
     ...StyleSheet.absoluteFillObject,
