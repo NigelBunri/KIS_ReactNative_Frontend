@@ -378,3 +378,30 @@ export const resumePausedBibleDownloadsWhenOnline = async (
   if (changed) await writeBibleOfflineDownloadJobs(jobs);
   runBibleOfflineDownloadQueue(books).catch(() => undefined);
 };
+
+/** Remove a completed offline download entirely: every cached chapter for
+ * that translation, its manifest entry, and any leftover job record. Frees
+ * the device storage a download used and lets "Download" show up again for
+ * that translation instead of "Offline". */
+export const deleteOfflineBibleTranslation = async (translationCode: string) => {
+  const allKeys = await AsyncStorage.getAllKeys();
+  const chapterKeyPrefix = `${CHAPTER_PREFIX}:${translationCode}:`;
+  const chapterKeys = allKeys.filter((key) => key.startsWith(chapterKeyPrefix));
+  if (chapterKeys.length) await AsyncStorage.multiRemove(chapterKeys);
+
+  const manifest = await readBibleOfflineManifest();
+  if (manifest[translationCode]) {
+    const rest = { ...manifest };
+    delete rest[translationCode];
+    await AsyncStorage.setItem(MANIFEST_KEY, JSON.stringify(rest));
+  }
+
+  const jobs = await readBibleOfflineDownloadJobs();
+  if (jobs[translationCode]) {
+    const restJobs = { ...jobs };
+    delete restJobs[translationCode];
+    await AsyncStorage.setItem(DOWNLOAD_JOBS_KEY, JSON.stringify(restJobs));
+  }
+
+  emitDownloadUpdate();
+};

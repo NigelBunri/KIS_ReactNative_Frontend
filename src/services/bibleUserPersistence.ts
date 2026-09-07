@@ -105,11 +105,41 @@ export const mergeBibleEventsWithLocal = async <T extends LocalBibleEvent>(
     const time = new Date(item.start_at).getTime();
     return Number.isFinite(time) && time >= fromTime && time <= toTime;
   });
+  const normalizedServer = normalizeServerList(serverItems);
   const merged = new Map<string, LocalBibleEvent>();
-  normalizeServerList(serverItems).forEach((item) => merged.set(String(item.id), { ...item, sync_status: 'synced' }));
+  normalizedServer.forEach((item) => merged.set(String(item.id), { ...item, sync_status: 'synced' }));
+
+  // A 'local_pending' item is a placeholder created when its create POST
+  // (see createEvent() in BiblePlansPanel.tsx) *appeared* to fail - but that
+  // can just as easily mean the request actually reached the server and
+  // only the response was lost (timeout, connection dropped after the
+  // server already wrote the row), not that nothing was ever created. If a
+  // server event with the same passage_ref + start_at has since shown up,
+  // that's what happened: the local placeholder is a stale duplicate of a
+  // real synced event, not a second real reading, so evict it here rather
+  // than let it merge in as its own entry. Without this the same reading
+  // (e.g. "Genesis 1-3") would keep appearing twice, permanently, since
+  // nothing else ever reconciles or clears these placeholders.
+  const staleLocalIds: string[] = [];
   scopedLocal.forEach((item) => {
-    if (!merged.has(String(item.id))) merged.set(String(item.id), item);
+    if (merged.has(String(item.id))) return;
+    const supersededByServer =
+      item.sync_status === 'local_pending' &&
+      normalizedServer.some(
+        (serverItem) =>
+          String(serverItem.passage_ref) === String(item.passage_ref) &&
+          String(serverItem.start_at) === String(item.start_at),
+      );
+    if (supersededByServer) {
+      staleLocalIds.push(item.id);
+      return;
+    }
+    merged.set(String(item.id), item);
   });
+  if (staleLocalIds.length) {
+    await Promise.all(staleLocalIds.map((id) => deleteLocalBibleEvent(id)));
+  }
+
   return Array.from(merged.values()).sort((a, b) => String(a.start_at).localeCompare(String(b.start_at)));
 };
 
