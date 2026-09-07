@@ -285,6 +285,17 @@ const BibleReaderPanel = forwardRef<BibleReaderPanelHandle, Props>(function Bibl
     `${
       reader?.book?.name ?? selectedBookObj?.name ?? 'Bible'
     } ${currentChapter}`;
+  // Same reference, with the currently-narrated verse appended while
+  // Listen is active/paused — skipped if currentReference already carries
+  // its own verse (e.g. loaded via a "John 3:16" reference lookup rather
+  // than a plain chapter load) so this never produces a doubled-up
+  // "3:16:5" reference.
+  const currentReferenceWithListenVerse =
+    (readAloud.status === 'playing' || readAloud.status === 'paused') &&
+    readAloud.currentVerseNumber != null &&
+    !currentReference.includes(':')
+      ? `${currentReference}:${readAloud.currentVerseNumber}`
+      : currentReference;
   const currentTranslation = useMemo(
     () =>
       translations.find(
@@ -2265,12 +2276,6 @@ const BibleReaderPanel = forwardRef<BibleReaderPanelHandle, Props>(function Bibl
               'Public Bible'}
           </Text>
           <View style={styles.readerHeaderTitleRow}>
-            <Text
-              style={[styles.chapterTitle, { color: palette.text }]}
-              numberOfLines={2}
-            >
-              {currentReference}
-            </Text>
             <TouchableOpacity
               activeOpacity={0.85}
               onPress={() => setReadAloudSheetOpen(true)}
@@ -2339,6 +2344,53 @@ const BibleReaderPanel = forwardRef<BibleReaderPanelHandle, Props>(function Bibl
                   Reload
                 </Text>
               ) : null}
+            </TouchableOpacity>
+          </View>
+
+          {/* Always-visible tap alternative to the pull-gesture chapter
+              navigation (the swipe-hint bar further down still works too —
+              this isn't a replacement, just a second, explicit control for
+              anyone who doesn't want to rely on the gesture). */}
+          <View style={styles.readerNavRow}>
+            <TouchableOpacity
+              activeOpacity={0.85}
+              onPress={() => loadNavigation(reader?.navigation?.previous)}
+              disabled={!reader?.navigation?.previous}
+              accessibilityRole="button"
+              accessibilityLabel="Previous chapter"
+              style={[
+                styles.readerNavArrow,
+                {
+                  backgroundColor: palette.royalInk,
+                  borderColor: palette.goldLight,
+                  opacity: reader?.navigation?.previous ? 1 : 0.4,
+                },
+              ]}
+            >
+              <KISIcon name="chevron-left" size={18} color={palette.ivory} />
+            </TouchableOpacity>
+            <Text
+              style={[styles.readerNavReference, { color: palette.text }]}
+              numberOfLines={1}
+            >
+              {currentReferenceWithListenVerse}
+            </Text>
+            <TouchableOpacity
+              activeOpacity={0.85}
+              onPress={() => loadNavigation(reader?.navigation?.next)}
+              disabled={!reader?.navigation?.next}
+              accessibilityRole="button"
+              accessibilityLabel="Next chapter"
+              style={[
+                styles.readerNavArrow,
+                {
+                  backgroundColor: palette.royalInk,
+                  borderColor: palette.goldLight,
+                  opacity: reader?.navigation?.next ? 1 : 0.4,
+                },
+              ]}
+            >
+              <KISIcon name="chevron-right" size={18} color={palette.ivory} />
             </TouchableOpacity>
           </View>
         </View>
@@ -2696,7 +2748,28 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   translationLabel: { fontSize: 12, textTransform: 'uppercase' },
-  chapterTitle: { flex: 1, fontSize: 20, fontWeight: '900' },
+  readerNavRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+    marginTop: 10,
+  },
+  readerNavArrow: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+  readerNavReference: {
+    flex: 1,
+    textAlign: 'center',
+    fontSize: 18,
+    fontWeight: '900',
+  },
   reloadIconButton: {
     minHeight: 36,
     borderRadius: 999,
