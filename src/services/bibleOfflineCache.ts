@@ -41,6 +41,11 @@ export type BibleOfflineDownloadJob = {
   createdAt: string;
   updatedAt: string;
   pausedAt?: string;
+  /** Set only on a 'paused' status — distinguishes a deliberate user tap of
+   * "Pause" (never auto-resumed; respects the user's choice) from the queue
+   * runner pausing itself on a connectivity/request failure ('auto', safe to
+   * resume automatically once the network is back). */
+  pausedReason?: 'user' | 'auto';
 };
 
 export const bibleOfflineChapterKey = (translationCode: string, bookCode: string, chapterNumber: number) =>
@@ -164,6 +169,7 @@ export const pauseBibleOfflineDownload = async (translationCode: string) => {
     return {
       ...job,
       status: 'paused',
+      pausedReason: 'user',
       pausedAt: nowIso(),
       updatedAt: nowIso(),
       currentLabel: job.currentLabel || 'Paused',
@@ -249,6 +255,7 @@ export const runBibleOfflineDownloadQueue = async (
         await upsertBibleOfflineDownloadJob(job.translation.code, (current) => ({
           ...(current || job),
           status: 'paused',
+          pausedReason: 'auto',
           pausedAt: nowIso(),
           updatedAt: nowIso(),
           currentLabel: 'Paused until internet is available',
@@ -309,6 +316,7 @@ export const runBibleOfflineDownloadQueue = async (
           await upsertBibleOfflineDownloadJob(job.translation.code, (current) => ({
             ...(current || latest),
             status: 'paused',
+            pausedReason: 'auto',
             pausedAt: nowIso(),
             updatedAt: nowIso(),
             currentLabel: 'Paused. Resume when internet is stable.',
@@ -356,7 +364,13 @@ export const resumePausedBibleDownloadsWhenOnline = async (
   const jobs = await readBibleOfflineDownloadJobs();
   let changed = false;
   Object.entries(jobs).forEach(([code, job]) => {
-    if (job.status === 'paused' && job.error === 'Internet connection is offline.') {
+    // Auto-resume anything the queue runner paused itself (connectivity lost
+    // mid-check, or a chapter request that failed for any reason — most real
+    // pauses happen here, not at the exact NetInfo check, since a chapter
+    // fetch can fail on a network drop that occurs after that check already
+    // passed). A user-tapped "Pause" is left alone — that's a deliberate
+    // choice, not something to override just because the network came back.
+    if (job.status === 'paused' && job.pausedReason !== 'user') {
       jobs[code] = { ...job, status: 'queued', currentLabel: 'Queued to resume', updatedAt: nowIso() };
       changed = true;
     }

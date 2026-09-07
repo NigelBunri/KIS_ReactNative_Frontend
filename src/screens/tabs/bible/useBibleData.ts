@@ -278,15 +278,6 @@ export function useBibleData() {
   const [preferredTranslationCode, setPreferredTranslationCode] = useState<string | null>(null);
   const [preferredTranslationId, setPreferredTranslationId] = useState<string | number | null>(null);
 
-  // Restore last reading position from AsyncStorage before fetching fresh data
-  useEffect(() => {
-    loadBiblePosition().then((position) => {
-      if (position?.translation && position?.book && position?.chapter) {
-        // Will be used once offlineManifestLoaded triggers the initial loadReader
-      }
-    }).catch(() => {});
-  }, []);
-
   useEffect(() => {
     Promise.all([readBibleOfflineManifest(), readLocalBiblePreference()])
       .then(([manifest, preference]) => {
@@ -482,12 +473,20 @@ export function useBibleData() {
 
   useEffect(() => {
     if (!offlineManifestLoaded || !defaultTranslation || !defaultBook) return;
-    // Restore last reading position from AsyncStorage, fall back to Genesis 1
+    // Restore last book/chapter position from AsyncStorage, but always read
+    // it back in the currently resolved translation rather than whatever
+    // translation happened to be saved with that position. defaultTranslation
+    // already factors in the user's Settings preference (see
+    // resolveDefaultTranslationCode above); this effect re-runs whenever that
+    // preference changes (it's a dependency), so trusting the saved
+    // translation here would silently undo a translation switch made in
+    // Settings the moment this effect re-fires — every successful loadReader()
+    // call re-saves whatever translation was on screen, so the saved value is
+    // just as often "stale" as it is "current."
     loadBiblePosition().then((position) => {
-      const translation = position?.translation ?? defaultTranslation;
       const book = position?.book ?? defaultBook;
       const chapter = position?.chapter ?? 1;
-      loadReader(translation, book, chapter);
+      loadReader(defaultTranslation, book, chapter);
     }).catch(() => {
       loadReader(defaultTranslation, defaultBook, 1);
     });

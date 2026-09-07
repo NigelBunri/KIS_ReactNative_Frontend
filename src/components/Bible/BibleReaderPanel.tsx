@@ -2391,17 +2391,25 @@ const BibleReaderPanel = forwardRef<BibleReaderPanelHandle, Props>(function Bibl
               },
             ]}
           >
-            <Animated.View
-              style={{
-                opacity: reader?.navigation?.previous ? leftArrowOpacity : 0.18,
-              }}
+            <Pressable
+              onPress={() => loadNavigation(reader?.navigation?.previous)}
+              disabled={!reader?.navigation?.previous}
+              hitSlop={10}
+              accessibilityRole="button"
+              accessibilityLabel="Previous chapter"
             >
-              <KISIcon
-                name="chevron-left"
-                size={24}
-                color={palette.primaryStrong}
-              />
-            </Animated.View>
+              <Animated.View
+                style={{
+                  opacity: reader?.navigation?.previous ? leftArrowOpacity : 0.18,
+                }}
+              >
+                <KISIcon
+                  name="chevron-left"
+                  size={24}
+                  color={palette.primaryStrong}
+                />
+              </Animated.View>
+            </Pressable>
             <Text
               style={{
                 color: palette.subtext,
@@ -2410,19 +2418,27 @@ const BibleReaderPanel = forwardRef<BibleReaderPanelHandle, Props>(function Bibl
                 fontWeight: '700',
               }}
             >
-              {tinyReader ? 'Swipe chapters' : 'Pull right for previous · Pull left for next'}
+              {tinyReader ? 'Swipe chapters' : 'Tap or swipe for previous · next chapter'}
             </Text>
-            <Animated.View
-              style={{
-                opacity: reader?.navigation?.next ? rightArrowOpacity : 0.18,
-              }}
+            <Pressable
+              onPress={() => loadNavigation(reader?.navigation?.next)}
+              disabled={!reader?.navigation?.next}
+              hitSlop={10}
+              accessibilityRole="button"
+              accessibilityLabel="Next chapter"
             >
-              <KISIcon
-                name="chevron-right"
-                size={24}
-                color={palette.primaryStrong}
-              />
-            </Animated.View>
+              <Animated.View
+                style={{
+                  opacity: reader?.navigation?.next ? rightArrowOpacity : 0.18,
+                }}
+              >
+                <KISIcon
+                  name="chevron-right"
+                  size={24}
+                  color={palette.primaryStrong}
+                />
+              </Animated.View>
+            </Pressable>
           </View>
         </BibleSectionCard>
 
