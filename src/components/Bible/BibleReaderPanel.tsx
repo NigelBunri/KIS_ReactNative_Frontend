@@ -68,6 +68,13 @@ import {
   upsertLocalBibleBookmark,
   upsertLocalBibleHighlight,
   upsertLocalBibleNote,
+  readLocalBibleHighlights,
+  readLocalBibleNotes,
+  readLocalBibleBookmarks,
+  deleteLocalBibleHighlight,
+  deleteLocalBibleNote,
+  deleteLocalBibleBookmark,
+  type LocalBibleLibraryItem,
 } from '@/services/bibleUserPersistence';
 import { scheduleBibleReadingEventReminders } from '@/services/inAppNotificationService';
 import { formatBibleReference, formatBibleShareText } from '@/utils/bibleReference';
@@ -665,6 +672,106 @@ const BibleReaderPanel = forwardRef<BibleReaderPanelHandle, Props>(function Bibl
   useEffect(() => {
     loadLibraries(filterColor);
   }, [filterColor, loadLibraries]);
+
+  // Folds a synced server record's fields into a local item, keeping
+  // whatever the server didn't return so a partial response can't blank
+  // out fields the user already sees.
+  const reconcileSyncedLibraryItem = (
+    item: LocalBibleLibraryItem,
+    serverData: any,
+  ): LocalBibleLibraryItem => ({
+    id: String(serverData?.id ?? item.id),
+    verse: String(serverData?.verse ?? item.verse),
+    verse_ref: serverData?.verse_ref ?? item.verse_ref,
+    verse_text: serverData?.verse_text ?? item.verse_text,
+    translation: serverData?.translation ?? item.translation,
+    color: serverData?.color ?? item.color,
+    text: serverData?.text ?? item.text,
+    created_at: serverData?.created_at ?? item.created_at,
+    updated_at: serverData?.updated_at ?? item.updated_at,
+    sync_status: 'synced',
+  });
+
+  // Highlights/notes/bookmarks created while offline (or when the create
+  // POST otherwise failed) are saved locally with sync_status:
+  // 'local_pending' — see addHighlightForVerse/addBookmarkForVerse/
+  // addNoteForVerse below — but nothing ever retried pushing them to the
+  // server; they'd sit local-only forever, tagged "local" in the library
+  // list, and would silently never appear on the user's other devices or
+  // survive a reinstall. Retries each pending item's create call and, on
+  // success, replaces the local-id placeholder with the server's real
+  // record — same pattern already used for offline Bible chapter downloads
+  // (see bibleOfflineCache's resumePausedBibleDownloadsWhenOnline).
+  const syncingLibraryRef = useRef(false);
+  const syncPendingLibraryItems = useCallback(async () => {
+    // Called from mount + AppState('active') + NetInfo(connected) below, any
+    // of which can fire in close succession (e.g. cold launch while already
+    // online fires all three almost at once) — without this guard, two
+    // overlapping calls could both read the same still-pending item before
+    // either finishes deleting it, and both POST it, creating a duplicate
+    // server-side record.
+    if (syncingLibraryRef.current) return;
+    syncingLibraryRef.current = true;
+    try {
+      const [pendingHighlights, pendingNotes, pendingBookmarks] = await Promise.all([
+        readLocalBibleHighlights(),
+        readLocalBibleNotes(),
+        readLocalBibleBookmarks(),
+      ]);
+      let anySynced = false;
+      const syncOne = async (
+        item: LocalBibleLibraryItem,
+        endpoint: string,
+        payload: Record<string, any>,
+        del: (id: string) => Promise<void>,
+        put: (item: LocalBibleLibraryItem) => Promise<LocalBibleLibraryItem>,
+      ) => {
+        const res = await postRequest(endpoint, payload, {
+          errorMessage: 'Unable to sync saved item.',
+        }).catch(() => null);
+        if (!res?.success) return;
+        await del(item.id);
+        await put(reconcileSyncedLibraryItem(item, res.data));
+        anySynced = true;
+      };
+      await Promise.all([
+        ...pendingHighlights
+          .filter(item => item.sync_status === 'local_pending')
+          .map(item =>
+            syncOne(item, ROUTES.bible.highlights, { verse: item.verse, color: item.color }, deleteLocalBibleHighlight, upsertLocalBibleHighlight),
+          ),
+        ...pendingNotes
+          .filter(item => item.sync_status === 'local_pending')
+          .map(item =>
+            syncOne(item, ROUTES.bible.notes, { verse: item.verse, text: item.text }, deleteLocalBibleNote, upsertLocalBibleNote),
+          ),
+        ...pendingBookmarks
+          .filter(item => item.sync_status === 'local_pending')
+          .map(item =>
+            syncOne(item, ROUTES.bible.bookmarks, { verse: item.verse }, deleteLocalBibleBookmark, upsertLocalBibleBookmark),
+          ),
+      ]);
+      if (anySynced) await loadLibraries(filterColor);
+    } finally {
+      syncingLibraryRef.current = false;
+    }
+  }, [filterColor, loadLibraries]);
+
+  useEffect(() => {
+    syncPendingLibraryItems().catch(() => undefined);
+    const appStateSub = AppState.addEventListener('change', state => {
+      if (state === 'active') syncPendingLibraryItems().catch(() => undefined);
+    });
+    const netInfoUnsub = NetInfo.addEventListener(state => {
+      if (state.isConnected && state.isInternetReachable !== false) {
+        syncPendingLibraryItems().catch(() => undefined);
+      }
+    });
+    return () => {
+      appStateSub.remove();
+      netInfoUnsub();
+    };
+  }, [syncPendingLibraryItems]);
 
   const callLoad = (
     chapterNum?: number,
