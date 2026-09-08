@@ -67,6 +67,7 @@ const socialRoutes = {
     getChannelById: (id: string) => `${API_BASE_URL}/api/v1/partner-channels/channels/${id}/`,
     createChannel: `${API_BASE_URL}/api/v1/partner-channels/channels/`,
     subscribeChannel: (id: string) => `${API_BASE_URL}/api/v1/partner-channels/channels/${id}/subscribe/`,
+    unsubscribeChannel: (id: string) => `${API_BASE_URL}/api/v1/partner-channels/channels/${id}/unsubscribe/`,
     addMembersToChannel: (channelId: string) => `${API_BASE_URL}/api/v1/partner-channels/channels/${channelId}/members/`,
     getChannelMembers: (channelId: string) => `${API_BASE_URL}/api/v1/partner-channels/channels/${channelId}/members/`,
     updateChannel: (id: string) => `${API_BASE_URL}/api/v1/partner-channels/channels/${id}/`,
