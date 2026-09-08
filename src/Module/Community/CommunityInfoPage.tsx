@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActionSheetIOS,
   Alert,
@@ -27,6 +27,7 @@ import { uploadFileToBackend } from '@/Module/ChatRoom/uploadFileToBackend';
 import { getAccessToken } from '@/security/authStorage';
 import { getFeedPlainText } from '@/components/feeds/richTextValue';
 import { useSafeTopInset } from '@/hooks/useSafeTopInset';
+import { useSocket } from '@/SocketProvider';
 
 type MemberUser = {
   id?: string;
@@ -94,54 +95,89 @@ export const CommunityInfoPage: React.FC<CommunityInfoPageProps> = ({
   const [inviteLink, setInviteLink] = useState<string | null>(null);
   const [inviteLinkLoading, setInviteLinkLoading] = useState(false);
 
+  const mountedRef = useRef(true);
   useEffect(() => {
-    let mounted = true;
-    const loadCommunity = async () => {
-      setLoading(true);
-      try {
-        const detail = await getRequest(ROUTES.community.detail(communityId), {
-          errorMessage: 'Failed to load community',
-        });
-        const detailData = detail?.data ?? detail ?? {};
-        if (mounted) {
-          setAvatarUrl(detailData.avatar_url ?? detailData.avatarUrl ?? undefined);
-          setDescription(detailData.description ?? '');
-        }
-
-        const membersRes = await getRequest(ROUTES.community.members(communityId), {
-          errorMessage: 'Failed to load members',
-        });
-        const list =
-          membersRes?.data?.results ??
-          membersRes?.results ??
-          membersRes?.data ??
-          membersRes ??
-          [];
-        if (mounted) {
-          setMembers(Array.isArray(list) ? list : []);
-        }
-
-        const postsRes = await getRequest(`${ROUTES.community.posts}?community=${communityId}`, {
-          errorMessage: 'Failed to load community posts',
-        });
-        const postList =
-          postsRes?.data?.results ??
-          postsRes?.results ??
-          postsRes?.data ??
-          postsRes ??
-          [];
-        if (mounted) {
-          setPosts(Array.isArray(postList) ? postList : []);
-        }
-      } finally {
-        if (mounted) setLoading(false);
-      }
-    };
-    loadCommunity();
+    mountedRef.current = true;
     return () => {
-      mounted = false;
+      mountedRef.current = false;
     };
+  }, []);
+
+  const loadCommunity = useCallback(async () => {
+    setLoading(true);
+    try {
+      const detail = await getRequest(ROUTES.community.detail(communityId), {
+        errorMessage: 'Failed to load community',
+      });
+      const detailData = detail?.data ?? detail ?? {};
+      if (mountedRef.current) {
+        setAvatarUrl(detailData.avatar_url ?? detailData.avatarUrl ?? undefined);
+        setDescription(detailData.description ?? '');
+      }
+
+      const membersRes = await getRequest(ROUTES.community.members(communityId), {
+        errorMessage: 'Failed to load members',
+      });
+      const list =
+        membersRes?.data?.results ??
+        membersRes?.results ??
+        membersRes?.data ??
+        membersRes ??
+        [];
+      if (mountedRef.current) {
+        setMembers(Array.isArray(list) ? list : []);
+      }
+
+      const postsRes = await getRequest(`${ROUTES.community.posts}?community=${communityId}`, {
+        errorMessage: 'Failed to load community posts',
+      });
+      const postList =
+        postsRes?.data?.results ??
+        postsRes?.results ??
+        postsRes?.data ??
+        postsRes ??
+        [];
+      if (mountedRef.current) {
+        setPosts(Array.isArray(postList) ? postList : []);
+      }
+    } finally {
+      if (mountedRef.current) setLoading(false);
+    }
   }, [communityId]);
+
+  useEffect(() => {
+    loadCommunity();
+  }, [loadCommunity]);
+
+  // Live updates: another member's join/leave/ban/role-change or a new
+  // post/comment nudges this screen (if open) to refetch instead of the
+  // user having to manually pull-to-refresh. Same "event -> refetch"
+  // pattern already used for main-tab badges (see AppNavigator.tsx),
+  // scoped here to just this community's own room instead of globally.
+  const { socket } = useSocket();
+  useEffect(() => {
+    if (!socket || !communityId) return undefined;
+    const events = [
+      'community.member_joined',
+      'community.member_left',
+      'community.member_banned',
+      'community.role_changed',
+      'community.join_request_created',
+      'community.join_request_decided',
+      'community.post_created',
+      'community.post_updated',
+      'community.post_deleted',
+      'community.comment_created',
+    ];
+    const handler = (payload: any) => {
+      if (String(payload?.communityId ?? '') !== String(communityId)) return;
+      loadCommunity();
+    };
+    events.forEach((eventName) => socket.on(eventName, handler));
+    return () => {
+      events.forEach((eventName) => socket.off(eventName, handler));
+    };
+  }, [socket, communityId, loadCommunity]);
 
   const me = useMemo(() => {
     if (!currentUserId) return null;
