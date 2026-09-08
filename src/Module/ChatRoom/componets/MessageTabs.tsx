@@ -12,6 +12,7 @@ import {
   Animated,
   StyleSheet,
   DeviceEventEmitter,
+  ActivityIndicator,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { ScrollableHandle } from '@/hooks/useHeaderDragToScroll';
@@ -74,6 +75,14 @@ type ChatsTabProps = {
   selectedChat?: Chat[];
   setSelectedChat?: (chats: Chat[]) => void;
   loading?: boolean;
+
+  // Distinguishes "confirmed empty account" from "the last refresh failed
+  // and this may be stale/cached data" so the empty state (or a banner over
+  // a non-empty cached list) can tell the user what actually happened
+  // instead of always rendering the same generic empty view.
+  connectivityError?: 'offline' | 'server' | null;
+  isRetrying?: boolean;
+  onRetry?: () => void;
 };
 
 type ChatListItem = Chat & { _isArchivedItem?: boolean };
@@ -122,6 +131,9 @@ export const ChatsTab = forwardRef<ScrollableHandle, ChatsTabProps>(function Cha
   selectedChat = [],
   setSelectedChat,
   loading = false,
+  connectivityError = null,
+  isRetrying = false,
+  onRetry,
 }: ChatsTabProps, ref) {
   const { palette } = useKISTheme();
   const listRef = useRef<FlatList>(null);
@@ -725,6 +737,109 @@ export const ChatsTab = forwardRef<ScrollableHandle, ChatsTabProps>(function Cha
     </Pressable>
   ) : null;
 
+  // Shown above a non-empty list when it may be stale: the last refresh
+  // either couldn't reach the network or the server rejected/failed the
+  // request. Distinct from the empty state below, which only applies when
+  // there's nothing at all to show yet.
+  const connectivityBanner = connectivityError && conversations.length > 0 ? (
+    <View
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 16,
+        paddingVertical: 10,
+        marginBottom: 4,
+        borderRadius: 10,
+        backgroundColor: palette.surfaceSoft ?? palette.surface ?? (palette.isDark ? '#1a1a1a' : '#f5f5f5'),
+        gap: 10,
+      }}
+    >
+      <KISIcon
+        name={connectivityError === 'offline' ? 'warning' : 'alert-circle'}
+        size={16}
+        color={connectivityError === 'offline' ? palette.warning : palette.danger}
+      />
+      <Text style={{ flex: 1, fontSize: 13, color: palette.text }}>
+        {connectivityError === 'offline'
+          ? "You're offline — showing saved chats."
+          : "Couldn't refresh chats — showing saved chats."}
+      </Text>
+      {onRetry && (
+        <Pressable
+          onPress={onRetry}
+          disabled={isRetrying}
+          hitSlop={8}
+          style={{ paddingHorizontal: 10, paddingVertical: 4 }}
+        >
+          {isRetrying ? (
+            <ActivityIndicator size="small" color={palette.subtext} />
+          ) : (
+            <Text style={{ fontSize: 13, fontWeight: '700', color: palette.primary }}>Retry</Text>
+          )}
+        </Pressable>
+      )}
+    </View>
+  ) : null;
+
+  const isSearchingOrFiltering = search.trim().length > 0 || activeQuick.size > 0 || !!activeCustomId;
+
+  const emptyState = (() => {
+    if (isSearchingOrFiltering) {
+      return (
+        <View style={[styles.center, { paddingVertical: 60 }]}>
+          <Text style={{ color: palette.subtext }}>No chats match your filters.</Text>
+        </View>
+      );
+    }
+    if (connectivityError) {
+      return (
+        <View style={[styles.center, { paddingVertical: 60, paddingHorizontal: 32, gap: 12 }]}>
+          <KISIcon
+            name={connectivityError === 'offline' ? 'warning' : 'alert-circle'}
+            size={28}
+            color={connectivityError === 'offline' ? palette.warning : palette.danger}
+          />
+          <Text style={{ color: palette.text, fontWeight: '600', textAlign: 'center' }}>
+            {connectivityError === 'offline'
+              ? "You're offline"
+              : "Couldn't load your chats"}
+          </Text>
+          <Text style={{ color: palette.subtext, textAlign: 'center', fontSize: 13 }}>
+            {connectivityError === 'offline'
+              ? 'Nothing saved on this device yet. Reconnect and try again.'
+              : 'Check your connection and try again.'}
+          </Text>
+          {onRetry && (
+            <Pressable
+              onPress={onRetry}
+              disabled={isRetrying}
+              style={{
+                marginTop: 4,
+                paddingHorizontal: 20,
+                paddingVertical: 10,
+                borderRadius: 20,
+                backgroundColor: palette.royalInk,
+                minWidth: 92,
+                alignItems: 'center',
+              }}
+            >
+              {isRetrying ? (
+                <ActivityIndicator size="small" color={palette.ivory} />
+              ) : (
+                <Text style={{ color: palette.ivory, fontWeight: '700', fontSize: 13 }}>Retry</Text>
+              )}
+            </Pressable>
+          )}
+        </View>
+      );
+    }
+    return (
+      <View style={[styles.center, { paddingVertical: 60 }]}>
+        <Text style={{ color: palette.subtext }}>No chats yet — start a conversation.</Text>
+      </View>
+    );
+  })();
+
   return (
     <FlatList
       initialNumToRender={20}
@@ -739,15 +854,16 @@ export const ChatsTab = forwardRef<ScrollableHandle, ChatsTabProps>(function Cha
       scrollEventThrottle={16}
       onEndReached={onEndReached}
       onEndReachedThreshold={0.2}
-      refreshControl={onRefresh ? <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={palette.primary} colors={[palette.primary]} /> : undefined}
-      ListHeaderComponent={archivedBanner}
-      ListEmptyComponent={
-        <View style={[styles.center, { paddingVertical: 60 }]}>
-          <Text style={{ color: palette.subtext }}>
-            No chats match your filters.
-          </Text>
-        </View>
+      refreshControl={onRefresh ? <RefreshControl refreshing={refreshing || isRetrying} onRefresh={onRefresh} tintColor={palette.primary} colors={[palette.primary]} /> : undefined}
+      ListHeaderComponent={
+        archivedBanner || connectivityBanner ? (
+          <>
+            {connectivityBanner}
+            {archivedBanner}
+          </>
+        ) : null
       }
+      ListEmptyComponent={emptyState}
       renderItem={({ item }) => renderChatItem(item)}
     />
   );

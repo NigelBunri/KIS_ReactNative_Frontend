@@ -424,14 +424,26 @@ function dedupeChats(chats: Chat[]): Chat[] {
  */
 const lastRefreshByUser: Record<string, number> = {};
 
-export async function fetchConversationsForCurrentUser(
+/**
+ * Outcome of a conversations fetch, so a caller can distinguish "confirmed
+ * empty account" from "network/refresh failed, showing whatever's cached"
+ * from "network/refresh failed and there is nothing cached to show" -
+ * three states that used to be indistinguishable (fetchConversationsForCurrentUser
+ * always just returned a Chat[] with no signal of which case produced it),
+ * which is why the chat list previously had no way to render a distinct
+ * error/offline state instead of a generic "no chats" empty view.
+ */
+export type ConversationsFetchStatus = 'fresh' | 'cache_fallback' | 'error_no_cache';
+
+export async function fetchConversationsForCurrentUserWithStatus(
   fallback: Chat[] = [],
   currentUserId?: string,
   forceRefresh?: boolean,
-): Promise<Chat[]> {
+): Promise<{ chats: Chat[]; status: ConversationsFetchStatus }> {
   const effectiveUserId = await resolveConversationUserId(currentUserId);
   if (!effectiveUserId) {
-    return dedupeChats(fallback);
+    const chats = dedupeChats(fallback);
+    return { chats, status: chats.length ? 'cache_fallback' : 'error_no_cache' };
   }
   const userKey = effectiveUserId;
   if (forceRefresh) {
@@ -443,20 +455,31 @@ export async function fetchConversationsForCurrentUser(
       const normalizedFallback = fallbackRaw.map((item: any) =>
         normalizeConversation(item, effectiveUserId),
       );
-      return dedupeChats(normalizedFallback);
+      const chats = dedupeChats(normalizedFallback);
+      return { chats, status: chats.length ? 'cache_fallback' : 'error_no_cache' };
     }
     const normalizedFresh = freshRaw.map((item: any) =>
       normalizeConversation(item, effectiveUserId),
     );
-    return dedupeChats(normalizedFresh);
+    return { chats: dedupeChats(normalizedFresh), status: 'fresh' };
   }
 
   let cachedRaw = await getRawConversationsFromCache(effectiveUserId);
+  let status: ConversationsFetchStatus = 'fresh';
   if (!cachedRaw.length) {
     const freshRaw = await refreshConversationsAndHandleEmpty(effectiveUserId);
-    cachedRaw = Array.isArray(freshRaw) && freshRaw.length
-      ? freshRaw
-      : await getRawConversationsFromCache(effectiveUserId);
+    if (Array.isArray(freshRaw) && freshRaw.length) {
+      cachedRaw = freshRaw;
+    } else {
+      cachedRaw = await getRawConversationsFromCache(effectiveUserId);
+      // freshRaw === null means the refresh itself failed (vs. freshRaw
+      // being a confirmed-empty [] from the backend), which is the only
+      // case that should read as an error rather than a genuinely empty
+      // account.
+      if (freshRaw === null) {
+        status = cachedRaw.length ? 'cache_fallback' : 'error_no_cache';
+      }
+    }
   }
   cachedRaw = filterConversationsForUser(cachedRaw, effectiveUserId);
   if (__DEV__) console.log('[fetchConversationsForCurrentUser] Cached raw list:', cachedRaw);
@@ -467,7 +490,16 @@ export async function fetchConversationsForCurrentUser(
     normalizeConversation(item, effectiveUserId),
   );
 
-  const deduped = dedupeChats(normalized);
+  const chats = dedupeChats(normalized);
 
-  return deduped;
+  return { chats, status };
+}
+
+export async function fetchConversationsForCurrentUser(
+  fallback: Chat[] = [],
+  currentUserId?: string,
+  forceRefresh?: boolean,
+): Promise<Chat[]> {
+  const { chats } = await fetchConversationsForCurrentUserWithStatus(fallback, currentUserId, forceRefresh);
+  return chats;
 }
