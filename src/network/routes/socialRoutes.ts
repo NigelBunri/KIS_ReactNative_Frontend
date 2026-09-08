@@ -30,6 +30,9 @@ const socialRoutes = {
     requestJoin: (id: string) => `${API_BASE_URL}/api/v1/chat-communities/${id}/request-join/`,
     approveRequest: (id: string) => `${API_BASE_URL}/api/v1/chat-communities/${id}/approve-request/`,
     rejectRequest: (id: string) => `${API_BASE_URL}/api/v1/chat-communities/${id}/reject-request/`,
+    setMemberRole: (id: string) => `${API_BASE_URL}/api/v1/chat-communities/${id}/members/set-role/`,
+    removeMember: (id: string) => `${API_BASE_URL}/api/v1/chat-communities/${id}/members/remove/`,
+    blockMember: (id: string) => `${API_BASE_URL}/api/v1/chat-communities/${id}/members/block/`,
     ban: (id: string) => `${API_BASE_URL}/api/v1/chat-communities/${id}/ban/`,
     unban: (id: string) => `${API_BASE_URL}/api/v1/chat-communities/${id}/unban/`,
     inviteLink: (id: string) => `${API_BASE_URL}/api/v1/chat-communities/${id}/invite-link/`,
@@ -43,7 +46,10 @@ const socialRoutes = {
     postPin: (id: string) => `${API_BASE_URL}/api/v1/posts/${id}/pin/`,
     postUnpin: (id: string) => `${API_BASE_URL}/api/v1/posts/${id}/unpin/`,
     postDelete: (id: string) => `${API_BASE_URL}/api/v1/posts/${id}/delete/`,
-    postUpdate: (id: string) => `${API_BASE_URL}/api/v1/posts/${id}/edit/`,
+    // Community posts have no separate .../edit/ action - PATCH the post's
+    // own detail endpoint, now permission-checked (author or community
+    // admin/mod) in CommunityPostViewSet.partial_update.
+    postUpdate: (id: string) => `${API_BASE_URL}/api/v1/posts/${id}/`,
     postBroadcast: (id: string) => `${API_BASE_URL}/api/v1/posts/${id}/broadcast/`,
   },
   groups: {

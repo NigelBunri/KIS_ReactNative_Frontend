@@ -1,8 +1,9 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import FeedScreen from './FeedScreen';
 import { getRequest } from '@/network/get';
 import ROUTES from '@/network';
 import { getFeedPlainText } from './richTextValue';
+import { useSocket } from '@/SocketProvider';
 
 type CommunityFeedScreenProps = {
   community: {
@@ -13,13 +14,45 @@ type CommunityFeedScreenProps = {
 };
 
 export default function CommunityFeedScreen({ community, onBack }: CommunityFeedScreenProps) {
+  // Bumped when a live community.post_*/comment_created event for this
+  // community arrives - included in loadPosts' own identity below so
+  // FeedScreen's existing `useEffect(() => { loadFeed() }, [loadFeed])`
+  // refetches automatically, the same way it already does whenever
+  // community.id changes. No changes to FeedScreen itself needed.
+  const [liveRefreshNonce, setLiveRefreshNonce] = useState(0);
+  const { socket } = useSocket();
+  useEffect(() => {
+    if (!socket || !community.id) return undefined;
+    const events = [
+      'community.post_created',
+      'community.post_updated',
+      'community.post_deleted',
+      'community.comment_created',
+    ];
+    const handler = (payload: any) => {
+      if (String(payload?.communityId ?? '') !== String(community.id)) return;
+      setLiveRefreshNonce((n) => n + 1);
+    };
+    events.forEach((eventName) => socket.on(eventName, handler));
+    // Missed events during a disconnect aren't replayed on reconnect -
+    // without this, a feed screen left mounted through a disconnect would
+    // show stale posts until the next live event happened to arrive.
+    const bumpNonce = () => setLiveRefreshNonce((n) => n + 1);
+    socket.on('connect', bumpNonce);
+    return () => {
+      events.forEach((eventName) => socket.off(eventName, handler));
+      socket.off('connect', bumpNonce);
+    };
+  }, [socket, community.id]);
+
   const loadPosts = useCallback(async () => {
     const response = await getRequest(`${ROUTES.community.posts}?community=${community.id}`, {
       errorMessage: 'Failed to load posts',
     });
     const list = response?.data?.results ?? response?.data ?? response ?? [];
     return Array.isArray(list) ? list : [];
-  }, [community.id]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [community.id, liveRefreshNonce]);
 
   return (
     <FeedScreen

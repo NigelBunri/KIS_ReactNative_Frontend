@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActionSheetIOS,
   Alert,
@@ -27,6 +27,7 @@ import { uploadFileToBackend } from '@/Module/ChatRoom/uploadFileToBackend';
 import { getAccessToken } from '@/security/authStorage';
 import { getFeedPlainText } from '@/components/feeds/richTextValue';
 import { useSafeTopInset } from '@/hooks/useSafeTopInset';
+import { useSocket } from '@/SocketProvider';
 
 type MemberUser = {
   id?: string;
@@ -94,54 +95,97 @@ export const CommunityInfoPage: React.FC<CommunityInfoPageProps> = ({
   const [inviteLink, setInviteLink] = useState<string | null>(null);
   const [inviteLinkLoading, setInviteLinkLoading] = useState(false);
 
+  const mountedRef = useRef(true);
   useEffect(() => {
-    let mounted = true;
-    const loadCommunity = async () => {
-      setLoading(true);
-      try {
-        const detail = await getRequest(ROUTES.community.detail(communityId), {
-          errorMessage: 'Failed to load community',
-        });
-        const detailData = detail?.data ?? detail ?? {};
-        if (mounted) {
-          setAvatarUrl(detailData.avatar_url ?? detailData.avatarUrl ?? undefined);
-          setDescription(detailData.description ?? '');
-        }
-
-        const membersRes = await getRequest(ROUTES.community.members(communityId), {
-          errorMessage: 'Failed to load members',
-        });
-        const list =
-          membersRes?.data?.results ??
-          membersRes?.results ??
-          membersRes?.data ??
-          membersRes ??
-          [];
-        if (mounted) {
-          setMembers(Array.isArray(list) ? list : []);
-        }
-
-        const postsRes = await getRequest(`${ROUTES.community.posts}?community=${communityId}`, {
-          errorMessage: 'Failed to load community posts',
-        });
-        const postList =
-          postsRes?.data?.results ??
-          postsRes?.results ??
-          postsRes?.data ??
-          postsRes ??
-          [];
-        if (mounted) {
-          setPosts(Array.isArray(postList) ? postList : []);
-        }
-      } finally {
-        if (mounted) setLoading(false);
-      }
-    };
-    loadCommunity();
+    mountedRef.current = true;
     return () => {
-      mounted = false;
+      mountedRef.current = false;
     };
+  }, []);
+
+  const loadCommunity = useCallback(async () => {
+    setLoading(true);
+    try {
+      const detail = await getRequest(ROUTES.community.detail(communityId), {
+        errorMessage: 'Failed to load community',
+      });
+      const detailData = detail?.data ?? detail ?? {};
+      if (mountedRef.current) {
+        setAvatarUrl(detailData.avatar_url ?? detailData.avatarUrl ?? undefined);
+        setDescription(detailData.description ?? '');
+      }
+
+      const membersRes = await getRequest(ROUTES.community.members(communityId), {
+        errorMessage: 'Failed to load members',
+      });
+      const list =
+        membersRes?.data?.results ??
+        membersRes?.results ??
+        membersRes?.data ??
+        membersRes ??
+        [];
+      if (mountedRef.current) {
+        setMembers(Array.isArray(list) ? list : []);
+      }
+
+      const postsRes = await getRequest(`${ROUTES.community.posts}?community=${communityId}`, {
+        errorMessage: 'Failed to load community posts',
+      });
+      const postList =
+        postsRes?.data?.results ??
+        postsRes?.results ??
+        postsRes?.data ??
+        postsRes ??
+        [];
+      if (mountedRef.current) {
+        setPosts(Array.isArray(postList) ? postList : []);
+      }
+    } finally {
+      if (mountedRef.current) setLoading(false);
+    }
   }, [communityId]);
+
+  useEffect(() => {
+    loadCommunity();
+  }, [loadCommunity]);
+
+  // Live updates: another member's join/leave/ban/role-change or a new
+  // post/comment nudges this screen (if open) to refetch instead of the
+  // user having to manually pull-to-refresh. Same "event -> refetch"
+  // pattern already used for main-tab badges (see AppNavigator.tsx),
+  // scoped here to just this community's own room instead of globally.
+  const { socket } = useSocket();
+  useEffect(() => {
+    if (!socket || !communityId) return undefined;
+    const events = [
+      'community.member_joined',
+      'community.member_left',
+      'community.member_banned',
+      'community.role_changed',
+      'community.join_request_created',
+      'community.join_request_decided',
+      'community.settings_changed',
+      'community.post_created',
+      'community.post_updated',
+      'community.post_deleted',
+      'community.comment_created',
+    ];
+    const handler = (payload: any) => {
+      if (String(payload?.communityId ?? '') !== String(communityId)) return;
+      loadCommunity();
+    };
+    events.forEach((eventName) => socket.on(eventName, handler));
+    // A socket that reconnects after being offline (backgrounded app, dead
+    // wifi) doesn't get missed community.* events replayed - without this,
+    // a screen left mounted through a disconnect would show stale state
+    // indefinitely until the next live event happened to arrive. Same
+    // reconnect->refetch pattern already used for main-tab badges.
+    socket.on('connect', loadCommunity);
+    return () => {
+      events.forEach((eventName) => socket.off(eventName, handler));
+      socket.off('connect', loadCommunity);
+    };
+  }, [socket, communityId, loadCommunity]);
 
   const me = useMemo(() => {
     if (!currentUserId) return null;
@@ -178,20 +222,24 @@ export const CommunityInfoPage: React.FC<CommunityInfoPageProps> = ({
       actions.push(() => {
         Alert.alert(
           'Remove member',
-          `Remove ${label} from this community?`,
+          `Remove ${label} from this community? They can rejoin later.`,
           [
             { text: 'Cancel', style: 'cancel' },
             {
               text: 'Remove',
               style: 'destructive',
               onPress: async () => {
-                try {
-                  await postRequest(ROUTES.community.ban(communityId), { user_id: userId }, {
-                    errorMessage: 'Failed to remove member',
-                  });
+                // members/remove is non-permanent - the member can rejoin
+                // through the community's normal join_policy later. This
+                // previously called ban() by mistake, which is permanent
+                // until an admin explicitly unbans them.
+                const res = await postRequest(ROUTES.community.removeMember(communityId), { user_id: userId }, {
+                  errorMessage: 'Failed to remove member',
+                });
+                if (res.success) {
                   setMembers((prev) => prev.filter((m) => resolveUserId(m) !== userId));
-                } catch (err: any) {
-                  Alert.alert('Error', err?.message || 'Unable to remove member.');
+                } else {
+                  Alert.alert('Error', res.message || 'Unable to remove member.');
                 }
               },
             },
@@ -202,33 +250,37 @@ export const CommunityInfoPage: React.FC<CommunityInfoPageProps> = ({
       if (isMemberAdmin) {
         options.push('Demote from admin');
         actions.push(async () => {
-          try {
-            await postRequest(ROUTES.community.members(communityId), { user_id: userId, role: 'member' }, {
-              errorMessage: 'Failed to demote member',
-            });
+          const res = await postRequest(
+            ROUTES.community.setMemberRole(communityId),
+            { user_id: userId, role: 'member' },
+            { errorMessage: 'Failed to demote member' },
+          );
+          if (res.success) {
             setMembers((prev) =>
               prev.map((m) =>
                 resolveUserId(m) === userId ? { ...m, role: 'member', base_role: 'member' } : m,
               ),
             );
-          } catch (err: any) {
-            Alert.alert('Error', err?.message || 'Unable to demote member.');
+          } else {
+            Alert.alert('Error', res.message || 'Unable to demote member.');
           }
         });
       } else {
         options.push('Promote to admin');
         actions.push(async () => {
-          try {
-            await postRequest(ROUTES.community.members(communityId), { user_id: userId, role: 'admin' }, {
-              errorMessage: 'Failed to promote member',
-            });
+          const res = await postRequest(
+            ROUTES.community.setMemberRole(communityId),
+            { user_id: userId, role: 'admin' },
+            { errorMessage: 'Failed to promote member' },
+          );
+          if (res.success) {
             setMembers((prev) =>
               prev.map((m) =>
                 resolveUserId(m) === userId ? { ...m, role: 'admin', base_role: 'admin' } : m,
               ),
             );
-          } catch (err: any) {
-            Alert.alert('Error', err?.message || 'Unable to promote member.');
+          } else {
+            Alert.alert('Error', res.message || 'Unable to promote member.');
           }
         });
       }

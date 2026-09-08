@@ -51,6 +51,26 @@ const slugify = (value: string): string =>
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '');
 
+type CommunityVisibility = 'public' | 'private' | 'hidden';
+type CommunityJoinPolicy = 'open' | 'request' | 'invite_only';
+type CommunityPostPolicy = 'all_members' | 'admins_only' | 'mods_only';
+
+const VISIBILITY_OPTIONS: { value: CommunityVisibility; label: string }[] = [
+  { value: 'public', label: 'Public' },
+  { value: 'private', label: 'Private' },
+  { value: 'hidden', label: 'Hidden' },
+];
+const JOIN_POLICY_OPTIONS: { value: CommunityJoinPolicy; label: string }[] = [
+  { value: 'open', label: 'Open' },
+  { value: 'request', label: 'Request to join' },
+  { value: 'invite_only', label: 'Invite only' },
+];
+const POST_POLICY_OPTIONS: { value: CommunityPostPolicy; label: string }[] = [
+  { value: 'all_members', label: 'All members' },
+  { value: 'mods_only', label: 'Mods & admins' },
+  { value: 'admins_only', label: 'Admins only' },
+];
+
 export const NewCommunityForm: React.FC<NewCommunityFormProps> = ({
   palette,
   onSuccess,
@@ -72,6 +92,9 @@ export const NewCommunityForm: React.FC<NewCommunityFormProps> = ({
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [avatarUrl, setAvatarUrl] = useState('');
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [visibility, setVisibility] = useState<CommunityVisibility>('public');
+  const [joinPolicy, setJoinPolicy] = useState<CommunityJoinPolicy>('request');
+  const [postPolicy, setPostPolicy] = useState<CommunityPostPolicy>('all_members');
 
   const handlePickAvatar = async () => {
     if (uploadingAvatar) return;
@@ -140,6 +163,9 @@ export const NewCommunityForm: React.FC<NewCommunityFormProps> = ({
         description: descriptionValue.trim() || undefined,
         partner: partnerId ?? null,
         avatar_url: avatarUrl || undefined,
+        visibility,
+        join_policy: joinPolicy,
+        post_policy: postPolicy,
         create_main_conversation: true,
         create_posts_conversation: true,
       };
@@ -173,15 +199,28 @@ export const NewCommunityForm: React.FC<NewCommunityFormProps> = ({
   };
 
   return (
-    <View style={{ marginTop: 4 }}>
-      <View style={{
-        backgroundColor: palette.card,
-        borderRadius: 18,
-        padding: 16,
-        marginBottom: 16,
-        borderWidth: 1,
-        borderColor: palette.inputBorder,
-      }}>
+    // Explicit opaque background here, not just on the hosting screen -
+    // this form is mounted from two different places (AddContactsPage and
+    // PartnerCreatePanel's slide-over) and relied on every current and
+    // future host painting a background behind it at every ancestor level.
+    // Where that didn't hold (e.g. inside a ScrollView's bounce/overscroll
+    // area) whatever sat behind it in the native view hierarchy showed
+    // through. Horizontal padding stays with the host (both already apply
+    // their own) - adding it here too would double the inset.
+    <View style={{ backgroundColor: palette.bg, marginTop: 4 }}>
+      <View
+        style={[
+          {
+            backgroundColor: palette.card,
+            borderRadius: 18,
+            padding: 16,
+            marginBottom: 16,
+            borderWidth: 1,
+            borderColor: palette.inputBorder,
+          },
+          KIS_TOKENS.elevation.card,
+        ]}
+      >
         <Text
           style={{
             color: palette.text,
@@ -333,6 +372,117 @@ export const NewCommunityForm: React.FC<NewCommunityFormProps> = ({
             }}
             multiline
           />
+        </View>
+      </View>
+
+      {/* Visibility */}
+      <View style={{ marginBottom: 12 }}>
+        <Text style={{ color: palette.subtext, fontSize: 13, marginBottom: 6 }}>
+          Who can see this community
+        </Text>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+          {VISIBILITY_OPTIONS.map((opt) => {
+            const selected = visibility === opt.value;
+            return (
+              <Pressable
+                key={opt.value}
+                onPress={() => setVisibility(opt.value)}
+                style={({ pressed }) => ({
+                  borderRadius: 999,
+                  paddingVertical: 8,
+                  paddingHorizontal: 14,
+                  borderWidth: 2,
+                  borderColor: selected ? palette.primary : palette.inputBorder,
+                  backgroundColor: selected ? palette.primary : palette.card,
+                  opacity: pressed ? KIS_TOKENS.opacity.pressed : 1,
+                })}
+              >
+                <Text
+                  style={{
+                    color: selected ? palette.onPrimary : palette.text,
+                    fontSize: 13,
+                    fontWeight: selected ? '700' : '500',
+                  }}
+                >
+                  {opt.label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      </View>
+
+      {/* Join policy */}
+      <View style={{ marginBottom: 12 }}>
+        <Text style={{ color: palette.subtext, fontSize: 13, marginBottom: 6 }}>
+          How people can join
+        </Text>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+          {JOIN_POLICY_OPTIONS.map((opt) => {
+            const selected = joinPolicy === opt.value;
+            return (
+              <Pressable
+                key={opt.value}
+                onPress={() => setJoinPolicy(opt.value)}
+                style={({ pressed }) => ({
+                  borderRadius: 999,
+                  paddingVertical: 8,
+                  paddingHorizontal: 14,
+                  borderWidth: 2,
+                  borderColor: selected ? palette.primary : palette.inputBorder,
+                  backgroundColor: selected ? palette.primary : palette.card,
+                  opacity: pressed ? KIS_TOKENS.opacity.pressed : 1,
+                })}
+              >
+                <Text
+                  style={{
+                    color: selected ? palette.onPrimary : palette.text,
+                    fontSize: 13,
+                    fontWeight: selected ? '700' : '500',
+                  }}
+                >
+                  {opt.label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      </View>
+
+      {/* Post policy */}
+      <View style={{ marginBottom: 16 }}>
+        <Text style={{ color: palette.subtext, fontSize: 13, marginBottom: 6 }}>
+          Who can post
+        </Text>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+          {POST_POLICY_OPTIONS.map((opt) => {
+            const selected = postPolicy === opt.value;
+            return (
+              <Pressable
+                key={opt.value}
+                onPress={() => setPostPolicy(opt.value)}
+                style={({ pressed }) => ({
+                  borderRadius: 999,
+                  paddingVertical: 8,
+                  paddingHorizontal: 14,
+                  borderWidth: 2,
+                  borderColor: selected ? palette.primary : palette.inputBorder,
+                  backgroundColor: selected ? palette.primary : palette.card,
+                  opacity: pressed ? KIS_TOKENS.opacity.pressed : 1,
+                })}
+              >
+                <Text
+                  style={{
+                    color: selected ? palette.onPrimary : palette.text,
+                    fontSize: 13,
+                    fontWeight: selected ? '700' : '500',
+                  }}
+                >
+                  {opt.label}
+                </Text>
+              </Pressable>
+            );
+          })}
         </View>
       </View>
 
