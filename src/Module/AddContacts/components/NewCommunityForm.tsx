@@ -199,15 +199,28 @@ export const NewCommunityForm: React.FC<NewCommunityFormProps> = ({
   };
 
   return (
-    <View style={{ marginTop: 4 }}>
-      <View style={{
-        backgroundColor: palette.card,
-        borderRadius: 18,
-        padding: 16,
-        marginBottom: 16,
-        borderWidth: 1,
-        borderColor: palette.inputBorder,
-      }}>
+    // Explicit opaque background here, not just on the hosting screen -
+    // this form is mounted from two different places (AddContactsPage and
+    // PartnerCreatePanel's slide-over) and relied on every current and
+    // future host painting a background behind it at every ancestor level.
+    // Where that didn't hold (e.g. inside a ScrollView's bounce/overscroll
+    // area) whatever sat behind it in the native view hierarchy showed
+    // through. Horizontal padding stays with the host (both already apply
+    // their own) - adding it here too would double the inset.
+    <View style={{ backgroundColor: palette.bg, marginTop: 4 }}>
+      <View
+        style={[
+          {
+            backgroundColor: palette.card,
+            borderRadius: 18,
+            padding: 16,
+            marginBottom: 16,
+            borderWidth: 1,
+            borderColor: palette.inputBorder,
+          },
+          KIS_TOKENS.elevation.card,
+        ]}
+      >
         <Text
           style={{
             color: palette.text,
