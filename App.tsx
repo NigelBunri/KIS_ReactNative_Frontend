@@ -69,11 +69,17 @@ import {
   DetachedChatOverlayProvider,
   useDetachedChatOverlayProps,
 } from '@/contexts/DetachedChatOverlayContext';
+import {
+  DetachedPartnersOverlayProvider,
+  useDetachedPartnersOverlayProps,
+} from '@/contexts/DetachedPartnersOverlayContext';
 import { TabletDialogOverlay } from '@/components/shell';
 import ChatRoomPage from '@/Module/ChatRoom/ChatRoomPage';
 import CommunityRoomPage from '@/Module/Community/CommunityRoomPage';
 import ChatInfoPage from '@/Module/ChatRoom/ChatInfoPage';
 import CommunityInfoPage from '@/Module/Community/CommunityInfoPage';
+import PartnersMessagesPane from '@/components/partners/PartnersMessagesPane';
+import PartnerSheet from '@/components/partners/PartnerSheet';
 import type { RootStackParamList } from '@/navigation/types';
 import BroadcastDetailScreen from '@/screens/tabs/feeds/BroadcastDetailScreen';
 import PlaylistsScreen from '@/screens/broadcast/playlists/PlaylistsScreen';
@@ -462,6 +468,27 @@ function DetachedChatOverlayOutlet() {
           />
         ) : null}
       </TabletDialogOverlay>
+    </>
+  );
+}
+
+// Renders Partners' own chat/feed pane and settings sheet as true top-level
+// siblings, same reasoning and same shape as DetachedChatOverlayOutlet just
+// above — see DetachedPartnersOverlayContext.tsx for the full stacking-
+// context explanation. Both components already position themselves via
+// position:absolute + a local zIndex of 20 (partnersStyles.ts) - unchanged
+// here; only the render location moved, from a box capped by the zIndex:1
+// View wrapping NavigationContainer below to this component's own top-level
+// position, which is enough for that existing zIndex:20 to finally beat
+// AnimatedKISTabBar's zIndex:10 and Golden Section's implicit (unset)
+// stacking, both of which it can finally reach from here.
+function DetachedPartnersOverlayOutlet() {
+  const p = useDetachedPartnersOverlayProps();
+  if (!p) return null;
+  return (
+    <>
+      <PartnersMessagesPane {...p.messagesPaneProps} />
+      <PartnerSheet {...p.partnerSheetProps} />
     </>
   );
 }
@@ -1274,6 +1301,9 @@ function AppContent() {
         {/* Same bridge shape as above, for the chat/community overlays -
             see DetachedChatOverlayContext.tsx. */}
         <DetachedChatOverlayProvider>
+        {/* Same bridge shape again, for Partners' own chat/feed pane and
+            settings sheet - see DetachedPartnersOverlayContext.tsx. */}
+        <DetachedPartnersOverlayProvider>
         {/* Wraps BOTH the normal NavigationContainer subtree below AND
             DetachedChatOverlayOutlet further down — not just the former.
             ChatRoomPage/MessageBubble (and therefore every
@@ -2028,6 +2058,11 @@ function AppContent() {
               path resolves outside it too. */}
           <NavigationContainerRefContext.Provider value={navigationRef.current}>
             <DetachedChatOverlayOutlet />
+            {/* Same NavigationContainerRefContext need as DetachedChatOverlayOutlet
+                above — PartnersMessagesPane renders ChatRoomPage internally,
+                same as the chat overlay does. See
+                DetachedPartnersOverlayContext.tsx. */}
+            <DetachedPartnersOverlayOutlet />
           </NavigationContainerRefContext.Provider>
           <LanguageSwitcher />
           <InAppNotificationToast ref={InAppNotificationToastRef} />
@@ -2047,6 +2082,7 @@ function AppContent() {
           <VoiceMessageMiniBadge />
         </View>
         </VoiceMessagePlayerProvider>
+        </DetachedPartnersOverlayProvider>
         </DetachedChatOverlayProvider>
         </DetachedTabBarProvider>
       </SocketProvider>

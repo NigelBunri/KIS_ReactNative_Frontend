@@ -1,15 +1,16 @@
 import React from 'react';
 import { View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import LinearGradient from 'react-native-linear-gradient';
 import styles from '@/components/partners/partnersStyles';
 import PartnersLeftRail from '@/components/partners/PartnersLeftRail';
 import PartnersCenterPane from '@/components/partners/PartnersCenterPane';
-import PartnersMessagesPane from '@/components/partners/PartnersMessagesPane';
-import PartnerSheet from '@/components/partners/PartnerSheet';
 import PartnerPanels from './PartnerPanels';
+import { DetachedPartnersOverlayBridge } from '@/contexts/DetachedPartnersOverlayContext';
 import { useKISTheme } from '@/theme/useTheme';
 import { useStatusBarStyle } from '@/theme/useStatusBarStyle';
+import { useResponsiveLayout } from '@/theme/responsive';
 import PartnerAppLaunchBar from '@/components/partners/PartnerAppLaunchBar';
 import { usePartnerOrganizationAppsContext } from '@/context/partners/PartnerOrganizationAppsContext';
 import type { PartnerOrganizationApp } from '@/screens/tabs/partners/hooks/usePartnerOrganizationApps';
@@ -181,6 +182,49 @@ export default function PartnerLayout({
     error: organizationAppsError,
     reload: reloadOrganizationApps,
   } = usePartnerOrganizationAppsContext();
+
+  // PartnersMessagesPane's "closed" state is an intentional, always-visible
+  // peek sliver at the right edge (RIGHT_PEEK_WIDTH), not a hidden state —
+  // it now renders as a genuine top-level sibling (see
+  // DetachedPartnersOverlayContext.tsx) so it can fully cover the Golden
+  // Section + tab bar once actually open, exactly as requested. But that
+  // same top-level promotion means its position:absolute top:0/bottom:0 is
+  // now relative to the whole window instead of a box already confined
+  // below the Golden Section / above the tab bar by ordinary flex layout,
+  // so the always-visible peek sliver needs its OWN top/bottom insets while
+  // closed to stay out of both. These are applied as a plain style prop on
+  // the always-mounted pane (never remounting it) — an earlier attempt
+  // solved this by conditionally switching between rendering the pane
+  // inline vs. via the detached bridge based on isMessagesExpanded, which
+  // genuinely fixed the visual bug but broke the close animation: the
+  // remount happens while the closing spring animation (useNativeDriver:
+  // true) is still in flight, and destroying/recreating the native view
+  // mid-animation desyncs it from messagesOffsetAnim, leaving the pane
+  // visually stuck partway closed until the user manually drags it the
+  // rest of the way. A single, permanently-stable render location (matching
+  // the proven chat-overlay Bridge/Outlet pattern exactly — it always
+  // bridges, never conditionally un-bridges) avoids that entirely.
+  //
+  // peekBottomInset mirrors AnimatedKISTabBar's own height formula exactly
+  // (see AppNavigator.tsx) so the sliver's bottom edge lines up with the
+  // real tab bar's top edge precisely, not an approximation.
+  //
+  // peekTopInset is a deliberately generous, static estimate of the Golden
+  // Section's own worst-case (fully expanded) rendered height for this
+  // screen specifically, not a pixel-exact live measurement — the Golden
+  // Section's real height is a Reanimated-driven, continuously variable
+  // value (collapses on scroll; see useCollapsingGoldHeader.ts) that isn't
+  // otherwise exposed outside its own shared-value graph, and threading it
+  // out just for this approximate, non-critical buffer isn't worth the
+  // complexity it would add. Overestimating here is safe (worst case: a
+  // sliver of visible background above the peek sliver) - underestimating
+  // is the actual bug, so this errs generous on purpose.
+  const responsive = useResponsiveLayout();
+  const safeAreaInsets = useSafeAreaInsets();
+  const tabBarHeight = responsive.isWatch ? 52 : responsive.isCompactPhone ? 62 : 72;
+  const peekBottomInset = tabBarHeight + Math.max(safeAreaInsets.bottom, 0);
+  const peekTopInset = topInset + 300;
+
   return (
     // Root no longer has paddingTop — the left rail fills all the way to y=0
     // (behind the status bar) while the centre column handles its own top inset
@@ -243,42 +287,55 @@ export default function PartnerLayout({
         />
       ) : null}
 
-      <PartnersMessagesPane
-        width={width}
-        messagesOffsetAnim={messagesOffsetAnim}
-        messagePanHandlers={messagePanHandlers}
-        isMessagesExpanded={isMessagesExpanded}
-        toggleMessagesPane={toggleMessagesPane}
-        closeMessagesPane={handleCloseMessages}
-        selectedGroupId={selectedGroupId}
-        selectedChannelId={selectedChannelId}
-        selectedFeed={selectedFeed}
-        selectedCommunityFeedId={selectedCommunityFeedId}
-        groupsForPartner={groupsForPartner}
-        channelsForPartner={channelsForPartner}
-        communitiesForPartner={communitiesForPartner}
-        selectedPartner={selectedPartner}
-        onOpenInfo={onOpenInfo}
-        onOpenTasks={onOpenTasks}
-      />
-
-      <PartnerSheet
-        isOpen={isPartnerSheetOpen}
-        sheetHeight={sheetHeight}
-        sheetOffsetAnim={sheetOffsetAnim}
-        overlayOpacity={overlayOpacity}
-        sheetPanHandlers={sheetPanHandlers}
-        selectedPartner={selectedPartner}
-        communitiesCount={communitiesCount}
-        groupsCount={groupsCount}
-        channelsCount={channelsCount}
-        partnerRole={partnerRole}
-        sections={settingsSections}
-        onOpenSettingsSection={openSection}
-        onOpenCreate={onOpenCreate}
-        animatePartnerSheet={animatePartnerSheet}
-        onOpenLinks={onOpenLinks}
-        onOpenOrganizations={onOpenOrganizations}
+      {/* Chat/feed pane + settings sheet render as true top-level siblings in
+          App.tsx (see DetachedPartnersOverlayContext.tsx), permanently — the
+          same "always bridged, never conditionally unbridged" shape as the
+          chat overlay, so the pane is never remounted mid-animation (an
+          earlier attempt toggled render location based on isMessagesExpanded
+          and broke the close animation this way - see the long comment
+          above peekTopInset/peekBottomInset). Instead, the pane's own
+          top/bottom insets do the work: full coverage while open, confined
+          to peekTopInset/peekBottomInset while closed - a plain style change
+          on an always-mounted component, not a remount. */}
+      <DetachedPartnersOverlayBridge
+        messagesPaneProps={{
+          width,
+          messagesOffsetAnim,
+          messagePanHandlers,
+          isMessagesExpanded,
+          toggleMessagesPane,
+          closeMessagesPane: handleCloseMessages,
+          selectedGroupId,
+          selectedChannelId,
+          selectedFeed,
+          selectedCommunityFeedId,
+          groupsForPartner,
+          channelsForPartner,
+          communitiesForPartner,
+          selectedPartner,
+          onOpenInfo,
+          onOpenTasks,
+          peekTopInset,
+          peekBottomInset,
+        }}
+        partnerSheetProps={{
+          isOpen: isPartnerSheetOpen,
+          sheetHeight,
+          sheetOffsetAnim,
+          overlayOpacity,
+          sheetPanHandlers,
+          selectedPartner,
+          communitiesCount,
+          groupsCount,
+          channelsCount,
+          partnerRole,
+          sections: settingsSections,
+          onOpenSettingsSection: openSection,
+          onOpenCreate,
+          animatePartnerSheet,
+          onOpenLinks,
+          onOpenOrganizations,
+        }}
       />
 
       <PartnerPanels
