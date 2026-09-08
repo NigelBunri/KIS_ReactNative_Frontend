@@ -1577,7 +1577,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
                     }}
                   />
                 )}
-                {!canOpenDownloaded && renderDownloadControl(att, 'overlay')}
+                {!canOpenDownloaded && (!isTopLevelViewOnce || isMe || topLevelViewOnceViewed) && renderDownloadControl(att, 'overlay')}
                 {renderInlineUploadOverlay()}
               </Pressable>
             );
@@ -1661,7 +1661,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
                     }}
                   />
                 )}
-                {!canOpenDownloaded && renderDownloadControl(att, 'overlay')}
+                {!canOpenDownloaded && (!isTopLevelViewOnce || isMe || topLevelViewOnceViewed) && renderDownloadControl(att, 'overlay')}
                 {renderInlineUploadOverlay()}
               </Pressable>
             );
@@ -1706,7 +1706,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
                 <Text style={{ marginTop: 8, color: '#fff', fontWeight: '700', fontSize: 12 }} numberOfLines={1}>
                   {downloadedUri ? 'Play video' : displayName}
                 </Text>
-                {!canOpenDownloaded && renderDownloadControl(att, 'overlay')}
+                {!canOpenDownloaded && (!isTopLevelViewOnce || isMe || topLevelViewOnceViewed) && renderDownloadControl(att, 'overlay')}
                 {renderInlineUploadOverlay()}
               </Pressable>
             );
@@ -1744,7 +1744,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
                   <Text numberOfLines={1} style={{ fontSize: 11, marginTop: 3, color: isOutgoing ? palette.onPrimaryMuted ?? '#e0e0e0' : palette.subtext }}>
                     Audio {sizeLabel ? `• ${sizeLabel}` : ''}
                   </Text>
-                  {!canOpenDownloaded && renderDownloadControl(att, 'inline')}
+                  {!canOpenDownloaded && (!isTopLevelViewOnce || isMe || topLevelViewOnceViewed) && renderDownloadControl(att, 'inline')}
                 </View>
                 {renderInlineUploadOverlay()}
               </Pressable>
@@ -1865,7 +1865,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
                   </Text>
                 )}
 
-                {!canOpenDownloaded && renderDownloadControl(att, 'inline')}
+                {!canOpenDownloaded && (!isTopLevelViewOnce || isMe || topLevelViewOnceViewed) && renderDownloadControl(att, 'inline')}
               </View>
               {renderInlineUploadOverlay()}
             </Pressable>
