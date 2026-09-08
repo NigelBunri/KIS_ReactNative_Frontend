@@ -26,6 +26,7 @@ import { KISIcon } from '@/constants/kisIcons';
 import ROUTES, { buildMediaSource, useMediaHeaders } from '@/network';
 import { getRequest } from '@/network/get';
 import { postRequest } from '@/network/post';
+import { deleteRequest } from '@/network/delete';
 import NewChannelForm from '@/Module/AddContacts/components/NewChannelForm';
 import { Chat } from '@/Module/ChatRoom/messagesUtils';
 import Skeleton from '@/components/common/Skeleton';
@@ -908,6 +909,38 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
       { text: 'Cancel', style: 'cancel' },
     ]);
   }, [activeUser, closeViewer, currentItem?.id, currentUserId, loadStatuses]);
+
+  // Owner-only counterpart to handleStatusActionMenu above — there was
+  // previously no way to delete a posted status from the app at all (the
+  // backend destroy() action existed but nothing in the frontend called
+  // it). Deletion is real: the server soft-deletes the row (so it
+  // immediately disappears from every viewer, including this device on
+  // next load) and removes the underlying media file, not just a
+  // client-side hide.
+  const handleOwnStatusActionMenu = useCallback(() => {
+    if (!currentItem?.id) return;
+    const itemIndexAtOpen = viewerIndex;
+    Alert.alert('Delete this status?', 'This cannot be undone.', [
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          const res = await deleteRequest(ROUTES.statuses.delete(currentItem.id), {
+            errorMessage: 'Unable to delete status.',
+          });
+          if (!res?.success) return;
+          const wasLastItem = (activeUser?.items.length ?? 0) <= 1;
+          if (wasLastItem) {
+            closeViewer();
+          } else if (itemIndexAtOpen > 0) {
+            setViewerIndex(itemIndexAtOpen - 1);
+          }
+          await loadStatuses(true);
+        },
+      },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
+  }, [activeUser?.items.length, closeViewer, currentItem?.id, loadStatuses, viewerIndex]);
 
   const handleNext = useCallback(() => {
     if (!activeUser) return;
@@ -2308,6 +2341,20 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
               >
                 More
               </Text>
+            </Pressable>
+          ) : null}
+          {activeUser?.userId && activeUser.userId === currentUserId ? (
+            <Pressable
+              style={[
+                styles.viewerMenuButton,
+                {
+                  backgroundColor: palette.surfaceElevated,
+                  borderColor: palette.inputBorder,
+                },
+              ]}
+              onPress={handleOwnStatusActionMenu}
+            >
+              <KISIcon name="trash" size={14} color={palette.text} />
             </Pressable>
           ) : null}
 

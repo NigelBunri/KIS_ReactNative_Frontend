@@ -91,6 +91,9 @@ const socialRoutes = {
     viewers: (id: string) => `${API_BASE_URL}/api/v1/statuses/${id}/viewers/`,
     report: (id: string) => `${API_BASE_URL}/api/v1/statuses/${id}/report/`,
     reply: (id: string) => `${API_BASE_URL}/api/v1/statuses/${id}/reply/`,
+    // Owner-only real deletion (soft-delete + underlying file removed
+    // server-side — see apps/statuses/views.py's destroy() override).
+    delete: (id: string) => `${API_BASE_URL}/api/v1/statuses/${id}/`,
     mute: `${API_BASE_URL}/api/v1/statuses/mute/`,
     unmute: `${API_BASE_URL}/api/v1/statuses/unmute/`,
     // Fresh short-lived presigned GET for a status's media — visibility is
