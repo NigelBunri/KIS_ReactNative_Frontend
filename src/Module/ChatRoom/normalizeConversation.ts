@@ -89,6 +89,68 @@ const mergeRawConversationLists = (...lists: any[][]): any[] => {
   return Array.from(map.values());
 };
 
+// DRF's max page_size. Requesting this size on every page keeps the number
+// of round trips small even for a user with hundreds of conversations.
+const CONVERSATION_PAGE_SIZE = 100;
+// Defensive ceiling on how many pages we'll walk in one refresh (200 * 100 =
+// 20,000 conversations). Guards against spinning forever if a server bug
+// ever reports a runaway total_pages value; a real account will never hit
+// this and simply gets every page it actually has.
+const MAX_CONVERSATION_PAGES = 200;
+
+/**
+ * Walks every page the backend reports for the conversation list and
+ * returns the concatenated raw results.
+ *
+ * Previously this only ever fetched page 1: the backend's default
+ * pagination (page_size=25) silently truncated any account with more than
+ * 25 conversations, and nothing in this file ever read `meta.total_pages`
+ * to know a second page existed. A user with 26+ conversations would never
+ * see the rest, with no error and no visible sign anything was missing.
+ *
+ * Throws (rather than returning a partial list) if any page after the
+ * first fails, so a mid-walk network error is treated as a full refresh
+ * failure by the caller and falls back to cache instead of silently
+ * caching a truncated list.
+ */
+async function fetchAllConversationPages(): Promise<any[]> {
+  const pageUrl = (page: number) =>
+    `${ROUTES.chat.listConversations}?page=${page}&page_size=${CONVERSATION_PAGE_SIZE}`;
+
+  // getRequest never throws on a normal network/HTTP failure - every
+  // failure path (network error, 4xx/5xx, etc.) resolves to
+  // `{ success: false, ... }` instead (see src/network/get/index.tsx). A
+  // caller that ignores `success` and just extracts whatever list-shaped
+  // data it can find will silently treat a failed page as "zero
+  // conversations on that page" and keep walking, which reintroduces the
+  // exact silent-truncation bug this function exists to fix. Explicitly
+  // check and throw so a failed page aborts the whole walk instead.
+  const fetchPageOrThrow = async (page: number) => {
+    const res = await getRequest(pageUrl(page), {
+      errorMessage: 'Unable to load conversations.',
+    });
+    if ((res as any)?.success === false) {
+      throw new Error((res as any)?.message || `Failed to load conversations page ${page}.`);
+    }
+    return res;
+  };
+
+  const first = await fetchPageOrThrow(1);
+  const all = extractConversationList(first);
+
+  const totalPagesRaw = Number((first as any)?.data?.meta?.total_pages);
+  const totalPages = Number.isFinite(totalPagesRaw) && totalPagesRaw > 0
+    ? Math.min(totalPagesRaw, MAX_CONVERSATION_PAGES)
+    : 1;
+
+  for (let page = 2; page <= totalPages; page++) {
+    const res = await fetchPageOrThrow(page);
+    all.push(...extractConversationList(res));
+  }
+
+  return all;
+}
+
 
 /* -------------------------------------------------------------------------- */
 /*  CONSTANTS                                                                 */
@@ -287,11 +349,7 @@ async function getRawConversationsFromCache(currentUserId: string): Promise<any[
  */
 async function refreshConversationsAndHandleEmpty(currentUserId: string): Promise<any[] | null> {
   try {
-    const res = await getRequest(ROUTES.chat.listConversations, {
-      errorMessage: 'Unable to load conversations.',
-    });
-
-    const rawList = filterConversationsForUser(extractConversationList(res), currentUserId);
+    const rawList = filterConversationsForUser(await fetchAllConversationPages(), currentUserId);
 
     if (__DEV__) console.log(
       '[refreshConversationsAndHandleEmpty] Fetched conversations:',
@@ -380,14 +438,26 @@ function dedupeChats(chats: Chat[]): Chat[] {
  */
 const lastRefreshByUser: Record<string, number> = {};
 
-export async function fetchConversationsForCurrentUser(
+/**
+ * Outcome of a conversations fetch, so a caller can distinguish "confirmed
+ * empty account" from "network/refresh failed, showing whatever's cached"
+ * from "network/refresh failed and there is nothing cached to show" -
+ * three states that used to be indistinguishable (fetchConversationsForCurrentUser
+ * always just returned a Chat[] with no signal of which case produced it),
+ * which is why the chat list previously had no way to render a distinct
+ * error/offline state instead of a generic "no chats" empty view.
+ */
+export type ConversationsFetchStatus = 'fresh' | 'cache_fallback' | 'error_no_cache';
+
+export async function fetchConversationsForCurrentUserWithStatus(
   fallback: Chat[] = [],
   currentUserId?: string,
   forceRefresh?: boolean,
-): Promise<Chat[]> {
+): Promise<{ chats: Chat[]; status: ConversationsFetchStatus }> {
   const effectiveUserId = await resolveConversationUserId(currentUserId);
   if (!effectiveUserId) {
-    return dedupeChats(fallback);
+    const chats = dedupeChats(fallback);
+    return { chats, status: chats.length ? 'cache_fallback' : 'error_no_cache' };
   }
   const userKey = effectiveUserId;
   if (forceRefresh) {
@@ -399,20 +469,31 @@ export async function fetchConversationsForCurrentUser(
       const normalizedFallback = fallbackRaw.map((item: any) =>
         normalizeConversation(item, effectiveUserId),
       );
-      return dedupeChats(normalizedFallback);
+      const chats = dedupeChats(normalizedFallback);
+      return { chats, status: chats.length ? 'cache_fallback' : 'error_no_cache' };
     }
     const normalizedFresh = freshRaw.map((item: any) =>
       normalizeConversation(item, effectiveUserId),
     );
-    return dedupeChats(normalizedFresh);
+    return { chats: dedupeChats(normalizedFresh), status: 'fresh' };
   }
 
   let cachedRaw = await getRawConversationsFromCache(effectiveUserId);
+  let status: ConversationsFetchStatus = 'fresh';
   if (!cachedRaw.length) {
     const freshRaw = await refreshConversationsAndHandleEmpty(effectiveUserId);
-    cachedRaw = Array.isArray(freshRaw) && freshRaw.length
-      ? freshRaw
-      : await getRawConversationsFromCache(effectiveUserId);
+    if (Array.isArray(freshRaw) && freshRaw.length) {
+      cachedRaw = freshRaw;
+    } else {
+      cachedRaw = await getRawConversationsFromCache(effectiveUserId);
+      // freshRaw === null means the refresh itself failed (vs. freshRaw
+      // being a confirmed-empty [] from the backend), which is the only
+      // case that should read as an error rather than a genuinely empty
+      // account.
+      if (freshRaw === null) {
+        status = cachedRaw.length ? 'cache_fallback' : 'error_no_cache';
+      }
+    }
   }
   cachedRaw = filterConversationsForUser(cachedRaw, effectiveUserId);
   if (__DEV__) console.log('[fetchConversationsForCurrentUser] Cached raw list:', cachedRaw);
@@ -423,7 +504,16 @@ export async function fetchConversationsForCurrentUser(
     normalizeConversation(item, effectiveUserId),
   );
 
-  const deduped = dedupeChats(normalized);
+  const chats = dedupeChats(normalized);
 
-  return deduped;
+  return { chats, status };
+}
+
+export async function fetchConversationsForCurrentUser(
+  fallback: Chat[] = [],
+  currentUserId?: string,
+  forceRefresh?: boolean,
+): Promise<Chat[]> {
+  const { chats } = await fetchConversationsForCurrentUserWithStatus(fallback, currentUserId, forceRefresh);
+  return chats;
 }

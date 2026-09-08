@@ -60,7 +60,7 @@ import {
   type Chat,
   CUSTOM_FILTERS_KEY 
 } from '@/Module/ChatRoom/messagesUtils';
-import { fetchConversationsForCurrentUser, searchConversationsFromServer } from '@/Module/ChatRoom/normalizeConversation';
+import { fetchConversationsForCurrentUser, fetchConversationsForCurrentUserWithStatus, searchConversationsFromServer } from '@/Module/ChatRoom/normalizeConversation';
 import { mapBackendToChatMessage } from '@/Module/ChatRoom/componets/chatMapping';
 import { MessageStatus } from '@/Module/ChatRoom/chatTypes';
 import { decryptConversationPayload, ENCRYPTION_VERSION } from '@/security/customE2EE';
@@ -209,6 +209,12 @@ const [statusByUserId, setStatusByUserId] = useState<Record<string, { hasStatus:
 const [avatarPreview, setAvatarPreview] = useState<{ uri: string; chat?: Chat; userId?: string | null } | null>(null);
 const [avatarPreviewFull, setAvatarPreviewFull] = useState(false);
 const [_isOffline, setIsOffline] = useState(false);
+// Distinguishes "confirmed empty account" from "the last refresh failed and
+// this is cached/fallback data" (offline or a server/API error) so the UI
+// can show a real error/offline indicator instead of silently rendering a
+// generic empty state when a fetch actually failed.
+const [conversationsError, setConversationsError] = useState<'offline' | 'server' | null>(null);
+const [isRetryingConversations, setIsRetryingConversations] = useState(false);
 const avatarAnim = useRef(new Animated.Value(0)).current;
 const tabRef = useRef<any>(null);
 const loadCommunitiesRef = useRef<() => void | Promise<void>>(() => {});
@@ -221,6 +227,7 @@ const userScopedCacheKey = useCallback(
 );
 
 const mountedRef = useRef(true);
+const isOfflineRef = useRef(false);
 const conversationsRef = useRef<Chat[]>([]);
 const conversationMetaRef = useRef<Record<string, ConversationMetaEntry>>({});
 const metaRefreshQueue = useRef(new Set<string>());
@@ -385,7 +392,12 @@ const handleStartQuickCall = useCallback(
 
 const refreshConversations = useCallback(async (force?: boolean, refreshCommunities?: boolean) => {
   const currentList = conversationsRef.current;
-  const convs = await fetchConversationsForCurrentUser(currentList, effectiveCurrentUserId ?? undefined, !!force);
+  const { chats: convs, status } = await fetchConversationsForCurrentUserWithStatus(
+    currentList, effectiveCurrentUserId ?? undefined, !!force,
+  );
+  setConversationsError(
+    status === 'fresh' ? null : (isOfflineRef.current ? 'offline' : 'server'),
+  );
   if (convs.length === 0 && currentList.length > 0) return;
   // Override server unread counts with local zero-reads — prevents stale server counts
   // from showing after the user has already read those messages in a prior session.
@@ -420,6 +432,18 @@ const refreshConversations = useCallback(async (force?: boolean, refreshCommunit
     await loadCommunitiesRef.current();
   }
 }, [effectiveCurrentUserId]);
+
+// User-initiated retry: pull-to-refresh, or tapping "Retry" on the
+// error/offline state. Shows its own spinner state distinct from the
+// background refreshes refreshConversations otherwise runs silently.
+const handleRetryConversations = useCallback(async () => {
+  setIsRetryingConversations(true);
+  try {
+    await refreshConversations(true, true);
+  } finally {
+    setIsRetryingConversations(false);
+  }
+}, [refreshConversations]);
 
 const CONVERSATIONS_CACHE_KEY = 'kis.conversations_cache';
 
@@ -457,8 +481,11 @@ useEffect(() => {
       if (active) setConversationsLoading(false);
       return;
     }
-    const convs = await fetchConversationsForCurrentUser(conversationsRef.current, effectiveCurrentUserId ?? undefined);
+    const { chats: convs, status } = await fetchConversationsForCurrentUserWithStatus(
+      conversationsRef.current, effectiveCurrentUserId ?? undefined,
+    );
     if (active) {
+      setConversationsError(status === 'fresh' ? null : (isOfflineRef.current ? 'offline' : 'server'));
       // Apply local zero-read overrides so server's stale unread counts don't re-appear
       const meta = conversationMetaRef.current;
       const merged = convs.map(c => {
@@ -719,6 +746,7 @@ useEffect(() => {
 useEffect(() => {
   const unsubscribe = NetInfo.addEventListener((state) => {
     const connected = state.isConnected === true && state.isInternetReachable !== false;
+    isOfflineRef.current = !connected;
     setIsOffline(!connected);
     if (connected) {
       flushPendingMutations().catch(() => {});
@@ -2476,6 +2504,11 @@ const handleOpenChatFromAddContacts = useCallback((chat: Chat) => {
                 setSelectedChat={setSelectedChat}
                 conversations={conversations}
                 loading={conversationsLoading}
+                connectivityError={conversationsError}
+                isRetrying={isRetryingConversations}
+                onRetry={handleRetryConversations}
+                onRefresh={handleRetryConversations}
+                refreshing={isRetryingConversations}
               />
             )}
           />
