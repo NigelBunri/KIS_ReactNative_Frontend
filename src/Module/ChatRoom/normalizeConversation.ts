@@ -89,6 +89,54 @@ const mergeRawConversationLists = (...lists: any[][]): any[] => {
   return Array.from(map.values());
 };
 
+// DRF's max page_size. Requesting this size on every page keeps the number
+// of round trips small even for a user with hundreds of conversations.
+const CONVERSATION_PAGE_SIZE = 100;
+// Defensive ceiling on how many pages we'll walk in one refresh (200 * 100 =
+// 20,000 conversations). Guards against spinning forever if a server bug
+// ever reports a runaway total_pages value; a real account will never hit
+// this and simply gets every page it actually has.
+const MAX_CONVERSATION_PAGES = 200;
+
+/**
+ * Walks every page the backend reports for the conversation list and
+ * returns the concatenated raw results.
+ *
+ * Previously this only ever fetched page 1: the backend's default
+ * pagination (page_size=25) silently truncated any account with more than
+ * 25 conversations, and nothing in this file ever read `meta.total_pages`
+ * to know a second page existed. A user with 26+ conversations would never
+ * see the rest, with no error and no visible sign anything was missing.
+ *
+ * Throws (rather than returning a partial list) if any page after the
+ * first fails, so a mid-walk network error is treated as a full refresh
+ * failure by the caller and falls back to cache instead of silently
+ * caching a truncated list.
+ */
+async function fetchAllConversationPages(): Promise<any[]> {
+  const pageUrl = (page: number) =>
+    `${ROUTES.chat.listConversations}?page=${page}&page_size=${CONVERSATION_PAGE_SIZE}`;
+
+  const first = await getRequest(pageUrl(1), {
+    errorMessage: 'Unable to load conversations.',
+  });
+  const all = extractConversationList(first);
+
+  const totalPagesRaw = Number((first as any)?.data?.meta?.total_pages);
+  const totalPages = Number.isFinite(totalPagesRaw) && totalPagesRaw > 0
+    ? Math.min(totalPagesRaw, MAX_CONVERSATION_PAGES)
+    : 1;
+
+  for (let page = 2; page <= totalPages; page++) {
+    const res = await getRequest(pageUrl(page), {
+      errorMessage: 'Unable to load conversations.',
+    });
+    all.push(...extractConversationList(res));
+  }
+
+  return all;
+}
+
 
 /* -------------------------------------------------------------------------- */
 /*  CONSTANTS                                                                 */
@@ -287,11 +335,7 @@ async function getRawConversationsFromCache(currentUserId: string): Promise<any[
  */
 async function refreshConversationsAndHandleEmpty(currentUserId: string): Promise<any[] | null> {
   try {
-    const res = await getRequest(ROUTES.chat.listConversations, {
-      errorMessage: 'Unable to load conversations.',
-    });
-
-    const rawList = filterConversationsForUser(extractConversationList(res), currentUserId);
+    const rawList = filterConversationsForUser(await fetchAllConversationPages(), currentUserId);
 
     if (__DEV__) console.log(
       '[refreshConversationsAndHandleEmpty] Fetched conversations:',
