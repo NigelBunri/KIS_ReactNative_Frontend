@@ -175,8 +175,15 @@ export const CommunityInfoPage: React.FC<CommunityInfoPageProps> = ({
       loadCommunity();
     };
     events.forEach((eventName) => socket.on(eventName, handler));
+    // A socket that reconnects after being offline (backgrounded app, dead
+    // wifi) doesn't get missed community.* events replayed - without this,
+    // a screen left mounted through a disconnect would show stale state
+    // indefinitely until the next live event happened to arrive. Same
+    // reconnect->refetch pattern already used for main-tab badges.
+    socket.on('connect', loadCommunity);
     return () => {
       events.forEach((eventName) => socket.off(eventName, handler));
+      socket.off('connect', loadCommunity);
     };
   }, [socket, communityId, loadCommunity]);
 

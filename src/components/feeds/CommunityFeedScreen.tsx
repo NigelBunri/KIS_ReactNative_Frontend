@@ -34,8 +34,14 @@ export default function CommunityFeedScreen({ community, onBack }: CommunityFeed
       setLiveRefreshNonce((n) => n + 1);
     };
     events.forEach((eventName) => socket.on(eventName, handler));
+    // Missed events during a disconnect aren't replayed on reconnect -
+    // without this, a feed screen left mounted through a disconnect would
+    // show stale posts until the next live event happened to arrive.
+    const bumpNonce = () => setLiveRefreshNonce((n) => n + 1);
+    socket.on('connect', bumpNonce);
     return () => {
       events.forEach((eventName) => socket.off(eventName, handler));
+      socket.off('connect', bumpNonce);
     };
   }, [socket, community.id]);
 
