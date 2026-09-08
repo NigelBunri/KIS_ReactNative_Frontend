@@ -927,13 +927,6 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         ).catch(() => {});
       }
     }
-    // Also keep kis.call_history (legacy key) for CallHistoryScreen backward compat.
-    AsyncStorage.getItem('kis.call_history').then(raw => {
-      let history: any[] = [];
-      if (raw) { try { history = JSON.parse(raw); } catch { history = []; } }
-      history.unshift(entry);
-      AsyncStorage.setItem('kis.call_history', JSON.stringify(history.slice(0, 100)));
-    }).catch(() => {});
     // Save to backend (fire and forget, skip missed calls)
     if (resolvedState !== 'missed') {
       postRequest(ROUTES.calls.history, {
