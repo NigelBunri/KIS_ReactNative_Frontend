@@ -1,6 +1,7 @@
 import React, { forwardRef, useCallback, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
+  ActivityIndicator,
   Alert,
   FlatList,
   Image,
@@ -25,6 +26,7 @@ import { KISIcon } from '@/constants/kisIcons';
 import ROUTES, { buildMediaSource, useMediaHeaders } from '@/network';
 import { getRequest } from '@/network/get';
 import { postRequest } from '@/network/post';
+import { deleteRequest } from '@/network/delete';
 import NewChannelForm from '@/Module/AddContacts/components/NewChannelForm';
 import { Chat } from '@/Module/ChatRoom/messagesUtils';
 import Skeleton from '@/components/common/Skeleton';
@@ -197,6 +199,22 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
   const mediaHeaders = useMediaHeaders();
   const [channels, setChannels] = useState<any[]>([]);
   const [channelsLoading, setChannelsLoading] = useState(false);
+  // "Loading more" (pagination) is visually distinct from the initial/
+  // search skeleton load — a spinner at the bottom of an already-visible
+  // list, not a full-list skeleton replacing real content the user is
+  // looking at.
+  const [channelsLoadingMore, setChannelsLoadingMore] = useState(false);
+  const [channelsNextPageUrl, setChannelsNextPageUrl] = useState<string | null>(null);
+  const [channelsError, setChannelsError] = useState(false);
+  // Backend-search results are kept separate from the plain discovery list
+  // rather than reusing `channels` for both — clearing the search must
+  // restore exactly the discovery list that was already loaded (no refetch
+  // needed), and a slow in-flight search response must never stomp on the
+  // discovery list if the user cleared the query before it returned.
+  const [channelSearchResults, setChannelSearchResults] = useState<any[] | null>(null);
+  const [channelSearchLoading, setChannelSearchLoading] = useState(false);
+  const channelSearchRequestIdRef = useRef(0);
+  const channelSearchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [showCreateChannel, setShowCreateChannel] = useState(false);
   const [statusUsers, setStatusUsers] = useState<StatusUser[]>([]);
@@ -250,6 +268,10 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
   const [channelPreviewOpen, setChannelPreviewOpen] = useState(false);
   const [previewChannel, setPreviewChannel] = useState<any | null>(null);
   const [channelSubscribing, setChannelSubscribing] = useState(false);
+  const [channelDetailOpen, setChannelDetailOpen] = useState(false);
+  const [channelDetail, setChannelDetail] = useState<any | null>(null);
+  const [channelDetailLoading, setChannelDetailLoading] = useState(false);
+  const [channelFollowBusy, setChannelFollowBusy] = useState(false);
 
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const progressRef = useRef(0);
@@ -299,6 +321,27 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
     [onOpenChat],
   );
 
+  // Single place that keeps every copy of a channel object (the plain
+  // discovery list, an active search-results list, the subscribe-preview
+  // modal, and the detail sheet) in sync after a follow/unfollow — so a
+  // user who unfollows from the detail sheet immediately sees the list
+  // card update too, with no refetch and no stale duplicate state.
+  const applyChannelPatch = useCallback(
+    (channelId: string, patch: Record<string, any>) => {
+      const merge = (ch: any) =>
+        String(ch.id) === String(channelId) ? { ...ch, ...patch } : ch;
+      setChannels(prev => prev.map(merge));
+      setChannelSearchResults(prev => (prev ? prev.map(merge) : prev));
+      setPreviewChannel((prev: any) =>
+        prev && String(prev.id) === String(channelId) ? { ...prev, ...patch } : prev,
+      );
+      setChannelDetail((prev: any) =>
+        prev && String(prev.id) === String(channelId) ? { ...prev, ...patch } : prev,
+      );
+    },
+    [],
+  );
+
   const handleSubscribeChannel = useCallback(async () => {
     if (!previewChannel) return;
     setChannelSubscribing(true);
@@ -312,49 +355,186 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
       setChannelSubscribing(false);
       return;
     }
-    setChannels(prev =>
-      prev.map(ch =>
-        String(ch.id) === String(previewChannel.id)
-          ? {
-              ...ch,
-              is_subscribed: true,
-              member_role: res?.data?.role ?? ch?.member_role,
-            }
-          : ch,
-      ),
-    );
-    const next = {
-      ...previewChannel,
+    const patch = {
       is_subscribed: true,
       member_role: res?.data?.role ?? previewChannel?.member_role,
     };
+    applyChannelPatch(String(previewChannel.id), patch);
+    const next = { ...previewChannel, ...patch };
     setPreviewChannel(next);
     setChannelSubscribing(false);
     setChannelPreviewOpen(false);
     handleOpenChannel(next);
-  }, [previewChannel, handleOpenChannel]);
+  }, [previewChannel, handleOpenChannel, applyChannelPatch]);
 
-  const loadChannels = useCallback(async () => {
+  // Unfollow — idempotent on the backend (see apps/channels/views.py
+  // unsubscribe()), so a duplicate tap or a retried request after a
+  // dropped response is always safe. Optimistic with rollback: the sheet
+  // stays open so the user sees the state change land immediately.
+  const handleUnsubscribeChannel = useCallback(
+    async (channel: any) => {
+      if (!channel?.id || channelFollowBusy) return;
+      setChannelFollowBusy(true);
+      const previousRole = channel.member_role;
+      applyChannelPatch(String(channel.id), { is_subscribed: false, member_role: null });
+      const res = await postRequest(
+        ROUTES.channels.unsubscribeChannel(String(channel.id)),
+        {},
+        { errorMessage: 'Unable to unfollow channel.' },
+      );
+      const ok = res?.success ?? true;
+      if (!ok) {
+        // Rollback — the request genuinely failed (network/server error),
+        // not merely "already unsubscribed" (that path returns success).
+        applyChannelPatch(String(channel.id), {
+          is_subscribed: true,
+          member_role: previousRole,
+        });
+      }
+      setChannelFollowBusy(false);
+    },
+    [applyChannelPatch, channelFollowBusy],
+  );
+
+  const handleFollowChannel = useCallback(
+    async (channel: any) => {
+      if (!channel?.id || channelFollowBusy) return;
+      setChannelFollowBusy(true);
+      const res = await postRequest(
+        ROUTES.channels.subscribeChannel(String(channel.id)),
+        {},
+        { errorMessage: 'Unable to follow channel.' },
+      );
+      const ok = res?.success ?? true;
+      if (ok) {
+        applyChannelPatch(String(channel.id), {
+          is_subscribed: true,
+          member_role: res?.data?.role ?? channel?.member_role,
+        });
+      }
+      setChannelFollowBusy(false);
+    },
+    [applyChannelPatch, channelFollowBusy],
+  );
+
+  // Channel detail sheet — avatar/name/description/follower count/
+  // owner info/follow-unfollow, per Phase 3 Priority 3. Opens instantly
+  // with whatever's already in the list (no blank flash), then fills in
+  // the detail-only fields (owner_display_name, subscriber_count) from
+  // the real detail endpoint, which also re-confirms is_subscribed —
+  // catching any drift if state changed elsewhere since the list loaded.
+  const openChannelDetail = useCallback(async (channel: any) => {
+    setChannelDetail(channel);
+    setChannelDetailOpen(true);
+    setChannelDetailLoading(true);
+    const res = await getRequest(ROUTES.channels.getChannelById(String(channel.id)), {
+      errorMessage: 'Failed to load channel details',
+    });
+    if (res?.success && res?.data) {
+      setChannelDetail((prev: any) =>
+        prev && String(prev.id) === String(channel.id) ? { ...prev, ...res.data } : prev,
+      );
+    }
+    setChannelDetailLoading(false);
+  }, []);
+
+  const loadChannels = useCallback(async (force = false) => {
     const now = Date.now();
     if (channelsLoadInFlightRef.current) return;
-    if (now - channelsLastLoadAtRef.current < 15000) return;
+    if (!force && now - channelsLastLoadAtRef.current < 15000) return;
     channelsLoadInFlightRef.current = true;
     channelsLastLoadAtRef.current = now;
     setChannelsLoading(true);
+    setChannelsError(false);
     const res = await getRequest(ROUTES.channels.getAllChannels, {
       errorMessage: 'Failed to load channels',
     });
     if (res?.success) {
       const list = res?.data?.results ?? res?.data ?? res ?? [];
       setChannels(Array.isArray(list) ? list : []);
+      // DRF's standard pagination shape: a full next-page URL or null —
+      // passed straight back into getRequest for "load more" rather than
+      // this screen reconstructing a page number/query string itself.
+      setChannelsNextPageUrl(res?.data?.next ?? null);
+    } else {
+      setChannelsError(true);
     }
     setChannelsLoading(false);
     channelsLoadInFlightRef.current = false;
   }, []);
 
+  const loadMoreChannels = useCallback(async () => {
+    if (!channelsNextPageUrl || channelsLoadingMore || channelSearchResults !== null) return;
+    setChannelsLoadingMore(true);
+    const res = await getRequest(channelsNextPageUrl, {
+      errorMessage: 'Failed to load more channels',
+    });
+    if (res?.success) {
+      const list = res?.data?.results ?? [];
+      setChannels((prev) => {
+        // The backend's own dedupe guarantee (deterministic subscriber_count
+        // DESC / created_at DESC / id ordering, see apps/channels/views.py)
+        // is what actually prevents duplicate/missing rows across pages —
+        // this id-based merge is a defensive second layer, not the primary
+        // fix, in case a channel's subscriber_count changed between page
+        // loads and shifted its sort position.
+        const seen = new Set(prev.map((c: any) => c.id));
+        const next = Array.isArray(list) ? list.filter((c: any) => !seen.has(c.id)) : [];
+        return [...prev, ...next];
+      });
+      setChannelsNextPageUrl(res?.data?.next ?? null);
+    }
+    setChannelsLoadingMore(false);
+  }, [channelsNextPageUrl, channelsLoadingMore, channelSearchResults]);
+
+  const runChannelSearch = useCallback(async (query: string) => {
+    const requestId = ++channelSearchRequestIdRef.current;
+    setChannelSearchLoading(true);
+    const res = await getRequest(ROUTES.channels.getAllChannels, {
+      params: { q: query },
+      errorMessage: 'Failed to search channels',
+    });
+    // Stale-response guard: if a newer search (or a query clear) started
+    // after this request went out, its result must never overwrite
+    // whatever the newer request already produced.
+    if (requestId !== channelSearchRequestIdRef.current) return;
+    if (res?.success) {
+      const list = res?.data?.results ?? [];
+      setChannelSearchResults(Array.isArray(list) ? list : []);
+    } else {
+      setChannelSearchResults([]);
+    }
+    setChannelSearchLoading(false);
+  }, []);
+
+  // Debounced backend search — real query to the backend (which applies
+  // the exact same privacy/visibility filtering as plain discovery, see
+  // apps/channels/views.py::get_queryset), not a client-side filter over
+  // whatever page happened to already be loaded. Clearing the query
+  // restores the plain discovery list instantly, with no refetch.
+  React.useEffect(() => {
+    const query = searchTerm.trim();
+    if (channelSearchDebounceRef.current) clearTimeout(channelSearchDebounceRef.current);
+    if (!query) {
+      channelSearchRequestIdRef.current += 1; // invalidate any in-flight search
+      setChannelSearchResults(null);
+      setChannelSearchLoading(false);
+      return;
+    }
+    channelSearchDebounceRef.current = setTimeout(() => {
+      runChannelSearch(query);
+    }, 350);
+    return () => {
+      if (channelSearchDebounceRef.current) clearTimeout(channelSearchDebounceRef.current);
+    };
+  }, [searchTerm, runChannelSearch]);
+
   React.useEffect(() => {
     loadChannels();
   }, [loadChannels]);
+
+  const isChannelSearchActive = searchTerm.trim().length > 0;
+  const displayedChannels = channelSearchResults ?? channels;
 
   const resetStatusDraft = useCallback(() => {
     setStatusDraftType('text');
@@ -474,11 +654,15 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
 
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
-    channelsLastLoadAtRef.current = 0;
     statusesLastLoadAtRef.current = 0;
-    await Promise.all([loadChannels(), loadStatuses()]);
+    const query = searchTerm.trim();
+    await Promise.all([
+      loadChannels(true),
+      query ? runChannelSearch(query) : Promise.resolve(),
+      loadStatuses(),
+    ]);
     setRefreshing(false);
-  }, [loadChannels, loadStatuses]);
+  }, [loadChannels, loadStatuses, runChannelSearch, searchTerm]);
 
   React.useEffect(() => {
     const sub = DeviceEventEmitter.addListener(
@@ -725,6 +909,38 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
       { text: 'Cancel', style: 'cancel' },
     ]);
   }, [activeUser, closeViewer, currentItem?.id, currentUserId, loadStatuses]);
+
+  // Owner-only counterpart to handleStatusActionMenu above — there was
+  // previously no way to delete a posted status from the app at all (the
+  // backend destroy() action existed but nothing in the frontend called
+  // it). Deletion is real: the server soft-deletes the row (so it
+  // immediately disappears from every viewer, including this device on
+  // next load) and removes the underlying media file, not just a
+  // client-side hide.
+  const handleOwnStatusActionMenu = useCallback(() => {
+    if (!currentItem?.id) return;
+    const itemIndexAtOpen = viewerIndex;
+    Alert.alert('Delete this status?', 'This cannot be undone.', [
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          const res = await deleteRequest(ROUTES.statuses.delete(currentItem.id), {
+            errorMessage: 'Unable to delete status.',
+          });
+          if (!res?.success) return;
+          const wasLastItem = (activeUser?.items.length ?? 0) <= 1;
+          if (wasLastItem) {
+            closeViewer();
+          } else if (itemIndexAtOpen > 0) {
+            setViewerIndex(itemIndexAtOpen - 1);
+          }
+          await loadStatuses(true);
+        },
+      },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
+  }, [activeUser?.items.length, closeViewer, currentItem?.id, loadStatuses, viewerIndex]);
 
   const handleNext = useCallback(() => {
     if (!activeUser) return;
@@ -1109,7 +1325,8 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
             Channels
           </Text>
         </View>
-        {channelsLoading ? (
+        {(channelsLoading && channels.length === 0) ||
+        (isChannelSearchActive && channelSearchLoading && channelSearchResults === null) ? (
           <View style={{ paddingHorizontal: 16, gap: 12 }}>
             {Array.from({ length: 3 }).map((_, idx) => (
               <View
@@ -1137,15 +1354,29 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
               </View>
             ))}
           </View>
+        ) : channelsError && channels.length === 0 && !isChannelSearchActive ? (
+          <View style={{ paddingHorizontal: 16, paddingVertical: 24, alignItems: 'center', gap: 10 }}>
+            <Text style={{ color: palette.subtext, textAlign: 'center' }}>
+              Couldn't load channels.
+            </Text>
+            <Pressable
+              onPress={() => loadChannels(true)}
+              style={[styles.subscribeButton, { backgroundColor: palette.primary }]}
+            >
+              <Text style={{ color: palette.onPrimary, fontWeight: '700' }}>Retry</Text>
+            </Pressable>
+          </View>
+        ) : displayedChannels.length === 0 ? (
+          <View style={{ paddingHorizontal: 16, paddingVertical: 24, alignItems: 'center' }}>
+            <Text style={{ color: palette.subtext, textAlign: 'center' }}>
+              {isChannelSearchActive
+                ? 'No channels match your search.'
+                : 'No channels yet.'}
+            </Text>
+          </View>
         ) : (
-          channels
-            .filter(ch => {
-              if (!searchTerm.trim()) return true;
-              const q = searchTerm.trim().toLowerCase();
-              const name = String(ch.name ?? '').toLowerCase();
-              const desc = String(ch.description ?? '').toLowerCase();
-              return name.includes(q) || desc.includes(q);
-            })
+          <>
+          {displayedChannels
             .map(ch => (
               <Pressable
                 key={ch.id}
@@ -1217,9 +1448,40 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
                       </Text>
                     ) : null}
                   </View>
+                  <Pressable
+                    onPress={() => openChannelDetail(ch)}
+                    hitSlop={10}
+                    style={{ padding: 6, marginLeft: 4 }}
+                  >
+                    <KISIcon name="info" size={18} color={palette.subtext} />
+                  </Pressable>
                 </View>
               </Pressable>
-            ))
+            ))}
+          {!isChannelSearchActive && channelsNextPageUrl ? (
+            <Pressable
+              onPress={loadMoreChannels}
+              disabled={channelsLoadingMore}
+              style={{
+                marginHorizontal: 16,
+                marginTop: 4,
+                paddingVertical: 12,
+                alignItems: 'center',
+                borderRadius: 12,
+                borderWidth: 1,
+                borderColor: palette.inputBorder,
+              }}
+            >
+              {channelsLoadingMore ? (
+                <ActivityIndicator color={palette.primary} />
+              ) : (
+                <Text style={{ color: palette.primaryStrong, fontWeight: '600' }}>
+                  Load more channels
+                </Text>
+              )}
+            </Pressable>
+          ) : null}
+          </>
         )}
       </ScrollView>
 
@@ -1294,6 +1556,125 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
                 {channelSubscribing ? 'Subscribing…' : 'Subscribe'}
               </Text>
             </Pressable>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Channel detail sheet: avatar, description, follower state,
+          owner info, follow/unfollow — Phase 3 Priority 3. Deliberately
+          no cover image (not part of this product's identity, and not
+          something WhatsApp Channels have either). */}
+      <Modal visible={channelDetailOpen} transparent animationType="slide">
+        <View style={[styles.channelPreviewBackdrop, { backgroundColor: palette.royalInk }]}>
+          <Pressable
+            style={styles.channelPreviewClose}
+            onPress={() => {
+              setChannelDetailOpen(false);
+              setChannelDetail(null);
+            }}
+          />
+          <View style={[styles.channelPreviewCard, { backgroundColor: palette.card }]}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+              {channelDetail?.avatar_url ? (
+                <Image
+                  source={{ uri: channelDetail.avatar_url }}
+                  style={styles.channelAvatar}
+                />
+              ) : (
+                <View style={[styles.channelAvatar, { backgroundColor: palette.surface }]}>
+                  <KISIcon name="megaphone" size={18} color={palette.text} />
+                </View>
+              )}
+              <View style={{ flex: 1 }}>
+                <Text style={{ color: palette.text, fontSize: 18, fontWeight: '700' }}>
+                  {channelDetail?.name ?? 'Channel'}
+                </Text>
+                {channelDetail?.partner ? (
+                  <Text style={{ color: palette.primaryStrong, fontSize: 11 }}>Partner</Text>
+                ) : null}
+              </View>
+            </View>
+
+            {channelDetail?.description ? (
+              <Text style={{ color: palette.subtext, marginTop: 12 }}>
+                {channelDetail.description}
+              </Text>
+            ) : null}
+
+            <View style={{ marginTop: 14, gap: 6 }}>
+              <Text style={{ color: palette.subtext, fontSize: 13 }}>
+                {typeof channelDetail?.subscriber_count === 'number'
+                  ? `${channelDetail.subscriber_count} follower${channelDetail.subscriber_count === 1 ? '' : 's'}`
+                  : channelDetailLoading
+                    ? 'Loading followers…'
+                    : ''}
+              </Text>
+              {channelDetail?.owner_display_name ? (
+                <Text style={{ color: palette.subtext, fontSize: 13 }}>
+                  Owned by {channelDetail.owner_display_name}
+                </Text>
+              ) : null}
+              {channelDetail?.is_subscribed && channelDetail?.member_role ? (
+                <Text style={{ color: palette.subtext, fontSize: 13 }}>
+                  Your role: {channelDetail.member_role}
+                </Text>
+              ) : null}
+            </View>
+
+            <Pressable
+              onPress={() =>
+                channelDetail?.is_subscribed
+                  ? handleUnsubscribeChannel(channelDetail)
+                  : handleFollowChannel(channelDetail)
+              }
+              disabled={channelFollowBusy || channelDetail?.member_role === 'owner'}
+              style={({ pressed }) => [
+                styles.subscribeButton,
+                {
+                  backgroundColor: channelDetail?.is_subscribed
+                    ? palette.surfaceElevated
+                    : palette.primary,
+                  opacity: pressed || channelFollowBusy ? 0.75 : 1,
+                  marginTop: 16,
+                },
+              ]}
+            >
+              <Text
+                style={{
+                  color: channelDetail?.is_subscribed ? palette.text : palette.onPrimary,
+                  fontWeight: '700',
+                }}
+              >
+                {channelDetail?.member_role === 'owner'
+                  ? 'You own this channel'
+                  : channelFollowBusy
+                    ? 'Please wait…'
+                    : channelDetail?.is_subscribed
+                      ? 'Following · Tap to unfollow'
+                      : 'Follow'}
+              </Text>
+            </Pressable>
+
+            {channelDetail?.is_subscribed ? (
+              <Pressable
+                onPress={() => {
+                  setChannelDetailOpen(false);
+                  handleOpenChannel(channelDetail);
+                }}
+                style={({ pressed }) => [
+                  styles.subscribeButton,
+                  {
+                    backgroundColor: 'transparent',
+                    borderWidth: 1,
+                    borderColor: palette.inputBorder,
+                    opacity: pressed ? 0.75 : 1,
+                    marginTop: 8,
+                  },
+                ]}
+              >
+                <Text style={{ color: palette.text, fontWeight: '700' }}>Open channel</Text>
+              </Pressable>
+            ) : null}
           </View>
         </View>
       </Modal>
@@ -1960,6 +2341,20 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
               >
                 More
               </Text>
+            </Pressable>
+          ) : null}
+          {activeUser?.userId && activeUser.userId === currentUserId ? (
+            <Pressable
+              style={[
+                styles.viewerMenuButton,
+                {
+                  backgroundColor: palette.surfaceElevated,
+                  borderColor: palette.inputBorder,
+                },
+              ]}
+              onPress={handleOwnStatusActionMenu}
+            >
+              <KISIcon name="trash" size={14} color={palette.text} />
             </Pressable>
           ) : null}
 
