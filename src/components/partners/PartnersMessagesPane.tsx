@@ -31,12 +31,19 @@ type Props = {
   selectedPartner?: Partner;
   onOpenInfo?: (payload: { chat: any; currentUserId: string | null }) => void;
   onOpenTasks?: () => void;
+  /** How far below the true screen top / above the true screen bottom this
+   * pane's always-visible "closed" peek sliver must stay, now that it
+   * renders as a top-level sibling that can otherwise reach the Golden
+   * Section and tab bar (see DetachedPartnersOverlayContext.tsx). Ignored
+   * while isMessagesExpanded - the whole point of opening is to cover both. */
+  peekTopInset?: number;
+  peekBottomInset?: number;
 };
 
 export default function PartnersMessagesPane({
   width,
   messagesOffsetAnim,
-  isMessagesExpanded: _isMessagesExpanded,
+  isMessagesExpanded,
   toggleMessagesPane: _toggleMessagesPane,
   closeMessagesPane,
   messagePanHandlers,
@@ -50,6 +57,8 @@ export default function PartnersMessagesPane({
   selectedPartner,
   onOpenInfo,
   onOpenTasks,
+  peekTopInset = 0,
+  peekBottomInset = 0,
 }: Props) {
   const { palette } = useKISTheme();
   const responsive = useResponsiveLayout();
@@ -118,6 +127,14 @@ export default function PartnersMessagesPane({
           backgroundColor: palette.chatBg,
           borderLeftColor: palette.divider,
           transform: [{ translateX: messagesOffsetAnim }],
+          // Full coverage while open (overrides styles.messagesPane's own
+          // top:0/bottom:0 with the same values - explicit here so the
+          // intent reads clearly next to the peeked case below); confined
+          // to stay clear of the Golden Section + tab bar while the pane is
+          // just its normal always-visible peek sliver. See peekTopInset/
+          // peekBottomInset's own doc comment on this component's Props.
+          top: isMessagesExpanded ? 0 : peekTopInset,
+          bottom: isMessagesExpanded ? 0 : peekBottomInset,
         },
       ]}
       {...messagePanHandlers}
