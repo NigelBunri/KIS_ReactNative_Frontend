@@ -178,20 +178,24 @@ export const CommunityInfoPage: React.FC<CommunityInfoPageProps> = ({
       actions.push(() => {
         Alert.alert(
           'Remove member',
-          `Remove ${label} from this community?`,
+          `Remove ${label} from this community? They can rejoin later.`,
           [
             { text: 'Cancel', style: 'cancel' },
             {
               text: 'Remove',
               style: 'destructive',
               onPress: async () => {
-                try {
-                  await postRequest(ROUTES.community.ban(communityId), { user_id: userId }, {
-                    errorMessage: 'Failed to remove member',
-                  });
+                // members/remove is non-permanent - the member can rejoin
+                // through the community's normal join_policy later. This
+                // previously called ban() by mistake, which is permanent
+                // until an admin explicitly unbans them.
+                const res = await postRequest(ROUTES.community.removeMember(communityId), { user_id: userId }, {
+                  errorMessage: 'Failed to remove member',
+                });
+                if (res.success) {
                   setMembers((prev) => prev.filter((m) => resolveUserId(m) !== userId));
-                } catch (err: any) {
-                  Alert.alert('Error', err?.message || 'Unable to remove member.');
+                } else {
+                  Alert.alert('Error', res.message || 'Unable to remove member.');
                 }
               },
             },
@@ -202,33 +206,37 @@ export const CommunityInfoPage: React.FC<CommunityInfoPageProps> = ({
       if (isMemberAdmin) {
         options.push('Demote from admin');
         actions.push(async () => {
-          try {
-            await postRequest(ROUTES.community.members(communityId), { user_id: userId, role: 'member' }, {
-              errorMessage: 'Failed to demote member',
-            });
+          const res = await postRequest(
+            ROUTES.community.setMemberRole(communityId),
+            { user_id: userId, role: 'member' },
+            { errorMessage: 'Failed to demote member' },
+          );
+          if (res.success) {
             setMembers((prev) =>
               prev.map((m) =>
                 resolveUserId(m) === userId ? { ...m, role: 'member', base_role: 'member' } : m,
               ),
             );
-          } catch (err: any) {
-            Alert.alert('Error', err?.message || 'Unable to demote member.');
+          } else {
+            Alert.alert('Error', res.message || 'Unable to demote member.');
           }
         });
       } else {
         options.push('Promote to admin');
         actions.push(async () => {
-          try {
-            await postRequest(ROUTES.community.members(communityId), { user_id: userId, role: 'admin' }, {
-              errorMessage: 'Failed to promote member',
-            });
+          const res = await postRequest(
+            ROUTES.community.setMemberRole(communityId),
+            { user_id: userId, role: 'admin' },
+            { errorMessage: 'Failed to promote member' },
+          );
+          if (res.success) {
             setMembers((prev) =>
               prev.map((m) =>
                 resolveUserId(m) === userId ? { ...m, role: 'admin', base_role: 'admin' } : m,
               ),
             );
-          } catch (err: any) {
-            Alert.alert('Error', err?.message || 'Unable to promote member.');
+          } else {
+            Alert.alert('Error', res.message || 'Unable to promote member.');
           }
         });
       }
