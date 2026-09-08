@@ -164,6 +164,7 @@ export const CommunityInfoPage: React.FC<CommunityInfoPageProps> = ({
       'community.role_changed',
       'community.join_request_created',
       'community.join_request_decided',
+      'community.settings_changed',
       'community.post_created',
       'community.post_updated',
       'community.post_deleted',
