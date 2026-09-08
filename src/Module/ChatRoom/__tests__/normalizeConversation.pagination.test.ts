@@ -104,7 +104,9 @@ describe('conversation list pagination (P0 fix)', () => {
       if (page === 1) {
         return { data: { meta: { total_pages: 2, count: 150 }, results: [conv(0)] } };
       }
-      throw new Error('network down');
+      // getRequest's real contract: it never throws on a normal
+      // network/HTTP failure, it resolves to { success: false, ... }.
+      return { success: false, message: 'network down' };
     });
 
     const chats = await fetchConversationsForCurrentUser([], 'user-1', true);

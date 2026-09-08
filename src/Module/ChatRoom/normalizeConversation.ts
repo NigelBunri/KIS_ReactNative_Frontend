@@ -117,9 +117,25 @@ async function fetchAllConversationPages(): Promise<any[]> {
   const pageUrl = (page: number) =>
     `${ROUTES.chat.listConversations}?page=${page}&page_size=${CONVERSATION_PAGE_SIZE}`;
 
-  const first = await getRequest(pageUrl(1), {
-    errorMessage: 'Unable to load conversations.',
-  });
+  // getRequest never throws on a normal network/HTTP failure - every
+  // failure path (network error, 4xx/5xx, etc.) resolves to
+  // `{ success: false, ... }` instead (see src/network/get/index.tsx). A
+  // caller that ignores `success` and just extracts whatever list-shaped
+  // data it can find will silently treat a failed page as "zero
+  // conversations on that page" and keep walking, which reintroduces the
+  // exact silent-truncation bug this function exists to fix. Explicitly
+  // check and throw so a failed page aborts the whole walk instead.
+  const fetchPageOrThrow = async (page: number) => {
+    const res = await getRequest(pageUrl(page), {
+      errorMessage: 'Unable to load conversations.',
+    });
+    if ((res as any)?.success === false) {
+      throw new Error((res as any)?.message || `Failed to load conversations page ${page}.`);
+    }
+    return res;
+  };
+
+  const first = await fetchPageOrThrow(1);
   const all = extractConversationList(first);
 
   const totalPagesRaw = Number((first as any)?.data?.meta?.total_pages);
@@ -128,9 +144,7 @@ async function fetchAllConversationPages(): Promise<any[]> {
     : 1;
 
   for (let page = 2; page <= totalPages; page++) {
-    const res = await getRequest(pageUrl(page), {
-      errorMessage: 'Unable to load conversations.',
-    });
+    const res = await fetchPageOrThrow(page);
     all.push(...extractConversationList(res));
   }
 

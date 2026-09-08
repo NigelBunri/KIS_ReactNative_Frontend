@@ -77,7 +77,9 @@ describe('conversation list fetch status (P1 fix)', () => {
 
   it('reports "cache_fallback" when a forced refresh fails but cached data exists', async () => {
     mockCacheStore.set('CHAT_CACHE:CONVERSATION_LIST:user-1', [conv(0)]);
-    getRequestMock.mockRejectedValue(new Error('network down'));
+    // getRequest's real contract: it never throws on a normal network/HTTP
+    // failure, it resolves to { success: false, ... } instead.
+    getRequestMock.mockResolvedValue({ success: false, message: 'network down' });
 
     const { chats, status } = await fetchConversationsForCurrentUserWithStatus([], 'user-1', true);
 
@@ -86,7 +88,9 @@ describe('conversation list fetch status (P1 fix)', () => {
   });
 
   it('reports "error_no_cache" when a forced refresh fails and nothing is cached', async () => {
-    getRequestMock.mockRejectedValue(new Error('network down'));
+    // getRequest's real contract: it never throws on a normal network/HTTP
+    // failure, it resolves to { success: false, ... } instead.
+    getRequestMock.mockResolvedValue({ success: false, message: 'network down' });
 
     const { chats, status } = await fetchConversationsForCurrentUserWithStatus([], 'user-1', true);
 
@@ -95,9 +99,15 @@ describe('conversation list fetch status (P1 fix)', () => {
   });
 
   it('reports "error_no_cache" on the passive (non-forced) path when the cache is empty and the background refresh fails', async () => {
-    getRequestMock.mockRejectedValue(new Error('network down'));
+    // getRequest's real contract: it never throws on a normal network/HTTP
+    // failure, it resolves to { success: false, ... } instead.
+    getRequestMock.mockResolvedValue({ success: false, message: 'network down' });
 
-    const { chats, status } = await fetchConversationsForCurrentUserWithStatus([conv(0)], 'user-1', false);
+    // `fallback` is typed as already-normalized Chat[] (this is what callers
+    // like MessagesScreen actually pass - their live in-memory chat list),
+    // unlike `conv()`'s raw-backend shape used elsewhere in this file.
+    const fallback = [{ ...conv(0), name: 'Conversation 0' }] as any;
+    const { chats, status } = await fetchConversationsForCurrentUserWithStatus(fallback, 'user-1', false);
 
     // Falls back to the caller-supplied `fallback` list (e.g. in-memory
     // state) - still an error, not a silent "fresh empty" result.
