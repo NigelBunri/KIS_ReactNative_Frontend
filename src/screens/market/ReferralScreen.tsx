@@ -35,7 +35,7 @@ type ReferralEntry = {
 
 type ReferralSummary = {
   code: string;
-  reward_points_per_referral: number;
+  referral_link: string;
   current_referral_rate_percent: string | number | null;
   current_referral_rate_tier: string | null;
   total_referred: number;
@@ -118,10 +118,20 @@ export default function ReferralScreen() {
 
   const handleShare = useCallback(() => {
     if (!summary?.code) return;
+    // referral_link (apps.referrals.views.MyReferralsView) is a real
+    // https://.../join/referral/<code> deep link, resolved by
+    // apps.core.link_resolver and the website's /join/[type]/[token]
+    // landing page - opens straight into KIS if already installed, or
+    // carries the code through the store-install fallback via clipboard
+    // (see OpenInApp's attributionCode). Falls back to the bare code for
+    // any client old enough not to have received this field yet.
+    const link = summary.referral_link;
     Share.share({
-      message: `Join me on KIS! Use my referral code ${summary.code} when you sign up.`,
+      message: link
+        ? `Join me on KIS! Use my referral code ${summary.code} when you sign up, or just tap this link: ${link}`
+        : `Join me on KIS! Use my referral code ${summary.code} when you sign up.`,
     }).catch(() => {});
-  }, [summary?.code]);
+  }, [summary?.code, summary?.referral_link]);
 
   const ratePercent = summary?.current_referral_rate_percent;
 

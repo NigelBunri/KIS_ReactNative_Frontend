@@ -19,6 +19,7 @@ import ROUTES from '@/network';
 import { postRequest } from '@/network/post';
 import { getRequest } from '@/network/get';
 import { useSafeTopInset } from '@/hooks/useSafeTopInset';
+import { useAuth } from '../../../App';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'InviteJoin'>;
 
@@ -27,6 +28,7 @@ export default function InviteJoinScreen({ route, navigation }: Props) {
   const { palette } = useKISTheme();
   const responsive = useResponsiveLayout();
   const topInset = useSafeTopInset();
+  const { isAuth } = useAuth();
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
   const [message, setMessage] = useState('');
   const [groupName, setGroupName] = useState('');
@@ -42,6 +44,22 @@ export default function InviteJoinScreen({ route, navigation }: Props) {
     }).start();
 
     const join = async () => {
+      if (type === 'referral') {
+        // A referral code only ever applies at registration
+        // (apps.referrals.models.Referral.referred_user is a
+        // OneToOneField, set exactly once) - there is no "join" action
+        // for an already-registered visitor. Signed-out: hand the code
+        // straight to Register so it rides along in the same request
+        // RegisterScreen already sends (referral_code), rather than a
+        // separate redeem call. Signed-in: nothing to do but say so.
+        if (!isAuth) {
+          navigation.replace('Register', { referralCode: token });
+          return;
+        }
+        setStatus('success');
+        setMessage('You already have a KIS account, so this invite code doesn’t apply — but glad you’re here!');
+        return;
+      }
       if (type === 'contact') {
         // A contact link redeems into a pending DM request, not a group/
         // community membership - a genuinely different flow (see

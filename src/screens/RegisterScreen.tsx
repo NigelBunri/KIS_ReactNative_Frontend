@@ -1,5 +1,5 @@
 // src/screens/RegisterScreen.tsx
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Country, CountryCode } from 'react-native-country-picker-modal';
 import SafeCountryPicker from '@/components/common/SafeCountryPicker';
@@ -32,6 +32,7 @@ import { useResponsiveLayout } from '@/theme/responsive';
 import KISText from '@/components/common/KISText';
 import KISDateTimeInput from '@/constants/KISDateTimeInput';
 import { KIS_TOKENS } from '@/theme/constants';
+import { readReferralCodeFromClipboard } from '@/utils/referralAttribution';
 
 const createStyles = (tokens: typeof KIS_TOKENS, contentMaxWidth: number) =>
   StyleSheet.create({
@@ -133,7 +134,7 @@ const createStyles = (tokens: typeof KIS_TOKENS, contentMaxWidth: number) =>
     },
   });
 
-export default function RegisterScreen({ navigation }: any) {
+export default function RegisterScreen({ navigation, route }: any) {
   const { setAuth, setUser } = useAuth();
   const { palette, tokens, tone } = useKISTheme();
   const responsive = useResponsiveLayout();
@@ -162,6 +163,31 @@ export default function RegisterScreen({ navigation }: any) {
   const [regPassword2, setRegPassword2] = useState('');
   const [loading, setLoading] = useState(false);
   const [termsAgreed, setTermsAgreed] = useState(false);
+
+  // Install attribution: InviteJoinScreen's referral branch navigates here
+  // with a code straight from a deep link the app was already installed
+  // for. Otherwise (fresh install, deep link lost across the store
+  // boundary) fall back to whatever the website's OpenInApp component
+  // wrote to the clipboard before sending this visitor to the store - the
+  // "existing clipboard/manual-code fallback" the deep-links spec calls
+  // for. Either source is editable below, never silently applied.
+  const [referralCode, setReferralCode] = useState(route?.params?.referralCode ?? '');
+  const [referralFieldExpanded, setReferralFieldExpanded] = useState(!!route?.params?.referralCode);
+
+  useEffect(() => {
+    if (route?.params?.referralCode) return; // deep link already provided one
+    let cancelled = false;
+    readReferralCodeFromClipboard().then((code) => {
+      if (!cancelled && code) {
+        setReferralCode(code);
+        setReferralFieldExpanded(true);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const onChangeRegPhone = useCallback((value: string) => {
     setRegPhone(String(value || '').replace(/[^\d]/g, '').slice(0, 14));
@@ -244,6 +270,7 @@ export default function RegisterScreen({ navigation }: any) {
         device_platform: Platform.OS,
         ...(simPhoneNumber ? { sim_phone_number: simPhoneNumber } : {}),
       };
+      if (referralCode.trim()) payload.referral_code = referralCode.trim();
       if (displayName.trim()) payload.display_name = displayName.trim();
       if (dateOfBirth) payload.date_of_birth = dateOfBirth.slice(0, 10);
 
@@ -460,6 +487,27 @@ export default function RegisterScreen({ navigation }: any) {
               textContentType="newPassword"
             />
           </View>
+
+          {referralFieldExpanded ? (
+            <View style={styles.field}>
+              <KISText preset="label" color={palette.subtext}>Referral code (optional)</KISText>
+              <TextInput
+                value={referralCode}
+                onChangeText={(v) => setReferralCode(v.toUpperCase())}
+                autoCapitalize="characters"
+                autoCorrect={false}
+                placeholder="e.g. B6UCUG5S"
+                placeholderTextColor={palette.subtext}
+                style={[styles.input, inputStyle]}
+              />
+            </View>
+          ) : (
+            <Pressable onPress={() => setReferralFieldExpanded(true)} hitSlop={8}>
+              <KISText preset="helper" color={palette.primary}>
+                Have a referral code?
+              </KISText>
+            </Pressable>
+          )}
 
           <Pressable
             onPress={() => setTermsAgreed(v => !v)}

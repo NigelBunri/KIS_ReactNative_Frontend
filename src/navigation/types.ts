@@ -7,7 +7,7 @@ export type RootStackParamList = {
   TermsAndConditions: undefined;
   PrivacyPolicy: undefined;
   Login: undefined;
-  Register: undefined;
+  Register: { referralCode?: string } | undefined;
   TwoFactor: {
     phone?: string;
     email?: string;
@@ -66,7 +66,7 @@ export type RootStackParamList = {
   NotificationsDashboard: undefined;
   OrganizationApp: { app: PartnerOrganizationApp; partnerId?: string; partnerName?: string; canManage?: boolean };
   OrgAppLaunch: { partnerId: string; appId: string };
-  InviteJoin: { type: 'group' | 'community' | 'contact'; token: string };
+  InviteJoin: { type: 'group' | 'community' | 'contact' | 'referral'; token: string };
   CallJoin: { token: string };
   PartnerRedeemInvite: { code?: string };
   OrganizationAppForm: { partnerId: string; app?: PartnerOrganizationApp };
