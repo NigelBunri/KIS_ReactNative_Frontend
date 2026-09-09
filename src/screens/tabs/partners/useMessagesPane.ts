@@ -156,6 +156,10 @@ export const useMessagesPane = (
     openMessagesPane,
     closeMessagesPane,
     animateMessagesPane,
+    // Instant, non-animated snap-closed - exposed for PartnersScreen.tsx's
+    // blur handler, which needs the pane visually gone the moment focus is
+    // lost, not mid-spring on a screen the user has already left.
+    snapMessagesPane,
     panHandlers: panResponder.panHandlers,
     messagePanHandlers: panResponder.panHandlers,
   };

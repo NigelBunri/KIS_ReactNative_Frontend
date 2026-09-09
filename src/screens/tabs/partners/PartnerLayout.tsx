@@ -111,6 +111,10 @@ type Props = {
   isKcanAdmin?: boolean;
   onOpenAdminDashboard?: () => void;
   onRefreshPartner?: () => Promise<void> | void;
+  // Whether the Partners tab is the currently-focused screen. The detached
+  // overlay bridge below is only mounted while true - see the comment at
+  // its render site for why this is required, not optional.
+  isFocused: boolean;
 };
 
 export default function PartnerLayout({
@@ -168,6 +172,7 @@ export default function PartnerLayout({
   isKcanAdmin,
   onOpenAdminDashboard,
   onRefreshPartner,
+  isFocused,
 }: Props) {
   const { palette, tone } = useKISTheme();
   // Gold header → dark icons (same as Messages + Broadcast + Bible)
@@ -288,15 +293,32 @@ export default function PartnerLayout({
       ) : null}
 
       {/* Chat/feed pane + settings sheet render as true top-level siblings in
-          App.tsx (see DetachedPartnersOverlayContext.tsx), permanently — the
-          same "always bridged, never conditionally unbridged" shape as the
-          chat overlay, so the pane is never remounted mid-animation (an
-          earlier attempt toggled render location based on isMessagesExpanded
-          and broke the close animation this way - see the long comment
-          above peekTopInset/peekBottomInset). Instead, the pane's own
-          top/bottom insets do the work: full coverage while open, confined
-          to peekTopInset/peekBottomInset while closed - a plain style change
-          on an always-mounted component, not a remount. */}
+          App.tsx (see DetachedPartnersOverlayContext.tsx) WHILE THE PARTNERS
+          TAB IS FOCUSED - "always bridged, never conditionally unbridged"
+          only within a single focus session, not across the tab's entire
+          mounted lifetime. Bottom `Tabs.Navigator` has no unmountOnBlur, so
+          PartnerLayout itself keeps living after the user switches tabs;
+          without this isFocused gate, the Bridge's setProps(...) effect
+          kept re-firing on every re-render regardless of which tab was
+          actually showing, and the Outlet (App.tsx) had no way to know it
+          should stop painting - the peek sliver (and, if left open, the
+          full pane) would visibly leak onto every other tab in the app.
+          Unmounting the Bridge on blur reuses its EXISTING cleanup
+          (setProps(null) in its own effect return, see
+          DetachedPartnersOverlayContext.tsx) rather than adding new
+          clear-on-blur logic - remounting on refocus is cheap and correct
+          since all the real state (isMessagesExpanded, offsets, etc.) lives
+          in PartnersScreen's hooks, not in this bridge.
+          This does NOT reintroduce the old mid-animation-remount bug: that
+          bug was about remounting while the CLOSE SPRING was still running
+          on THIS tab (a user-visible glitch); unmounting because the user
+          navigated to a completely different tab is a different, legitimate
+          case where an instant disappearance is exactly what's wanted, not
+          a regression - see PartnersScreen.tsx's blur handler, which also
+          snaps (non-animated) the pane/sheet closed and restores the tab
+          bar the instant focus is lost, precisely so nothing is mid-flight
+          when this unmount happens. */}
+      {isFocused && (
       <DetachedPartnersOverlayBridge
         messagesPaneProps={{
           width,
@@ -337,6 +359,7 @@ export default function PartnerLayout({
           onOpenOrganizations,
         }}
       />
+      )}
 
       <PartnerPanels
         selectedPartnerId={selectedPartner?.id}

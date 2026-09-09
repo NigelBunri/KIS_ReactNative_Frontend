@@ -1,7 +1,7 @@
 // src/screens/tabs/PartnersScreen.tsx
 import React, { useCallback, useEffect } from 'react';
 import { Alert, Animated, DeviceEventEmitter, Pressable, Text, useWindowDimensions, View } from 'react-native';
-import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { useNavigation, useFocusEffect, useIsFocused } from '@react-navigation/native';
 import { useResponsiveLayout } from '@/theme/responsive';
 import { useKISTheme } from '@/theme/useTheme';
 import { useContextPanelContent, TabletCard } from '@/components/shell';
@@ -94,6 +94,12 @@ import {
 
 export default function PartnersScreen({ setHidNav, onOpenInfo }: any) {
   const navigation = useNavigation<any>();
+  // Drives PartnerLayout's isFocused prop, which gates whether the
+  // detached messages-pane/settings-sheet bridge is mounted at all - see
+  // the long comment at that bridge's render site in PartnerLayout.tsx for
+  // why this is required (without it, Partners' overlay pixels leak onto
+  // every other tab once Partners has been visited once).
+  const isFocused = useIsFocused();
   const { setAuth, user } = useAuth();
   const currentUserId = user?.id ?? null;
   const { width, height } = useWindowDimensions();
@@ -281,6 +287,7 @@ export default function PartnersScreen({ setHidNav, onOpenInfo }: any) {
     toggleMessagesPane,
     closeMessagesPane,
     openMessagesPane,
+    snapMessagesPane,
     panHandlers,
     messagePanHandlers,
   } = useMessagesPane(width, setHidNav);
@@ -314,7 +321,29 @@ export default function PartnersScreen({ setHidNav, onOpenInfo }: any) {
     overlayOpacity,
     sheetPanHandlers,
     animatePartnerSheet,
+    snapPartnerSheetClosed,
   } = usePartnerSheet(height);
+
+  // The moment Partners loses focus (user switched tabs), collapse both
+  // overlays instantly (no animation - the user isn't looking at this
+  // screen anymore) and restore the tab bar. This runs BEFORE
+  // PartnerLayout's isFocused prop flips to false and unmounts the detached
+  // bridge, so nothing is left mid-open/mid-animation when that unmount
+  // happens. Without this, isMessagesExpanded/isPartnerSheetOpen would
+  // silently stay true in the background, and returning to Partners later
+  // would show it already open with no user action - not the "closing
+  // restores exactly, reopening starts fresh" behavior a contextual overlay
+  // is supposed to have.
+  useFocusEffect(
+    useCallback(() => {
+      return () => {
+        snapMessagesPane(false);
+        snapPartnerSheetClosed();
+        setHidNav?.(false);
+      };
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []),
+  );
   const {
     panelWidth,
     panelTranslateX,
@@ -902,6 +931,7 @@ export default function PartnersScreen({ setHidNav, onOpenInfo }: any) {
   return (
     <PartnerOrganizationAppsProvider partnerId={selectedPartner?.id}>
       <PartnerLayout
+        isFocused={isFocused}
         rootPanHandlers={rootPanHandlers}
         partners={partners}
         partnersLoading={partnersLoading}

@@ -79,6 +79,18 @@ export const usePartnerSheet = (height: number) => {
     },
   });
 
+  // Instant, non-animated close - for when the sheet needs to disappear
+  // because the user left the Partners tab entirely (see PartnersScreen.tsx's
+  // blur handler), not because they interacted with it. A spring animation
+  // would be wasted motion on a screen the user is no longer looking at.
+  const snapPartnerSheetClosed = () => {
+    isOpenRef.current = false;
+    setIsPartnerSheetOpen(false);
+    sheetOffsetAnim.stopAnimation();
+    sheetOffsetAnim.setValue(sheetHeight);
+    sheetOffsetRef.current = sheetHeight;
+  };
+
   return {
     isPartnerSheetOpen,
     sheetHeight,
@@ -86,5 +98,6 @@ export const usePartnerSheet = (height: number) => {
     overlayOpacity,
     sheetPanHandlers: sheetPanResponder.panHandlers,
     animatePartnerSheet,
+    snapPartnerSheetClosed,
   };
 };
