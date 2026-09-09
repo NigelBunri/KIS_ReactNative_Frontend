@@ -1,5 +1,4 @@
 import React, { forwardRef, useCallback, useImperativeHandle, useMemo, useRef, useState } from 'react';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   ActivityIndicator,
   Alert,
@@ -42,7 +41,7 @@ import Video from 'react-native-video';
 import AudioRecorderPlayer from 'react-native-audio-recorder-player';
 import { PERMISSIONS, RESULTS, check, request } from 'react-native-permissions';
 import RNFS from 'react-native-fs';
-import { useSafeTopInset } from '@/hooks/useSafeTopInset';
+import { useSafeTopInset, useRawTopInset } from '@/hooks/useSafeTopInset';
 import type { ScrollableHandle } from '@/hooks/useHeaderDragToScroll';
 
 type StatusVisibility = 'contacts' | 'contacts_except' | 'only_share_with';
@@ -191,6 +190,12 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
   const { palette } = useKISTheme();
   const responsive = useResponsiveLayout();
   const topInset = useSafeTopInset();
+  // Raw device inset (status bar/notch/Dynamic Island), Android-15+-bug-
+  // corrected - used instead of topInset for the Status viewer's overlay
+  // controls below, since that's the full GLOBAL_TOP_PADDING dial meant for
+  // this screen's own header, not the right fit for a modal presented as
+  // its own full-screen surface.
+  const viewerTopInset = useRawTopInset();
   const scrollRef = useRef<ScrollView>(null);
   useImperativeHandle(ref, () => ({
     scrollTo: (opts) => scrollRef.current?.scrollTo(opts),
@@ -220,6 +225,8 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
   const [statusUsers, setStatusUsers] = useState<StatusUser[]>([]);
   const [statusesLoading, setStatusesLoading] = useState(false);
   const [statusComposerOpen, setStatusComposerOpen] = useState(false);
+  const [statusManageOpen, setStatusManageOpen] = useState(false);
+  const [deletingStatusItemId, setDeletingStatusItemId] = useState<string | null>(null);
   // Guards the publish button against double-tap: the direct-to-S3 flow for
   // image/video/audio statuses is now a multi-step (initiate -> PUT ->
   // confirm -> create) round trip per asset, taking noticeably longer than
@@ -264,7 +271,6 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
   const [pendingOpenUserId, setPendingOpenUserId] = useState<string | null>(
     null,
   );
-  const [viewedMap, setViewedMap] = useState<Record<string, number>>({});
   const [channelPreviewOpen, setChannelPreviewOpen] = useState(false);
   const [previewChannel, setPreviewChannel] = useState<any | null>(null);
   const [channelSubscribing, setChannelSubscribing] = useState(false);
@@ -562,6 +568,21 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
     setStatusComposerOpen(true);
   }, [resetStatusDraft]);
 
+  // The "+" on the user's own status thumb used to always jump straight to
+  // a blank composer, even after they already had active items - so adding
+  // a second update meant losing any sense that the first one still
+  // existed, and there was no way to remove one short of it expiring.
+  // WhatsApp's own "add to status" affordance opens a manage view over
+  // your existing items instead of a blank slate; this is that view.
+  const openAddOrManageStatus = useCallback(() => {
+    const myItems = statusUsers.find(u => u.id === 'me')?.items ?? [];
+    if (myItems.length > 0) {
+      setStatusManageOpen(true);
+    } else {
+      openStatusComposer();
+    }
+  }, [statusUsers, openStatusComposer]);
+
   const loadStatuses = useCallback(async (force = false) => {
     const now = Date.now();
     if (statusesLoadInFlightRef.current) return;
@@ -653,6 +674,49 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
       statusesLoadInFlightRef.current = false;
     }
   }, [currentUserId]);
+
+  const deleteStatusItem = useCallback(
+    (item: StatusItem) => {
+      Alert.alert(
+        'Remove this status?',
+        'This cannot be undone.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Remove',
+            style: 'destructive',
+            onPress: async () => {
+              setDeletingStatusItemId(item.id);
+              try {
+                const res = await deleteRequest(ROUTES.statuses.detail(item.id), {
+                  errorMessage: 'Unable to remove status.',
+                });
+                if (!res?.success && res?.status !== 404) {
+                  Alert.alert('Remove failed', res?.message || 'Unable to remove this status. Please try again.');
+                  return;
+                }
+                // Update local state immediately (don't wait on a refetch to
+                // reflect a delete that already succeeded) and reconcile
+                // with the server right after - same "explicit action, no
+                // false-throttle" pattern as the post-create refresh.
+                setStatusUsers(prev =>
+                  prev.map(u =>
+                    u.id === 'me'
+                      ? { ...u, items: u.items.filter(existing => existing.id !== item.id) }
+                      : u,
+                  ),
+                );
+                await loadStatuses(true);
+              } finally {
+                setDeletingStatusItemId(null);
+              }
+            },
+          },
+        ],
+      );
+    },
+    [loadStatuses],
+  );
 
   React.useEffect(() => {
     loadStatuses();
@@ -824,30 +888,43 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
   }, []);
 
   const openViewer = useCallback(
-    (userId: string) => {
+    (userId: string, startIndex?: number) => {
       const target = statuses.find(u => u.id === userId);
       if (!target || target.items.length === 0) return;
-      const lastViewed = viewedMap[userId] ?? 0;
+      if (typeof startIndex === 'number') {
+        // Explicit index requested (e.g. tapping a specific item from the
+        // manage-status list) - honor it over the resume heuristic below.
+        setViewerUserId(userId);
+        setViewerIndex(Math.max(0, Math.min(startIndex, target.items.length - 1)));
+        setViewerOpen(true);
+        return;
+      }
+      // Resume at the first item that hasn't been viewed yet (matching each
+      // item's own server-tracked `viewed` flag) - not "whatever index the
+      // viewer happened to be on when it last closed". That distinction is
+      // exactly what was breaking backward navigation: once every item had
+      // been viewed, the old index-based bookmark pointed at the LAST item
+      // (wherever an auto-advance-to-close or a manual close last left it),
+      // so every subsequent open landed back on the last item instead of
+      // the start of the sequence - "viewed everything once" permanently
+      // meant "can only ever reopen at the end" until the items themselves
+      // changed. Falls back to the first item once nothing is unviewed,
+      // same as reviewing your own already-seen status from the start.
+      const firstUnviewedIndex = target.items.findIndex(item => !item.viewed);
       setViewerUserId(userId);
-      setViewerIndex(Math.min(lastViewed, target.items.length - 1));
+      setViewerIndex(firstUnviewedIndex >= 0 ? firstUnviewedIndex : 0);
       setViewerOpen(true);
     },
-    [statuses, viewedMap],
+    [statuses],
   );
 
   const closeViewer = useCallback(() => {
     stopTimer();
-    if (viewerUserId) {
-      setViewedMap(prev => ({
-        ...prev,
-        [viewerUserId]: viewerIndex,
-      }));
-    }
     setViewerOpen(false);
     setViewerUserId(null);
     setViewerIndex(0);
     setViewerProgress(0);
-  }, [stopTimer, viewerIndex, viewerUserId]);
+  }, [stopTimer]);
 
   const handleStatusAudienceToggle = useCallback((userId: string) => {
     setStatusDraftTargetUserIds(prev =>
@@ -1124,11 +1201,11 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
         onPress={() => {
           suppressMyOpenRef.current = true;
           setSuppressMyOpen(true);
-          openStatusComposer();
+          openAddOrManageStatus();
         }}
         hitSlop={10}
         accessibilityRole="button"
-        accessibilityLabel="Add to status"
+        accessibilityLabel="Add or manage status"
         style={[
           styles.statusAddBadge,
           { backgroundColor: palette.primaryStrong, borderColor: palette.bg },
@@ -1185,8 +1262,11 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
       );
     }
     const ringColor = user.hasUnseen ? palette.primaryStrong : palette.divider;
-    const lastViewed = viewedMap[user.id] ?? 0;
-    const pickIndex = lastViewed < user.items.length ? lastViewed : 0;
+    // Same "first unviewed, else the first item" rule openViewer() uses -
+    // keeps the thumbnail preview in sync with whatever item tapping it
+    // will actually open the viewer to.
+    const firstUnviewedIndex = user.items.findIndex(entry => !entry.viewed);
+    const pickIndex = firstUnviewedIndex >= 0 ? firstUnviewedIndex : 0;
     const item = user.items[pickIndex];
     if (item?.type === 'image' && item?.uri) {
       return (
@@ -1714,6 +1794,112 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
               setChannels(prev => [created, ...prev]);
             }}
           />
+        </View>
+      </Modal>
+
+      {/* Manage status - opened instead of a blank composer when the user
+          already has active items (see openAddOrManageStatus above), so
+          adding another update loads and shows what's already posted
+          rather than silently starting over. */}
+      <Modal visible={statusManageOpen} transparent animationType="slide" onRequestClose={() => setStatusManageOpen(false)}>
+        <View style={[styles.composerBackdrop, { backgroundColor: palette.royalInk }]}>
+          <View style={[styles.composerCard, { backgroundColor: palette.card }]}>
+            <KISText preset="h3" color={palette.text} style={styles.composerTitle}>
+              My Status
+            </KISText>
+            <Text style={{ color: palette.subtext }}>
+              {(statusUsers.find(u => u.id === 'me')?.items.length ?? 0)} active{' '}
+              {(statusUsers.find(u => u.id === 'me')?.items.length ?? 0) === 1 ? 'update' : 'updates'} - tap one to
+              view it, or remove it below.
+            </Text>
+            <ScrollView style={{ maxHeight: 360 }}>
+              {(statusUsers.find(u => u.id === 'me')?.items ?? []).map((item, idx) => {
+                const itemTextStyle = resolveTextStyle(item);
+                const deleting = deletingStatusItemId === item.id;
+                return (
+                  <View
+                    key={item.id}
+                    style={[styles.manageStatusRow, { borderColor: palette.divider }]}
+                  >
+                    <Pressable
+                      style={styles.manageStatusInfo}
+                      disabled={deleting}
+                      onPress={() => {
+                        setStatusManageOpen(false);
+                        openViewer('me', idx);
+                      }}
+                    >
+                      {item.type === 'image' && item.uri ? (
+                        <Image source={{ uri: item.uri }} style={styles.manageStatusThumb} />
+                      ) : (
+                        <View
+                          style={[
+                            styles.manageStatusThumb,
+                            { backgroundColor: item.type === 'text' ? itemTextStyle.bgColor : palette.surfaceElevated, alignItems: 'center', justifyContent: 'center' },
+                          ]}
+                        >
+                          <KISIcon
+                            name={item.type === 'video' ? 'video' : item.type === 'audio' ? 'mic' : 'chat'}
+                            size={16}
+                            color={item.type === 'text' ? itemTextStyle.textColor : palette.text}
+                          />
+                        </View>
+                      )}
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ color: palette.text, fontWeight: '700' }} numberOfLines={1}>
+                          {item.type === 'text' ? item.text || 'Text update' : `${item.type[0].toUpperCase()}${item.type.slice(1)} update`}
+                        </Text>
+                        <Text style={{ color: palette.subtext, fontSize: 12, marginTop: 2 }}>
+                          {item.visibility === 'contacts_except'
+                            ? 'My contacts except...'
+                            : item.visibility === 'only_share_with'
+                            ? 'Only share with...'
+                            : 'My contacts'}
+                        </Text>
+                      </View>
+                    </Pressable>
+                    <Pressable
+                      onPress={() => deleteStatusItem(item)}
+                      disabled={deleting}
+                      hitSlop={10}
+                      accessibilityRole="button"
+                      accessibilityLabel="Remove this status"
+                      style={styles.manageStatusDelete}
+                    >
+                      {deleting ? (
+                        <ActivityIndicator size="small" color={palette.subtext} />
+                      ) : (
+                        <KISIcon name="trash" size={18} color={palette.subtext} />
+                      )}
+                    </Pressable>
+                  </View>
+                );
+              })}
+            </ScrollView>
+            <View style={styles.composerFooter}>
+              <Pressable
+                onPress={() => setStatusManageOpen(false)}
+                style={({ pressed }) => [
+                  styles.composerBtn,
+                  { backgroundColor: pressed ? palette.surface : palette.surfaceElevated },
+                ]}
+              >
+                <Text style={{ color: palette.text }}>Done</Text>
+              </Pressable>
+              <Pressable
+                onPress={() => {
+                  setStatusManageOpen(false);
+                  openStatusComposer();
+                }}
+                style={({ pressed }) => [
+                  styles.composerBtn,
+                  { backgroundColor: pressed ? palette.primaryStrong : palette.primary },
+                ]}
+              >
+                <Text style={{ color: palette.onPrimary, fontWeight: '700' }}>Add another</Text>
+              </Pressable>
+            </View>
+          </View>
         </View>
       </Modal>
 
@@ -2299,9 +2485,30 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
       </Modal>
 
       {/* Status viewer */}
-      <Modal visible={viewerOpen} transparent animationType="fade">
-        <SafeAreaView style={[styles.viewerWrap, { backgroundColor: palette.bg, }]} edges={['top']}>
-          <View style={styles.viewerProgressRow} pointerEvents="auto">
+      {/* statusBarTranslucent matters specifically for Android inset
+          correctness here - ActiveCallScreen.tsx's own full-screen Modal
+          (the other place in this app driving overlay controls off
+          useSafeAreaInsets() inside a Modal) sets the same prop. Without
+          it, useSafeAreaInsets().top can read back near-zero on Android
+          inside a Modal since the OS may already be reserving the status-
+          bar area itself rather than reporting it as an inset to measure. */}
+      <Modal visible={viewerOpen} transparent animationType="fade" statusBarTranslucent>
+        {/* Not SafeAreaView here - a Modal presents as its own full-screen
+            native surface, and SafeAreaView's automatic top-edge padding was
+            unreliable in that context (most visibly on Android, where
+            SafeAreaView commonly reads a near-zero inset unless edge-to-edge
+            is fully configured - the same class of bug useRawTopInset()
+            already works around for the rest of the app). Driving the close
+            button, progress bar, and menu button off viewerTopInset directly
+            - the same pattern already used for ActiveCallScreen's own
+            full-screen overlay controls - so this box is correct on both
+            platforms and every notch/Dynamic Island/status-bar
+            configuration regardless of how the Modal itself renders. */}
+        <View style={[styles.viewerWrap, { backgroundColor: palette.bg }]}>
+          <View
+            style={[styles.viewerProgressRow, { paddingTop: viewerTopInset + 12 }]}
+            pointerEvents="auto"
+          >
             {(activeUser?.items ?? []).map((item, idx) => {
               const fill =
                 idx < viewerIndex
@@ -2338,9 +2545,11 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
           </View>
 
           <Pressable
-            style={styles.viewerClose}
+            style={[styles.viewerClose, { top: viewerTopInset + 8 }]}
             onPress={closeViewer}
-            hitSlop={10}
+            hitSlop={16}
+            accessibilityRole="button"
+            accessibilityLabel="Close"
           >
             <KISIcon name="close" size={18} color={palette.text} />
           </Pressable>
@@ -2349,6 +2558,7 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
               style={[
                 styles.viewerMenuButton,
                 {
+                  top: viewerTopInset + 42,
                   backgroundColor: palette.surfaceElevated,
                   borderColor: palette.inputBorder,
                 },
@@ -2560,7 +2770,7 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
               </Text>
             </Pressable>
           )}
-        </SafeAreaView>
+        </View>
       </Modal>
     </View>
   );
@@ -2756,6 +2966,31 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingVertical: 12,
     alignItems: 'center',
+  },
+  manageStatusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 10,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  manageStatusInfo: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  manageStatusThumb: {
+    width: 44,
+    height: 44,
+    borderRadius: 10,
+  },
+  manageStatusDelete: {
+    padding: 8,
+    minWidth: 40,
+    minHeight: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   viewerWrap: { flex: 1 },
   viewerProgressRow: {
