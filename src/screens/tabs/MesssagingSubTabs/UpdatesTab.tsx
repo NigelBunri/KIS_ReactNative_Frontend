@@ -279,6 +279,12 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
   const seekBarWidthRef = useRef(0);
   const [viewerReplyText, setViewerReplyText] = useState('');
   const [sendingReply, setSendingReply] = useState(false);
+  // Stable per-attempt id for the status-reply idempotency key (see
+  // handleSendReply below) - generated lazily on first send, reused if the
+  // same tap fires twice before `sendingReply` disables the button, and
+  // cleared once the reply actually succeeds or the user moves to a
+  // different status, so the next real reply gets its own fresh id.
+  const replyClientIdRef = useRef<string | null>(null);
   const channelsLoadInFlightRef = useRef(false);
   const statusesLoadInFlightRef = useRef(false);
   const channelsLastLoadAtRef = useRef(0);
@@ -715,6 +721,12 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
   );
 
   const currentItem = activeUser?.items?.[viewerIndex] ?? null;
+  React.useEffect(() => {
+    // Switching to a different status abandons any in-progress reply
+    // attempt - the next send on the new status must get its own fresh
+    // idempotency key, not reuse one scoped to whatever was open before.
+    replyClientIdRef.current = null;
+  }, [currentItem?.id]);
   const viewerMediaSource = buildMediaSource(currentItem?.uri, mediaHeaders);
   const resolveTextStyle = (item?: StatusItem) => ({
     bgColor: item?.style?.bgColor ?? palette.card,
@@ -1022,8 +1034,15 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
     if (!text || !currentItem?.id) return;
     setSendingReply(true);
     try {
-      await postRequest(ROUTES.statuses.reply(currentItem.id), { text });
+      if (!replyClientIdRef.current) {
+        replyClientIdRef.current = `client_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+      }
+      await postRequest(ROUTES.statuses.reply(currentItem.id), {
+        text,
+        client_id: replyClientIdRef.current,
+      });
       setViewerReplyText('');
+      replyClientIdRef.current = null;
     } finally {
       setSendingReply(false);
     }
