@@ -2015,6 +2015,14 @@ export default function ProfileScreen() {
         tone: 'primary' as const,
         onPress: () => rootNavigation?.navigate('TestimonyHub'),
       },
+      {
+        key: 'contact-share-link',
+        title: 'My Contact Link',
+        subtitle: 'Let people message you without seeing your number',
+        icon: 'link' as const,
+        tone: 'primary' as const,
+        onPress: () => rootNavigation?.navigate('ContactShareLink'),
+      },
     ],
     [
       c.openCreatePartner,

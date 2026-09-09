@@ -52,6 +52,14 @@ const socialRoutes = {
     postUpdate: (id: string) => `${API_BASE_URL}/api/v1/posts/${id}/`,
     postBroadcast: (id: string) => `${API_BASE_URL}/api/v1/posts/${id}/broadcast/`,
   },
+  contactLinks: {
+    me: `${API_BASE_URL}/api/v1/chats/contact-links/me/`,
+    redeem: `${API_BASE_URL}/api/v1/chats/contact-links/redeem/`,
+    // Unauthenticated preview - same public resolver every join-link type
+    // uses (apps.core.link_resolver), never phone/id, safe to call before
+    // login.
+    resolve: (token: string) => `${API_BASE_URL}/api/v1/links/resolve/contact/${token}/`,
+  },
   groups: {
     list: `${API_BASE_URL}/api/v1/chat-groups/`,
     create: `${API_BASE_URL}/api/v1/chat-groups/`,

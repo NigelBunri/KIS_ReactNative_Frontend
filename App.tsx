@@ -200,6 +200,7 @@ import ParentRecoveryScreen from '@/screens/ParentRecoveryScreen';
 import InvoiceListScreen from '@/screens/market/InvoiceListScreen';
 import LoyaltyScreen from '@/screens/market/LoyaltyScreen';
 import ReferralScreen from '@/screens/market/ReferralScreen';
+import ContactShareLinkScreen from '@/screens/chat/ContactShareLinkScreen';
 import HowRewardsWorkScreen from '@/screens/market/HowRewardsWorkScreen';
 import PromoCodeScreen from '@/screens/market/PromoCodeScreen';
 import GlobalSearchScreen from '@/screens/GlobalSearchScreen';
@@ -1725,6 +1726,11 @@ function AppContent() {
                     <RootStack.Screen
                       name="Referrals"
                       getComponent={() => ReferralScreen}
+                      options={{ presentation: 'modal' }}
+                    />
+                    <RootStack.Screen
+                      name="ContactShareLink"
+                      getComponent={() => ContactShareLinkScreen}
                       options={{ presentation: 'modal' }}
                     />
                     <RootStack.Screen

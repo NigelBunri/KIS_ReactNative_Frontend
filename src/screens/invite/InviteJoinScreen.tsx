@@ -42,6 +42,25 @@ export default function InviteJoinScreen({ route, navigation }: Props) {
     }).start();
 
     const join = async () => {
+      if (type === 'contact') {
+        // A contact link redeems into a pending DM request, not a group/
+        // community membership - a genuinely different flow (see
+        // apps.chat.contact_links.RedeemContactLinkView on the backend),
+        // so it's handled entirely separately rather than forced into the
+        // group/community shape below.
+        const res = await postRequest(ROUTES.contactLinks.redeem, { token });
+        const data = res?.data ?? res;
+        if (res?.success && data?.conversation_id) {
+          setConversationId(String(data.conversation_id));
+          setStatus('success');
+          setMessage('Your message request has been sent.');
+        } else {
+          setStatus('error');
+          setMessage(data?.detail ?? res?.message ?? 'This link may be invalid, expired, or no longer active.');
+        }
+        return;
+      }
+
       const url =
         type === 'group'
           ? ROUTES.groups.joinByInvite
@@ -101,14 +120,14 @@ export default function InviteJoinScreen({ route, navigation }: Props) {
       DeviceEventEmitter.emit('chat.open', {
         conversationId,
         name: groupName || type,
-        kind: type === 'community' ? 'community' : 'group',
+        kind: type === 'contact' ? 'direct' : type === 'community' ? 'community' : 'group',
       });
     }
 
     navigation.replace('MainTabs');
   };
 
-  const label = type === 'group' ? 'group' : 'community';
+  const label = type === 'contact' ? 'this person' : type === 'group' ? 'group' : 'community';
   const displayName = groupName ? `"${groupName}"` : label;
 
   return (
@@ -117,7 +136,9 @@ export default function InviteJoinScreen({ route, navigation }: Props) {
         {status === 'loading' && (
           <>
             <ActivityIndicator size="large" color={palette.primary} style={{ marginBottom: 16 }} />
-            <Text style={[styles.title, { color: palette.text }]}>Joining {label}…</Text>
+            <Text style={[styles.title, { color: palette.text }]}>
+              {type === 'contact' ? 'Sending message request…' : `Joining ${label}…`}
+            </Text>
             <Text style={[styles.subtitle, { color: palette.subtext }]}>
               Verifying your invite link
             </Text>
