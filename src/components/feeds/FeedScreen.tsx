@@ -403,12 +403,30 @@ export default function FeedScreen<T extends FeedPost>({
     [logImpression, userHasPersonalizedHistory],
   );
 
+  // composerContext is commonly passed as a fresh object literal from the
+  // caller (e.g. PartnerFeedScreen's composerContext={{key:'partner',
+  // value: partner.id}}) — a brand-new reference every render even when its
+  // actual content hasn't changed. loadFeed used to depend on that object
+  // directly, so any unrelated parent re-render (a socket-driven typing/
+  // presence update, a sibling state change — anything) gave loadFeed a new
+  // identity, re-firing the effect below and restarting the whole
+  // cache-then-network cycle: show the cached copy (and its "Offline copy"
+  // badge) immediately, then replace it once the network call resolves a
+  // moment later. Repeated continuously, that's a badge visibly flashing in
+  // and out rather than a one-time cache handoff. Deriving a stable STRING
+  // key instead fixes it: primitives compare by value, so this key is
+  // reference-equal across renders whenever the underlying key/value
+  // haven't actually changed, even though this useMemo itself still
+  // recomputes on every render (recomputing to an equal value is fine —
+  // what matters is what loadFeed's own dependency array sees).
+  const composerContextKey = useMemo(() => JSON.stringify(composerContext || {}), [composerContext]);
+
   const loadFeed = useCallback(async () => {
     const cacheKey = offlineStructuredCacheKey(
       'feed',
       feedType || entityTitle,
       composerEndpoint || 'default',
-      JSON.stringify(composerContext || {}),
+      composerContextKey,
     );
     setLoading(true);
     const cached = await readOfflineStructuredCache<T[]>(cacheKey);
@@ -424,7 +442,7 @@ export default function FeedScreen<T extends FeedPost>({
     } finally {
       setLoading(false);
     }
-  }, [applyFeedPosts, composerContext, composerEndpoint, entityTitle, feedType, loadPosts]);
+  }, [applyFeedPosts, composerContextKey, composerEndpoint, entityTitle, feedType, loadPosts]);
 
   useEffect(() => {
     loadFeed();
