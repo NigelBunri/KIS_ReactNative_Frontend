@@ -2,6 +2,7 @@ import React, { forwardRef, useCallback, useImperativeHandle, useMemo, useRef, u
 import {
   ActivityIndicator,
   Alert,
+  Animated,
   FlatList,
   Image,
   KeyboardAvoidingView,
@@ -21,7 +22,7 @@ import {
 } from 'react-native';
 import { useKISTheme } from '@/theme/useTheme';
 import { useResponsiveLayout } from '@/theme/responsive';
-import { KISIcon } from '@/constants/kisIcons';
+import { KISIcon, type KISIconName } from '@/constants/kisIcons';
 import ROUTES, { buildMediaSource, useMediaHeaders } from '@/network';
 import { getRequest } from '@/network/get';
 import { postRequest } from '@/network/post';
@@ -41,6 +42,7 @@ import Video from 'react-native-video';
 import AudioRecorderPlayer from 'react-native-audio-recorder-player';
 import { PERMISSIONS, RESULTS, check, request } from 'react-native-permissions';
 import RNFS from 'react-native-fs';
+import LinearGradient from 'react-native-linear-gradient';
 import { useSafeTopInset, useRawTopInset } from '@/hooks/useSafeTopInset';
 import type { ScrollableHandle } from '@/hooks/useHeaderDragToScroll';
 
@@ -53,6 +55,7 @@ type StatusItem = {
   uri?: string;
   text?: string;
   durationMs?: number;
+  createdAt?: string;
   viewed?: boolean;
   visibility?: StatusVisibility;
   audienceUserIds?: string[];
@@ -77,6 +80,24 @@ type StatusUser = {
 };
 
 const SAMPLE_STATUSES: StatusUser[] = [];
+
+// Every world-standard status/story viewer (WhatsApp, Instagram, Snapchat)
+// shows "who and when" right under the progress bars - the viewer here had
+// no such header at all before, so there was no way to tell whose status
+// you were looking at or how recent it was without backing out.
+function timeAgo(isoString?: string): string {
+  if (!isoString) return '';
+  const diff = Date.now() - new Date(isoString).getTime();
+  if (!Number.isFinite(diff) || diff < 0) return '';
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return 'Just now';
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  const days = Math.floor(hrs / 24);
+  if (days < 7) return `${days}d ago`;
+  return new Date(isoString).toLocaleDateString([], { month: 'short', day: 'numeric' });
+}
 
 const itemDuration = (item: StatusItem) => item.durationMs ?? 5000;
 const STATUS_BG_COLORS = [
@@ -182,6 +203,90 @@ type UpdatesTabProps = {
   onScroll?: (e: NativeSyntheticEvent<NativeScrollEvent>) => void;
 };
 
+// The world-standard "story ring" pattern (WhatsApp/Instagram/Snapchat): a
+// genuinely CIRCULAR ring - not the rounded-square "squircle" thumbnails
+// this screen used before, which don't read as a status/story affordance
+// at a glance the way a circle universally does - with a real gap between
+// the ring and the avatar/content it frames. Unseen gets a warm gold
+// gradient (this app's own brand identity, standing in for the
+// pink-orange gradient Instagram/WhatsApp use for the same "something new
+// here" signal); already-seen gets a plain muted ring, same convention
+// every one of those apps uses to mean "you've already watched this."
+function StatusRing({
+  size,
+  hasUnseen,
+  palette,
+  children,
+}: {
+  size: number;
+  hasUnseen: boolean;
+  palette: ReturnType<typeof useKISTheme>['palette'];
+  children: React.ReactNode;
+}) {
+  const ringWidth = 2.5;
+  const gapWidth = 2.5;
+  const innerSize = size - (ringWidth + gapWidth) * 2;
+
+  const inner = (
+    <View
+      style={{
+        width: size - ringWidth * 2,
+        height: size - ringWidth * 2,
+        borderRadius: (size - ringWidth * 2) / 2,
+        backgroundColor: palette.bg,
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}
+    >
+      <View
+        style={{
+          width: innerSize,
+          height: innerSize,
+          borderRadius: innerSize / 2,
+          overflow: 'hidden',
+        }}
+      >
+        {children}
+      </View>
+    </View>
+  );
+
+  if (!hasUnseen) {
+    return (
+      <View
+        style={{
+          width: size,
+          height: size,
+          borderRadius: size / 2,
+          borderWidth: ringWidth,
+          borderColor: palette.divider,
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        {inner}
+      </View>
+    );
+  }
+
+  return (
+    <LinearGradient
+      colors={[palette.goldReadable, palette.primaryStrong, palette.goldDeep]}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      style={{
+        width: size,
+        height: size,
+        borderRadius: size / 2,
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}
+    >
+      {inner}
+    </LinearGradient>
+  );
+}
+
 const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function UpdatesTab({
   searchTerm = '',
   onOpenChat,
@@ -257,6 +362,17 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
   const mediaFallbackRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const lastMediaProgressRef = useRef(0);
   const [mediaPaused, setMediaPaused] = useState(false);
+  // Mirrors mediaPaused into a ref so startTimer's setInterval closure (fixed
+  // at the moment the interval was created) reads the CURRENT paused state
+  // each tick instead of whatever it was when startTimer last ran.
+  const mediaPausedRef = useRef(false);
+  React.useEffect(() => { mediaPausedRef.current = mediaPaused; }, [mediaPaused]);
+  // Lets a text/image status's auto-advance timer pause "in place" during a
+  // hold instead of losing its progress: elapsed time excludes however long
+  // was spent paused, rather than the progress bar jumping forward the
+  // instant a hold releases.
+  const pausedMsRef = useRef(0);
+  const pauseBeganAtRef = useRef<number | null>(null);
   const [statusDraftStyle, setStatusDraftStyle] = useState({
     bgColor: STATUS_BG_COLORS[0],
     textColor: STATUS_TEXT_COLORS[0],
@@ -285,6 +401,31 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
   const seekBarWidthRef = useRef(0);
   const [viewerReplyText, setViewerReplyText] = useState('');
   const [sendingReply, setSendingReply] = useState(false);
+  // Replaces the native Alert.alert(...) this screen used for both the
+  // "More"/status-options menu and the delete-confirmation - a system
+  // dialog with default OS chrome looks completely out of place popping up
+  // over a full-bleed, custom-themed story viewer. One themed bottom sheet
+  // drives both.
+  const [actionSheet, setActionSheet] = useState<{
+    title?: string;
+    subtitle?: string;
+    options: { key: string; label: string; icon?: KISIconName; destructive?: boolean; onPress: () => void }[];
+  } | null>(null);
+  // Same reasoning for "Seen by" - it used to be a native Alert.alert with
+  // viewer names joined by '\n', not even a real list.
+  const [seenBySheetOpen, setSeenBySheetOpen] = useState(false);
+  const [seenByViewers, setSeenByViewers] = useState<any[]>([]);
+  const [seenByLoading, setSeenByLoading] = useState(false);
+  // Hold-to-pause: every world-standard story viewer pauses playback while
+  // the viewer is pressed down anywhere on the media (not just the
+  // dedicated video/audio controls this screen already had) and resumes on
+  // release, distinct from a quick tap which should still advance/rewind.
+  // holdTimerRef fires after a short threshold so a fast tap-to-navigate
+  // never visibly flickers into a pause first; wasHoldingRef records
+  // whether THIS press turned into a real hold, so release only treats it
+  // as "just resume" (not also a navigation) when it did.
+  const holdTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const wasHoldingRef = useRef(false);
   // Stable per-attempt id for the status-reply idempotency key (see
   // handleSendReply below) - generated lazily on first send, reused if the
   // same tap fires twice before `sendingReply` disables the button, and
@@ -628,6 +769,7 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
                   uri: item.file_url ?? undefined,
                   text: item.text ?? undefined,
                   durationMs: item.duration_ms ?? undefined,
+                  createdAt: item.created_at ?? undefined,
                   style: item.style ?? undefined,
                   viewed: Boolean(item.viewed),
                   visibility: item.visibility ?? 'contacts',
@@ -944,59 +1086,70 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
     const statusAuthorId = String(activeUser.userId);
     const muteLabel = activeUser.isMuted ? 'Unmute statuses' : 'Mute statuses';
 
-    Alert.alert('Status options', activeUser.name, [
-      {
-        text: muteLabel,
-        onPress: async () => {
-          const route = activeUser.isMuted
-            ? ROUTES.statuses.unmute
-            : ROUTES.statuses.mute;
-          const res = await postRequest(
-            route,
-            { user_id: statusAuthorId },
-            {
-              errorMessage: `Unable to ${
-                activeUser.isMuted ? 'unmute' : 'mute'
-              } statuses.`,
-            },
-          );
-          if (!res?.success) return;
-          await loadStatuses(true);
-          if (activeUser.isMuted) {
-            return;
-          }
-          closeViewer();
+    setActionSheet({
+      title: activeUser.name,
+      options: [
+        {
+          key: 'mute',
+          label: muteLabel,
+          icon: activeUser.isMuted ? 'volume-2' : 'volume-mute',
+          onPress: async () => {
+            setActionSheet(null);
+            const route = activeUser.isMuted
+              ? ROUTES.statuses.unmute
+              : ROUTES.statuses.mute;
+            const res = await postRequest(
+              route,
+              { user_id: statusAuthorId },
+              {
+                errorMessage: `Unable to ${
+                  activeUser.isMuted ? 'unmute' : 'mute'
+                } statuses.`,
+              },
+            );
+            if (!res?.success) return;
+            await loadStatuses(true);
+            if (activeUser.isMuted) {
+              return;
+            }
+            closeViewer();
+          },
         },
-      },
-      {
-        text: 'Report status',
-        onPress: async () => {
-          const res = await postRequest(
-            ROUTES.statuses.report(currentItem.id),
-            { reason: 'status_report' },
-            { errorMessage: 'Unable to report status.' },
-          );
-          if (res?.success) {
-            Alert.alert('Status', 'This status has been reported.');
-          }
+        {
+          key: 'report',
+          label: 'Report status',
+          icon: 'report',
+          onPress: async () => {
+            setActionSheet(null);
+            const res = await postRequest(
+              ROUTES.statuses.report(currentItem.id),
+              { reason: 'status_report' },
+              { errorMessage: 'Unable to report status.' },
+            );
+            if (res?.success) {
+              Alert.alert('Status', 'This status has been reported.');
+            }
+          },
         },
-      },
-      {
-        text: 'Block user',
-        style: 'destructive',
-        onPress: async () => {
-          const res = await postRequest(
-            ROUTES.moderation.userBlocks,
-            { blocked: statusAuthorId, reason: 'status_block' },
-            { errorMessage: 'Unable to block this user.' },
-          );
-          if (!res?.success) return;
-          closeViewer();
-          await loadStatuses(true);
+        {
+          key: 'block',
+          label: 'Block user',
+          icon: 'shield',
+          destructive: true,
+          onPress: async () => {
+            setActionSheet(null);
+            const res = await postRequest(
+              ROUTES.moderation.userBlocks,
+              { blocked: statusAuthorId, reason: 'status_block' },
+              { errorMessage: 'Unable to block this user.' },
+            );
+            if (!res?.success) return;
+            closeViewer();
+            await loadStatuses(true);
+          },
         },
-      },
-      { text: 'Cancel', style: 'cancel' },
-    ]);
+      ],
+    });
   }, [activeUser, closeViewer, currentItem?.id, currentUserId, loadStatuses]);
 
   // Owner-only counterpart to handleStatusActionMenu above — there was
@@ -1009,26 +1162,32 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
   const handleOwnStatusActionMenu = useCallback(() => {
     if (!currentItem?.id) return;
     const itemIndexAtOpen = viewerIndex;
-    Alert.alert('Delete this status?', 'This cannot be undone.', [
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: async () => {
-          const res = await deleteRequest(ROUTES.statuses.delete(currentItem.id), {
-            errorMessage: 'Unable to delete status.',
-          });
-          if (!res?.success) return;
-          const wasLastItem = (activeUser?.items.length ?? 0) <= 1;
-          if (wasLastItem) {
-            closeViewer();
-          } else if (itemIndexAtOpen > 0) {
-            setViewerIndex(itemIndexAtOpen - 1);
-          }
-          await loadStatuses(true);
+    setActionSheet({
+      title: 'Delete this status?',
+      subtitle: 'This cannot be undone.',
+      options: [
+        {
+          key: 'delete',
+          label: 'Delete',
+          icon: 'trash',
+          destructive: true,
+          onPress: async () => {
+            setActionSheet(null);
+            const res = await deleteRequest(ROUTES.statuses.delete(currentItem.id), {
+              errorMessage: 'Unable to delete status.',
+            });
+            if (!res?.success) return;
+            const wasLastItem = (activeUser?.items.length ?? 0) <= 1;
+            if (wasLastItem) {
+              closeViewer();
+            } else if (itemIndexAtOpen > 0) {
+              setViewerIndex(itemIndexAtOpen - 1);
+            }
+            await loadStatuses(true);
+          },
         },
-      },
-      { text: 'Cancel', style: 'cancel' },
-    ]);
+      ],
+    });
   }, [activeUser?.items.length, closeViewer, currentItem?.id, loadStatuses, viewerIndex]);
 
   const handleNext = useCallback(() => {
@@ -1053,10 +1212,16 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
     if (isMediaItem) return;
     const duration = itemDuration(currentItem);
     const startedAt = Date.now();
+    pausedMsRef.current = 0;
+    pauseBeganAtRef.current = null;
     progressRef.current = 0;
     setViewerProgress(0);
     timerRef.current = setInterval(() => {
-      const elapsed = Date.now() - startedAt;
+      // Hold-to-pause: skip this tick entirely while paused, so the
+      // progress bar freezes in place instead of the elapsed-time math
+      // jumping forward by however long the hold lasted once released.
+      if (mediaPausedRef.current) return;
+      const elapsed = Date.now() - startedAt - pausedMsRef.current;
       const next = Math.min(1, elapsed / duration);
       progressRef.current = next;
       setViewerProgress(next);
@@ -1149,6 +1314,72 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
     });
   }, [currentItem?.type]);
 
+  // Hold-to-pause on the left/right/middle tap zones - press-and-hold
+  // anywhere pauses playback (text timer or video/audio) in place; a quick
+  // tap still navigates. A short threshold before the hold "commits" means
+  // a fast tap never visibly flickers into a pause first.
+  const handleTapHoldStart = useCallback(() => {
+    wasHoldingRef.current = false;
+    holdTimerRef.current = setTimeout(() => {
+      wasHoldingRef.current = true;
+      pauseBeganAtRef.current = Date.now();
+      setMediaPaused(true);
+    }, 180);
+  }, []);
+  const handleTapHoldEnd = useCallback((navigate: () => void) => {
+    if (holdTimerRef.current) {
+      clearTimeout(holdTimerRef.current);
+      holdTimerRef.current = null;
+    }
+    if (wasHoldingRef.current) {
+      if (pauseBeganAtRef.current) {
+        pausedMsRef.current += Date.now() - pauseBeganAtRef.current;
+        pauseBeganAtRef.current = null;
+      }
+      setMediaPaused(false);
+      wasHoldingRef.current = false;
+      return; // a hold, not a tap - don't also navigate on release
+    }
+    navigate();
+  }, []);
+
+  // Swipe-down-to-dismiss - the other world-standard story-viewer gesture
+  // this screen had no equivalent of (close button only, before). Only
+  // claims the gesture once a real, dominant downward drag is underway
+  // (onMoveShouldSetPanResponderCapture, not onStartShouldSetPanResponder),
+  // which is what lets ordinary taps on the zones/buttons beneath pass
+  // straight through untouched - a tap never moves enough to satisfy this.
+  const viewerDragY = useRef(new Animated.Value(0)).current;
+  const dismissPanResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onStartShouldSetPanResponder: () => false,
+        onMoveShouldSetPanResponderCapture: (_evt, gesture) =>
+          gesture.dy > 12 && Math.abs(gesture.dy) > Math.abs(gesture.dx) * 1.5,
+        onPanResponderMove: (_evt, gesture) => {
+          if (gesture.dy > 0) viewerDragY.setValue(gesture.dy);
+        },
+        onPanResponderRelease: (_evt, gesture) => {
+          if (gesture.dy > 120) {
+            Animated.timing(viewerDragY, {
+              toValue: 800,
+              duration: 200,
+              useNativeDriver: true,
+            }).start(() => {
+              viewerDragY.setValue(0);
+              closeViewer();
+            });
+          } else {
+            Animated.spring(viewerDragY, { toValue: 0, useNativeDriver: true, bounciness: 6 }).start();
+          }
+        },
+        onPanResponderTerminate: () => {
+          Animated.spring(viewerDragY, { toValue: 0, useNativeDriver: true, bounciness: 6 }).start();
+        },
+      }),
+    [closeViewer, viewerDragY],
+  );
+
   React.useEffect(() => {
     setViewerProgress(0);
     mediaDurationRef.current = 0;
@@ -1195,6 +1426,8 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
   // already been seen (or, for 'me' with no status yet, that there's
   // nothing there at all) - this distinction existed in the data
   // (hasUnseen/viewed) but nothing was actually rendering it before.
+  const STATUS_THUMB_SIZE = 64;
+
   const renderStatusThumb = (user: StatusUser) => {
     const addBadge = (
       <Pressable
@@ -1214,111 +1447,100 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
         <KISIcon name="add" size={16} color={palette.onPrimary} />
       </Pressable>
     );
+    const thumbFill = { width: '100%' as const, height: '100%' as const, alignItems: 'center' as const, justifyContent: 'center' as const };
+
     if (user.id === 'me') {
       const latest = user.items[user.items.length - 1];
       if (latest) {
-        const ringColor = user.hasUnseen ? palette.primaryStrong : palette.divider;
-        if (latest.type === 'image' && latest.uri) {
-          return (
-            <View style={[styles.statusThumb, { borderColor: ringColor }]}>
-              <Image source={{ uri: latest.uri }} style={styles.statusThumb} />
-              {addBadge}
-            </View>
+        const content =
+          latest.type === 'image' && latest.uri ? (
+            <Image source={{ uri: latest.uri }} style={thumbFill} />
+          ) : (
+            (() => {
+              const textStyle = resolveTextStyle(latest);
+              return (
+                <View style={[thumbFill, { backgroundColor: textStyle.bgColor, padding: 4 }]}>
+                  <Text
+                    style={{ color: textStyle.textColor, fontSize: 10, fontFamily: textStyle.fontFamily, textAlign: 'center' }}
+                    numberOfLines={2}
+                  >
+                    {latest.text ?? 'My status'}
+                  </Text>
+                </View>
+              );
+            })()
           );
-        }
-        const textStyle = resolveTextStyle(latest);
         return (
-          <View
-            style={[
-              styles.statusThumb,
-              {
-                borderColor: ringColor,
-                backgroundColor: textStyle.bgColor,
-              },
-            ]}
-          >
-            <Text
-              style={{
-                color: textStyle.textColor,
-                fontSize: 12,
-                fontFamily: textStyle.fontFamily,
-              }}
-              numberOfLines={2}
-            >
-              {latest.text ?? 'My status'}
-            </Text>
+          <View>
+            <StatusRing size={STATUS_THUMB_SIZE} hasUnseen={Boolean(user.hasUnseen)} palette={palette}>
+              {content}
+            </StatusRing>
             {addBadge}
           </View>
         );
       }
       return (
-        <View style={[styles.statusThumb, { borderColor: palette.divider }]}>
+        <View>
           <View
-            style={[styles.statusAdd, { backgroundColor: palette.primarySoft }]}
+            style={{
+              width: STATUS_THUMB_SIZE,
+              height: STATUS_THUMB_SIZE,
+              borderRadius: STATUS_THUMB_SIZE / 2,
+              borderWidth: 2,
+              borderColor: palette.divider,
+              borderStyle: 'dashed',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
           >
-            <KISIcon name="add" size={16} color={palette.primaryStrong} />
+            <View
+              style={[styles.statusAdd, { backgroundColor: palette.primarySoft }]}
+            >
+              <KISIcon name="add" size={16} color={palette.primaryStrong} />
+            </View>
           </View>
         </View>
       );
     }
-    const ringColor = user.hasUnseen ? palette.primaryStrong : palette.divider;
+
     // Same "first unviewed, else the first item" rule openViewer() uses -
     // keeps the thumbnail preview in sync with whatever item tapping it
     // will actually open the viewer to.
     const firstUnviewedIndex = user.items.findIndex(entry => !entry.viewed);
     const pickIndex = firstUnviewedIndex >= 0 ? firstUnviewedIndex : 0;
     const item = user.items[pickIndex];
+    let content: React.ReactNode;
     if (item?.type === 'image' && item?.uri) {
-      return (
-        <Image
-          source={{ uri: item.uri }}
-          style={[styles.statusThumb, { borderColor: ringColor }]}
-        />
-      );
-    }
-    if (item?.type === 'video') {
-      return (
-        <View
-          style={[
-            styles.statusThumb,
-            { borderColor: ringColor, backgroundColor: palette.card },
-          ]}
-        >
+      content = <Image source={{ uri: item.uri }} style={thumbFill} />;
+    } else if (item?.type === 'video') {
+      content = (
+        <View style={[thumbFill, { backgroundColor: palette.card }]}>
           <KISIcon name="video" size={18} color={palette.text} />
         </View>
       );
-    }
-    if (item?.type === 'audio') {
-      return (
-        <View
-          style={[
-            styles.statusThumb,
-            { borderColor: ringColor, backgroundColor: palette.card },
-          ]}
-        >
+    } else if (item?.type === 'audio') {
+      content = (
+        <View style={[thumbFill, { backgroundColor: palette.card }]}>
           <KISIcon name="mic" size={18} color={palette.text} />
         </View>
       );
+    } else {
+      const textStyle = resolveTextStyle(item);
+      content = (
+        <View style={[thumbFill, { backgroundColor: textStyle.bgColor, padding: 4 }]}>
+          <Text
+            style={{ color: textStyle.textColor, fontSize: 10, fontFamily: textStyle.fontFamily, textAlign: 'center' }}
+            numberOfLines={2}
+          >
+            {item?.text ?? 'Status'}
+          </Text>
+        </View>
+      );
     }
-    const textStyle = resolveTextStyle(item);
     return (
-      <View
-        style={[
-          styles.statusThumb,
-          { borderColor: ringColor, backgroundColor: textStyle.bgColor },
-        ]}
-      >
-        <Text
-          style={{
-            color: textStyle.textColor,
-            fontSize: 12,
-            fontFamily: textStyle.fontFamily,
-          }}
-          numberOfLines={2}
-        >
-          {item?.text ?? 'Status'}
-        </Text>
-      </View>
+      <StatusRing size={STATUS_THUMB_SIZE} hasUnseen={Boolean(user.hasUnseen)} palette={palette}>
+        {content}
+      </StatusRing>
     );
   };
 
@@ -2504,7 +2726,31 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
             full-screen overlay controls - so this box is correct on both
             platforms and every notch/Dynamic Island/status-bar
             configuration regardless of how the Modal itself renders. */}
-        <View style={[styles.viewerWrap, { backgroundColor: palette.bg }]}>
+        <Animated.View
+          style={[
+            styles.viewerWrap,
+            {
+              backgroundColor: palette.bg,
+              transform: [{ translateY: viewerDragY }],
+              opacity: viewerDragY.interpolate({
+                inputRange: [0, 300],
+                outputRange: [1, 0.4],
+                extrapolate: 'clamp',
+              }),
+            },
+          ]}
+          {...dismissPanResponder.panHandlers}
+        >
+          {/* Top gradient scrim - keeps the progress bars/header legible
+              over any bright photo/video content, the same way every
+              world-standard story viewer darkens the top edge rather than
+              relying on the raw media contrast alone. */}
+          <LinearGradient
+            colors={['rgba(0,0,0,0.55)', 'rgba(0,0,0,0)']}
+            style={styles.viewerTopScrim}
+            pointerEvents="none"
+          />
+
           <View
             style={[styles.viewerProgressRow, { paddingTop: viewerTopInset + 12 }]}
             pointerEvents="auto"
@@ -2523,10 +2769,7 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
                     setViewerIndex(idx);
                     setViewerProgress(0);
                   }}
-                  style={[
-                    styles.progressTrack,
-                    { backgroundColor: palette.subtext, opacity: 0.5 },
-                  ]}
+                  style={styles.progressTrack}
                 >
                   <View
                     style={[
@@ -2535,7 +2778,6 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
                         width: `${Math.round(
                           Math.max(0, Math.min(1, fill)) * 100,
                         )}%`,
-                        backgroundColor: palette.text,
                       },
                     ]}
                   />
@@ -2543,6 +2785,32 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
               );
             })}
           </View>
+
+          {/* Who/when header - every world-standard status/story viewer
+              shows this prominently under the progress bar; there was
+              previously no way to tell whose status you were looking at,
+              or how recent it was, without backing out to the list. */}
+          {activeUser ? (
+            <View style={styles.viewerHeaderRow} pointerEvents="none">
+              <View style={[styles.viewerHeaderAvatar, { backgroundColor: palette.surfaceElevated }]}>
+                {activeUser.avatar ? (
+                  <Image source={{ uri: activeUser.avatar }} style={styles.viewerHeaderAvatarImg} />
+                ) : (
+                  <Text style={{ color: palette.text, fontWeight: '800', fontSize: 14 }}>
+                    {(activeUser.name || '?').trim().charAt(0).toUpperCase()}
+                  </Text>
+                )}
+              </View>
+              <View style={{ marginLeft: 10, flexShrink: 1 }}>
+                <Text style={styles.viewerHeaderName} numberOfLines={1}>
+                  {activeUser.id === 'me' ? 'My status' : activeUser.name}
+                </Text>
+                {currentItem?.createdAt ? (
+                  <Text style={styles.viewerHeaderTime}>{timeAgo(currentItem.createdAt)}</Text>
+                ) : null}
+              </View>
+            </View>
+          ) : null}
 
           <Pressable
             style={[styles.viewerClose, { top: viewerTopInset + 8 }]}
@@ -2587,10 +2855,15 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
             </Pressable>
           ) : null}
 
-          <Pressable style={styles.viewerTapZone} onPress={handlePrev} />
+          <Pressable
+            style={styles.viewerTapZone}
+            onPressIn={handleTapHoldStart}
+            onPressOut={() => handleTapHoldEnd(handlePrev)}
+          />
           <Pressable
             style={[styles.viewerTapZone, { left: '50%' }]}
-            onPress={handleNext}
+            onPressIn={handleTapHoldStart}
+            onPressOut={() => handleTapHoldEnd(handleNext)}
           />
 
           <View style={styles.viewerContent}>
@@ -2755,13 +3028,12 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
             <Pressable
               style={styles.viewerSeenRow}
               onPress={async () => {
+                setSeenBySheetOpen(true);
+                setSeenByLoading(true);
                 const res = await getRequest(ROUTES.statuses.viewers(currentItem.id), {});
                 const viewers: any[] = Array.isArray(res?.data?.results) ? res.data.results : Array.isArray(res?.data) ? res.data : [];
-                if (viewers.length === 0) {
-                  Alert.alert('Views', 'No one has viewed this status yet.');
-                } else {
-                  Alert.alert('Seen by', viewers.map((v: any) => v.viewer_name ?? v.viewer_id ?? 'Someone').join('\n'));
-                }
+                setSeenByViewers(viewers);
+                setSeenByLoading(false);
               }}
             >
               <KISIcon name="eye" size={14} color={palette.ivory} />
@@ -2770,7 +3042,99 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
               </Text>
             </Pressable>
           )}
-        </View>
+        </Animated.View>
+      </Modal>
+
+      {/* Themed replacement for the native Alert.alert(...) this screen used
+          for the status "More" menu and the delete-confirmation - a plain
+          system dialog looked jarring popping up over a custom full-bleed
+          dark viewer. */}
+      <Modal visible={Boolean(actionSheet)} transparent animationType="fade" onRequestClose={() => setActionSheet(null)}>
+        <Pressable style={styles.sheetBackdrop} onPress={() => setActionSheet(null)}>
+          <Pressable style={[styles.sheetCard, { backgroundColor: palette.surfaceElevated }]} onPress={() => {}}>
+            {actionSheet?.title ? (
+              <Text style={[styles.sheetTitle, { color: palette.text }]}>{actionSheet.title}</Text>
+            ) : null}
+            {actionSheet?.subtitle ? (
+              <Text style={[styles.sheetSubtitle, { color: palette.subtext }]}>{actionSheet.subtitle}</Text>
+            ) : null}
+            {(actionSheet?.options ?? []).map(option => (
+              <Pressable
+                key={option.key}
+                onPress={option.onPress}
+                style={({ pressed }) => [
+                  styles.sheetOptionRow,
+                  { borderColor: palette.inputBorder, opacity: pressed ? 0.7 : 1 },
+                ]}
+              >
+                {option.icon ? (
+                  <KISIcon name={option.icon} size={18} color={option.destructive ? palette.danger : palette.text} />
+                ) : null}
+                <Text
+                  style={[
+                    styles.sheetOptionLabel,
+                    { color: option.destructive ? palette.danger : palette.text },
+                  ]}
+                >
+                  {option.label}
+                </Text>
+              </Pressable>
+            ))}
+            <Pressable
+              onPress={() => setActionSheet(null)}
+              style={({ pressed }) => [styles.sheetCancelRow, { opacity: pressed ? 0.7 : 1 }]}
+            >
+              <Text style={[styles.sheetOptionLabel, { color: palette.subtext, fontWeight: '700' }]}>Cancel</Text>
+            </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {/* Themed replacement for the native Alert.alert(...) "Seen by" this
+          screen used to just join viewer names with '\n' - a real list with
+          avatars and relative view times instead. */}
+      <Modal visible={seenBySheetOpen} transparent animationType="fade" onRequestClose={() => setSeenBySheetOpen(false)}>
+        <Pressable style={styles.sheetBackdrop} onPress={() => setSeenBySheetOpen(false)}>
+          <Pressable style={[styles.sheetCard, { backgroundColor: palette.surfaceElevated, maxHeight: '70%' }]} onPress={() => {}}>
+            <Text style={[styles.sheetTitle, { color: palette.text }]}>
+              {seenByLoading ? 'Seen by…' : `Seen by ${seenByViewers.length}`}
+            </Text>
+            {seenByLoading ? (
+              <ActivityIndicator color={palette.primaryStrong} style={{ marginVertical: 20 }} />
+            ) : seenByViewers.length === 0 ? (
+              <Text style={[styles.sheetSubtitle, { color: palette.subtext, marginVertical: 12 }]}>
+                No one has viewed this status yet.
+              </Text>
+            ) : (
+              <ScrollView showsVerticalScrollIndicator={false} style={{ marginTop: 4 }}>
+                {seenByViewers.map((viewer: any, idx: number) => {
+                  const name = viewer.display_name ?? viewer.viewer_name ?? viewer.viewer_id ?? 'Someone';
+                  return (
+                    <View key={viewer.id ?? viewer.viewer_id ?? idx} style={styles.seenByRow}>
+                      <View style={[styles.seenByAvatar, { backgroundColor: palette.card }]}>
+                        <Text style={{ color: palette.text, fontWeight: '800', fontSize: 13 }}>
+                          {String(name).trim().charAt(0).toUpperCase()}
+                        </Text>
+                      </View>
+                      <Text style={{ color: palette.text, fontSize: 14, flex: 1 }} numberOfLines={1}>
+                        {name}
+                      </Text>
+                      {viewer.viewed_at ? (
+                        <Text style={{ color: palette.subtext, fontSize: 12 }}>{timeAgo(viewer.viewed_at)}</Text>
+                      ) : null}
+                    </View>
+                  );
+                })}
+              </ScrollView>
+            )}
+            <Pressable
+              onPress={() => setSeenBySheetOpen(false)}
+              style={({ pressed }) => [styles.sheetCancelRow, { opacity: pressed ? 0.7 : 1 }]}
+            >
+              <Text style={[styles.sheetOptionLabel, { color: palette.subtext, fontWeight: '700' }]}>Close</Text>
+            </Pressable>
+          </Pressable>
+        </Pressable>
       </Modal>
     </View>
   );
@@ -2782,16 +3146,7 @@ const styles = StyleSheet.create({
   wrap: { flex: 1 },
   sectionHeader: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 8 },
   statusRow: { paddingHorizontal: 16, paddingBottom: 12, gap: 12 },
-  statusCard: { width: 86, alignItems: 'center', gap: 6 },
-  statusThumb: {
-    width: 70,
-    height: 70,
-    borderRadius: 18,
-    borderWidth: 2,
-    overflow: 'hidden',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  statusCard: { width: 80, alignItems: 'center', gap: 6 },
   statusAdd: {
     width: 28,
     height: 28,
@@ -2801,11 +3156,11 @@ const styles = StyleSheet.create({
   },
   statusAddBadge: {
     position: 'absolute',
-    bottom: -6,
-    right: -6,
-    width: 34,
-    height: 34,
-    borderRadius: 17,
+    bottom: -2,
+    right: -2,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
     borderWidth: 3,
     alignItems: 'center',
     justifyContent: 'center',
@@ -2993,6 +3348,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   viewerWrap: { flex: 1 },
+  viewerTopScrim: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 150,
+    zIndex: 10,
+  },
   viewerProgressRow: {
     flexDirection: 'row',
     gap: 6,
@@ -3000,6 +3363,25 @@ const styles = StyleSheet.create({
     paddingTop: 12,
     zIndex: 20,
   },
+  viewerHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingTop: 10,
+    paddingRight: 90,
+    zIndex: 20,
+  },
+  viewerHeaderAvatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  viewerHeaderAvatarImg: { width: 32, height: 32 },
+  viewerHeaderName: { color: '#fff', fontSize: 13, fontWeight: '800' },
+  viewerHeaderTime: { color: 'rgba(255,255,255,0.75)', fontSize: 11, marginTop: 1 },
   viewerMenuButton: {
     position: 'absolute',
     top: 42,
@@ -3015,9 +3397,48 @@ const styles = StyleSheet.create({
     height: 3,
     borderRadius: 999,
     overflow: 'hidden',
+    backgroundColor: 'rgba(255,255,255,0.35)',
   },
   progressFill: {
     height: 3,
+    backgroundColor: '#fff',
+  },
+  sheetBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  sheetCard: {
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingHorizontal: 18,
+    paddingTop: 16,
+    paddingBottom: 28,
+  },
+  sheetTitle: { fontSize: 16, fontWeight: '800' },
+  sheetSubtitle: { fontSize: 13, marginTop: 4 },
+  sheetOptionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 14,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    marginTop: 8,
+  },
+  sheetOptionLabel: { fontSize: 15, fontWeight: '600' },
+  sheetCancelRow: { paddingVertical: 14, alignItems: 'center', marginTop: 6 },
+  seenByRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 10,
+  },
+  seenByAvatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   viewerClose: {
     position: 'absolute',
