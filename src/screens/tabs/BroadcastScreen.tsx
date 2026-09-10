@@ -42,6 +42,10 @@ import BroadcastJobsPage from '../broadcast/pages/BroadcastJobsPage';
 import { KISIcon } from '@/constants/kisIcons';
 import { useResponsiveLayout } from '@/theme/responsive';
 import {
+  bindMainTabBadgeSourceEvents,
+  fetchMainTabBadgeCounts,
+} from '@/services/mainTabNotificationBadges';
+import {
   getShopCartState,
   refreshShopCartFromBackend,
   subscribeToShopCart,
@@ -142,6 +146,24 @@ export default function BroadcastScreen() {
 
   const [activeMainTab, setActiveMainTab] =
     useState<BroadcastMainTabId>('feeds');
+
+  // Bell icon in the header — see BroadcastHeaderBar's onNotifications prop.
+  // Reuses the same backend-backed badge count every other main tab's
+  // unread dot already reads, refreshed on the same shared event bus
+  // (message/broadcast/channel/bible updates etc.) rather than a bespoke
+  // poll.
+  const [hasUnreadBroadcastNotifications, setHasUnreadBroadcastNotifications] = useState(false);
+  const refreshBroadcastNotificationBadge = useCallback(() => {
+    fetchMainTabBadgeCounts()
+      .then((counts) => setHasUnreadBroadcastNotifications((counts.Broadcast ?? 0) > 0))
+      .catch(() => {});
+  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      refreshBroadcastNotificationBadge();
+      return bindMainTabBadgeSourceEvents(refreshBroadcastNotificationBadge);
+    }, [refreshBroadcastNotificationBadge]),
+  );
 
   // Tablet-shell sidebar deep-link: Sidebar's "Marketplace" nav item calls
   // navigation.navigate('Broadcast', { mainTab: 'market' }) to switch this
@@ -490,12 +512,14 @@ export default function BroadcastScreen() {
                 paddingHorizontal: responsive.pageGutter,
               }}
             >
-              <View style={styles.headerSection}>
+              <View>
                 <BroadcastHeaderBar
                   title="Broadcast"
                   tierLabel="Business Pro"
                   onCreate={handleCreate}
                   onSearch={handleOpenSearch}
+                  onNotifications={() => (navigation as any).navigate('ProfileNotifications')}
+                  hasUnreadNotifications={hasUnreadBroadcastNotifications}
                 />
               </View>
             </View>
@@ -513,8 +537,6 @@ export default function BroadcastScreen() {
                       onPress={() => setVisionVisible(true)}
                       hitSlop={10}
                       style={[styles.visionButton, {
-                        paddingHorizontal: compactBroadcast ? 10 : 14,
-                        paddingVertical: compactBroadcast ? 9 : 12,
                         borderRadius: compactBroadcast ? 16 : 20,
                       }]}
                     >
@@ -534,7 +556,7 @@ export default function BroadcastScreen() {
                   </View>
                 </Animated.View>
 
-                <Animated.View style={[testimonyAnimStyle, { marginTop: 12, paddingBottom: compactBroadcast ? 14 : 18 }]}>
+                <Animated.View style={[testimonyAnimStyle]}>
                   <Pressable
                     onPress={() => (navigation as any).navigate('TestimonyHub')}
                     style={[styles.testimonyBanner, { backgroundColor: palette.primaryStrong }]}
@@ -551,7 +573,7 @@ export default function BroadcastScreen() {
             </Animated.View>
 
             {/* ── BOTTOM: always visible — tabs + search + mini pills ───────── */}
-            <View style={{ paddingHorizontal: responsive.pageGutter, paddingTop: 8, paddingBottom: 6 }}>
+            <View style={{ paddingHorizontal: responsive.pageGutter, paddingTop: 5, paddingBottom: 6 }}>
               <BroadcastMainTabs
                 value={activeMainTab}
                 onChange={tab => { setActiveMainTab(tab); setFilterVisible(false); }}
@@ -800,9 +822,8 @@ const makeStyles = (palette: ReturnType<typeof useKISTheme>['palette']) =>
       alignItems: 'center',
       gap: 12,
       borderRadius: 16,
-      padding: 16,
+      padding: 12,
       marginHorizontal: 16,
-      marginBottom: 12,
     },
     // ── Mini pills (appear in search row when collapsed) ────────────────────
     miniPillWrap: {
@@ -849,13 +870,12 @@ const makeStyles = (palette: ReturnType<typeof useKISTheme>['palette']) =>
       paddingBottom: 22,
     },
     headerSection: {
-      marginBottom: 12,
+      marginBottom: 8,
     },
     visionButton: {
       marginTop: 12,
       borderRadius: 22,
-      paddingHorizontal: 14,
-      paddingVertical: 14,
+      padding: 10,
       // Semi-transparent royalInk overlay on the gold gradient header
       backgroundColor: `${palette.royalInk}4D`,
       opacity: 0.92,

@@ -476,7 +476,8 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     borderLeftWidth: 1,
-    zIndex: 20,
+    // zIndex is set inline per open/closed state (PartnersMessagesPane.tsx) —
+    // no static default here since both states need an explicit value.
     elevation: 4,
   },
   messagesHeader: {

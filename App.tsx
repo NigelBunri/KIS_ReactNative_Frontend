@@ -477,12 +477,15 @@ function DetachedChatOverlayOutlet() {
 // siblings, same reasoning and same shape as DetachedChatOverlayOutlet just
 // above — see DetachedPartnersOverlayContext.tsx for the full stacking-
 // context explanation. Both components already position themselves via
-// position:absolute + a local zIndex of 20 (partnersStyles.ts) - unchanged
-// here; only the render location moved, from a box capped by the zIndex:1
-// View wrapping NavigationContainer below to this component's own top-level
-// position, which is enough for that existing zIndex:20 to finally beat
-// AnimatedKISTabBar's zIndex:10 and Golden Section's implicit (unset)
-// stacking, both of which it can finally reach from here.
+// position:absolute (partnersStyles.ts) - unchanged here; only the render
+// location moved, from a box capped by the zIndex:1 View wrapping
+// NavigationContainer below to this component's own top-level position.
+// PartnerSheet keeps a static zIndex:20, always beating AnimatedKISTabBar's
+// zIndex:10 and the Golden Section's implicit (unset) stacking, both of
+// which it can finally reach from here. PartnersMessagesPane instead swaps
+// zIndex 20/-1 depending on open/closed state (see PartnersMessagesPane.tsx)
+// so its always-full-height box paints below the Golden Section + tab bar
+// while closed (the "peek sliver" look) and above both while open.
 function DetachedPartnersOverlayOutlet() {
   const p = useDetachedPartnersOverlayProps();
   if (!p) return null;

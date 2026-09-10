@@ -284,6 +284,7 @@ export default function PartnersScreen({ setHidNav, onOpenInfo }: any) {
   const {
     messagesOffsetAnim,
     isMessagesExpanded,
+    isMessagesPaneOnTop,
     toggleMessagesPane,
     closeMessagesPane,
     openMessagesPane,
@@ -960,6 +961,7 @@ export default function PartnersScreen({ setHidNav, onOpenInfo }: any) {
         messagesOffsetAnim={messagesOffsetAnim}
         messagePanHandlers={messagePanHandlers}
         isMessagesExpanded={isMessagesExpanded}
+        isMessagesPaneOnTop={isMessagesPaneOnTop}
         toggleMessagesPane={toggleMessagesPane}
         handleCloseMessages={handleCloseMessages}
         onOpenInfo={onOpenInfo}

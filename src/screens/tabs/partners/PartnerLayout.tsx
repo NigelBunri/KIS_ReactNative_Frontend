@@ -1,6 +1,5 @@
 import React from 'react';
 import { View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import LinearGradient from 'react-native-linear-gradient';
 import styles from '@/components/partners/partnersStyles';
@@ -10,7 +9,6 @@ import PartnerPanels from './PartnerPanels';
 import { DetachedPartnersOverlayBridge } from '@/contexts/DetachedPartnersOverlayContext';
 import { useKISTheme } from '@/theme/useTheme';
 import { useStatusBarStyle } from '@/theme/useStatusBarStyle';
-import { useResponsiveLayout } from '@/theme/responsive';
 import PartnerAppLaunchBar from '@/components/partners/PartnerAppLaunchBar';
 import { usePartnerOrganizationAppsContext } from '@/context/partners/PartnerOrganizationAppsContext';
 import type { PartnerOrganizationApp } from '@/screens/tabs/partners/hooks/usePartnerOrganizationApps';
@@ -45,6 +43,7 @@ type Props = {
   messagesOffsetAnim: any;
   messagePanHandlers: Record<string, any>;
   isMessagesExpanded: boolean;
+  isMessagesPaneOnTop: boolean;
   toggleMessagesPane: () => void;
   handleCloseMessages: () => void;
   onOpenInfo: any;
@@ -146,6 +145,7 @@ export default function PartnerLayout({
   messagesOffsetAnim,
   messagePanHandlers,
   isMessagesExpanded,
+  isMessagesPaneOnTop,
   toggleMessagesPane,
   handleCloseMessages,
   onOpenInfo,
@@ -190,45 +190,29 @@ export default function PartnerLayout({
 
   // PartnersMessagesPane's "closed" state is an intentional, always-visible
   // peek sliver at the right edge (RIGHT_PEEK_WIDTH), not a hidden state —
-  // it now renders as a genuine top-level sibling (see
+  // it renders as a genuine top-level sibling (see
   // DetachedPartnersOverlayContext.tsx) so it can fully cover the Golden
-  // Section + tab bar once actually open, exactly as requested. But that
-  // same top-level promotion means its position:absolute top:0/bottom:0 is
-  // now relative to the whole window instead of a box already confined
-  // below the Golden Section / above the tab bar by ordinary flex layout,
-  // so the always-visible peek sliver needs its OWN top/bottom insets while
-  // closed to stay out of both. These are applied as a plain style prop on
-  // the always-mounted pane (never remounting it) — an earlier attempt
-  // solved this by conditionally switching between rendering the pane
-  // inline vs. via the detached bridge based on isMessagesExpanded, which
-  // genuinely fixed the visual bug but broke the close animation: the
-  // remount happens while the closing spring animation (useNativeDriver:
-  // true) is still in flight, and destroying/recreating the native view
-  // mid-animation desyncs it from messagesOffsetAnim, leaving the pane
-  // visually stuck partway closed until the user manually drags it the
-  // rest of the way. A single, permanently-stable render location (matching
-  // the proven chat-overlay Bridge/Outlet pattern exactly — it always
-  // bridges, never conditionally un-bridges) avoids that entirely.
+  // Section + tab bar once actually open, exactly as requested. It is always
+  // full-height (top:0/bottom:0, matching the open state exactly) — the
+  // Golden Section and tab bar naturally paint over the peek sliver's ends
+  // while closed because PartnersMessagesPane's own zIndex drops below both
+  // of theirs in that state (see the zIndex swap in PartnersMessagesPane.tsx
+  // itself), and rises above both once opened. No separate top/bottom inset
+  // math is needed — a stacking-order swap instead of a size change, so
+  // there's nothing here that needs to track the Golden Section's live
+  // (Reanimated-driven, collapsible) height or the tab bar's own height
+  // formula.
   //
-  // peekBottomInset mirrors AnimatedKISTabBar's own height formula exactly
-  // (see AppNavigator.tsx) so the sliver's bottom edge lines up with the
-  // real tab bar's top edge precisely, not an approximation.
-  //
-  // peekTopInset is a deliberately generous, static estimate of the Golden
-  // Section's own worst-case (fully expanded) rendered height for this
-  // screen specifically, not a pixel-exact live measurement — the Golden
-  // Section's real height is a Reanimated-driven, continuously variable
-  // value (collapses on scroll; see useCollapsingGoldHeader.ts) that isn't
-  // otherwise exposed outside its own shared-value graph, and threading it
-  // out just for this approximate, non-critical buffer isn't worth the
-  // complexity it would add. Overestimating here is safe (worst case: a
-  // sliver of visible background above the peek sliver) - underestimating
-  // is the actual bug, so this errs generous on purpose.
-  const responsive = useResponsiveLayout();
-  const safeAreaInsets = useSafeAreaInsets();
-  const tabBarHeight = responsive.isWatch ? 52 : responsive.isCompactPhone ? 62 : 72;
-  const peekBottomInset = tabBarHeight + Math.max(safeAreaInsets.bottom, 0);
-  const peekTopInset = topInset + 300;
+  // This is a single, permanently-stable render location (matching the
+  // proven chat-overlay Bridge/Outlet pattern exactly — it always bridges,
+  // never conditionally un-bridges): an earlier attempt conditionally
+  // switched between rendering the pane inline vs. via the detached bridge
+  // based on isMessagesExpanded, which broke the close animation — the
+  // remount happened while the closing spring animation (useNativeDriver:
+  // true) was still in flight, and destroying/recreating the native view
+  // mid-animation desynced it from messagesOffsetAnim, leaving the pane
+  // visually stuck partway closed until the user manually dragged it the
+  // rest of the way.
 
   return (
     // Root no longer has paddingTop — the left rail fills all the way to y=0
@@ -324,7 +308,7 @@ export default function PartnerLayout({
           width,
           messagesOffsetAnim,
           messagePanHandlers,
-          isMessagesExpanded,
+          isMessagesPaneOnTop,
           toggleMessagesPane,
           closeMessagesPane: handleCloseMessages,
           selectedGroupId,
@@ -337,8 +321,6 @@ export default function PartnerLayout({
           selectedPartner,
           onOpenInfo,
           onOpenTasks,
-          peekTopInset,
-          peekBottomInset,
         }}
         partnerSheetProps={{
           isOpen: isPartnerSheetOpen,

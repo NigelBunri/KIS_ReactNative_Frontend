@@ -101,7 +101,6 @@ export default function PartnerSheet({
           />
         </View>
         <ScrollView
-          style={{ marginTop: 200}}
           contentContainerStyle={styles.settingsScrollContent}
           showsVerticalScrollIndicator={false}
         >

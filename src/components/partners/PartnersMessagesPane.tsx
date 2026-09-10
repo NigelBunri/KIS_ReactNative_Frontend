@@ -1,6 +1,6 @@
 // src/screens/tabs/PartnersMessagesPane.tsx
 import React, { useMemo } from 'react';
-import { Animated, Text, View } from 'react-native';
+import { Animated, Pressable, Text, View } from 'react-native';
 import styles from './partnersStyles';
 import { useKISTheme } from '../../theme/useTheme';
 import {
@@ -13,11 +13,18 @@ import ChatRoomPage from '@/Module/ChatRoom/ChatRoomPage';
 import PartnerFeedScreen from '@/components/feeds/PartnerFeedScreen';
 import CommunityFeedScreen from '@/components/feeds/CommunityFeedScreen';
 import { useResponsiveLayout } from '@/theme/responsive';
+import { KISIcon } from '@/constants/kisIcons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 type Props = {
   width: number;
   messagesOffsetAnim: Animated.Value;
-  isMessagesExpanded: boolean;
+  /** True while open OR while a drag gesture is actively dragging it open/
+   * closed — see useMessagesPane.ts's isDragging doc comment. Used instead
+   * of the settled isMessagesExpanded state so the pane is elevated above
+   * the Golden Section/tab bar for the whole opening drag, not just once
+   * fully open. */
+  isMessagesPaneOnTop: boolean;
   toggleMessagesPane: () => void;
   closeMessagesPane: () => void;
   messagePanHandlers?: Record<string, any>;
@@ -31,19 +38,12 @@ type Props = {
   selectedPartner?: Partner;
   onOpenInfo?: (payload: { chat: any; currentUserId: string | null }) => void;
   onOpenTasks?: () => void;
-  /** How far below the true screen top / above the true screen bottom this
-   * pane's always-visible "closed" peek sliver must stay, now that it
-   * renders as a top-level sibling that can otherwise reach the Golden
-   * Section and tab bar (see DetachedPartnersOverlayContext.tsx). Ignored
-   * while isMessagesExpanded - the whole point of opening is to cover both. */
-  peekTopInset?: number;
-  peekBottomInset?: number;
 };
 
 export default function PartnersMessagesPane({
   width,
   messagesOffsetAnim,
-  isMessagesExpanded,
+  isMessagesPaneOnTop,
   toggleMessagesPane: _toggleMessagesPane,
   closeMessagesPane,
   messagePanHandlers,
@@ -57,11 +57,10 @@ export default function PartnersMessagesPane({
   selectedPartner,
   onOpenInfo,
   onOpenTasks,
-  peekTopInset = 0,
-  peekBottomInset = 0,
 }: Props) {
   const { palette } = useKISTheme();
   const responsive = useResponsiveLayout();
+  const safeAreaInsets = useSafeAreaInsets();
   const paneWidth = Math.min(width, responsive.isTablet ? Math.max(520, Math.round(width * 0.62)) : width);
 
   const selectedGroup = useMemo(
@@ -127,30 +126,83 @@ export default function PartnersMessagesPane({
           backgroundColor: palette.chatBg,
           borderLeftColor: palette.divider,
           transform: [{ translateX: messagesOffsetAnim }],
-          // Full coverage while open (overrides styles.messagesPane's own
-          // top:0/bottom:0 with the same values - explicit here so the
-          // intent reads clearly next to the peeked case below); confined
-          // to stay clear of the Golden Section + tab bar while the pane is
-          // just its normal always-visible peek sliver. See peekTopInset/
-          // peekBottomInset's own doc comment on this component's Props.
-          top: isMessagesExpanded ? 0 : peekTopInset,
-          bottom: isMessagesExpanded ? 0 : peekBottomInset,
+          // Always full height (top:0/bottom:0), identical in both states —
+          // the closed "peek sliver" and the fully-open pane are the exact
+          // same box; only the horizontal translateX and the zIndex below
+          // change between them. While closed, dropping below the Golden
+          // Section's and tab bar's own stacking means those two opaque
+          // layers naturally paint over the sliver's top/bottom ends, which
+          // is what keeps it looking like a confined sliver rather than a
+          // full-height strip - no separate inset math needed to track
+          // either one's (live, Reanimated-driven) height. While open (or
+          // mid-drag toward open — isMessagesPaneOnTop, not isMessagesExpanded
+          // alone), this rises back above both so the pane can cover them.
+          // Using isMessagesExpanded here instead would keep the pane
+          // beneath the Golden Section/tab bar for the ENTIRE opening drag
+          // (isMessagesExpanded only flips at the end, on release), so the
+          // user's finger would visibly slide the pane while it stayed
+          // invisibly tucked behind those two layers, then have it "pop"
+          // into view all at once on release - correct on close (where
+          // being covered by them throughout the drag is exactly the
+          // desired look) but wrong on open.
+          zIndex: isMessagesPaneOnTop ? 20 : -1,
         },
       ]}
       {...messagePanHandlers}
     >
       {!hasDestination ? (
-        <View style={[styles.messagesBody, { paddingHorizontal: responsive.pageGutter }]}>
-          <Text
-            style={[styles.messagesPlaceholderTitle, { color: palette.text }]}
+        <View style={{ flex: 1 }}>
+          {/* Same closeMessagesPane the drag gesture and every other
+              destination's header use (see the onBack props below) — one
+              shared animated-close path, so the button and the drag-close
+              animation always end up in sync instead of two separate ways
+              to "be closed" that could disagree. */}
+          <Pressable
+            onPress={closeMessagesPane}
+            hitSlop={12}
+            style={{
+              position: 'absolute',
+              top: safeAreaInsets.top + 12,
+              right: 16,
+              zIndex: 1,
+              width: 36,
+              height: 36,
+              borderRadius: 18,
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: palette.chrome,
+            }}
           >
-            No destination selected
-          </Text>
-          <Text
-            style={[styles.messagesPlaceholderText, { color: palette.subtext }]}
+            <KISIcon name="close" size={20} color={palette.subtext} />
+          </Pressable>
+          <View
+            style={[
+              styles.messagesBody,
+              {
+                flex: 1,
+                alignItems: 'center',
+                justifyContent: 'center',
+                paddingHorizontal: responsive.pageGutter,
+              },
+            ]}
           >
-            Choose the partner feed, a group, or a channel to open it here.
-          </Text>
+            <Text
+              style={[
+                styles.messagesPlaceholderTitle,
+                { color: palette.text, textAlign: 'center' },
+              ]}
+            >
+              No destination selected
+            </Text>
+            <Text
+              style={[
+                styles.messagesPlaceholderText,
+                { color: palette.subtext, textAlign: 'center' },
+              ]}
+            >
+              Choose the partner feed, a group, or a channel to open it here.
+            </Text>
+          </View>
         </View>
       ) : null}
       {selectedFeed && selectedPartner ? (

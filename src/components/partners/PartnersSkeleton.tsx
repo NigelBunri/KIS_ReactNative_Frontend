@@ -2,7 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import { Animated, ScrollView, StyleSheet, View } from 'react-native';
 import { useKISTheme } from '@/theme/useTheme';
 import { useResponsiveLayout } from '@/theme/responsive';
-import { LEFT_RAIL_WIDTH, RIGHT_PEEK_WIDTH } from './partnersTypes';
+import { LEFT_RAIL_WIDTH } from './partnersTypes';
 
 // ─── Shared shimmer hook ───────────────────────────────────────────────────────
 
@@ -92,14 +92,12 @@ export function PartnerCenterPaneSkeleton() {
   const { palette } = useKISTheme();
   const responsive = useResponsiveLayout();
   const compact = responsive.isWatch || responsive.isCompactPhone;
-  const rightPeek = responsive.isWatch ? 48 : responsive.isCompactPhone ? 56 : RIGHT_PEEK_WIDTH;
 
   return (
     <View
       style={[
         styles.centerPane,
         {
-          marginRight: rightPeek,
           paddingHorizontal: responsive.pageGutter ?? 16,
         },
       ]}

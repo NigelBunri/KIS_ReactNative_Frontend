@@ -13,7 +13,6 @@ import {
   PartnerChannel,
   PartnerCommunity,
   PartnerGroup,
-  RIGHT_PEEK_WIDTH,
 } from './partnersTypes';
 import PartnerAdminsStrip from './center/PartnerAdminsStrip';
 import PartnerChannelsSection from './center/PartnerChannelsSection';
@@ -97,7 +96,6 @@ export default function PartnersCenterPane({
   const { palette } = useKISTheme();
   const responsive = useResponsiveLayout();
   const compact = responsive.isWatch || responsive.isCompactPhone;
-  const rightPeek = responsive.isWatch ? 48 : responsive.isCompactPhone ? 56 : RIGHT_PEEK_WIDTH;
   const contentAnim = useRef(new Animated.Value(0)).current;
   const [collapsed, setCollapsed] = useState({
     feed: false,
@@ -243,7 +241,10 @@ export default function PartnersCenterPane({
       style={[
         styles.centerPane,
         {
-          marginRight: rightPeek,
+          // No marginRight reserved for the messages pane's peek sliver —
+          // that sliver now sits below the Golden Section/tab bar (zIndex -1)
+          // while at rest and isn't visible, so the center pane fills the
+          // full remaining width instead of leaving a dead gap for it.
           // Zero out all padding — golden header fills edge-to-edge naturally,
           // content below uses its own padded View wrapper.
           paddingHorizontal: 0,
