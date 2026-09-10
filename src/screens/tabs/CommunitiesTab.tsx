@@ -13,6 +13,7 @@ import {
   Image,
   KeyboardAvoidingView,
   Platform,
+  ScrollView,
   useWindowDimensions,
   DeviceEventEmitter,
   NativeScrollEvent,
@@ -80,6 +81,81 @@ type CommunitiesTabProps = {
   onScroll?: (e: NativeSyntheticEvent<NativeScrollEvent>) => void;
 };
 
+// Matches NewCommunityForm.tsx's own option set/values exactly - the
+// "create community" flow used to exist as two visually and functionally
+// different implementations (this tab's inline Modal, and the richer
+// NewCommunityForm used from AddContactsPage/PartnerCreatePanel); this
+// brings the plainer one up to the same design and the same backend
+// fields (visibility/join_policy/post_policy) rather than silently
+// defaulting them.
+const VISIBILITY_OPTIONS: { value: 'public' | 'private' | 'hidden'; label: string }[] = [
+  { value: 'public', label: 'Public' },
+  { value: 'private', label: 'Private' },
+  { value: 'hidden', label: 'Hidden' },
+];
+const JOIN_POLICY_OPTIONS: { value: 'open' | 'request' | 'invite_only'; label: string }[] = [
+  { value: 'open', label: 'Open' },
+  { value: 'request', label: 'Request to join' },
+  { value: 'invite_only', label: 'Invite only' },
+];
+const POST_POLICY_OPTIONS: { value: 'all_members' | 'mods_only' | 'admins_only'; label: string }[] = [
+  { value: 'all_members', label: 'All members' },
+  { value: 'mods_only', label: 'Mods & admins' },
+  { value: 'admins_only', label: 'Admins only' },
+];
+
+function CreateCommunityPolicyPicker<T extends string>({
+  label,
+  options,
+  value,
+  onChange,
+  palette,
+  isLast,
+}: {
+  label: string;
+  options: { value: T; label: string }[];
+  value: T;
+  onChange: (value: T) => void;
+  palette: ReturnType<typeof useKISTheme>['palette'];
+  isLast?: boolean;
+}) {
+  return (
+    <View style={{ marginBottom: isLast ? 4 : 12 }}>
+      <Text style={{ color: palette.subtext, fontSize: 13, marginBottom: 6 }}>{label}</Text>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+        {options.map((opt) => {
+          const selected = value === opt.value;
+          return (
+            <Pressable
+              key={opt.value}
+              onPress={() => onChange(opt.value)}
+              style={({ pressed }) => ({
+                borderRadius: 999,
+                paddingVertical: 8,
+                paddingHorizontal: 14,
+                borderWidth: 2,
+                borderColor: selected ? palette.primary : palette.inputBorder,
+                backgroundColor: selected ? palette.primary : palette.card,
+                opacity: pressed ? 0.7 : 1,
+              })}
+            >
+              <Text
+                style={{
+                  color: selected ? palette.onPrimary : palette.text,
+                  fontSize: 13,
+                  fontWeight: selected ? '700' : '500',
+                }}
+              >
+                {opt.label}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
+
 const CommunitiesTab = forwardRef<ScrollableHandle, CommunitiesTabProps>(function CommunitiesTab({ onOpenChat, onScroll }: CommunitiesTabProps, ref) {
   const { palette } = useKISTheme();
   const insets = useSafeAreaInsets();
@@ -124,6 +200,10 @@ const CommunitiesTab = forwardRef<ScrollableHandle, CommunitiesTabProps>(functio
   const [createName, setCreateName] = useState('');
   const [createDesc, setCreateDesc] = useState('');
   const [createAvatarUri, setCreateAvatarUri] = useState<string | null>(null);
+  const [createVisibility, setCreateVisibility] = useState<'public' | 'private' | 'hidden'>('public');
+  const [createJoinPolicy, setCreateJoinPolicy] = useState<'open' | 'request' | 'invite_only'>('request');
+  const [createPostPolicy, setCreatePostPolicy] = useState<'all_members' | 'mods_only' | 'admins_only'>('all_members');
+  const [creatingCommunity, setCreatingCommunity] = useState(false);
   const [discoverVisible, setDiscoverVisible] = useState(false);
   const [discoverQuery, setDiscoverQuery] = useState('');
   const [discoverResults, setDiscoverResults] = useState<Community[]>([]);
@@ -249,7 +329,8 @@ const CommunitiesTab = forwardRef<ScrollableHandle, CommunitiesTabProps>(functio
   }, []);
 
   const createCommunity = useCallback(async () => {
-    if (!createName.trim()) return;
+    if (!createName.trim() || creatingCommunity) return;
+    setCreatingCommunity(true);
 
     let avatarUrl: string | undefined;
     if (createAvatarUri) {
@@ -273,9 +354,21 @@ const CommunitiesTab = forwardRef<ScrollableHandle, CommunitiesTabProps>(functio
       name: createName.trim(),
       slug: createName.trim().toLowerCase().replace(/\s+/g, '-'),
       description: createDesc.trim(),
+      visibility: createVisibility,
+      join_policy: createJoinPolicy,
+      post_policy: createPostPolicy,
       create_main_conversation: true,
       create_posts_conversation: true,
       ...(avatarUrl ? { icon_url: avatarUrl, avatar_url: avatarUrl } : {}),
+    };
+    const resetCreateForm = () => {
+      setCreateVisible(false);
+      setCreateName('');
+      setCreateDesc('');
+      setCreateAvatarUri(null);
+      setCreateVisibility('public');
+      setCreateJoinPolicy('request');
+      setCreatePostPolicy('all_members');
     };
     try {
       const res = await postRequest(ROUTES.community.create, payload, {
@@ -293,19 +386,13 @@ const CommunitiesTab = forwardRef<ScrollableHandle, CommunitiesTabProps>(functio
           created,
           ...items.filter((item) => item.id !== created.id),
         ]);
-        setCreateVisible(false);
-        setCreateName('');
-        setCreateDesc('');
-        setCreateAvatarUri(null);
+        resetCreateForm();
       }
     } catch {
       const netState = await NetInfo.fetch().catch(() => ({ isConnected: false }));
       if (!netState.isConnected) {
         await enqueueMutation({ method: 'POST', url: ROUTES.community.create, payload });
-        setCreateVisible(false);
-        setCreateName('');
-        setCreateDesc('');
-        setCreateAvatarUri(null);
+        resetCreateForm();
         // Optimistic: add a local placeholder so the user sees their action
         const optimistic: Community = {
           id: `local_${Date.now()}`,
@@ -317,8 +404,10 @@ const CommunitiesTab = forwardRef<ScrollableHandle, CommunitiesTabProps>(functio
         setCommunities((prev) => [optimistic, ...prev]);
         Alert.alert('Saved offline', 'Community will be created when you are back online.');
       }
+    } finally {
+      setCreatingCommunity(false);
     }
-  }, [createName, createDesc, createAvatarUri]);
+  }, [createName, createDesc, createAvatarUri, createVisibility, createJoinPolicy, createPostPolicy, creatingCommunity]);
 
   const createPost = useCallback(async () => {
     if (!selected || !composerText.trim()) return;
@@ -830,56 +919,184 @@ const CommunitiesTab = forwardRef<ScrollableHandle, CommunitiesTabProps>(functio
       )}
 
       <Modal visible={createVisible} transparent animationType="fade">
+        {/* Explicit backgroundColor at every wrapper level, not just modalCard -
+            the same lesson NewCommunityForm.tsx's own comment documents: a
+            Modal's `transparent` prop only means the native modal WINDOW has
+            no background, so every nested layer still needs to paint its own
+            opaque fill or whatever sits behind it in the native hierarchy can
+            show through. */}
         <View style={[styles.modalOverlay, { backgroundColor: palette.backdrop }]}>
-          <View style={[styles.modalCard, { backgroundColor: palette.card, borderColor: palette.inputBorder }]}>
-            <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
-            <Text style={{ color: palette.text, fontWeight: '600', marginBottom: 12 }}>Create Community</Text>
-            <View style={{ alignItems: 'center', marginBottom: 12 }}>
-              <Pressable
-                onPress={handlePickCreateAvatar}
-                style={{
-                  width: 60,
-                  height: 60,
-                  borderRadius: 30,
-                  backgroundColor: palette.surface ?? palette.card,
-                  borderWidth: 2,
-                  borderColor: palette.inputBorder,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  overflow: 'hidden',
-                }}
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={styles.createModalKav}
+          >
+            <View
+              style={[
+                styles.modalCard,
+                styles.createModalCard,
+                { backgroundColor: palette.card, borderColor: palette.inputBorder },
+              ]}
+            >
+              <View style={{ marginBottom: 16 }}>
+                <Text style={{ color: palette.text, fontSize: 18, fontWeight: '800' }}>
+                  Create a community
+                </Text>
+                <Text style={{ color: palette.subtext, fontSize: 12, marginTop: 2 }}>
+                  Build a space for your audience to connect, share and grow together.
+                </Text>
+              </View>
+
+              <ScrollView
+                showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
+                style={{ backgroundColor: palette.card }}
               >
-                {createAvatarUri ? (
-                  <Image source={{ uri: createAvatarUri }} style={{ width: 60, height: 60, borderRadius: 30 }} />
-                ) : (
-                  <KISIcon name="camera" size={24} color={palette.subtext} />
-                )}
-              </Pressable>
+                <View style={{ alignItems: 'center', marginBottom: 18 }}>
+                  <Pressable
+                    onPress={handlePickCreateAvatar}
+                    style={({ pressed }) => ({
+                      width: 84,
+                      height: 84,
+                      borderRadius: 42,
+                      backgroundColor: palette.card,
+                      borderWidth: 2,
+                      borderColor: createAvatarUri ? palette.primary : palette.inputBorder,
+                      borderStyle: createAvatarUri ? 'solid' : 'dashed',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      overflow: 'hidden',
+                      opacity: pressed ? 0.8 : 1,
+                    })}
+                  >
+                    {createAvatarUri ? (
+                      <Image source={{ uri: createAvatarUri }} style={{ width: 84, height: 84 }} />
+                    ) : (
+                      <KISIcon name="camera" size={28} color={palette.subtext} />
+                    )}
+                  </Pressable>
+                  <Text style={{ color: palette.subtext, fontSize: 12, marginTop: 6 }}>
+                    Community photo (optional)
+                  </Text>
+                </View>
+
+                <View style={{ marginBottom: 12 }}>
+                  <Text style={{ color: palette.subtext, fontSize: 13, marginBottom: 4 }}>
+                    Community name
+                  </Text>
+                  <View
+                    style={{
+                      borderRadius: 12,
+                      borderWidth: 2,
+                      borderColor: palette.inputBorder,
+                      backgroundColor: palette.card,
+                      paddingHorizontal: 12,
+                      paddingVertical: 8,
+                    }}
+                  >
+                    <TextInput
+                      placeholder="e.g. KIS Global Prayer"
+                      placeholderTextColor={palette.subtext}
+                      style={{ color: palette.text, fontSize: 14 }}
+                      value={createName}
+                      onChangeText={setCreateName}
+                    />
+                  </View>
+                </View>
+
+                <View style={{ marginBottom: 16 }}>
+                  <Text style={{ color: palette.subtext, fontSize: 13, marginBottom: 4 }}>
+                    Description (optional)
+                  </Text>
+                  <View
+                    style={{
+                      borderRadius: 12,
+                      borderWidth: 2,
+                      borderColor: palette.inputBorder,
+                      backgroundColor: palette.card,
+                      paddingHorizontal: 12,
+                      paddingVertical: 8,
+                    }}
+                  >
+                    <TextInput
+                      placeholder="What is this community about?"
+                      placeholderTextColor={palette.subtext}
+                      style={{ color: palette.text, fontSize: 14, minHeight: 60, textAlignVertical: 'top' }}
+                      value={createDesc}
+                      onChangeText={setCreateDesc}
+                      multiline
+                    />
+                  </View>
+                </View>
+
+                <CreateCommunityPolicyPicker
+                  label="Who can see this community"
+                  options={VISIBILITY_OPTIONS}
+                  value={createVisibility}
+                  onChange={setCreateVisibility}
+                  palette={palette}
+                />
+                <CreateCommunityPolicyPicker
+                  label="How people can join"
+                  options={JOIN_POLICY_OPTIONS}
+                  value={createJoinPolicy}
+                  onChange={setCreateJoinPolicy}
+                  palette={palette}
+                />
+                <CreateCommunityPolicyPicker
+                  label="Who can post"
+                  options={POST_POLICY_OPTIONS}
+                  value={createPostPolicy}
+                  onChange={setCreatePostPolicy}
+                  palette={palette}
+                  isLast
+                />
+              </ScrollView>
+
+              <View style={{ flexDirection: 'row', gap: 10, marginTop: 16 }}>
+                <Pressable
+                  onPress={() => {
+                    setCreateVisible(false);
+                    setCreateAvatarUri(null);
+                  }}
+                  style={({ pressed }) => ({
+                    flex: 1,
+                    borderRadius: 999,
+                    paddingVertical: 12,
+                    alignItems: 'center',
+                    borderWidth: 2,
+                    borderColor: palette.inputBorder,
+                    opacity: pressed ? 0.7 : 1,
+                  })}
+                >
+                  <Text style={{ color: palette.text, fontSize: 14, fontWeight: '700' }}>Cancel</Text>
+                </Pressable>
+                <Pressable
+                  onPress={creatingCommunity ? undefined : createCommunity}
+                  style={({ pressed }) => ({
+                    flex: 2,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    borderRadius: 999,
+                    paddingVertical: 12,
+                    backgroundColor: palette.primary,
+                    opacity: creatingCommunity || !createName.trim() ? 0.6 : pressed ? 0.85 : 1,
+                  })}
+                >
+                  {creatingCommunity ? (
+                    <ActivityIndicator color={palette.onPrimary} />
+                  ) : (
+                    <>
+                      <KISIcon name="megaphone" size={16} color={palette.onPrimary} />
+                      <Text style={{ color: palette.onPrimary, fontSize: 14, fontWeight: '700', marginLeft: 6 }}>
+                        Create community
+                      </Text>
+                    </>
+                  )}
+                </Pressable>
+              </View>
             </View>
-            <TextInput
-              placeholder="Community name"
-              placeholderTextColor={palette.subtext}
-              style={[styles.input, { color: palette.text, borderColor: palette.inputBorder }]}
-              value={createName}
-              onChangeText={setCreateName}
-            />
-            <TextInput
-              placeholder="Description"
-              placeholderTextColor={palette.subtext}
-              style={[styles.input, { color: palette.text, borderColor: palette.inputBorder, marginTop: 8 }]}
-              value={createDesc}
-              onChangeText={setCreateDesc}
-            />
-            <View style={styles.modalRow}>
-              <Pressable onPress={() => { setCreateVisible(false); setCreateAvatarUri(null); }} style={styles.iconBtn}>
-                <Text style={{ color: palette.text }}>Cancel</Text>
-              </Pressable>
-              <Pressable onPress={createCommunity} style={styles.iconBtn}>
-                <Text style={{ color: palette.primary }}>Create</Text>
-              </Pressable>
-            </View>
-            </KeyboardAvoidingView>
-          </View>
+          </KeyboardAvoidingView>
         </View>
       </Modal>
 
@@ -1083,6 +1300,13 @@ const styles = StyleSheet.create({
   overlay: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 },
   modalOverlay: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   modalCard: { width: '88%', borderRadius: 14, borderWidth: 2, padding: 16 },
+  // Wider/taller variant for the create-community modal specifically - it
+  // has real content (avatar + 2 text fields + 3 pill-picker rows), unlike
+  // the plainer name-only modals styles.modalCard's base size was tuned
+  // for. maxHeight + the ScrollView inside keeps it from ever overflowing
+  // the screen instead of being cut off / pushing the action row offscreen.
+  createModalKav: { width: '100%', alignItems: 'center' },
+  createModalCard: { width: '90%', maxHeight: '86%' },
   modalRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 12 },
   memberRow: { paddingVertical: 8, paddingHorizontal: 10, borderWidth: 2, borderRadius: 10, marginBottom: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   joinBtn: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
