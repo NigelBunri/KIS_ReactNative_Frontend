@@ -60,7 +60,7 @@ import {
   type Chat,
   CUSTOM_FILTERS_KEY 
 } from '@/Module/ChatRoom/messagesUtils';
-import { fetchConversationsForCurrentUser, fetchConversationsForCurrentUserWithStatus, searchConversationsFromServer } from '@/Module/ChatRoom/normalizeConversation';
+import { fetchConversationsForCurrentUserWithStatus, searchConversationsFromServer } from '@/Module/ChatRoom/normalizeConversation';
 import { mapBackendToChatMessage } from '@/Module/ChatRoom/componets/chatMapping';
 import { MessageStatus } from '@/Module/ChatRoom/chatTypes';
 import { decryptConversationPayload, ENCRYPTION_VERSION } from '@/security/customE2EE';
@@ -447,7 +447,23 @@ const handleRetryConversations = useCallback(async () => {
 
 const CONVERSATIONS_CACHE_KEY = 'kis.conversations_cache';
 
-// Load cached conversations on mount before the API call completes
+// Load cached conversations on mount before the API call completes, then
+// ALWAYS force a real network reconciliation afterward.
+//
+// Previously this effect returned early once it had a non-empty cache,
+// never touching the network at all on that mount. The only thing that
+// force-refreshes conversations (refreshConversations(true)) elsewhere in
+// this file is the AppState 'active' listener a few effects down - but
+// AppState 'change' only fires on a background->foreground TRANSITION, not
+// on the app's initial active state at cold start. So a genuine kill+
+// relaunch (not background+foreground) skipped every force-refresh path:
+// whatever unread counts happened to be cached - even for a conversation
+// the user fully read in a *previous* session, if the read state was
+// server-confirmed after that session's last cache write - would keep
+// showing until some other trigger (pull-to-refresh, a socket event, or
+// finally backgrounding once) happened to fire. Forcing a refresh here
+// closes that gap without changing the instant-cache-paint behavior users
+// already see.
 useEffect(() => {
   let active = true;
   const cacheKey = userScopedCacheKey(CONVERSATIONS_CACHE_KEY);
@@ -455,21 +471,16 @@ useEffect(() => {
   AsyncStorage.getItem(cacheKey).then(async (raw) => {
     try {
       const cached = raw ? JSON.parse(raw) as Chat[] : [];
-      if (Array.isArray(cached) && cached.length > 0) {
-        if (active) setConversations((prev) => (prev.length === 0 ? cached : prev));
-        return;
-      }
-      const canonical = await fetchConversationsForCurrentUser(conversationsRef.current, effectiveCurrentUserId ?? undefined);
-      if (active && canonical.length > 0) {
-        setConversations((prev) => (prev.length === 0 ? canonical : prev));
-        AsyncStorage.setItem(cacheKey, JSON.stringify(canonical)).catch(() => {});
+      if (Array.isArray(cached) && cached.length > 0 && active) {
+        setConversations((prev) => (prev.length === 0 ? cached : prev));
       }
     } catch { /* silent */ }
+    if (active) await refreshConversations(true).catch(() => {});
   }).catch(() => {});
   return () => {
     active = false;
   };
-}, [effectiveCurrentUserId, userScopedCacheKey]);
+}, [effectiveCurrentUserId, userScopedCacheKey, refreshConversations]);
 
 useEffect(() => {
   let active = true;

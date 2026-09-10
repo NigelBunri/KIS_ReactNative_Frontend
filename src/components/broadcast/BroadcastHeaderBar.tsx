@@ -9,6 +9,12 @@ type Props = {
   tierLabel?: string;
   onCreate?: () => void;
   onSearch?: () => void;
+  // Entry point into the general Notifications list (ProfileNotifications) -
+  // the fix for "a notification shows on the broadcast section and I can't
+  // trace it to where it's coming from." unreadCount shows a small dot, not
+  // an exact number, matching the compact space every other control here has.
+  onNotifications?: () => void;
+  hasUnreadNotifications?: boolean;
 };
 
 export default function BroadcastHeaderBar({
@@ -16,6 +22,8 @@ export default function BroadcastHeaderBar({
   tierLabel = 'Business Pro',
   onCreate,
   onSearch,
+  onNotifications,
+  hasUnreadNotifications,
 }: Props) {
   const { palette, tokens, tone } = useKISTheme();
   const responsive = useResponsiveLayout();
@@ -75,6 +83,27 @@ export default function BroadcastHeaderBar({
         </View>
 
         <View style={[styles.actions, compact && styles.actionsCompact]}>
+          {onNotifications && (
+            <Pressable
+              onPress={onNotifications}
+              style={[
+                styles.createBtn,
+                {
+                  backgroundColor: controlBg,
+                  borderColor: controlBorder,
+                  borderWidth: 1,
+                  paddingHorizontal: compact ? 9 : 12,
+                },
+              ]}
+              accessibilityRole="button"
+              accessibilityLabel="Notifications"
+            >
+              <View>
+                <KISIcon name="bell" size={16} color={controlText} />
+                {hasUnreadNotifications ? <View style={styles.unreadDot} /> : null}
+              </View>
+            </Pressable>
+          )}
           {onSearch && (
             <Pressable
               onPress={onSearch}
@@ -201,5 +230,14 @@ const makeStyles = (_tokens: any) =>
       minHeight: 42,
       paddingVertical: 9,
       justifyContent: 'center',
+    },
+    unreadDot: {
+      position: 'absolute',
+      top: -2,
+      right: -2,
+      width: 8,
+      height: 8,
+      borderRadius: 4,
+      backgroundColor: '#ef4444',
     },
   });

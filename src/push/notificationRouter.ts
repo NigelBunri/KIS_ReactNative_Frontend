@@ -1,6 +1,8 @@
 // src/push/notificationRouter.ts
 // Maps incoming notification payload fields to the correct navigation target.
 
+import { DeviceEventEmitter } from 'react-native';
+
 export function routeNotification(
   data: Record<string, string>,
   navigation: any,
@@ -8,7 +10,6 @@ export function routeNotification(
   try {
     const {
       type,
-      conversation_id,
       broadcast_id,
       channel_id,
       channel_content_id,
@@ -25,11 +26,29 @@ export function routeNotification(
       live_id,
     } = data ?? {};
 
-    // Conversation / chat message — deep-link into Messages tab.
+    // Nest's own push payloads (notifyNewMessage/notifyIncomingCall/
+    // notifyMissedCall in notifications.service.ts) send camelCase
+    // 'conversationId', not 'conversation_id' - this destructuring only
+    // ever read the snake_case form, so this whole branch silently never
+    // fired for a real message push. Read both defensively, same as the
+    // per-chat-sound/channel-toggle checks in notifications.ts already do.
+    const conversation_id = data?.conversationId ?? data?.conversation_id;
+
+    // Conversation / chat message — open the exact chat room, not just the
+    // Messages tab. 'MainTabs' -> 'Messages' with a conversationId param
+    // used to be the whole implementation here, but ChatRoomPage isn't a
+    // navigator screen at all - it's rendered by AppNavigator's own
+    // chatHistory local state, and MessagesScreen never reads an incoming
+    // conversationId param to open it. 'chat.open' is the real, established
+    // bridge into that state (see AppNavigator.tsx's listener + every other
+    // "jump into a specific chat" call site: ChatRoomPage, ChatInfoPage,
+    // GlobalSearchScreen, etc.) - it works regardless of which tab is
+    // currently active since the chat renders as an overlay above the tabs.
     if (conversation_id) {
-      navigation.navigate('MainTabs', {
-        screen: 'Messages',
-        params: { conversationId: conversation_id },
+      DeviceEventEmitter.emit('chat.open', {
+        conversationId: String(conversation_id),
+        name: data.sender_name ?? data.title ?? 'Chat',
+        kind: data.chat_kind,
       });
       return;
     }

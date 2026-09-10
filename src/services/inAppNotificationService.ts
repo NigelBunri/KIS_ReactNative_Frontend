@@ -28,6 +28,14 @@ export type InAppNotification = {
   bibleEventId?: string;
   passageRef?: string;
   offsetMinutes?: number;
+  // Backend Notification.type/target_type/target_id — carried through so a
+  // detail screen can offer a real "go to" action instead of just showing
+  // static text. Only ever populated for kind:'backend' items (see
+  // toBackendNotification below); local reminder-type notifications have no
+  // backend row to have come from.
+  notificationType?: string;
+  targetType?: string;
+  targetId?: string;
 };
 
 type AvailabilityReminder = {
@@ -107,6 +115,7 @@ const toBackendNotification = (raw: any): InAppNotification | null => {
   if (!id) return null;
   const createdAt = raw?.created_at || raw?.createdAt || new Date().toISOString();
   const readAt = raw?.read_at || raw?.readAt || (raw?.is_read ? new Date().toISOString() : null);
+  const targetId = raw?.target_id ?? raw?.targetId;
   return {
     id,
     title: String(raw?.title || 'Notification'),
@@ -114,6 +123,9 @@ const toBackendNotification = (raw: any): InAppNotification | null => {
     createdAt: String(createdAt),
     readAt: readAt ? String(readAt) : null,
     kind: 'backend',
+    notificationType: raw?.type ? String(raw.type) : undefined,
+    targetType: raw?.target_type ? String(raw.target_type) : undefined,
+    targetId: targetId ? String(targetId) : undefined,
   };
 };
 
