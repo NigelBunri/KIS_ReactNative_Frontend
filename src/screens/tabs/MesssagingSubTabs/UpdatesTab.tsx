@@ -6,6 +6,7 @@ import {
   FlatList,
   Image,
   KeyboardAvoidingView,
+  Linking,
   Modal,
   NativeScrollEvent,
   NativeSyntheticEvent,
@@ -43,6 +44,8 @@ import AudioRecorderPlayer from 'react-native-audio-recorder-player';
 import { PERMISSIONS, RESULTS, check, request } from 'react-native-permissions';
 import RNFS from 'react-native-fs';
 import LinearGradient from 'react-native-linear-gradient';
+import DocumentPicker from 'react-native-document-picker';
+import Pdf from 'react-native-pdf';
 import { useRawTopInset } from '@/hooks/useSafeTopInset';
 import type { ScrollableHandle } from '@/hooks/useHeaderDragToScroll';
 
@@ -51,9 +54,10 @@ type StatusReplyPermission = 'contacts' | 'nobody';
 
 type StatusItem = {
   id: string;
-  type: 'image' | 'video' | 'audio' | 'text';
+  type: 'image' | 'video' | 'audio' | 'text' | 'document';
   uri?: string;
   text?: string;
+  documentName?: string;
   durationMs?: number;
   createdAt?: string;
   viewed?: boolean;
@@ -368,7 +372,7 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
   const [statusDraftText, setStatusDraftText] = useState('');
   const [statusDraftAssets, setStatusDraftAssets] = useState<any[]>([]);
   const [statusDraftType, setStatusDraftType] = useState<
-    'text' | 'image' | 'video' | 'audio'
+    'text' | 'image' | 'video' | 'audio' | 'document'
   >('text');
   const [statusDraftVisibility, setStatusDraftVisibility] =
     useState<StatusVisibility>('contacts');
@@ -820,6 +824,7 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
                   text: item.text ?? undefined,
                   durationMs: item.duration_ms ?? undefined,
                   createdAt: item.created_at ?? undefined,
+                  documentName: item.original_filename ?? undefined,
                   style: item.style ?? undefined,
                   viewed: Boolean(item.viewed),
                   visibility: item.visibility ?? 'contacts',
@@ -1010,6 +1015,17 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
   // segment fill were never actually in sync with each other.
   const isImageItem = currentItem?.type === 'image';
   const imageReady = !isImageItem || readyImageId === currentItem?.id;
+  // PDFs get a real, full-bleed, scrollable-through-pages preview (same
+  // library/pattern chat attachments already use); Word/other documents
+  // have no in-app renderer anywhere in this codebase, so they fall back
+  // to a plain filename card with an "Open" action instead of pretending
+  // to preview something that can't actually be shown.
+  const isPdfDocument =
+    currentItem?.type === 'document' &&
+    Boolean(
+      currentItem.documentName?.toLowerCase().endsWith('.pdf') ||
+        currentItem.uri?.toLowerCase().endsWith('.pdf'),
+    );
 
   const ensureMicPermission = useCallback(async () => {
     const perm =
@@ -1235,6 +1251,26 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
       }
     }
   }, [activeUser, closeViewer, statuses, viewerIndex]);
+
+  // Preload the NEXT item's image while the CURRENT one is still on
+  // screen, so its progress segment can start filling the instant we
+  // advance instead of waiting on a fresh network fetch first (the
+  // imageReady gate above stops the bar from racing ahead of a loading
+  // picture, but on its own that just turns the wait into a visible
+  // spinner - prefetching removes the wait itself for anything that had
+  // the current item's full viewing time to finish loading in the
+  // background). Purely a cache warm - doesn't touch imageReady/the
+  // timer for whatever is next; that item still goes through the exact
+  // same load-gated start when it actually becomes current.
+  React.useEffect(() => {
+    if (!viewerOpen || !activeUser) return;
+    const next =
+      activeUser.items[viewerIndex + 1] ??
+      statuses[statuses.findIndex(u => u.id === activeUser.id) + 1]?.items[0];
+    if (next?.type === 'image' && next.uri) {
+      Image.prefetch(next.uri).catch(() => {});
+    }
+  }, [viewerOpen, viewerIndex, activeUser, statuses]);
 
   const startTimer = useCallback(() => {
     stopTimer();
@@ -1519,6 +1555,16 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
         const content =
           latest.type === 'image' && latest.uri ? (
             <Image source={{ uri: latest.uri }} style={thumbFill} resizeMode="cover" />
+          ) : latest.type === 'document' ? (
+            <View style={[thumbFill, { backgroundColor: palette.card, padding: 6 }]}>
+              <KISIcon name="document" size={24} color={palette.text} />
+              <Text
+                style={{ color: palette.text, fontSize: 10, marginTop: 4, textAlign: 'center' }}
+                numberOfLines={2}
+              >
+                {latest.documentName || 'Document'}
+              </Text>
+            </View>
           ) : (
             (() => {
               const textStyle = resolveTextStyle(latest);
@@ -1592,6 +1638,18 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
       content = (
         <View style={[thumbFill, { backgroundColor: palette.card }]}>
           <KISIcon name="mic" size={24} color={palette.text} />
+        </View>
+      );
+    } else if (item?.type === 'document') {
+      content = (
+        <View style={[thumbFill, { backgroundColor: palette.card, padding: 6 }]}>
+          <KISIcon name="document" size={24} color={palette.text} />
+          <Text
+            style={{ color: palette.text, fontSize: 10, marginTop: 4, textAlign: 'center' }}
+            numberOfLines={2}
+          >
+            {item.documentName || 'Document'}
+          </Text>
         </View>
       );
     } else {
@@ -2289,6 +2347,48 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
                   Text
                 </KISText>
               </Pressable>
+              <Pressable
+                onPress={async () => {
+                  try {
+                    const picked = await DocumentPicker.pick({
+                      type: [
+                        DocumentPicker.types.pdf,
+                        DocumentPicker.types.doc,
+                        DocumentPicker.types.docx,
+                      ],
+                      copyTo: 'cachesDirectory',
+                    });
+                    const file = Array.isArray(picked) ? picked[0] : picked;
+                    if (!file?.uri) return;
+                    setStatusDraftType('document');
+                    setStatusDraftAssets([
+                      {
+                        uri: file.fileCopyUri || file.uri,
+                        type: file.type || 'application/pdf',
+                        fileName: file.name || 'Document',
+                        fileSize: file.size ?? undefined,
+                      },
+                    ]);
+                  } catch (err: any) {
+                    if (!DocumentPicker.isCancel(err)) {
+                      console.warn('[UpdatesTab] document pick failed', err);
+                    }
+                  }
+                }}
+                style={({ pressed }) => [
+                  styles.composerAction,
+                  {
+                    backgroundColor: pressed
+                      ? palette.surface
+                      : palette.surfaceElevated,
+                  },
+                ]}
+              >
+                <KISIcon name="document" size={18} color={palette.text} />
+                <KISText preset="helper" color={palette.text}>
+                  Document
+                </KISText>
+              </Pressable>
             </View>
 
             {statusDraftType === 'text' ? (
@@ -2527,6 +2627,21 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
                   </Text>
                 </View>
               </View>
+            ) : statusDraftType === 'document' ? (
+              <View style={styles.composerPreview}>
+                {statusDraftAssets.length > 0 ? (
+                  <View style={styles.audioPreview}>
+                    <KISIcon name="document" size={22} color={palette.text} />
+                    <Text style={{ color: palette.text }} numberOfLines={1}>
+                      {statusDraftAssets[0].fileName}
+                    </Text>
+                  </View>
+                ) : (
+                  <Text style={{ color: palette.subtext }}>
+                    No document selected.
+                  </Text>
+                )}
+              </View>
             ) : (
               <View style={styles.composerPreview}>
                 {statusDraftAssets.length > 0 ? (
@@ -2593,7 +2708,12 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
                     statusDraftType !== 'text' &&
                     statusDraftAssets.length === 0
                   ) {
-                    Alert.alert('Status', 'Please choose a photo or video.');
+                    Alert.alert(
+                      'Status',
+                      statusDraftType === 'document'
+                        ? 'Please choose a document.'
+                        : 'Please choose a photo or video.',
+                    );
                     return;
                   }
                   if (
@@ -2647,8 +2767,17 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
                       for (const asset of statusDraftAssets) {
                         const isVideo = asset.type?.startsWith('video');
                         const isAudio = asset.type?.startsWith('audio');
-                        const statusType = isVideo ? 'video' : isAudio ? 'audio' : 'image';
-                        const purpose: StatusMediaPurpose = isVideo
+                        const isDocument = statusDraftType === 'document';
+                        const statusType = isDocument
+                          ? 'document'
+                          : isVideo
+                          ? 'video'
+                          : isAudio
+                          ? 'audio'
+                          : 'image';
+                        const purpose: StatusMediaPurpose = isDocument
+                          ? 'status_document'
+                          : isVideo
                           ? 'status_video'
                           : isAudio
                           ? 'status_audio'
@@ -2939,6 +3068,12 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
                 </View>
               ) : null}
             </>
+          ) : isPdfDocument && currentItem?.uri ? (
+            <Pdf
+              source={{ uri: currentItem.uri, cache: true }}
+              style={styles.viewerMediaFill}
+              onError={() => {}}
+            />
           ) : null}
 
           {/* Top gradient scrim - keeps the progress bars/header legible
@@ -3163,7 +3298,36 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
                   </Text>
                 </Pressable>
               </View>
-            ) : currentItem?.type === 'video' || currentItem?.type === 'image' ? null : (
+            ) : currentItem?.type === 'video' || currentItem?.type === 'image' || isPdfDocument ? null : currentItem?.type === 'document' ? (
+              <View
+                style={[
+                  styles.viewerTextCard,
+                  { backgroundColor: palette.card },
+                ]}
+              >
+                <KISIcon name="document" size={40} color={palette.text} />
+                <Text
+                  style={{ color: palette.text, marginTop: 12, fontWeight: '700' }}
+                  numberOfLines={2}
+                >
+                  {currentItem.documentName || 'Document'}
+                </Text>
+                <Pressable
+                  onPress={() => currentItem.uri && Linking.openURL(currentItem.uri)}
+                  style={[
+                    styles.audioButton,
+                    {
+                      marginTop: 16,
+                      backgroundColor: palette.surfaceElevated,
+                      borderColor: palette.inputBorder,
+                    },
+                  ]}
+                >
+                  <KISIcon name="link" size={16} color={palette.text} />
+                  <Text style={{ color: palette.text }}>Open</Text>
+                </Pressable>
+              </View>
+            ) : (
               <View
                 style={[
                   styles.viewerTextCard,

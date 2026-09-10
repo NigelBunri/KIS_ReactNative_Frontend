@@ -27,7 +27,7 @@ const MAX_IMAGE_DIMENSION = 1600;
 const JPEG_QUALITY = 85;
 const S3_UPLOAD_TIMEOUT_MS = 10 * 60 * 1000;
 
-export type StatusMediaPurpose = 'status_image' | 'status_video' | 'status_audio';
+export type StatusMediaPurpose = 'status_image' | 'status_video' | 'status_audio' | 'status_document';
 
 export type StatusMediaMeta = {
   mediaId: string;
