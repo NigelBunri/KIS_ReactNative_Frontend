@@ -43,7 +43,7 @@ import AudioRecorderPlayer from 'react-native-audio-recorder-player';
 import { PERMISSIONS, RESULTS, check, request } from 'react-native-permissions';
 import RNFS from 'react-native-fs';
 import LinearGradient from 'react-native-linear-gradient';
-import { useSafeTopInset, useRawTopInset } from '@/hooks/useSafeTopInset';
+import { useRawTopInset } from '@/hooks/useSafeTopInset';
 import type { ScrollableHandle } from '@/hooks/useHeaderDragToScroll';
 
 type StatusVisibility = 'contacts' | 'contacts_except' | 'only_share_with';
@@ -66,6 +66,9 @@ type StatusItem = {
     textColor?: string;
     fontSize?: number;
     fontFamily?: string;
+    textAlign?: 'left' | 'center' | 'right';
+    bold?: boolean;
+    italic?: boolean;
   };
 };
 
@@ -203,36 +206,41 @@ type UpdatesTabProps = {
   onScroll?: (e: NativeSyntheticEvent<NativeScrollEvent>) => void;
 };
 
-// The world-standard "story ring" pattern (WhatsApp/Instagram/Snapchat): a
-// genuinely CIRCULAR ring - not the rounded-square "squircle" thumbnails
-// this screen used before, which don't read as a status/story affordance
-// at a glance the way a circle universally does - with a real gap between
-// the ring and the avatar/content it frames. Unseen gets a warm gold
-// gradient (this app's own brand identity, standing in for the
-// pink-orange gradient Instagram/WhatsApp use for the same "something new
-// here" signal); already-seen gets a plain muted ring, same convention
-// every one of those apps uses to mean "you've already watched this."
-function StatusRing({
-  size,
+// Rectangular story-tray card (Facebook Stories-style) rather than a small
+// circular ring - a bigger, more scannable preview of the actual photo/
+// video/text content, with the person's name overlaid at the bottom on its
+// own gradient scrim instead of a separate caption line beneath the card.
+// Unseen keeps this app's warm gold gradient frame; already-seen gets a
+// plain muted frame - same "something new here" convention the previous
+// circular ring used, just applied to a rounded rectangle instead.
+function StatusCard({
+  width,
+  height,
   hasUnseen,
   palette,
+  label,
   children,
 }: {
-  size: number;
+  width: number;
+  height: number;
   hasUnseen: boolean;
   palette: ReturnType<typeof useKISTheme>['palette'];
+  label?: string;
   children: React.ReactNode;
 }) {
-  const ringWidth = 2.5;
-  const gapWidth = 2.5;
-  const innerSize = size - (ringWidth + gapWidth) * 2;
+  const frameWidth = 3;
+  const gapWidth = 3;
+  const cornerRadius = 20;
+  const innerWidth = width - (frameWidth + gapWidth) * 2;
+  const innerHeight = height - (frameWidth + gapWidth) * 2;
+  const innerRadius = Math.max(cornerRadius - (frameWidth + gapWidth), 12);
 
   const inner = (
     <View
       style={{
-        width: size - ringWidth * 2,
-        height: size - ringWidth * 2,
-        borderRadius: (size - ringWidth * 2) / 2,
+        width: width - frameWidth * 2,
+        height: height - frameWidth * 2,
+        borderRadius: cornerRadius - frameWidth,
         backgroundColor: palette.bg,
         alignItems: 'center',
         justifyContent: 'center',
@@ -240,29 +248,51 @@ function StatusRing({
     >
       <View
         style={{
-          width: innerSize,
-          height: innerSize,
-          borderRadius: innerSize / 2,
+          width: innerWidth,
+          height: innerHeight,
+          borderRadius: innerRadius,
           overflow: 'hidden',
         }}
       >
         {children}
+        {label ? (
+          <LinearGradient
+            colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.7)']}
+            style={{
+              position: 'absolute',
+              left: 0,
+              right: 0,
+              bottom: 0,
+              height: '48%',
+              justifyContent: 'flex-end',
+              paddingHorizontal: 8,
+              paddingBottom: 8,
+            }}
+          >
+            <Text
+              numberOfLines={2}
+              style={{ color: '#fff', fontSize: 12, fontWeight: '800' }}
+            >
+              {label}
+            </Text>
+          </LinearGradient>
+        ) : null}
       </View>
     </View>
   );
 
+  const frameStyle = {
+    width,
+    height,
+    borderRadius: cornerRadius,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+  };
+
   if (!hasUnseen) {
     return (
       <View
-        style={{
-          width: size,
-          height: size,
-          borderRadius: size / 2,
-          borderWidth: ringWidth,
-          borderColor: palette.divider,
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}
+        style={[frameStyle, { borderWidth: frameWidth, borderColor: palette.divider }]}
       >
         {inner}
       </View>
@@ -274,13 +304,7 @@ function StatusRing({
       colors={[palette.goldReadable, palette.primaryStrong, palette.goldDeep]}
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 1 }}
-      style={{
-        width: size,
-        height: size,
-        borderRadius: size / 2,
-        alignItems: 'center',
-        justifyContent: 'center',
-      }}
+      style={frameStyle}
     >
       {inner}
     </LinearGradient>
@@ -294,12 +318,15 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
 }: UpdatesTabProps, ref) {
   const { palette } = useKISTheme();
   const responsive = useResponsiveLayout();
-  const topInset = useSafeTopInset();
   // Raw device inset (status bar/notch/Dynamic Island), Android-15+-bug-
-  // corrected - used instead of topInset for the Status viewer's overlay
-  // controls below, since that's the full GLOBAL_TOP_PADDING dial meant for
-  // this screen's own header, not the right fit for a modal presented as
-  // its own full-screen surface.
+  // corrected - used for the Status viewer's overlay controls below, since
+  // that's a modal presented as its own full-screen surface and needs to
+  // clear the real status bar itself. The screen body below does NOT also
+  // add useSafeTopInset() on top of this - this tab already renders below
+  // MessagesScreen's own header and the Chats/Updates/Calls/Hub tab bar,
+  // both of which already account for the safe area, so stacking a second
+  // full inset here was pure dead space between the tab bar and this
+  // screen's content (ChatsTab, the sibling tab, has none either).
   const viewerTopInset = useRawTopInset();
   const scrollRef = useRef<ScrollView>(null);
   useImperativeHandle(ref, () => ({
@@ -378,6 +405,9 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
     textColor: STATUS_TEXT_COLORS[0],
     fontSize: STATUS_FONT_SIZES[2],
     fontFamily: STATUS_FONT_FAMILIES[0],
+    textAlign: 'center' as 'left' | 'center' | 'right',
+    bold: false,
+    italic: false,
   });
 
   const [viewerOpen, setViewerOpen] = useState(false);
@@ -393,6 +423,13 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
   // image whose id doesn't match this yet, imageReady below is false on
   // that very render, no transient "starts timer for old id" flash.
   const [readyImageId, setReadyImageId] = useState<string | null>(null);
+  // "Read more" state for long text statuses - textTruncated only flips
+  // true once RN's own onTextLayout confirms the collapsed text actually
+  // overflows the clamp (font size/screen width dependent, so a length
+  // heuristic on the raw string would be wrong in either direction).
+  const [textExpanded, setTextExpanded] = useState(false);
+  const [textTruncated, setTextTruncated] = useState(false);
+  const TEXT_STATUS_COLLAPSED_LINES = 6;
   const [channelPreviewOpen, setChannelPreviewOpen] = useState(false);
   const [previewChannel, setPreviewChannel] = useState<any | null>(null);
   const [channelSubscribing, setChannelSubscribing] = useState(false);
@@ -432,6 +469,10 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
   // as "just resume" (not also a navigation) when it did.
   const holdTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const wasHoldingRef = useRef(false);
+  // Separate from the hold-to-pause gesture above: set while the reply
+  // input is focused or "Read more" is expanded, so a hold-tap elsewhere
+  // releasing doesn't resume playback out from under either of those.
+  const manualPauseRef = useRef(false);
   // Stable per-attempt id for the status-reply idempotency key (see
   // handleSendReply below) - generated lazily on first send, reused if the
   // same tap fires twice before `sendingReply` disables the button, and
@@ -707,6 +748,9 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
       textColor: STATUS_TEXT_COLORS[0],
       fontSize: STATUS_FONT_SIZES[2],
       fontFamily: STATUS_FONT_FAMILIES[0],
+      textAlign: 'center',
+      bold: false,
+      italic: false,
     });
   }, []);
 
@@ -953,6 +997,9 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
     textColor: item?.style?.textColor ?? palette.text,
     fontSize: item?.style?.fontSize ?? 20,
     fontFamily: item?.style?.fontFamily ?? undefined,
+    textAlign: item?.style?.textAlign ?? 'center',
+    bold: item?.style?.bold ?? false,
+    italic: item?.style?.italic ?? false,
   });
   const isMediaItem =
     currentItem?.type === 'video' || currentItem?.type === 'audio';
@@ -1319,11 +1366,33 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
         pausedMsRef.current += Date.now() - pauseBeganAtRef.current;
         pauseBeganAtRef.current = null;
       }
-      setMediaPaused(false);
+      // Don't resume out from under a still-active manual pause (typing a
+      // reply, or "Read more" expanded) just because a hold-tap elsewhere
+      // on the screen happened to release at the same moment.
+      if (!manualPauseRef.current) setMediaPaused(false);
       wasHoldingRef.current = false;
       return; // a hold, not a tap - don't also navigate on release
     }
     navigate();
+  }, []);
+
+  // Manual pause (reply typing, "Read more" expanded) - same underlying
+  // pause/elapsed-time-accounting mechanism as hold-to-pause, just started
+  // and ended explicitly instead of on press-in/press-out.
+  const beginManualPause = useCallback(() => {
+    manualPauseRef.current = true;
+    if (!mediaPausedRef.current) {
+      pauseBeganAtRef.current = Date.now();
+      setMediaPaused(true);
+    }
+  }, []);
+  const endManualPause = useCallback(() => {
+    manualPauseRef.current = false;
+    if (pauseBeganAtRef.current) {
+      pausedMsRef.current += Date.now() - pauseBeganAtRef.current;
+      pauseBeganAtRef.current = null;
+    }
+    setMediaPaused(false);
   }, []);
 
   // Swipe-down-to-dismiss - the other world-standard story-viewer gesture
@@ -1362,6 +1431,11 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
       }),
     [closeViewer, viewerDragY],
   );
+
+  React.useEffect(() => {
+    setTextExpanded(false);
+    setTextTruncated(false);
+  }, [currentItem?.id]);
 
   React.useEffect(() => {
     setViewerProgress(0);
@@ -1411,11 +1485,12 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
   }, [viewerOpen, currentItem?.id, activeUser?.id]);
 
   // Same story-ring convention on every thumb below: a bold accent ring
-  // means there's something new to see, a plain divider ring means it's
+  // means there's something new to see, a plain divider frame means it's
   // already been seen (or, for 'me' with no status yet, that there's
   // nothing there at all) - this distinction existed in the data
   // (hasUnseen/viewed) but nothing was actually rendering it before.
-  const STATUS_THUMB_SIZE = 64;
+  const STATUS_CARD_WIDTH = responsive.isWatch ? 78 : 110;
+  const STATUS_CARD_HEIGHT = responsive.isWatch ? 118 : 172;
 
   const renderStatusThumb = (user: StatusUser) => {
     const addBadge = (
@@ -1443,15 +1518,15 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
       if (latest) {
         const content =
           latest.type === 'image' && latest.uri ? (
-            <Image source={{ uri: latest.uri }} style={thumbFill} />
+            <Image source={{ uri: latest.uri }} style={thumbFill} resizeMode="cover" />
           ) : (
             (() => {
               const textStyle = resolveTextStyle(latest);
               return (
-                <View style={[thumbFill, { backgroundColor: textStyle.bgColor, padding: 4 }]}>
+                <View style={[thumbFill, { backgroundColor: textStyle.bgColor, padding: 8 }]}>
                   <Text
-                    style={{ color: textStyle.textColor, fontSize: 10, fontFamily: textStyle.fontFamily, textAlign: 'center' }}
-                    numberOfLines={2}
+                    style={{ color: textStyle.textColor, fontSize: 13, fontFamily: textStyle.fontFamily, textAlign: textStyle.textAlign, fontWeight: textStyle.bold ? '800' : '600', fontStyle: textStyle.italic ? 'italic' : 'normal' }}
+                    numberOfLines={4}
                   >
                     {latest.text ?? 'My status'}
                   </Text>
@@ -1461,33 +1536,39 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
           );
         return (
           <View>
-            <StatusRing size={STATUS_THUMB_SIZE} hasUnseen={Boolean(user.hasUnseen)} palette={palette}>
+            <StatusCard
+              width={STATUS_CARD_WIDTH}
+              height={STATUS_CARD_HEIGHT}
+              hasUnseen={Boolean(user.hasUnseen)}
+              palette={palette}
+              label="My status"
+            >
               {content}
-            </StatusRing>
+            </StatusCard>
             {addBadge}
           </View>
         );
       }
       return (
-        <View>
+        <View
+          style={{
+            width: STATUS_CARD_WIDTH,
+            height: STATUS_CARD_HEIGHT,
+            borderRadius: 20,
+            borderWidth: 2,
+            borderColor: palette.divider,
+            borderStyle: 'dashed',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 8,
+          }}
+        >
           <View
-            style={{
-              width: STATUS_THUMB_SIZE,
-              height: STATUS_THUMB_SIZE,
-              borderRadius: STATUS_THUMB_SIZE / 2,
-              borderWidth: 2,
-              borderColor: palette.divider,
-              borderStyle: 'dashed',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
+            style={[styles.statusAdd, { backgroundColor: palette.primarySoft }]}
           >
-            <View
-              style={[styles.statusAdd, { backgroundColor: palette.primarySoft }]}
-            >
-              <KISIcon name="add" size={16} color={palette.primaryStrong} />
-            </View>
+            <KISIcon name="add" size={16} color={palette.primaryStrong} />
           </View>
+          <Text style={{ color: palette.subtext, fontSize: 12 }}>My status</Text>
         </View>
       );
     }
@@ -1500,26 +1581,26 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
     const item = user.items[pickIndex];
     let content: React.ReactNode;
     if (item?.type === 'image' && item?.uri) {
-      content = <Image source={{ uri: item.uri }} style={thumbFill} />;
+      content = <Image source={{ uri: item.uri }} style={thumbFill} resizeMode="cover" />;
     } else if (item?.type === 'video') {
       content = (
         <View style={[thumbFill, { backgroundColor: palette.card }]}>
-          <KISIcon name="video" size={18} color={palette.text} />
+          <KISIcon name="video" size={24} color={palette.text} />
         </View>
       );
     } else if (item?.type === 'audio') {
       content = (
         <View style={[thumbFill, { backgroundColor: palette.card }]}>
-          <KISIcon name="mic" size={18} color={palette.text} />
+          <KISIcon name="mic" size={24} color={palette.text} />
         </View>
       );
     } else {
       const textStyle = resolveTextStyle(item);
       content = (
-        <View style={[thumbFill, { backgroundColor: textStyle.bgColor, padding: 4 }]}>
+        <View style={[thumbFill, { backgroundColor: textStyle.bgColor, padding: 8 }]}>
           <Text
-            style={{ color: textStyle.textColor, fontSize: 10, fontFamily: textStyle.fontFamily, textAlign: 'center' }}
-            numberOfLines={2}
+            style={{ color: textStyle.textColor, fontSize: 13, fontFamily: textStyle.fontFamily, textAlign: textStyle.textAlign, fontWeight: textStyle.bold ? '800' : '600', fontStyle: textStyle.italic ? 'italic' : 'normal' }}
+            numberOfLines={4}
           >
             {item?.text ?? 'Status'}
           </Text>
@@ -1527,14 +1608,20 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
       );
     }
     return (
-      <StatusRing size={STATUS_THUMB_SIZE} hasUnseen={Boolean(user.hasUnseen)} palette={palette}>
+      <StatusCard
+        width={STATUS_CARD_WIDTH}
+        height={STATUS_CARD_HEIGHT}
+        hasUnseen={Boolean(user.hasUnseen)}
+        palette={palette}
+        label={user.name}
+      >
         {content}
-      </StatusRing>
+      </StatusCard>
     );
   };
 
   return (
-    <View style={[styles.wrap, { backgroundColor: palette.bg, paddingTop: topInset }]}>
+    <View style={[styles.wrap, { backgroundColor: palette.bg }]}>
       <ScrollView
         ref={scrollRef}
         onScroll={onScroll}
@@ -1566,13 +1653,13 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
               { paddingHorizontal: 16, flexDirection: 'row', gap: 12 },
             ]}
           >
-            {Array.from({ length: 5 }).map((_, idx) => (
-              <View
-                key={`status-skel-${idx}`}
-                style={{ width: responsive.isWatch ? 68 : 86, alignItems: 'center', gap: responsive.isWatch ? 4 : 6 }}
-              >
-                <Skeleton width={70} height={70} radius={18} />
-                <Skeleton width={60} height={10} radius={6} />
+            {Array.from({ length: 4 }).map((_, idx) => (
+              <View key={`status-skel-${idx}`}>
+                <Skeleton
+                  width={responsive.isWatch ? 78 : 110}
+                  height={responsive.isWatch ? 118 : 172}
+                  radius={20}
+                />
               </View>
             ))}
           </View>
@@ -1616,12 +1703,6 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
                 ]}
               >
                 {renderStatusThumb(item)}
-                <Text
-                  style={{ color: palette.text, fontSize: 12 }}
-                  numberOfLines={1}
-                >
-                  {item.name}
-                </Text>
               </Pressable>
             )}
           />
@@ -2226,6 +2307,9 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
                       backgroundColor: statusDraftStyle.bgColor,
                       fontSize: statusDraftStyle.fontSize,
                       fontFamily: statusDraftStyle.fontFamily,
+                      textAlign: statusDraftStyle.textAlign,
+                      fontWeight: statusDraftStyle.bold ? '800' : '400',
+                      fontStyle: statusDraftStyle.italic ? 'italic' : 'normal',
                     },
                   ]}
                 />
@@ -2347,6 +2431,87 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
                         </Text>
                       </Pressable>
                     ))}
+                  </View>
+                </View>
+                <View style={styles.optionRow}>
+                  <Text style={{ color: palette.subtext, fontSize: 12 }}>
+                    Align
+                  </Text>
+                  <View style={styles.choiceRow}>
+                    {(['left', 'center', 'right'] as const).map(align => (
+                      <Pressable
+                        key={align}
+                        onPress={() =>
+                          setStatusDraftStyle(prev => ({
+                            ...prev,
+                            textAlign: align,
+                          }))
+                        }
+                        style={[
+                          styles.choiceChip,
+                          {
+                            borderColor:
+                              statusDraftStyle.textAlign === align
+                                ? palette.primary
+                                : palette.inputBorder,
+                            backgroundColor: palette.surfaceElevated,
+                          },
+                        ]}
+                      >
+                        <Text style={{ color: palette.text, fontSize: 12, textTransform: 'capitalize' }}>
+                          {align}
+                        </Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                </View>
+                <View style={styles.optionRow}>
+                  <Text style={{ color: palette.subtext, fontSize: 12 }}>
+                    Style
+                  </Text>
+                  <View style={styles.choiceRow}>
+                    <Pressable
+                      onPress={() =>
+                        setStatusDraftStyle(prev => ({
+                          ...prev,
+                          bold: !prev.bold,
+                        }))
+                      }
+                      style={[
+                        styles.choiceChip,
+                        {
+                          borderColor: statusDraftStyle.bold
+                            ? palette.primary
+                            : palette.inputBorder,
+                          backgroundColor: palette.surfaceElevated,
+                        },
+                      ]}
+                    >
+                      <Text style={{ color: palette.text, fontSize: 13, fontWeight: '800' }}>
+                        B
+                      </Text>
+                    </Pressable>
+                    <Pressable
+                      onPress={() =>
+                        setStatusDraftStyle(prev => ({
+                          ...prev,
+                          italic: !prev.italic,
+                        }))
+                      }
+                      style={[
+                        styles.choiceChip,
+                        {
+                          borderColor: statusDraftStyle.italic
+                            ? palette.primary
+                            : palette.inputBorder,
+                          backgroundColor: palette.surfaceElevated,
+                        },
+                      ]}
+                    >
+                      <Text style={{ color: palette.text, fontSize: 13, fontStyle: 'italic' }}>
+                        I
+                      </Text>
+                    </Pressable>
                   </View>
                 </View>
               </>
@@ -2730,6 +2895,52 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
           ]}
           {...dismissPanResponder.panHandlers}
         >
+          {/* Full-bleed photo/video layer - sits behind the scrim, progress
+              bar, and header (all zIndex 10+) so images and videos fill the
+              entire screen edge to edge like every other world-standard
+              story viewer, instead of floating as a padded rounded card in
+              the middle of the screen. Text/audio keep their own centered
+              card below since they were never the ones asked to go
+              full-bleed. */}
+          {currentItem?.type === 'video' && currentItem?.uri ? (
+            <Video
+              ref={videoRef}
+              source={viewerMediaSource ?? { uri: currentItem.uri }}
+              style={styles.viewerMediaFill}
+              resizeMode="cover"
+              paused={!viewerOpen || mediaPaused}
+              onLoad={e => {
+                mediaDurationRef.current = e.duration ?? 0;
+              }}
+              onProgress={e => {
+                const dur =
+                  mediaDurationRef.current ||
+                  e.seekableDuration ||
+                  e.playableDuration ||
+                  0;
+                if (dur > 0)
+                  setViewerProgress(Math.min(1, e.currentTime / dur));
+                lastMediaProgressRef.current = Date.now();
+              }}
+              onEnd={handleNext}
+            />
+          ) : currentItem?.type === 'image' && currentItem?.uri ? (
+            <>
+              <Image
+                source={{ uri: currentItem.uri }}
+                style={styles.viewerMediaFill}
+                resizeMode="cover"
+                onLoadEnd={() => setReadyImageId(currentItem.id)}
+                onError={() => setReadyImageId(currentItem.id)}
+              />
+              {!imageReady ? (
+                <View style={styles.viewerImageLoading}>
+                  <ActivityIndicator color={palette.goldReadable} />
+                </View>
+              ) : null}
+            </>
+          ) : null}
+
           {/* Top gradient scrim - keeps the progress bars/header legible
               over any bright photo/video content, the same way every
               world-standard story viewer darkens the top edge rather than
@@ -2848,42 +3059,60 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
                   { backgroundColor: resolveTextStyle(currentItem).bgColor },
                 ]}
               >
-                <Text
-                  style={{
-                    color: resolveTextStyle(currentItem).textColor,
-                    fontSize: resolveTextStyle(currentItem).fontSize,
-                    fontFamily: resolveTextStyle(currentItem).fontFamily,
-                    fontWeight: '700',
-                  }}
-                >
-                  {currentItem?.text ?? 'Status'}
-                </Text>
-                <Text style={{ color: palette.subtext, marginTop: 12 }}>
-                  Text status
-                </Text>
+                {textExpanded ? (
+                  <ScrollView style={{ maxHeight: '70%' }} showsVerticalScrollIndicator={false}>
+                    <Text
+                      style={{
+                        color: resolveTextStyle(currentItem).textColor,
+                        fontSize: resolveTextStyle(currentItem).fontSize,
+                        fontFamily: resolveTextStyle(currentItem).fontFamily,
+                        textAlign: resolveTextStyle(currentItem).textAlign,
+                        fontWeight: resolveTextStyle(currentItem).bold ? '800' : '600',
+                        fontStyle: resolveTextStyle(currentItem).italic ? 'italic' : 'normal',
+                      }}
+                    >
+                      {currentItem?.text ?? 'Status'}
+                    </Text>
+                  </ScrollView>
+                ) : (
+                  <Text
+                    numberOfLines={TEXT_STATUS_COLLAPSED_LINES}
+                    onTextLayout={e => {
+                      if (e.nativeEvent.lines.length >= TEXT_STATUS_COLLAPSED_LINES) {
+                        setTextTruncated(true);
+                      }
+                    }}
+                    style={{
+                      color: resolveTextStyle(currentItem).textColor,
+                      fontSize: resolveTextStyle(currentItem).fontSize,
+                      fontFamily: resolveTextStyle(currentItem).fontFamily,
+                      textAlign: resolveTextStyle(currentItem).textAlign,
+                      fontWeight: resolveTextStyle(currentItem).bold ? '800' : '600',
+                      fontStyle: resolveTextStyle(currentItem).italic ? 'italic' : 'normal',
+                    }}
+                  >
+                    {currentItem?.text ?? 'Status'}
+                  </Text>
+                )}
+                {textTruncated ? (
+                  <Pressable
+                    hitSlop={8}
+                    onPress={() => {
+                      if (textExpanded) {
+                        setTextExpanded(false);
+                        endManualPause();
+                      } else {
+                        setTextExpanded(true);
+                        beginManualPause();
+                      }
+                    }}
+                  >
+                    <Text style={{ color: palette.subtext, marginTop: 8, fontWeight: '700' }}>
+                      {textExpanded ? 'Show less' : 'more'}
+                    </Text>
+                  </Pressable>
+                ) : null}
               </View>
-            ) : currentItem?.type === 'video' && currentItem?.uri ? (
-              <Video
-                ref={videoRef}
-                source={viewerMediaSource ?? { uri: currentItem.uri }}
-                style={styles.viewerImage}
-                resizeMode="cover"
-                paused={!viewerOpen || mediaPaused}
-                onLoad={e => {
-                  mediaDurationRef.current = e.duration ?? 0;
-                }}
-                onProgress={e => {
-                  const dur =
-                    mediaDurationRef.current ||
-                    e.seekableDuration ||
-                    e.playableDuration ||
-                    0;
-                  if (dur > 0)
-                    setViewerProgress(Math.min(1, e.currentTime / dur));
-                  lastMediaProgressRef.current = Date.now();
-                }}
-                onEnd={handleNext}
-              />
             ) : currentItem?.type === 'audio' && currentItem?.uri ? (
               <View style={styles.audioViewer}>
                 <Video
@@ -2934,21 +3163,7 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
                   </Text>
                 </Pressable>
               </View>
-            ) : currentItem?.uri ? (
-              <>
-                <Image
-                  source={{ uri: currentItem.uri }}
-                  style={styles.viewerImage}
-                  onLoadEnd={() => setReadyImageId(currentItem.id)}
-                  onError={() => setReadyImageId(currentItem.id)}
-                />
-                {!imageReady ? (
-                  <View style={styles.viewerImageLoading}>
-                    <ActivityIndicator color={palette.goldReadable} />
-                  </View>
-                ) : null}
-              </>
-            ) : (
+            ) : currentItem?.type === 'video' || currentItem?.type === 'image' ? null : (
               <View
                 style={[
                   styles.viewerTextCard,
@@ -2995,6 +3210,8 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
                 style={[styles.viewerReplyInput, { color: palette.ivory, borderColor: palette.divider }]}
                 returnKeyType="send"
                 onSubmitEditing={handleSendReply}
+                onFocus={beginManualPause}
+                onBlur={endManualPause}
               />
               <Pressable
                 onPress={handleSendReply}
@@ -3129,7 +3346,7 @@ const styles = StyleSheet.create({
   wrap: { flex: 1 },
   sectionHeader: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 8 },
   statusRow: { paddingHorizontal: 16, paddingBottom: 12, gap: 12 },
-  statusCard: { width: 80, alignItems: 'center', gap: 6 },
+  statusCard: {},
   statusAdd: {
     width: 28,
     height: 28,
@@ -3505,17 +3722,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 16,
   },
-  viewerImage: {
-    width: '100%',
-    height: '75%',
-    borderRadius: 24,
+  // Edge-to-edge behind the scrim/progress bar/header (all zIndex 10+) -
+  // see the layer stacked right after viewerWrap opens.
+  viewerMediaFill: {
+    ...StyleSheet.absoluteFillObject,
   },
   viewerImageLoading: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: '75%',
+    ...StyleSheet.absoluteFillObject,
     alignItems: 'center',
     justifyContent: 'center',
   },
