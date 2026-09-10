@@ -105,6 +105,8 @@ const socialRoutes = {
     viewers: (id: string) => `${API_BASE_URL}/api/v1/statuses/${id}/viewers/`,
     report: (id: string) => `${API_BASE_URL}/api/v1/statuses/${id}/report/`,
     reply: (id: string) => `${API_BASE_URL}/api/v1/statuses/${id}/reply/`,
+    react: (id: string) => `${API_BASE_URL}/api/v1/statuses/${id}/react/`,
+    reactions: (id: string) => `${API_BASE_URL}/api/v1/statuses/${id}/reactions/`,
     // Owner-only real deletion (soft-delete + underlying file removed
     // server-side — see apps/statuses/views.py's destroy() override).
     delete: (id: string) => `${API_BASE_URL}/api/v1/statuses/${id}/`,

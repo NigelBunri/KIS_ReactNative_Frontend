@@ -463,6 +463,10 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
   const [seenBySheetOpen, setSeenBySheetOpen] = useState(false);
   const [seenByViewers, setSeenByViewers] = useState<any[]>([]);
   const [seenByLoading, setSeenByLoading] = useState(false);
+  // userId -> emoji, so a viewer who also reacted shows their heart/emoji
+  // right next to their name in the same list instead of needing a
+  // separate sheet/tab for "who reacted" vs "who viewed".
+  const [seenByReactions, setSeenByReactions] = useState<Record<string, string>>({});
   // Hold-to-pause: every world-standard story viewer pauses playback while
   // the viewer is pressed down anywhere on the media (not just the
   // dedicated video/audio controls this screen already had) and resumes on
@@ -1355,6 +1359,33 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
       setSendingReply(false);
     }
   }, [currentItem?.id, viewerReplyText]);
+
+  // Heart/emoji quick-reactions - a reaction IS a reply as far as the
+  // backend and chat-room delivery are concerned (same /reply/ endpoint,
+  // same permission gating, same "shows up in the conversation like they
+  // replied to the status" behavior), just with the text pre-filled to an
+  // emoji instead of typed. Each tap is its own deliberate send, not a
+  // retry of a previous one, so unlike handleSendReply's persisted-until-
+  // success key above, a fresh client_id per tap is correct here.
+  const QUICK_REACTIONS = ['❤️', '😂', '😮', '😢', '🙏', '👍'];
+  const [reactionSentEmoji, setReactionSentEmoji] = useState<string | null>(null);
+  const handleSendReaction = useCallback(
+    async (emoji: string) => {
+      if (!currentItem?.id) return;
+      try {
+        await postRequest(ROUTES.statuses.react(currentItem.id), {
+          emoji,
+          client_id: `client_${Date.now()}_${Math.random().toString(36).slice(2)}`,
+        });
+        setReactionSentEmoji(emoji);
+        setTimeout(() => setReactionSentEmoji(prev => (prev === emoji ? null : prev)), 1200);
+      } catch {
+        // Best-effort feedback only - a failed reaction send isn't worth
+        // interrupting the story viewer with an alert over.
+      }
+    },
+    [currentItem?.id],
+  );
 
   const seekPanResponder = useMemo(() => {
     if (currentItem?.type !== 'video') return null;
@@ -3363,6 +3394,27 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
             </View>
           )}
 
+          {/* Heart/emoji quick-reactions - each one sends the same way a
+              typed reply does (see handleSendReaction), so it lands in the
+              chat room exactly like a reply would. */}
+          {activeUser && activeUser.id !== 'me' && activeUser.userId !== currentUserId && currentItem?.replyPermission !== 'nobody' && (
+            <View style={styles.viewerReactionRow}>
+              {QUICK_REACTIONS.map(emoji => (
+                <Pressable
+                  key={emoji}
+                  onPress={() => handleSendReaction(emoji)}
+                  hitSlop={6}
+                  style={[
+                    styles.viewerReactionButton,
+                    reactionSentEmoji === emoji && { transform: [{ scale: 1.25 }] },
+                  ]}
+                >
+                  <Text style={{ fontSize: 22 }}>{emoji}</Text>
+                </Pressable>
+              ))}
+            </View>
+          )}
+
           {/* Status reply input — shown for other users' statuses when replies are allowed */}
           {activeUser && activeUser.id !== 'me' && activeUser.userId !== currentUserId && currentItem?.replyPermission !== 'nobody' && (
             <View style={[styles.viewerReplyRow, { backgroundColor: palette.royalInk }]}>
@@ -3394,9 +3446,24 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
               onPress={async () => {
                 setSeenBySheetOpen(true);
                 setSeenByLoading(true);
-                const res = await getRequest(ROUTES.statuses.viewers(currentItem.id), {});
-                const viewers: any[] = Array.isArray(res?.data?.results) ? res.data.results : Array.isArray(res?.data) ? res.data : [];
+                const [viewersRes, reactionsRes] = await Promise.all([
+                  getRequest(ROUTES.statuses.viewers(currentItem.id), {}),
+                  getRequest(ROUTES.statuses.reactions(currentItem.id), {}),
+                ]);
+                const viewers: any[] = Array.isArray(viewersRes?.data?.results)
+                  ? viewersRes.data.results
+                  : Array.isArray(viewersRes?.data)
+                  ? viewersRes.data
+                  : [];
+                const reactions: any[] = Array.isArray(reactionsRes?.data?.results)
+                  ? reactionsRes.data.results
+                  : [];
+                const reactionMap: Record<string, string> = {};
+                reactions.forEach(r => {
+                  if (r?.id) reactionMap[String(r.id)] = r.emoji;
+                });
                 setSeenByViewers(viewers);
+                setSeenByReactions(reactionMap);
                 setSeenByLoading(false);
               }}
             >
@@ -3463,6 +3530,11 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
             <Text style={[styles.sheetTitle, { color: palette.text }]}>
               {seenByLoading ? 'Seen by…' : `Seen by ${seenByViewers.length}`}
             </Text>
+            {!seenByLoading && Object.keys(seenByReactions).length > 0 ? (
+              <Text style={[styles.sheetSubtitle, { color: palette.subtext }]}>
+                {Object.keys(seenByReactions).length} reacted
+              </Text>
+            ) : null}
             {seenByLoading ? (
               <ActivityIndicator color={palette.primaryStrong} style={{ marginVertical: 20 }} />
             ) : seenByViewers.length === 0 ? (
@@ -3483,6 +3555,11 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
                       <Text style={{ color: palette.text, fontSize: 14, flex: 1 }} numberOfLines={1}>
                         {name}
                       </Text>
+                      {seenByReactions[String(viewer.id ?? viewer.viewer_id)] ? (
+                        <Text style={{ fontSize: 16, marginRight: 6 }}>
+                          {seenByReactions[String(viewer.id ?? viewer.viewer_id)]}
+                        </Text>
+                      ) : null}
                       {viewer.viewed_at ? (
                         <Text style={{ color: palette.subtext, fontSize: 12 }}>{timeAgo(viewer.viewed_at)}</Text>
                       ) : null}
@@ -3848,6 +3925,16 @@ const styles = StyleSheet.create({
     height: 16,
     borderRadius: 8,
     marginLeft: -8,
+  },
+  viewerReactionRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 18,
+    paddingVertical: 8,
+    zIndex: 15,
+  },
+  viewerReactionButton: {
+    padding: 4,
   },
   viewerReplyRow: {
     flexDirection: 'row',
