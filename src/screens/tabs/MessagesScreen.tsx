@@ -1399,6 +1399,30 @@ const handleOpenChat = useCallback((chat: Chat) => {
   onOpenChat(chat);
 }, [onOpenChat, userScopedCacheKey]);
 
+// Previously defined inline in ChatsTab's JSX props (a fresh function
+// identity on every MessagesScreen render) — passed straight down to every
+// row in the chat list, which defeats ChatRow's React.memo no matter how
+// carefully everything else is memoized: one changed prop reference is
+// enough to force a re-render. Stable now, so a socket-driven re-render
+// here (typing/presence/meta updates, which happen continuously) no longer
+// touches rows that didn't actually change.
+const handleOpenStatusFromChat = useCallback((userId: string) => {
+  DeviceEventEmitter.emit('status.open', { userId });
+  tabRef.current?.navigate?.('Updates');
+}, []);
+
+const handleOpenAvatarPreviewFromChat = useCallback(
+  (payload: { avatarUrl: string; chat: Chat; userId?: string | null }) => {
+    setAvatarPreview({
+      uri: payload.avatarUrl,
+      chat: payload.chat,
+      userId: payload.userId ?? null,
+    });
+    setAvatarPreviewFull(false);
+  },
+  [],
+);
+
 const updateSelectedConversations = useCallback(
   (updater: (chat: Chat) => Chat | null) => {
     const selectedIds = new Set(selectedConversationIds);
@@ -2496,18 +2520,8 @@ const handleOpenChatFromAddContacts = useCallback((chat: Chat) => {
                 communityByConversationId={communityByConversationId}
                 communityGroupConversationIds={communityGroupConversationIds}
                 statusByUserId={statusByUserId}
-                onOpenStatus={(userId) => {
-                  DeviceEventEmitter.emit('status.open', { userId });
-                  tabRef.current?.navigate?.('Updates');
-                }}
-                onOpenAvatarPreview={(payload) => {
-                  setAvatarPreview({
-                    uri: payload.avatarUrl,
-                    chat: payload.chat,
-                    userId: payload.userId ?? null,
-                  });
-                  setAvatarPreviewFull(false);
-                }}
+                onOpenStatus={handleOpenStatusFromChat}
+                onOpenAvatarPreview={handleOpenAvatarPreviewFromChat}
                 onScroll={handleTabScroll}
                 onEndReached={handleChatsEndReached}
                 onOpenChat={handleOpenChat}

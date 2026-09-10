@@ -1,5 +1,5 @@
 // src/screens/tabs/MessageTabs.tsx
-import React, { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
+import React, { forwardRef, memo, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -87,6 +87,11 @@ type ChatsTabProps = {
 
 type ChatListItem = Chat & { _isArchivedItem?: boolean };
 
+// Hoisted to module scope (not an inline arrow, not even a useCallback) -
+// it has no closure dependencies at all, so there's no reason to recreate
+// it on every ChatsTab render.
+const chatListKeyExtractor = (i: ChatListItem) => `${i._isArchivedItem ? 'arch_' : ''}${i.id}`;
+
 function Badge({ count, palette }: { count: number; palette: any }) {
   return (
     <View
@@ -106,6 +111,398 @@ function Badge({ count, palette }: { count: number; palette: any }) {
     </View>
   );
 }
+
+function getStatusSymbol(status?: MessageStatus) {
+  if (!status) return '';
+  if (status === 'local_only' || status === 'pending' || status === 'sending') return '⏳';
+  if (status === 'sent') return '✓';
+  if (status === 'delivered') return '✓✓';
+  if (status === 'read') return '✓✓';
+  if (status === 'failed') return '!';
+  return '';
+}
+
+type ChatRowProps = {
+  item: ChatListItem;
+  isSelected: boolean;
+  selectionMode: boolean;
+  currentUserId?: string;
+  contactNameByPhone?: Record<string, string>;
+  communityInfo?: { id: string; name: string };
+  meta?: {
+    lastMessage?: string;
+    lastAt?: string;
+    unreadCount?: number;
+    lastStatus?: MessageStatus;
+    lastMessageFromMe?: boolean;
+  };
+  isTyping: boolean;
+  isOnline: boolean;
+  hasStatus: boolean;
+  hasUnseen: boolean;
+  palette: any;
+  onOpenChat?: (chat: Chat) => void;
+  onOpenStatus?: (userId: string) => void;
+  onOpenAvatarPreview?: (payload: { avatarUrl: string; chat: Chat; userId?: string | null }) => void;
+  onToggleSelect: (chat: Chat) => void;
+};
+
+// Each row was previously rendered by a plain closure recreated on every
+// ChatsTab render, reading straight from the shared conversationMeta/
+// typingByConversation/presenceByUser maps - so any single conversation's
+// update (a typing ping, a presence change, an unread count bump) forced
+// every visible+windowed row to rebuild its entire JSX tree, not just the
+// one row that actually changed. At "many chats" scale, with those events
+// arriving continuously from sockets, that's a full-list re-render
+// competing with the scroll gesture on the JS thread on every tick - the
+// visible stutter/"vibration" while scrolling.
+//
+// React.memo only helps if what it's comparing are stable, per-row values
+// rather than shared map references (a map reference changes for every row
+// alike whenever any single key in it changes) - see ChatsTab's renderItem
+// below, which resolves each row's own slice (meta/isTyping/isOnline/
+// hasStatus) BEFORE handing it to this component, so an unrelated
+// conversation's update no longer touches this row's props at all.
+const ChatRow = memo(function ChatRow({
+  item,
+  isSelected,
+  selectionMode,
+  currentUserId,
+  contactNameByPhone,
+  communityInfo,
+  meta,
+  isTyping,
+  isOnline,
+  hasStatus,
+  hasUnseen,
+  palette,
+  onOpenChat,
+  onOpenStatus,
+  onOpenAvatarPreview,
+  onToggleSelect,
+}: ChatRowProps) {
+  const isArchived = Boolean(item._isArchivedItem);
+  const metaAt = meta?.lastAt ?? '';
+  const itemAt = item.lastAt ?? '';
+  const metaTs = Date.parse(metaAt || '');
+  const itemTs = Date.parse(itemAt || '');
+  const backendOwnsUnread = item.readStateAuthoritative === true;
+  const useMeta =
+    Boolean(metaAt) &&
+    (!Number.isNaN(metaTs) &&
+      (Number.isNaN(itemTs) || metaTs >= itemTs));
+  const cleanPreview = (value?: string, source?: any) =>
+    resolveChatPreviewText(source ?? value, undefined, value);
+  const displayLastMessage = useMeta
+    ? cleanPreview(meta?.lastMessage) || cleanPreview(item.lastMessage, item)
+    : cleanPreview(item.lastMessage, item) || cleanPreview(meta?.lastMessage);
+  const displayLastAt = useMeta ? metaAt : itemAt;
+  const useMetaUnread =
+    useMeta &&
+    (!backendOwnsUnread ||
+      (Number.isNaN(itemTs) && !Number.isNaN(metaTs)) ||
+      (!Number.isNaN(metaTs) && !Number.isNaN(itemTs) && metaTs > itemTs));
+  const displayUnread = useMetaUnread
+    ? meta?.unreadCount ?? 0
+    : item.unreadCount ?? 0;
+
+  const displayName = (() => {
+    if (item.isDirect) {
+      const phone = otherParticipantPhone(item.participants ?? [], currentUserId);
+      const key = normalizePhoneKey(phone);
+      if (key && contactNameByPhone?.[key]) return contactNameByPhone[key];
+    }
+    return item.name;
+  })();
+
+  const handlePress = () => {
+    if (selectionMode) {
+      onToggleSelect(item);
+      return;
+    }
+    const communityId =
+      item.communityId ??
+      communityInfo?.id ??
+      (item.isCommunityChat ? item.id : undefined);
+    const isCommunity =
+      item.isCommunityChat ||
+      item.kind === 'community' ||
+      Boolean(communityId);
+    if (communityInfo) {
+      onOpenChat?.({
+        ...item,
+        name: communityInfo.name || displayName,
+        isCommunityChat: true,
+        communityId: communityInfo.id,
+      });
+      return;
+    }
+    if (isCommunity && communityId) {
+      onOpenChat?.({
+        ...item,
+        name: (item.name || displayName) as string,
+        isCommunityChat: true,
+        communityId,
+      });
+      return;
+    }
+    onOpenChat?.({ ...item, name: displayName });
+  };
+
+  const handleLongPress = () => {
+    onToggleSelect(item);
+  };
+
+  const avatarUrl = item.avatarUrl || (item.isDirect
+    ? directConversationAvatar(item.participants ?? [], currentUserId)
+    : null);
+
+  const ids = participantsToIds(item.participants ?? []);
+  const otherId = item.isDirect
+    ? ids.find((u) => u && u !== currentUserId) ?? null
+    : null;
+  const ringColor = hasStatus
+    ? hasUnseen
+      ? palette.primaryStrong ?? palette.primary
+      : palette.subtext ?? palette.divider
+    : null;
+
+  return (
+    <Pressable
+      onPress={handlePress}
+      onLongPress={handleLongPress}
+      style={[
+        styles.row,
+        {
+          backgroundColor: isSelected
+            ? palette.goldSoft
+            : isArchived
+            ? (palette.archivedBg ?? palette.surfaceSoft ?? palette.card)
+            : palette.card,
+          borderColor: isSelected
+            ? palette.goldDeep
+            : palette.inputBorder,
+          opacity: isArchived ? 0.88 : 1,
+        },
+        KIS_TOKENS.elevation.card,
+      ]}
+    >
+      {/* AVATAR */}
+      <Pressable
+        onPress={() => {
+          if (hasStatus && otherId) {
+            onOpenStatus?.(otherId);
+            return;
+          }
+          if (avatarUrl) {
+            onOpenAvatarPreview?.({
+              avatarUrl,
+              chat: item,
+              userId: otherId ?? null,
+            });
+          }
+        }}
+        disabled={!hasStatus && !avatarUrl}
+        style={{ position: 'relative' }}
+      >
+        <View
+          style={{
+            borderWidth: ringColor ? 2 : 0,
+            borderColor: ringColor ?? 'transparent',
+            padding: ringColor ? 2 : 0,
+            borderRadius: 28,
+          }}
+        >
+          {avatarUrl ? (
+            <Image source={{ uri: avatarUrl }} style={styles.avatar} />
+          ) : (
+            <ImagePlaceholder size={44} radius={22} style={styles.avatar} />
+          )}
+        </View>
+
+        {isArchived && (
+          <View
+            style={{
+              position: 'absolute',
+              right: -2,
+              bottom: -2,
+              width: 16,
+              height: 16,
+              borderRadius: 8,
+              backgroundColor: palette.surface ?? palette.card,
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <KISIcon name="archive" size={10} color={palette.subtext} />
+          </View>
+        )}
+
+        {item.isDirect && !isArchived && isOnline && (
+          <View
+            style={{
+              position: 'absolute',
+              right: 0,
+              bottom: 0,
+              width: 12,
+              height: 12,
+              borderRadius: 6,
+              backgroundColor: palette.success,
+              borderWidth: 2,
+              borderColor: palette.card,
+            }}
+          />
+        )}
+
+        {isSelected && (
+          <View
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: 'rgba(0,0,0,0.35)',
+              borderRadius: 30,
+            }}
+          >
+            <Text
+              style={{
+                color: palette.primaryStrong,
+                fontSize: 22,
+                fontWeight: 'bold',
+              }}
+            >
+              ✓
+            </Text>
+          </View>
+        )}
+      </Pressable>
+
+      {/* NAME + LAST MESSAGE */}
+      <View style={{ flex: 1 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          <Text style={[styles.name, { color: palette.text }]} numberOfLines={1}>
+            {displayName}
+          </Text>
+          {item.isBlocked && (
+            <View
+              style={{
+                paddingHorizontal: 6,
+                paddingVertical: 2,
+                borderRadius: 6,
+                backgroundColor: palette.danger,
+              }}
+            >
+              <Text style={{ color: palette.onPrimary, fontSize: 10 }}>
+                Blocked
+              </Text>
+            </View>
+          )}
+          {(item as any).isPinned ? (
+            <KISIcon name="pin" size={14} color={palette.goldDeep ?? palette.primaryStrong} />
+          ) : null}
+          {item.isMuted && (
+            <KISIcon
+              name="volume-mute"
+              size={14}
+              color={palette.subtext}
+            />
+          )}
+        </View>
+
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          {isTyping ? (
+            <>
+              <View
+                style={{
+                  width: 6,
+                  height: 6,
+                  borderRadius: 3,
+                  backgroundColor: palette.primary,
+                }}
+              />
+              <Text style={{ color: palette.primary }}>
+                typing...
+              </Text>
+            </>
+          ) : (() => {
+            const statusSymbol =
+              meta?.lastMessageFromMe && meta?.lastStatus
+                ? getStatusSymbol(meta.lastStatus)
+                : '';
+            const statusColor =
+              meta?.lastStatus === 'read'
+                ? palette.readStatus ?? palette.primary
+                : meta?.lastStatus === 'delivered'
+                ? palette.primary ?? palette.subtext
+                : palette.subtext;
+            return (
+              <>
+                {statusSymbol ? (
+                  <Text
+                    style={{
+                      color: statusColor,
+                      fontSize: 12,
+                      marginRight: 4,
+                    }}
+                  >
+                    {statusSymbol}
+                  </Text>
+                ) : null}
+                <Text
+                  style={{ color: palette.subtext }}
+                  numberOfLines={1}
+                >
+                  {displayLastMessage || ''}
+                </Text>
+              </>
+            );
+          })()}
+        </View>
+      </View>
+
+      {/* RIGHT SIDE INFO */}
+      <View style={{ alignItems: 'flex-end', gap: 4 }}>
+        <Text style={{ color: palette.subtext }}>
+          {(() => {
+            const raw = displayLastAt || '';
+            if (!raw) return '';
+            const dt = new Date(raw);
+            if (Number.isNaN(dt.getTime())) return String(raw);
+            return dt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+          })()}
+        </Text>
+
+        {displayUnread > 0 && !isSelected && (
+          <View
+            style={{
+              minWidth: 22,
+              paddingHorizontal: 6,
+              height: 22,
+              borderRadius: 11,
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: palette.primarySoft,
+            }}
+          >
+            <Text
+              style={{
+                color: palette.primaryStrong,
+                fontWeight: '700',
+                fontSize: 12,
+              }}
+            >
+              {displayUnread}
+            </Text>
+          </View>
+        )}
+      </View>
+    </Pressable>
+  );
+});
 
 export const ChatsTab = forwardRef<ScrollableHandle, ChatsTabProps>(function ChatsTab({
   conversations = [],
@@ -148,16 +545,6 @@ export const ChatsTab = forwardRef<ScrollableHandle, ChatsTabProps>(function Cha
       (listRef.current?.getScrollResponder() as { scrollTo: (opts: { y: number; animated?: boolean }) => void } | null | undefined)
         ?.scrollTo({ y, animated }),
   }), []);
-
-  const getStatusSymbol = (status?: MessageStatus) => {
-    if (!status) return '';
-    if (status === 'local_only' || status === 'pending' || status === 'sending') return '⏳';
-    if (status === 'sent') return '✓';
-    if (status === 'delivered') return '✓✓';
-    if (status === 'read') return '✓✓';
-    if (status === 'failed') return '!';
-    return '';
-  };
 
   /* ------------------------------------------------------------
    * BLOCKED CONTACTS — load blocked user IDs from AsyncStorage so
@@ -321,369 +708,76 @@ export const ChatsTab = forwardRef<ScrollableHandle, ChatsTabProps>(function Cha
   /* ------------------------------------------------------------
    * CHAT SELECTION HANDLING
    * ------------------------------------------------------------ */
-  const toggleSelectChat = (chat: Chat) => {
-    if (!setSelectedChat) return;
-
-    const exists = selectedChat.some((c) => c.id === chat.id);
-    if (exists) {
-      setSelectedChat(selectedChat.filter((c) => c.id !== chat.id));
-    } else {
-      setSelectedChat([...selectedChat, chat]);
-    }
-  };
+  const toggleSelectChat = useCallback(
+    (chat: Chat) => {
+      if (!setSelectedChat) return;
+      setSelectedChat(
+        selectedChat.some((c) => c.id === chat.id)
+          ? selectedChat.filter((c) => c.id !== chat.id)
+          : [...selectedChat, chat],
+      );
+    },
+    [selectedChat, setSelectedChat],
+  );
 
   /* ------------------------------------------------------------
    * RENDER HELPERS
    * ------------------------------------------------------------ */
-  const renderChatItem = (item: ChatListItem) => {
-    const isArchived = Boolean(item._isArchivedItem);
-    const isSelected = selectedChat.some((c) => c.id === item.id);
-    const convId = String((item as any).conversationId ?? item.id);
-    const meta = conversationMeta?.[convId];
-    const metaAt = meta?.lastAt ?? '';
-    const itemAt = item.lastAt ?? '';
-    const metaTs = Date.parse(metaAt || '');
-    const itemTs = Date.parse(itemAt || '');
-    const backendOwnsUnread = item.readStateAuthoritative === true;
-    const useMeta =
-      metaAt &&
-      (!Number.isNaN(metaTs) &&
-        (Number.isNaN(itemTs) || metaTs >= itemTs));
-    const cleanPreview = (value?: string, source?: any) =>
-      resolveChatPreviewText(source ?? value, undefined, value);
-    const displayLastMessage = useMeta
-      ? cleanPreview(meta?.lastMessage) || cleanPreview(item.lastMessage, item)
-      : cleanPreview(item.lastMessage, item) || cleanPreview(meta?.lastMessage);
-    const displayLastAt = useMeta ? metaAt : itemAt;
-    const useMetaUnread =
-      useMeta &&
-      (!backendOwnsUnread ||
-        (Number.isNaN(itemTs) && !Number.isNaN(metaTs)) ||
-        (!Number.isNaN(metaTs) && !Number.isNaN(itemTs) && metaTs > itemTs));
-    const displayUnread = useMetaUnread
-      ? meta?.unreadCount ?? 0
-      : item.unreadCount ?? 0;
-
-    const handlePress = () => {
-      const displayName = (() => {
-        if (item.isDirect) {
-          const phone = otherParticipantPhone(item.participants ?? [], currentUserId);
-          const key = normalizePhoneKey(phone);
-          if (key && contactNameByPhone?.[key]) return contactNameByPhone[key];
-        }
-        return item.name;
-      })();
-
-      if (selectionMode) {
-        toggleSelectChat(item);
-      } else {
-        const convKey = String((item as any).conversationId ?? item.id);
-        const community = communityByConversationId?.[convKey];
-        const communityId =
-          item.communityId ??
-          community?.id ??
-          (item.isCommunityChat ? item.id : undefined);
-        const isCommunity =
-          item.isCommunityChat ||
-          item.kind === 'community' ||
-          Boolean(communityId);
-        if (community) {
-          onOpenChat?.({
-            ...item,
-            name: community.name || displayName,
-            isCommunityChat: true,
-            communityId: community.id,
-          });
-          return;
-        }
-        if (isCommunity && communityId) {
-          onOpenChat?.({
-            ...item,
-            name: (item.name || displayName) as string,
-            isCommunityChat: true,
-            communityId,
-          });
-          return;
-        }
-        onOpenChat?.({ ...item, name: displayName });
-      }
-    };
-
-    const handleLongPress = () => {
-      toggleSelectChat(item);
-    };
-
-    const avatarUrl = item.avatarUrl || (item.isDirect
-      ? directConversationAvatar(item.participants ?? [], currentUserId)
-      : null);
-
-    const ids = participantsToIds(item.participants ?? []);
-    const otherId = item.isDirect
-      ? ids.find((u) => u && u !== currentUserId) ?? null
-      : null;
-    const statusInfo = otherId ? statusByUserId?.[otherId] : null;
-    const hasStatus = Boolean(statusInfo?.hasStatus);
-    const ringColor = hasStatus
-      ? statusInfo?.hasUnseen
-        ? palette.primaryStrong ?? palette.primary
-        : palette.subtext ?? palette.divider
-      : null;
-
-    return (
-      <Pressable
-        onPress={handlePress}
-        onLongPress={handleLongPress}
-        style={[
-          styles.row,
-          {
-            backgroundColor: isSelected
-              ? palette.goldSoft
-              : isArchived
-              ? (palette.archivedBg ?? palette.surfaceSoft ?? palette.card)
-              : palette.card,
-            borderColor: isSelected
-              ? palette.goldDeep
-              : palette.inputBorder,
-            opacity: isArchived ? 0.88 : 1,
-          },
-          KIS_TOKENS.elevation.card,
-        ]}
-      >
-        {/* AVATAR */}
-        <Pressable
-          onPress={() => {
-            if (hasStatus && otherId) {
-              onOpenStatus?.(otherId);
-              return;
-            }
-            if (avatarUrl) {
-              onOpenAvatarPreview?.({
-                avatarUrl,
-                chat: item,
-                userId: otherId ?? null,
-              });
-            }
-          }}
-          disabled={!hasStatus && !avatarUrl}
-          style={{ position: 'relative' }}
-        >
-          <View
-            style={{
-              borderWidth: ringColor ? 2 : 0,
-              borderColor: ringColor ?? 'transparent',
-              padding: ringColor ? 2 : 0,
-              borderRadius: 28,
-            }}
-          >
-            {avatarUrl ? (
-              <Image source={{ uri: avatarUrl }} style={styles.avatar} />
-            ) : (
-              <ImagePlaceholder size={44} radius={22} style={styles.avatar} />
-            )}
-          </View>
-
-          {isArchived && (
-            <View
-              style={{
-                position: 'absolute',
-                right: -2,
-                bottom: -2,
-                width: 16,
-                height: 16,
-                borderRadius: 8,
-                backgroundColor: palette.surface ?? palette.card,
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              <KISIcon name="archive" size={10} color={palette.subtext} />
-            </View>
-          )}
-
-          {item.isDirect && !isArchived && (() => {
-            const online = otherId ? presenceByUser?.[otherId]?.isOnline : false;
-            if (!online) return null;
-            return (
-              <View
-                style={{
-                  position: 'absolute',
-                  right: 0,
-                  bottom: 0,
-                  width: 12,
-                  height: 12,
-                  borderRadius: 6,
-                  backgroundColor: palette.success,
-                  borderWidth: 2,
-                  borderColor: palette.card,
-                }}
-              />
-            );
-          })()}
-
-          {isSelected && (
-            <View
-              style={{
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                right: 0,
-                bottom: 0,
-                alignItems: 'center',
-                justifyContent: 'center',
-                backgroundColor: 'rgba(0,0,0,0.35)',
-                borderRadius: 30,
-              }}
-            >
-              <Text
-                style={{
-                  color: palette.primaryStrong,
-                  fontSize: 22,
-                  fontWeight: 'bold',
-                }}
-              >
-                ✓
-              </Text>
-            </View>
-          )}
-        </Pressable>
-
-        {/* NAME + LAST MESSAGE */}
-        <View style={{ flex: 1 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-            <Text style={[styles.name, { color: palette.text }]}>
-              {(() => {
-                if (item.isDirect) {
-                  const phone = otherParticipantPhone(item.participants ?? [], currentUserId);
-                  const key = normalizePhoneKey(phone);
-                  if (key && contactNameByPhone?.[key]) return contactNameByPhone[key];
-                }
-                return item.name;
-              })()}
-            </Text>
-            {item.isBlocked && (
-              <View
-                style={{
-                  paddingHorizontal: 6,
-                  paddingVertical: 2,
-                  borderRadius: 6,
-                  backgroundColor: palette.danger,
-                }}
-              >
-                <Text style={{ color: palette.onPrimary, fontSize: 10 }}>
-                  Blocked
-                </Text>
-              </View>
-            )}
-            {(item as any).isPinned ? (
-              <KISIcon name="pin" size={14} color={palette.goldDeep ?? palette.primaryStrong} />
-            ) : null}
-            {item.isMuted && (
-              <KISIcon
-                name="volume-mute"
-                size={14}
-                color={palette.subtext}
-              />
-            )}
-          </View>
-
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-            {(() => {
-              const typingUsers = typingByConversation?.[String(convId)] ?? {};
-              const otherTyping = Object.keys(typingUsers).filter((u) => u !== currentUserId);
-              const isTyping = otherTyping.length > 0;
-              const statusSymbol =
-                meta?.lastMessageFromMe && meta?.lastStatus
-                  ? getStatusSymbol(meta.lastStatus)
-                  : '';
-              const statusColor =
-                meta?.lastStatus === 'read'
-                  ? palette.readStatus ?? palette.primary
-                  : meta?.lastStatus === 'delivered'
-                  ? palette.primary ?? palette.subtext
-                  : palette.subtext;
-
-              if (isTyping) {
-                return (
-                  <>
-                    <View
-                      style={{
-                        width: 6,
-                        height: 6,
-                        borderRadius: 3,
-                        backgroundColor: palette.primary,
-                      }}
-                    />
-                    <Text style={{ color: palette.primary }}>
-                      typing...
-                    </Text>
-                  </>
-                );
-              }
-
-              return (
-                <>
-                  {statusSymbol ? (
-                    <Text
-                      style={{
-                        color: statusColor,
-                        fontSize: 12,
-                        marginRight: 4,
-                      }}
-                    >
-                      {statusSymbol}
-                    </Text>
-                  ) : null}
-                  <Text
-                    style={{ color: palette.subtext }}
-                    numberOfLines={1}
-                  >
-                    {displayLastMessage || ''}
-                  </Text>
-                </>
-              );
-            })()}
-          </View>
-        </View>
-
-        {/* RIGHT SIDE INFO */}
-        <View style={{ alignItems: 'flex-end', gap: 4 }}>
-          <Text style={{ color: palette.subtext }}>
-            {(() => {
-              const raw = displayLastAt || '';
-              if (!raw) return '';
-              const dt = new Date(raw);
-              if (Number.isNaN(dt.getTime())) return String(raw);
-              return dt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-            })()}
-          </Text>
-
-          {displayUnread > 0 && !isSelected && (
-            <View
-              style={{
-                minWidth: 22,
-                paddingHorizontal: 6,
-                height: 22,
-                borderRadius: 11,
-                alignItems: 'center',
-                justifyContent: 'center',
-                backgroundColor: palette.primarySoft,
-              }}
-            >
-              <Text
-                style={{
-                  color: palette.primaryStrong,
-                  fontWeight: '700',
-                  fontSize: 12,
-                }}
-              >
-                {displayUnread}
-              </Text>
-            </View>
-          )}
-        </View>
-      </Pressable>
-    );
-  };
+  /* ------------------------------------------------------------
+   * RENDER HELPERS
+   * ------------------------------------------------------------ */
+  const renderItem = useCallback(
+    ({ item }: { item: ChatListItem }) => {
+      const convId = String((item as any).conversationId ?? item.id);
+      const meta = conversationMeta?.[convId];
+      const typingUsers = typingByConversation?.[convId] ?? {};
+      const isTyping = Object.keys(typingUsers).some((u) => u !== currentUserId);
+      const ids = participantsToIds(item.participants ?? []);
+      const otherId = item.isDirect ? ids.find((u) => u && u !== currentUserId) ?? null : null;
+      const isOnline = otherId ? Boolean(presenceByUser?.[otherId]?.isOnline) : false;
+      const statusInfo = otherId ? statusByUserId?.[otherId] : null;
+      const hasStatus = Boolean(statusInfo?.hasStatus);
+      const hasUnseen = Boolean(statusInfo?.hasUnseen);
+      const communityInfo = communityByConversationId?.[convId];
+      const isSelected = selectedChat.some((c) => c.id === item.id);
+      return (
+        <ChatRow
+          item={item}
+          isSelected={isSelected}
+          selectionMode={selectionMode}
+          currentUserId={currentUserId}
+          contactNameByPhone={contactNameByPhone}
+          communityInfo={communityInfo}
+          meta={meta}
+          isTyping={isTyping}
+          isOnline={isOnline}
+          hasStatus={hasStatus}
+          hasUnseen={hasUnseen}
+          palette={palette}
+          onOpenChat={onOpenChat}
+          onOpenStatus={onOpenStatus}
+          onOpenAvatarPreview={onOpenAvatarPreview}
+          onToggleSelect={toggleSelectChat}
+        />
+      );
+    },
+    [
+      conversationMeta,
+      typingByConversation,
+      currentUserId,
+      presenceByUser,
+      statusByUserId,
+      communityByConversationId,
+      selectedChat,
+      selectionMode,
+      contactNameByPhone,
+      palette,
+      onOpenChat,
+      onOpenStatus,
+      onOpenAvatarPreview,
+      toggleSelectChat,
+    ],
+  );
 
   /* ------------------------------------------------------------
    * RENDER
@@ -849,7 +943,7 @@ export const ChatsTab = forwardRef<ScrollableHandle, ChatsTabProps>(function Cha
       ref={listRef}
       contentContainerStyle={{ padding: 16 }}
       data={listData}
-      keyExtractor={(i) => `${i._isArchivedItem ? 'arch_' : ''}${i.id}`}
+      keyExtractor={chatListKeyExtractor}
       onScroll={onScroll}
       scrollEventThrottle={16}
       onEndReached={onEndReached}
@@ -864,7 +958,7 @@ export const ChatsTab = forwardRef<ScrollableHandle, ChatsTabProps>(function Cha
         ) : null
       }
       ListEmptyComponent={emptyState}
-      renderItem={({ item }) => renderChatItem(item)}
+      renderItem={renderItem}
     />
   );
 });
