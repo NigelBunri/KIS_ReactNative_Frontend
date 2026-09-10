@@ -387,6 +387,12 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
   const [pendingOpenUserId, setPendingOpenUserId] = useState<string | null>(
     null,
   );
+  // Which image status item has actually finished loading - derived
+  // (not effect-mirrored) so it's never a render behind the real
+  // currentItem: as soon as viewerIndex/currentItem changes to a new
+  // image whose id doesn't match this yet, imageReady below is false on
+  // that very render, no transient "starts timer for old id" flash.
+  const [readyImageId, setReadyImageId] = useState<string | null>(null);
   const [channelPreviewOpen, setChannelPreviewOpen] = useState(false);
   const [previewChannel, setPreviewChannel] = useState<any | null>(null);
   const [channelSubscribing, setChannelSubscribing] = useState(false);
@@ -810,7 +816,15 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
       DeviceEventEmitter.emit('status.loaded', statusMap);
     } catch (e) {
       console.warn('[UpdatesTab] loadStatuses failed', e);
-      setStatusUsers([{ id: 'me', name: 'My status', items: [] }]);
+      // A transient failure (e.g. reopening the app before connectivity is
+      // back) used to wipe every already-loaded status - including the
+      // user's own - down to an empty stub, which read as "everything's
+      // gone blank" until the next successful reload cleared it. Keep
+      // whatever was already on screen and only fall back to the empty
+      // stub if nothing had ever loaded yet.
+      setStatusUsers(prev =>
+        prev.length ? prev : [{ id: 'me', name: 'My status', items: [] }],
+      );
     } finally {
       setStatusesLoading(false);
       statusesLoadInFlightRef.current = false;
@@ -942,6 +956,13 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
   });
   const isMediaItem =
     currentItem?.type === 'video' || currentItem?.type === 'audio';
+  // Gates the auto-advance timer for image items on the picture actually
+  // being on screen - previously the progress bar started counting down
+  // the instant viewerIndex changed, regardless of whether the <Image>
+  // below it had finished loading, so a slow-loading picture and its
+  // segment fill were never actually in sync with each other.
+  const isImageItem = currentItem?.type === 'image';
+  const imageReady = !isImageItem || readyImageId === currentItem?.id;
 
   const ensureMicPermission = useCallback(async () => {
     const perm =
@@ -1152,44 +1173,6 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
     });
   }, [activeUser, closeViewer, currentItem?.id, currentUserId, loadStatuses]);
 
-  // Owner-only counterpart to handleStatusActionMenu above — there was
-  // previously no way to delete a posted status from the app at all (the
-  // backend destroy() action existed but nothing in the frontend called
-  // it). Deletion is real: the server soft-deletes the row (so it
-  // immediately disappears from every viewer, including this device on
-  // next load) and removes the underlying media file, not just a
-  // client-side hide.
-  const handleOwnStatusActionMenu = useCallback(() => {
-    if (!currentItem?.id) return;
-    const itemIndexAtOpen = viewerIndex;
-    setActionSheet({
-      title: 'Delete this status?',
-      subtitle: 'This cannot be undone.',
-      options: [
-        {
-          key: 'delete',
-          label: 'Delete',
-          icon: 'trash',
-          destructive: true,
-          onPress: async () => {
-            setActionSheet(null);
-            const res = await deleteRequest(ROUTES.statuses.delete(currentItem.id), {
-              errorMessage: 'Unable to delete status.',
-            });
-            if (!res?.success) return;
-            const wasLastItem = (activeUser?.items.length ?? 0) <= 1;
-            if (wasLastItem) {
-              closeViewer();
-            } else if (itemIndexAtOpen > 0) {
-              setViewerIndex(itemIndexAtOpen - 1);
-            }
-            await loadStatuses(true);
-          },
-        },
-      ],
-    });
-  }, [activeUser?.items.length, closeViewer, currentItem?.id, loadStatuses, viewerIndex]);
-
   const handleNext = useCallback(() => {
     if (!activeUser) return;
     if (viewerIndex + 1 < activeUser.items.length) {
@@ -1385,7 +1368,12 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
     mediaDurationRef.current = 0;
     lastMediaProgressRef.current = 0;
     setMediaPaused(false);
-    if (viewerOpen) startTimer();
+    // Text/video/audio start counting immediately as before; an image
+    // item only starts once imageReady flips true for this exact item
+    // (see the <Image> onLoadEnd/onError below), so the segment begins
+    // filling right as the picture appears instead of while it's still
+    // loading.
+    if (viewerOpen && imageReady) startTimer();
     if (viewerOpen && isMediaItem) startMediaFallback();
     return () => {
       stopTimer();
@@ -1396,6 +1384,7 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
     viewerIndex,
     currentItem?.id,
     isMediaItem,
+    imageReady,
     startMediaFallback,
     startTimer,
     stopMediaFallback,
@@ -2840,21 +2829,6 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
               </Text>
             </Pressable>
           ) : null}
-          {activeUser?.userId && activeUser.userId === currentUserId ? (
-            <Pressable
-              style={[
-                styles.viewerMenuButton,
-                {
-                  backgroundColor: palette.surfaceElevated,
-                  borderColor: palette.inputBorder,
-                },
-              ]}
-              onPress={handleOwnStatusActionMenu}
-            >
-              <KISIcon name="trash" size={14} color={palette.text} />
-            </Pressable>
-          ) : null}
-
           <Pressable
             style={styles.viewerTapZone}
             onPressIn={handleTapHoldStart}
@@ -2961,10 +2935,19 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
                 </Pressable>
               </View>
             ) : currentItem?.uri ? (
-              <Image
-                source={{ uri: currentItem.uri }}
-                style={styles.viewerImage}
-              />
+              <>
+                <Image
+                  source={{ uri: currentItem.uri }}
+                  style={styles.viewerImage}
+                  onLoadEnd={() => setReadyImageId(currentItem.id)}
+                  onError={() => setReadyImageId(currentItem.id)}
+                />
+                {!imageReady ? (
+                  <View style={styles.viewerImageLoading}>
+                    <ActivityIndicator color={palette.goldReadable} />
+                  </View>
+                ) : null}
+              </>
             ) : (
               <View
                 style={[
@@ -3526,6 +3509,15 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '75%',
     borderRadius: 24,
+  },
+  viewerImageLoading: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: '75%',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   audioViewer: {
     width: '100%',
