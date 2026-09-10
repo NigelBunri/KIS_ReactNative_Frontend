@@ -3275,6 +3275,81 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   };
 
   /* ─────────────────────────────────────────
+   * Bible games stats share card
+   * ──────────────────────────────────────── */
+  const renderBibleGameStatsCard = () => {
+    const stats = (message as any).bibleGameStats as
+      | { scope: 'game'; gameKey: string; gameTitle: string; stagesCompleted: number; totalStages: number; verseCount: number; bestScore?: number }
+      | { scope: 'general'; totalBibleVerses: number; versesCovered: number; gamesCompleted: number; totalGames: number; timesCompletedBible: number }
+      | undefined;
+    if (!stats) return null;
+
+    const isGeneral = stats.scope === 'general';
+    const percent = isGeneral
+      ? Math.round((stats.versesCovered / Math.max(1, stats.totalBibleVerses)) * 100)
+      : Math.round((stats.stagesCompleted / Math.max(1, stats.totalStages)) * 100);
+
+    return (
+      <Pressable
+        onPress={() => {
+          DeviceEventEmitter.emit('chat.close_all');
+          (navigation as any).navigate('MainTabs', { screen: 'Bible' });
+        }}
+        style={({ pressed }) => ({
+          marginTop: text ? 8 : 0,
+          borderRadius: 14,
+          borderWidth: 1,
+          borderColor: palette.divider,
+          overflow: 'hidden',
+          backgroundColor: isMe ? 'rgba(255,255,255,0.10)' : palette.surface,
+          minWidth: 220,
+          opacity: pressed ? 0.85 : 1,
+        })}
+      >
+        <View style={{ padding: 14, gap: 8 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <KISIcon name="trophy" size={16} color={isMe ? outgoingTextColor : palette.primary} />
+            <Text style={{ fontSize: 14, fontWeight: '800', color: isMe ? outgoingTextColor : palette.text }}>
+              {isGeneral ? 'Bible Games — Overall Progress' : stats.gameTitle}
+            </Text>
+          </View>
+
+          <View style={{ height: 8, borderRadius: 999, overflow: 'hidden', backgroundColor: isMe ? 'rgba(255,255,255,0.25)' : palette.divider }}>
+            <View style={{ height: 8, borderRadius: 999, width: `${percent}%`, backgroundColor: isMe ? outgoingTextColor : palette.primary }} />
+          </View>
+
+          {isGeneral ? (
+            <>
+              <Text style={{ fontSize: 12, fontWeight: '700', color: isMe ? outgoingMetaColor : palette.subtext }}>
+                {stats.versesCovered.toLocaleString()} of {stats.totalBibleVerses.toLocaleString()} Bible verses covered ({percent}%)
+              </Text>
+              <Text style={{ fontSize: 12, fontWeight: '700', color: isMe ? outgoingMetaColor : palette.subtext }}>
+                {stats.gamesCompleted} of {stats.totalGames} games completed
+                {stats.timesCompletedBible > 0 ? ` · Bible finished ${stats.timesCompletedBible}×` : ''}
+              </Text>
+            </>
+          ) : (
+            <>
+              <Text style={{ fontSize: 12, fontWeight: '700', color: isMe ? outgoingMetaColor : palette.subtext }}>
+                Stage {stats.stagesCompleted} of {stats.totalStages} · {stats.verseCount.toLocaleString()} verses in this game
+              </Text>
+              {typeof stats.bestScore === 'number' ? (
+                <Text style={{ fontSize: 12, fontWeight: '700', color: isMe ? outgoingMetaColor : palette.subtext }}>
+                  Best score: {stats.bestScore}
+                </Text>
+              ) : null}
+            </>
+          )}
+
+          <Text style={{ fontSize: 12, fontWeight: '600', color: isMe ? outgoingMetaColor : palette.primary, alignSelf: 'flex-end' }}>
+            Play Bible Games →
+          </Text>
+        </View>
+      </Pressable>
+    );
+  };
+
+  /* ─────────────────────────────────────────
    * GAP 4: Payment card
    * ──────────────────────────────────────── */
   const renderPaymentCard = () => {
@@ -4204,6 +4279,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
             {renderLocationCard()}
             {renderProductCard()}
             {renderBibleVerseCard()}
+            {renderBibleGameStatsCard()}
             {renderPaymentCard()}
 
             {/* Attachments (images, files, etc.) */}

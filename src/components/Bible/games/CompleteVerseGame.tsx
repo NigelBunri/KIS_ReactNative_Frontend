@@ -16,16 +16,33 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { StyleSheet, Text, View, Pressable, ScrollView } from 'react-native';
 import { useKISTheme } from '@/theme/useTheme';
 import GameShell from './GameShell';
-import { AnswerFeedback, RoundComplete } from './GameFeedback';
-import { CURATED_VERSES, type CuratedVerseRef } from '../../../screens/tabs/bible/games/curatedVerses';
+import { AnswerFeedback, StageComplete } from './GameFeedback';
 import { getVerseText, normalizeWord, tokenizeVerse } from '../../../screens/tabs/bible/games/verseText';
-import { getMissedWeights, recordVerseOutcome, recordScore } from '../../../screens/tabs/bible/games/gameStorage';
+import {
+  completeCurrentStage,
+  getCurrentStageVerses,
+  getMissedWeights,
+  recordVerseOutcome,
+  recordScore,
+  STAGES_PER_GAME,
+  type GameKey,
+  type VerseRef,
+} from '../../../screens/tabs/bible/games/gameStorage';
+import { GAME_METADATA } from '../../../screens/tabs/bible/games/gameMetadata';
 
 const ROUND_LENGTH = 10;
 const MIN_BLANK_WORD_LENGTH = 4; // skip blanking tiny connective words like "and"/"the"
 
+function verseId(ref: VerseRef): string {
+  return `${ref.bookName}-${ref.chapter}-${ref.verse}`;
+}
+
+function referenceOf(ref: VerseRef): string {
+  return `${ref.bookName} ${ref.chapter}:${ref.verse}`;
+}
+
 type Round = {
-  verse: CuratedVerseRef;
+  verse: VerseRef;
   tokens: string[];
   blankIndexes: number[];
   choices: string[]; // shuffled: correct word(s) + distractors
@@ -42,9 +59,9 @@ function pickBlankIndexes(tokens: string[]): number[] {
   return shuffled.slice(0, blankCount).map((e) => e.index).sort((a, b) => a - b);
 }
 
-function buildDistractors(correctWords: string[], excludeVerseId: string, count: number): string[] {
+function buildDistractors(stageVerses: VerseRef[], correctWords: string[], excludeId: string, count: number): string[] {
   const pool = new Set<string>();
-  const otherVerses = CURATED_VERSES.filter((v) => v.id !== excludeVerseId);
+  const otherVerses = stageVerses.filter((v) => verseId(v) !== excludeId);
   const shuffledVerses = [...otherVerses].sort(() => Math.random() - 0.5);
   for (const v of shuffledVerses) {
     if (pool.size >= count) break;
@@ -60,30 +77,34 @@ function buildDistractors(correctWords: string[], excludeVerseId: string, count:
   return Array.from(pool).slice(0, count);
 }
 
-function buildRound(weights: Record<string, number>, excludeIds: Set<string>): Round {
+function buildRound(stageVerses: VerseRef[], weights: Record<string, number>, excludeIds: Set<string>): Round | null {
   // Weighted-random pick: verses with a higher miss-weight appear more often
   // in the eligible pool (simple repetition trick, not a full weighted RNG).
-  const pool: CuratedVerseRef[] = [];
-  for (const v of CURATED_VERSES) {
-    if (excludeIds.has(v.id)) continue;
-    const weight = 1 + (weights[v.id] ?? 0);
+  const pool: VerseRef[] = [];
+  for (const v of stageVerses) {
+    const id = verseId(v);
+    if (excludeIds.has(id)) continue;
+    const weight = 1 + (weights[id] ?? 0);
     for (let i = 0; i < weight; i++) pool.push(v);
   }
-  const source = pool.length ? pool : CURATED_VERSES;
+  const source = pool.length ? pool : stageVerses;
+  if (!source.length) return null;
   const verse = source[Math.floor(Math.random() * source.length)];
 
   const text = getVerseText(verse.bookName, verse.chapter, verse.verse);
   const tokens = tokenizeVerse(text);
   const blankIndexes = pickBlankIndexes(tokens);
   const correctWords = blankIndexes.map((i) => normalizeWord(tokens[i]));
-  const distractors = buildDistractors(correctWords, verse.id, Math.max(3, 5 - correctWords.length));
+  const distractors = buildDistractors(stageVerses, correctWords, verseId(verse), Math.max(3, 5 - correctWords.length));
   const choices = [...correctWords, ...distractors].sort(() => Math.random() - 0.5);
 
   return { verse, tokens, blankIndexes, choices, correctWords };
 }
 
-export default function CompleteVerseGame({ onExit }: { onExit: () => void }) {
+export default function CompleteVerseGame({ gameKey, onExit, onOpenStats }: { gameKey: GameKey; onExit: () => void; onOpenStats: () => void }) {
   const { palette } = useKISTheme();
+  const meta = GAME_METADATA[gameKey];
+  const [stageVerses, setStageVerses] = useState<VerseRef[] | null>(null);
   const [weights, setWeights] = useState<Record<string, number>>({});
   const [weightsLoaded, setWeightsLoaded] = useState(false);
   const [roundIndex, setRoundIndex] = useState(0);
@@ -93,17 +114,22 @@ export default function CompleteVerseGame({ onExit }: { onExit: () => void }) {
   const [usedChoices, setUsedChoices] = useState<Set<number>>(new Set());
   const [submitted, setSubmitted] = useState(false);
   const [score, setScore] = useState(0);
-  const [finished, setFinished] = useState(false);
+  const [stageResult, setStageResult] = useState<{ stagesCompleted: number; isFinalStage: boolean } | null>(null);
 
   useEffect(() => {
-    getMissedWeights().then((w) => {
+    let active = true;
+    Promise.all([getCurrentStageVerses(gameKey), getMissedWeights()]).then(([verses, w]) => {
+      if (!active) return;
+      setStageVerses(verses);
       setWeights(w);
       setWeightsLoaded(true);
     });
-  }, []);
+    return () => { active = false; };
+  }, [gameKey]);
 
-  const startRound = useCallback((exclude: Set<string>, w: Record<string, number>) => {
-    const next = buildRound(w, exclude);
+  const startRound = useCallback((verses: VerseRef[], exclude: Set<string>, w: Record<string, number>) => {
+    const next = buildRound(verses, w, exclude);
+    if (!next) return;
     setRound(next);
     setFilled(new Array(next.blankIndexes.length).fill(null));
     setUsedChoices(new Set());
@@ -111,8 +137,8 @@ export default function CompleteVerseGame({ onExit }: { onExit: () => void }) {
   }, []);
 
   useEffect(() => {
-    if (weightsLoaded && !round) startRound(seenIds, weights);
-  }, [weightsLoaded, round, seenIds, weights, startRound]);
+    if (weightsLoaded && stageVerses && !round) startRound(stageVerses, seenIds, weights);
+  }, [weightsLoaded, stageVerses, round, seenIds, weights, startRound]);
 
   const nextBlankSlot = filled.findIndex((f) => f === null);
 
@@ -152,41 +178,45 @@ export default function CompleteVerseGame({ onExit }: { onExit: () => void }) {
     setSubmitted(true);
     const correct = filled.every((f, i) => f === round.correctWords[i]);
     if (correct) setScore((s) => s + 1);
-    const updated = await recordVerseOutcome(round.verse.id, correct);
+    const updated = await recordVerseOutcome(verseId(round.verse), correct);
     setWeights(updated);
   };
 
-  const handleNext = () => {
-    if (!round) return;
-    const nextSeen = new Set(seenIds).add(round.verse.id);
+  const handleNext = async () => {
+    if (!round || !stageVerses) return;
+    const nextSeen = new Set(seenIds).add(verseId(round.verse));
     setSeenIds(nextSeen);
     const nextIndex = roundIndex + 1;
     if (nextIndex >= ROUND_LENGTH) {
       setRoundIndex(nextIndex);
-      setFinished(true);
-      recordScore('complete-verse', score); // score already reflects this round's point, set by handleSubmit
+      await recordScore(gameKey, score); // score already reflects this round's point, set by handleSubmit
+      const progress = await completeCurrentStage(gameKey);
+      setStageResult({ stagesCompleted: progress.stagesCompleted, isFinalStage: progress.stagesCompleted >= STAGES_PER_GAME });
       return;
     }
     setRoundIndex(nextIndex);
-    startRound(nextSeen, weights);
+    startRound(stageVerses, nextSeen, weights);
   };
 
-  const handlePlayAgain = () => {
-    setRoundIndex(0);
-    setSeenIds(new Set());
-    setScore(0);
-    setFinished(false);
-    setRound(null);
-  };
-
-  if (finished) {
+  if (stageResult) {
     return (
-      <GameShell title="Complete the Verse" onBack={onExit}>
+      <GameShell title={meta.title} onBack={onExit}>
         <View style={styles.centerFill}>
-          <RoundComplete
-            title={score === ROUND_LENGTH ? 'Perfect round!' : 'Round complete'}
-            scoreLine={`${score} / ${ROUND_LENGTH} correct`}
-            onPlayAgain={handlePlayAgain}
+          <StageComplete
+            gameTitle={meta.title}
+            scoreLine={`${score} / ${ROUND_LENGTH} correct this stage`}
+            stagesCompleted={stageResult.stagesCompleted}
+            totalStages={STAGES_PER_GAME}
+            isFinalStage={stageResult.isFinalStage}
+            onContinue={() => {
+              setStageResult(null);
+              setRoundIndex(0);
+              setSeenIds(new Set());
+              setScore(0);
+              setRound(null);
+              getCurrentStageVerses(gameKey).then(setStageVerses);
+            }}
+            onViewStats={onOpenStats}
             onExit={onExit}
           />
         </View>
@@ -196,7 +226,7 @@ export default function CompleteVerseGame({ onExit }: { onExit: () => void }) {
 
   if (!round) {
     return (
-      <GameShell title="Complete the Verse" onBack={onExit}>
+      <GameShell title={meta.title} onBack={onExit}>
         <View style={styles.centerFill} />
       </GameShell>
     );
@@ -204,14 +234,14 @@ export default function CompleteVerseGame({ onExit }: { onExit: () => void }) {
 
   return (
     <GameShell
-      title="Complete the Verse"
+      title={meta.title}
       subtitle={`Verse ${roundIndex + 1} of ${ROUND_LENGTH}`}
       onBack={onExit}
       rightStat={{ label: 'Score', value: score }}
     >
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         <View style={[styles.verseCard, { backgroundColor: palette.card }]}>
-          <Text style={[styles.reference, { color: palette.goldReadable }]}>{round.verse.reference}</Text>
+          <Text style={[styles.reference, { color: palette.goldReadable }]}>{referenceOf(round.verse)}</Text>
           <View style={styles.verseTextWrap}>
             {round.tokens.map((word, index) => {
               const blankSlot = round.blankIndexes.indexOf(index);

@@ -1,141 +1,156 @@
 // src/components/Bible/games/VerseVaultGame.tsx
 //
-// Game 5 of 6: "Verse Vault" — spaced-repetition flashcards, the anchor
+// Game 5 of 30: "Verse Vault" — spaced-repetition flashcards, the anchor
 // piece built specifically for long-term mastery rather than a one-off
 // round (see srs.ts's SM-2-lite scheduler). Flip a card (reference only ->
 // full text), self-rate recall (Again/Hard/Good/Easy), and the scheduler
 // spaces out the next review based on that rating — exactly the mechanic
-// real memory-verse work uses (Anki-style), just scoped to a small,
-// curated Bible deck instead of a general flashcard app.
+// real memory-verse work uses (Anki-style).
 //
-// Includes a lightweight "Manage Deck" view since a spaced-repetition game
-// is only useful if the user can actually choose what's in their own deck,
-// not just play through a fixed starter set forever.
+// The deck is the current stage's own verses (one card per verse), reseeded
+// whenever the stage advances — same "this stage's content" contract every
+// other game follows, rather than a separately curated pool the player
+// manages by hand. A stage completes once every card in it has been
+// reviewed at least once (tracked via lastReviewedAt, which survives a
+// later "again" lapse resetting repetitions back to 0) — cards that lapse
+// keep resurfacing on their normal SRS schedule for as long as the stage's
+// deck is active, but that ongoing practice never blocks moving on, per the
+// "stages until a final stage, not running forever" requirement.
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { StyleSheet, Text, View, Pressable, ScrollView } from 'react-native';
+import React, { useCallback, useEffect, useState } from 'react';
+import { ActivityIndicator, StyleSheet, Text, View, Pressable } from 'react-native';
 import { useKISTheme } from '@/theme/useTheme';
 import { KISIcon } from '@/constants/kisIcons';
 import GameShell from './GameShell';
-import { CURATED_VERSES, type CuratedVerseRef } from '../../../screens/tabs/bible/games/curatedVerses';
+import { StageComplete } from './GameFeedback';
 import { getVerseText } from '../../../screens/tabs/bible/games/verseText';
 import {
+  completeCurrentStage,
   getOrSeedVaultDeck,
   saveVaultDeck,
-  addVerseToVault,
-  removeVerseFromVault,
+  vaultCardId,
+  STAGES_PER_GAME,
+  recordScore,
+  type GameKey,
   type VaultDeck,
+  type VerseRef,
 } from '../../../screens/tabs/bible/games/gameStorage';
 import { dueCards, reviewCard, type SrsCardState, type SrsRating } from '../../../screens/tabs/bible/games/srs';
+import { GAME_METADATA } from '../../../screens/tabs/bible/games/gameMetadata';
 
-type Mode = 'loading' | 'menu' | 'reviewing' | 'sessionComplete' | 'manage';
+type Mode = 'loading' | 'menu' | 'reviewing' | 'sessionComplete';
 
-const verseById = (id: string): CuratedVerseRef | undefined => CURATED_VERSES.find((v) => v.id === id);
-
-const RATING_CONFIG: { rating: SrsRating; label: string; color: string }[] = [
-  { rating: 'again', label: 'Again', color: '#dc2626' },
-  { rating: 'hard', label: 'Hard', color: '#d97706' },
-  { rating: 'good', label: 'Good', color: '#16a34a' },
-  { rating: 'easy', label: 'Easy', color: '#2563eb' },
+const RATING_CONFIG: { rating: SrsRating; label: string; color: string; points: number }[] = [
+  { rating: 'again', label: 'Again', color: '#dc2626', points: 0 },
+  { rating: 'hard', label: 'Hard', color: '#d97706', points: 1 },
+  { rating: 'good', label: 'Good', color: '#16a34a', points: 2 },
+  { rating: 'easy', label: 'Easy', color: '#2563eb', points: 3 },
 ];
 
-export default function VerseVaultGame({ onExit }: { onExit: () => void }) {
+export default function VerseVaultGame({ gameKey, onExit, onOpenStats }: { gameKey: GameKey; onExit: () => void; onOpenStats: () => void }) {
   const { palette } = useKISTheme();
+  const meta = GAME_METADATA[gameKey];
   const [mode, setMode] = useState<Mode>('loading');
   const [deck, setDeck] = useState<VaultDeck>({});
+  const [stageVerseById, setStageVerseById] = useState<Record<string, VerseRef>>({});
   const [queue, setQueue] = useState<SrsCardState[]>([]);
   const [queueIndex, setQueueIndex] = useState(0);
   const [revealed, setRevealed] = useState(false);
   const [sessionReviewed, setSessionReviewed] = useState(0);
+  const [sessionScore, setSessionScore] = useState(0);
+  const [stageResult, setStageResult] = useState<{ stagesCompleted: number; isFinalStage: boolean } | null>(null);
 
-  useEffect(() => {
-    getOrSeedVaultDeck().then((d) => {
-      setDeck(d);
-      setMode('menu');
-    });
+  const load = useCallback(async () => {
+    const { deck: freshDeck, stageVerses } = await getOrSeedVaultDeck();
+    setDeck(freshDeck);
+    const byId: Record<string, VerseRef> = {};
+    for (const ref of stageVerses) byId[vaultCardId(ref)] = ref;
+    setStageVerseById(byId);
+    setMode('menu');
   }, []);
 
-  const due = useMemo(() => dueCards(Object.values(deck)), [deck]);
+  useEffect(() => { load(); }, [load]);
+
+  const totalCards = Object.keys(deck).length;
+  const reviewedCount = Object.values(deck).filter((c) => c.lastReviewedAt !== null).length;
+  const due = dueCards(Object.values(deck));
 
   const startSession = useCallback(() => {
     setQueue(due);
     setQueueIndex(0);
     setSessionReviewed(0);
+    setSessionScore(0);
     setRevealed(false);
     setMode(due.length ? 'reviewing' : 'menu');
   }, [due]);
 
   const currentCard = queue[queueIndex];
-  const currentVerse = currentCard ? verseById(currentCard.verseId) : undefined;
+  const currentVerse = currentCard ? stageVerseById[currentCard.verseId] : undefined;
 
-  const handleRate = async (rating: SrsRating) => {
+  const handleRate = async (rating: SrsRating, points: number) => {
     if (!currentCard) return;
     const updatedCard = reviewCard(currentCard, rating);
     const nextDeck = { ...deck, [updatedCard.verseId]: updatedCard };
     setDeck(nextDeck);
     await saveVaultDeck(nextDeck);
     setSessionReviewed((n) => n + 1);
+    const finalScore = sessionScore + points;
+    setSessionScore(finalScore);
 
     const nextIndex = queueIndex + 1;
-    if (nextIndex >= queue.length) {
-      setMode('sessionComplete');
-    } else {
-      setQueueIndex(nextIndex);
-      setRevealed(false);
-    }
-  };
+    const allReviewedNow = Object.values(nextDeck).every((c) => c.lastReviewedAt !== null);
 
-  const handleToggleDeckVerse = async (verseId: string) => {
-    const inDeck = !!deck[verseId];
-    const next = inDeck ? await removeVerseFromVault(verseId) : await addVerseToVault(verseId);
-    setDeck(next);
+    if (nextIndex >= queue.length) {
+      if (allReviewedNow) {
+        await recordScore(gameKey, finalScore);
+        const progress = await completeCurrentStage(gameKey);
+        setStageResult({ stagesCompleted: progress.stagesCompleted, isFinalStage: progress.stagesCompleted >= STAGES_PER_GAME });
+      } else {
+        setMode('sessionComplete');
+      }
+      return;
+    }
+    setQueueIndex(nextIndex);
+    setRevealed(false);
   };
 
   // ── Loading ────────────────────────────────────────────────────────────
   if (mode === 'loading') {
     return (
-      <GameShell title="Verse Vault" onBack={onExit}>
-        <View style={styles.centerFill} />
+      <GameShell title={meta.title} onBack={onExit}>
+        <View style={styles.centerFill}><ActivityIndicator color={palette.primary} /></View>
       </GameShell>
     );
   }
 
-  // ── Manage deck ────────────────────────────────────────────────────────
-  if (mode === 'manage') {
+  // ── Stage complete ─────────────────────────────────────────────────────
+  if (stageResult) {
     return (
-      <GameShell title="Manage Deck" subtitle={`${Object.keys(deck).length} verses saved`} onBack={() => setMode('menu')}>
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.manageList}>
-          {CURATED_VERSES.map((v) => {
-            const inDeck = !!deck[v.id];
-            return (
-              <Pressable
-                key={v.id}
-                onPress={() => handleToggleDeckVerse(v.id)}
-                style={[
-                  styles.manageRow,
-                  { backgroundColor: palette.card, borderColor: inDeck ? palette.goldReadable : 'transparent' },
-                ]}
-              >
-                <View style={{ flex: 1 }}>
-                  <Text style={[styles.manageRowRef, { color: palette.text }]}>{v.reference}</Text>
-                </View>
-                <KISIcon
-                  name={inDeck ? 'checkmark-circle' : 'add'}
-                  size={22}
-                  color={inDeck ? '#16a34a' : palette.subtext}
-                />
-              </Pressable>
-            );
-          })}
-        </ScrollView>
+      <GameShell title={meta.title} onBack={onExit}>
+        <View style={styles.centerFill}>
+          <StageComplete
+            gameTitle={meta.title}
+            scoreLine={`${totalCards} ${totalCards === 1 ? 'verse' : 'verses'} reviewed at least once`}
+            stagesCompleted={stageResult.stagesCompleted}
+            totalStages={STAGES_PER_GAME}
+            isFinalStage={stageResult.isFinalStage}
+            onContinue={() => {
+              setStageResult(null);
+              setMode('loading');
+              load();
+            }}
+            onViewStats={onOpenStats}
+            onExit={onExit}
+          />
+        </View>
       </GameShell>
     );
   }
 
-  // ── Session complete ───────────────────────────────────────────────────
+  // ── Session complete (worked through the due queue, stage not done yet) ─
   if (mode === 'sessionComplete') {
     return (
-      <GameShell title="Verse Vault" onBack={onExit}>
+      <GameShell title={meta.title} onBack={onExit}>
         <View style={styles.centerFill}>
           <View style={[styles.completeCard, { backgroundColor: palette.card }]}>
             <View style={[styles.trophyCircle, { backgroundColor: palette.selectedBg }]}>
@@ -143,7 +158,10 @@ export default function VerseVaultGame({ onExit }: { onExit: () => void }) {
             </View>
             <Text style={[styles.completeTitle, { color: palette.text }]}>Session complete</Text>
             <Text style={[styles.completeScore, { color: palette.subtext }]}>
-              Reviewed {sessionReviewed} {sessionReviewed === 1 ? 'verse' : 'verses'}
+              Reviewed {sessionReviewed} {sessionReviewed === 1 ? 'verse' : 'verses'} this session
+            </Text>
+            <Text style={[styles.completeSub, { color: palette.subtext }]}>
+              {reviewedCount} of {totalCards} verses in this stage reviewed at least once
             </Text>
             <Pressable onPress={() => setMode('menu')} style={[styles.actionBtn, { backgroundColor: palette.goldReadable, marginTop: 10 }]}>
               <Text style={[styles.actionBtnText, { color: palette.onGold }]}>Back to Vault</Text>
@@ -157,9 +175,10 @@ export default function VerseVaultGame({ onExit }: { onExit: () => void }) {
   // ── Reviewing ──────────────────────────────────────────────────────────
   if (mode === 'reviewing' && currentCard && currentVerse) {
     const text = getVerseText(currentVerse.bookName, currentVerse.chapter, currentVerse.verse);
+    const reference = `${currentVerse.bookName} ${currentVerse.chapter}:${currentVerse.verse}`;
     return (
       <GameShell
-        title="Verse Vault"
+        title={meta.title}
         subtitle={`Card ${queueIndex + 1} of ${queue.length}`}
         onBack={onExit}
         rightStat={{ label: 'Reviewed', value: sessionReviewed }}
@@ -170,7 +189,7 @@ export default function VerseVaultGame({ onExit }: { onExit: () => void }) {
             disabled={revealed}
             style={[styles.flashcard, { backgroundColor: palette.card, borderColor: palette.goldReadable }]}
           >
-            <Text style={[styles.flashcardRef, { color: palette.goldReadable }]}>{currentVerse.reference}</Text>
+            <Text style={[styles.flashcardRef, { color: palette.goldReadable }]}>{reference}</Text>
             {revealed ? (
               <Text style={[styles.flashcardText, { color: palette.text }]}>{text}</Text>
             ) : (
@@ -183,10 +202,10 @@ export default function VerseVaultGame({ onExit }: { onExit: () => void }) {
 
           {revealed ? (
             <View style={styles.ratingRow}>
-              {RATING_CONFIG.map(({ rating, label, color }) => (
+              {RATING_CONFIG.map(({ rating, label, color, points }) => (
                 <Pressable
                   key={rating}
-                  onPress={() => handleRate(rating)}
+                  onPress={() => handleRate(rating, points)}
                   style={[styles.ratingBtn, { backgroundColor: `${color}20`, borderColor: color }]}
                 >
                   <Text style={[styles.ratingBtnText, { color }]}>{label}</Text>
@@ -204,20 +223,19 @@ export default function VerseVaultGame({ onExit }: { onExit: () => void }) {
   }
 
   // ── Menu ───────────────────────────────────────────────────────────────
-  const totalCards = Object.keys(deck).length;
   return (
-    <GameShell title="Verse Vault" subtitle="Spaced-repetition memorization" onBack={onExit}>
+    <GameShell title={meta.title} subtitle="Spaced-repetition memorization" onBack={onExit}>
       <View style={styles.menuWrap}>
         <View style={[styles.statCard, { backgroundColor: palette.card }]}>
           <View style={styles.statRow}>
-            <Text style={[styles.statBig, { color: palette.text }]}>{totalCards}</Text>
-            <Text style={[styles.statSmall, { color: palette.subtext }]}>verses in your deck</Text>
+            <Text style={[styles.statBig, { color: palette.text }]}>{reviewedCount}/{totalCards}</Text>
+            <Text style={[styles.statSmall, { color: palette.subtext }]}>verses reviewed this stage</Text>
           </View>
           <View style={styles.statRow}>
             <Text style={[styles.statBig, { color: due.length ? palette.goldReadable : palette.text }]}>
               {due.length}
             </Text>
-            <Text style={[styles.statSmall, { color: palette.subtext }]}>due for review today</Text>
+            <Text style={[styles.statSmall, { color: palette.subtext }]}>due for review now</Text>
           </View>
         </View>
 
@@ -231,13 +249,9 @@ export default function VerseVaultGame({ onExit }: { onExit: () => void }) {
           </Text>
         </Pressable>
 
-        <Pressable onPress={() => setMode('manage')} style={[styles.secondaryBtn, { borderColor: palette.selectedBg }]}>
-          <Text style={[styles.secondaryBtnText, { color: palette.text }]}>Manage Deck</Text>
-        </Pressable>
-
         {!due.length ? (
           <Text style={[styles.emptyHint, { color: palette.subtext }]}>
-            Nothing due right now — come back later, or add more verses from Manage Deck.
+            Nothing due right now — lapsed cards resurface on their own schedule. Come back later.
           </Text>
         ) : null}
       </View>
@@ -257,19 +271,6 @@ const styles = StyleSheet.create({
 
   actionBtn: { borderRadius: 999, paddingVertical: 15, alignItems: 'center' },
   actionBtnText: { fontSize: 15, fontWeight: '900' },
-  secondaryBtn: { borderRadius: 999, borderWidth: 1.5, paddingVertical: 13, alignItems: 'center' },
-  secondaryBtnText: { fontSize: 14, fontWeight: '800' },
-
-  manageList: { gap: 10, paddingBottom: 16 },
-  manageRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderRadius: 14,
-    borderWidth: 1.5,
-    paddingHorizontal: 14,
-    paddingVertical: 14,
-  },
-  manageRowRef: { fontSize: 15, fontWeight: '800' },
 
   reviewWrap: { flex: 1, gap: 20, paddingTop: 8 },
   flashcard: {
@@ -295,4 +296,5 @@ const styles = StyleSheet.create({
   trophyCircle: { width: 64, height: 64, borderRadius: 32, alignItems: 'center', justifyContent: 'center', marginBottom: 8 },
   completeTitle: { fontSize: 20, fontWeight: '900' },
   completeScore: { fontSize: 14, fontWeight: '700' },
+  completeSub: { fontSize: 12, fontWeight: '600', marginTop: 2 },
 });

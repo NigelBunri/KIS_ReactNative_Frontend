@@ -1,13 +1,17 @@
-// src/components/Bible/games/ScriptureTriviaGame.tsx
+// src/components/Bible/games/ReferenceRallyGame.tsx
 //
-// Game 4 of 6 (now 4 of 30): "Scripture Trivia" — multiple choice about
-// recognition/attribution rather than verbatim recall, the thing that made
-// this distinct from Complete the Verse/Word Weave. Two question types,
-// both universally derivable from ANY verse the partition engine assigns
-// (which book, which chapter) rather than the original curated-pool
-// version's "who said this" (that relied on hand-curated speaker
-// attribution that only ever existed for the original 68-verse pool, not
-// something derivable for an arbitrary stage of the whole Bible).
+// Game 14 of 30: "Reference Rally" — multiple choice. Given a verse's text,
+// pick its correct book/chapter/verse reference from 4 options. Distractor
+// references are drawn from the SAME stage's own verse list (other verses
+// the player is already working through), never from famous/well-known
+// verses elsewhere in the Bible - this keeps it plausible and hard
+// regardless of whether the stage happens to be Psalms or a Leviticus law
+// list, since it never depends on outside "which verses are famous" data.
+//
+// Reads its verses from the stage/partition system (gameStorage.ts), same
+// as Sequence Chain and Verse Jigsaw - the same-style reuse of Scripture
+// Trivia's existing multiple-choice UI (AnswerFeedback + choice rows) for
+// cross-game consistency.
 
 import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View, Pressable, ScrollView } from 'react-native';
@@ -25,15 +29,9 @@ import {
 } from '../../../screens/tabs/bible/games/gameStorage';
 import { GAME_METADATA } from '../../../screens/tabs/bible/games/gameMetadata';
 
-const ROUND_LENGTH = 10;
+const ROUND_LENGTH = 8;
 
-type Question = {
-  id: string;
-  verseText: string;
-  prompt: string;
-  choices: string[];
-  correctAnswer: string;
-};
+type Question = { id: string; verseText: string; correctReference: string; choices: string[] };
 
 function shuffle<T>(arr: T[]): T[] {
   const copy = [...arr];
@@ -44,55 +42,38 @@ function shuffle<T>(arr: T[]): T[] {
   return copy;
 }
 
-function distractorsFrom(pool: string[], correct: string, count: number): string[] {
-  const unique = Array.from(new Set(pool.filter((v) => v !== correct)));
-  return shuffle(unique).slice(0, count);
+function referenceOf(ref: VerseRef): string {
+  return `${ref.bookName} ${ref.chapter}:${ref.verse}`;
 }
 
-function buildQuestionPool(stageVerses: VerseRef[]): Question[] {
-  const allBookNames = Array.from(new Set(stageVerses.map((v) => v.bookName)));
+function buildQuestions(stageVerses: VerseRef[]): Question[] {
+  const withText = stageVerses
+    .map((ref) => ({ ref, text: getVerseText(ref.bookName, ref.chapter, ref.verse) }))
+    .filter((v) => v.text.length > 0);
+  const allReferences = withText.map((v) => referenceOf(v.ref));
 
-  const questions: Question[] = [];
-  for (const v of stageVerses) {
-    const text = getVerseText(v.bookName, v.chapter, v.verse);
-    if (!text) continue;
-    const id = `${v.bookName}-${v.chapter}-${v.verse}`;
-
-    // Type 1: which book is this from — needs at least 3 OTHER books
-    // present in this stage. A narrow stage (deep inside one large book)
-    // may not have enough - skipped for that verse rather than padding
-    // with fewer than 4 real choices.
-    const bookDistractors = distractorsFrom(allBookNames, v.bookName, 3);
-    if (bookDistractors.length === 3) {
-      questions.push({
-        id: `${id}-book`,
+  const questions: Question[] = shuffle(withText)
+    .slice(0, Math.min(ROUND_LENGTH * 2, withText.length))
+    .map(({ ref, text }) => {
+      const correctReference = referenceOf(ref);
+      const distractors = shuffle(Array.from(new Set(allReferences.filter((r) => r !== correctReference)))).slice(0, 3);
+      return {
+        id: correctReference,
         verseText: text,
-        prompt: 'Which book is this verse from?',
-        choices: shuffle([v.bookName, ...bookDistractors]),
-        correctAnswer: v.bookName,
-      });
-    }
+        correctReference,
+        choices: shuffle([correctReference, ...distractors]),
+      };
+    })
+    // A stage with too few distinct references (very short stage) can't
+    // always produce 3 real distractors - drop any question that came up
+    // short rather than show fewer than 4 choices.
+    .filter((q) => q.choices.length === 4)
+    .slice(0, ROUND_LENGTH);
 
-    // Type 2: which chapter is this from — distractors are other chapter
-    // numbers of the SAME book present in this stage.
-    const sameBookChapters = Array.from(
-      new Set(stageVerses.filter((o) => o.bookName === v.bookName).map((o) => String(o.chapter))),
-    );
-    const chapterDistractors = distractorsFrom(sameBookChapters, String(v.chapter), 3);
-    if (chapterDistractors.length === 3) {
-      questions.push({
-        id: `${id}-chapter`,
-        verseText: text,
-        prompt: `Which chapter of ${v.bookName} is this verse from?`,
-        choices: shuffle([String(v.chapter), ...chapterDistractors]),
-        correctAnswer: String(v.chapter),
-      });
-    }
-  }
   return questions;
 }
 
-export default function ScriptureTriviaGame({ gameKey, onExit, onOpenStats }: { gameKey: GameKey; onExit: () => void; onOpenStats: () => void }) {
+export default function ReferenceRallyGame({ gameKey, onExit, onOpenStats }: { gameKey: GameKey; onExit: () => void; onOpenStats: () => void }) {
   const { palette } = useKISTheme();
   const meta = GAME_METADATA[gameKey];
   const [round, setRound] = useState<Question[] | null>(null);
@@ -103,8 +84,7 @@ export default function ScriptureTriviaGame({ gameKey, onExit, onOpenStats }: { 
 
   const loadRound = useCallback(async () => {
     const verses = await getCurrentStageVerses(gameKey);
-    const pool = buildQuestionPool(verses);
-    setRound(shuffle(pool).slice(0, ROUND_LENGTH));
+    setRound(buildQuestions(verses));
   }, [gameKey]);
 
   useEffect(() => { loadRound(); }, [loadRound]);
@@ -114,14 +94,14 @@ export default function ScriptureTriviaGame({ gameKey, onExit, onOpenStats }: { 
   const handleSelect = (choice: string) => {
     if (selected || !current) return;
     setSelected(choice);
-    if (choice === current.correctAnswer) setScore((s) => s + 1);
+    if (choice === current.correctReference) setScore((s) => s + 1);
   };
 
   const handleNext = async () => {
     if (!round) return;
     const nextIndex = index + 1;
     if (nextIndex >= round.length) {
-      await recordScore(gameKey, score); // score already reflects this question's point, set by handleSelect
+      await recordScore(gameKey, score);
       const progress = await completeCurrentStage(gameKey);
       setStageResult({ stagesCompleted: progress.stagesCompleted, isFinalStage: progress.stagesCompleted >= STAGES_PER_GAME });
       return;
@@ -175,27 +155,15 @@ export default function ScriptureTriviaGame({ gameKey, onExit, onOpenStats }: { 
           <Text style={[styles.verseText, { color: palette.text }]}>“{current.verseText}”</Text>
         </View>
 
-        <Text style={[styles.prompt, { color: palette.goldReadable }]}>{current.prompt}</Text>
+        <Text style={[styles.prompt, { color: palette.goldReadable }]}>Which reference is this verse from?</Text>
 
         <View style={styles.choices}>
           {current.choices.map((choice) => {
             const isSelected = selected === choice;
-            const isCorrectChoice = choice === current.correctAnswer;
+            const isCorrectChoice = choice === current.correctReference;
             const showState = selected !== null;
-            const bg = !showState
-              ? palette.card
-              : isCorrectChoice
-                ? '#16a34a20'
-                : isSelected
-                  ? '#dc262620'
-                  : palette.card;
-            const border = !showState
-              ? palette.selectedBg
-              : isCorrectChoice
-                ? '#16a34a'
-                : isSelected
-                  ? '#dc2626'
-                  : palette.selectedBg;
+            const bg = !showState ? palette.card : isCorrectChoice ? '#16a34a20' : isSelected ? '#dc262620' : palette.card;
+            const border = !showState ? palette.selectedBg : isCorrectChoice ? '#16a34a' : isSelected ? '#dc2626' : palette.selectedBg;
             return (
               <Pressable
                 key={choice}
@@ -211,8 +179,8 @@ export default function ScriptureTriviaGame({ gameKey, onExit, onOpenStats }: { 
 
         {selected ? (
           <AnswerFeedback
-            correct={selected === current.correctAnswer}
-            text={selected === current.correctAnswer ? 'Correct!' : `Correct answer: ${current.correctAnswer}`}
+            correct={selected === current.correctReference}
+            text={selected === current.correctReference ? 'Correct!' : `Correct answer: ${current.correctReference}`}
           />
         ) : null}
       </ScrollView>
@@ -224,7 +192,7 @@ export default function ScriptureTriviaGame({ gameKey, onExit, onOpenStats }: { 
           style={[styles.actionBtn, { backgroundColor: selected ? palette.goldReadable : palette.selectedBg }]}
         >
           <Text style={[styles.actionBtnText, { color: selected ? palette.onGold : palette.subtext }]}>
-            {index + 1 >= round.length ? 'See Results' : 'Next Question'}
+            {index + 1 >= round.length ? 'Finish Stage' : 'Next Question'}
           </Text>
         </Pressable>
       </View>

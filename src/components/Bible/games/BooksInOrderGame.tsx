@@ -13,14 +13,24 @@
 // consecutive book order — which is what actually matters for navigating
 // the Bible, more than being able to recite all 66 in one unbroken breath.
 
-import React, { useCallback, useMemo, useState } from 'react';
-import { StyleSheet, Text, View, Pressable, ScrollView } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, StyleSheet, Text, View, Pressable, ScrollView } from 'react-native';
 import { useKISTheme } from '@/theme/useTheme';
 import { KISIcon } from '@/constants/kisIcons';
 import GameShell from './GameShell';
-import { RoundComplete } from './GameFeedback';
+import { StageComplete } from './GameFeedback';
 import { LOCAL_BIBLE_BOOKS } from '@/data/bibleLocalData';
-import { recordScore } from '../../../screens/tabs/bible/games/gameStorage';
+import {
+  completeCurrentStage,
+  getCurrentStageVerses,
+  recordScore,
+  STAGES_PER_GAME,
+  type GameKey,
+  type VerseRef,
+} from '../../../screens/tabs/bible/games/gameStorage';
+import { GAME_METADATA } from '../../../screens/tabs/bible/games/gameMetadata';
+
+const ROUNDS_PER_STAGE = 5;
 
 type Difficulty = { label: string; length: number };
 const DIFFICULTIES: Difficulty[] = [
@@ -31,10 +41,30 @@ const DIFFICULTIES: Difficulty[] = [
 
 type BookItem = { code: string; name: string };
 
-function pickSequence(length: number): BookItem[] {
-  const maxStart = LOCAL_BIBLE_BOOKS.length - length;
+/** The distinct books this stage's own verse allocation touches, in
+ * canonical order - this is the pool a round's books are drawn from, not
+ * the full 66-book canon. Playing this game "covers" the verses in the
+ * current stage the same way every other game does (completing the stage
+ * marks that verse range covered), even though the round itself only shows
+ * book names, not verse text - so the pool it draws from has to actually
+ * be the stage's own books for that accounting to mean anything. */
+function booksInStage(stageVerses: VerseRef[]): BookItem[] {
+  const seen = new Set<number>();
+  const books: BookItem[] = [];
+  for (const v of stageVerses) {
+    if (seen.has(v.bookIndex)) continue;
+    seen.add(v.bookIndex);
+    books.push({ code: v.bookCode, name: v.bookName });
+  }
+  return books;
+}
+
+function pickSequence(pool: BookItem[], length: number): BookItem[] {
+  const effectiveLength = Math.min(length, pool.length);
+  if (effectiveLength <= 0) return [];
+  const maxStart = pool.length - effectiveLength;
   const start = Math.floor(Math.random() * (maxStart + 1));
-  return LOCAL_BIBLE_BOOKS.slice(start, start + length).map((b) => ({ code: b.code, name: b.name }));
+  return pool.slice(start, start + effectiveLength);
 }
 
 function shuffle<T>(arr: T[]): T[] {
@@ -46,8 +76,12 @@ function shuffle<T>(arr: T[]): T[] {
   return copy;
 }
 
-export default function BooksInOrderGame({ onExit }: { onExit: () => void }) {
+const FULL_CANON_BOOKS: BookItem[] = LOCAL_BIBLE_BOOKS.map((b) => ({ code: b.code, name: b.name }));
+
+export default function BooksInOrderGame({ gameKey, onExit, onOpenStats }: { gameKey: GameKey; onExit: () => void; onOpenStats: () => void }) {
   const { palette } = useKISTheme();
+  const meta = GAME_METADATA[gameKey];
+  const [bookPool, setBookPool] = useState<BookItem[] | null>(null);
   const [difficulty, setDifficulty] = useState<Difficulty | null>(null);
   const [correctOrder, setCorrectOrder] = useState<BookItem[]>([]);
   const [tray, setTray] = useState<BookItem[]>([]);
@@ -55,9 +89,25 @@ export default function BooksInOrderGame({ onExit }: { onExit: () => void }) {
   const [submitted, setSubmitted] = useState(false);
   const [rounds, setRounds] = useState(0);
   const [correctRounds, setCorrectRounds] = useState(0);
+  const [stageResult, setStageResult] = useState<{ stagesCompleted: number; isFinalStage: boolean } | null>(null);
 
-  const startRound = useCallback((diff: Difficulty) => {
-    const seq = pickSequence(diff.length);
+  useEffect(() => {
+    let active = true;
+    getCurrentStageVerses(gameKey).then((verses) => {
+      if (!active) return;
+      const stageBooks = booksInStage(verses);
+      // A stage narrow enough to touch only 1 book (e.g. deep inside a
+      // single large book like Psalms) can't produce a real ordering
+      // puzzle on its own - fall back to the full 66-book canon for that
+      // round rather than breaking the game, while still preferring the
+      // stage's own books whenever there are enough of them.
+      setBookPool(stageBooks.length >= 2 ? stageBooks : FULL_CANON_BOOKS);
+    });
+    return () => { active = false; };
+  }, [gameKey]);
+
+  const startRound = useCallback((diff: Difficulty, pool: BookItem[]) => {
+    const seq = pickSequence(pool, diff.length);
     setCorrectOrder(seq);
     setTray(shuffle(seq));
     setPlaced([]);
@@ -78,7 +128,7 @@ export default function BooksInOrderGame({ onExit }: { onExit: () => void }) {
     setTray((prev) => [...prev, item]);
   };
 
-  const isComplete = difficulty ? placed.length === difficulty.length : false;
+  const isComplete = correctOrder.length > 0 && placed.length === correctOrder.length;
   const isAllCorrect = useMemo(
     () => isComplete && placed.every((b, i) => b.code === correctOrder[i]?.code),
     [isComplete, placed, correctOrder],
@@ -91,49 +141,78 @@ export default function BooksInOrderGame({ onExit }: { onExit: () => void }) {
     if (isAllCorrect) setCorrectRounds((c) => c + 1);
   };
 
-  const handleNextRound = () => {
-    if (difficulty) startRound(difficulty);
+  const handleNextRound = async () => {
+    if (!difficulty || !bookPool) return;
+    const roundsSoFar = rounds; // rounds state updates async via handleSubmit's setter; this render already reflects it
+    if (roundsSoFar >= ROUNDS_PER_STAGE) {
+      await recordScore(gameKey, correctRounds);
+      const progress = await completeCurrentStage(gameKey);
+      setStageResult({ stagesCompleted: progress.stagesCompleted, isFinalStage: progress.stagesCompleted >= STAGES_PER_GAME });
+      return;
+    }
+    startRound(difficulty, bookPool);
   };
 
-  const handleFinishSession = () => {
-    recordScore('books-in-order', correctRounds);
-    setDifficulty(null);
-  };
+  if (stageResult) {
+    return (
+      <GameShell title={meta.title} onBack={onExit}>
+        <View style={styles.centerFill}>
+          <StageComplete
+            gameTitle={meta.title}
+            scoreLine={`${correctRounds} / ${rounds} rounds correct this stage`}
+            stagesCompleted={stageResult.stagesCompleted}
+            totalStages={STAGES_PER_GAME}
+            isFinalStage={stageResult.isFinalStage}
+            onContinue={() => {
+              setStageResult(null);
+              setDifficulty(null);
+              setRounds(0);
+              setCorrectRounds(0);
+              getCurrentStageVerses(gameKey).then((verses) => {
+                const stageBooks = booksInStage(verses);
+                setBookPool(stageBooks.length >= 2 ? stageBooks : FULL_CANON_BOOKS);
+              });
+            }}
+            onViewStats={onOpenStats}
+            onExit={onExit}
+          />
+        </View>
+      </GameShell>
+    );
+  }
 
   // ── Difficulty picker ──────────────────────────────────────────────────
-  if (!difficulty) {
-    const sessionSummary = rounds > 0 ? `Last session: ${correctRounds}/${rounds} correct` : null;
+  if (!difficulty || !bookPool) {
     return (
-      <GameShell title="Books in Order" subtitle="Pick a difficulty" onBack={onExit}>
-        <View style={styles.pickerWrap}>
-          {sessionSummary ? (
-            <RoundComplete
-              title="Nice work!"
-              scoreLine={sessionSummary}
-              onPlayAgain={() => setRounds(0)}
-              onExit={onExit}
-            />
-          ) : null}
-          {DIFFICULTIES.map((d) => (
-            <Pressable
-              key={d.label}
-              onPress={() => startRound(d)}
-              style={[styles.difficultyCard, { backgroundColor: palette.card, borderColor: palette.goldReadable }]}
-            >
-              <KISIcon name="layers" size={22} color={palette.goldReadable} />
-              <Text style={[styles.difficultyLabel, { color: palette.text }]}>{d.label}</Text>
-            </Pressable>
-          ))}
-        </View>
+      <GameShell title={meta.title} subtitle={bookPool ? 'Pick a difficulty' : undefined} onBack={onExit}>
+        {!bookPool ? (
+          <View style={styles.centerFill}><ActivityIndicator color={palette.primary} /></View>
+        ) : (
+          <View style={styles.pickerWrap}>
+            <Text style={{ color: palette.subtext, fontSize: 12, fontWeight: '600' }}>
+              {ROUNDS_PER_STAGE} rounds completes this stage.
+            </Text>
+            {DIFFICULTIES.map((d) => (
+              <Pressable
+                key={d.label}
+                onPress={() => startRound(d, bookPool)}
+                style={[styles.difficultyCard, { backgroundColor: palette.card, borderColor: palette.goldReadable }]}
+              >
+                <KISIcon name="layers" size={22} color={palette.goldReadable} />
+                <Text style={[styles.difficultyLabel, { color: palette.text }]}>{d.label}</Text>
+              </Pressable>
+            ))}
+          </View>
+        )}
       </GameShell>
     );
   }
 
   return (
     <GameShell
-      title="Books in Order"
-      subtitle={difficulty.label}
-      onBack={handleFinishSession}
+      title={meta.title}
+      subtitle={`${difficulty.label} · Round ${Math.min(rounds + 1, ROUNDS_PER_STAGE)} of ${ROUNDS_PER_STAGE}`}
+      onBack={onExit}
       rightStat={{ label: 'Score', value: `${correctRounds}/${rounds}` }}
     >
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
@@ -194,7 +273,9 @@ export default function BooksInOrderGame({ onExit }: { onExit: () => void }) {
       <View style={styles.footer}>
         {submitted ? (
           <Pressable onPress={handleNextRound} style={[styles.actionBtn, { backgroundColor: palette.goldReadable }]}>
-            <Text style={[styles.actionBtnText, { color: palette.onGold }]}>Next Round</Text>
+            <Text style={[styles.actionBtnText, { color: palette.onGold }]}>
+              {rounds >= ROUNDS_PER_STAGE ? 'Finish Stage' : 'Next Round'}
+            </Text>
           </Pressable>
         ) : (
           <Pressable
@@ -213,6 +294,7 @@ export default function BooksInOrderGame({ onExit }: { onExit: () => void }) {
 }
 
 const styles = StyleSheet.create({
+  centerFill: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   pickerWrap: { flex: 1, gap: 14, paddingTop: 8 },
   difficultyCard: {
     borderRadius: 16,

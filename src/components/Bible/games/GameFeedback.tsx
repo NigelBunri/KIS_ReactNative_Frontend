@@ -24,6 +24,69 @@ export function AnswerFeedback({ correct, text }: { correct: boolean; text: stri
   );
 }
 
+/** Stage-aware completion card for the 30-game stage/partition system - the
+ * "Play Again" framing RoundComplete uses doesn't fit here, since a
+ * completed stage should advance to the NEXT slice of Scripture, not replay
+ * the same one. Shows the real "X of 10" progress and switches to a
+ * whole-game completion message once the final stage is done. */
+export function StageComplete({
+  gameTitle,
+  scoreLine,
+  stagesCompleted,
+  totalStages,
+  isFinalStage,
+  onContinue,
+  onViewStats,
+  onExit,
+}: {
+  gameTitle: string;
+  scoreLine: string;
+  stagesCompleted: number;
+  totalStages: number;
+  isFinalStage: boolean;
+  onContinue: () => void;
+  onViewStats: () => void;
+  onExit: () => void;
+}) {
+  const { palette } = useKISTheme();
+  const metallicGold = [palette.royalInk, palette.goldDeep, palette.gold, palette.goldDeep];
+
+  return (
+    <View style={[styles.completeCard, { backgroundColor: palette.card }]}>
+      <View style={[styles.trophyCircle, { backgroundColor: palette.selectedBg }]}>
+        <KISIcon name="trophy" size={30} color={palette.goldReadable} />
+      </View>
+      <Text style={[styles.completeTitle, { color: palette.text }]}>
+        {isFinalStage ? `${gameTitle} complete!` : `Stage ${stagesCompleted} of ${totalStages} complete`}
+      </Text>
+      <Text style={[styles.completeScore, { color: palette.subtext }]}>{scoreLine}</Text>
+      {isFinalStage ? (
+        <Text style={[styles.completeScore, { color: palette.subtext, marginTop: -8 }]}>
+          Every verse this game carries is done. Play the rest of the 30 games to cover the whole Bible.
+        </Text>
+      ) : null}
+
+      {isFinalStage ? (
+        <Pressable onPress={onViewStats} style={styles.primaryBtnWrap}>
+          <LinearGradient colors={metallicGold} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.primaryBtn}>
+            <Text style={[styles.primaryBtnText, { color: palette.ivory }]}>View Stats</Text>
+          </LinearGradient>
+        </Pressable>
+      ) : (
+        <Pressable onPress={onContinue} style={styles.primaryBtnWrap}>
+          <LinearGradient colors={metallicGold} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.primaryBtn}>
+            <Text style={[styles.primaryBtnText, { color: palette.ivory }]}>Next Stage</Text>
+          </LinearGradient>
+        </Pressable>
+      )}
+
+      <Pressable onPress={onExit} style={[styles.secondaryBtn, { borderColor: palette.selectedBg }]}>
+        <Text style={[styles.secondaryBtnText, { color: palette.text }]}>Back to Games</Text>
+      </Pressable>
+    </View>
+  );
+}
+
 export function RoundComplete({
   title,
   scoreLine,

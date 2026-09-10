@@ -10,15 +10,22 @@
 // without a flip animation barely reads as a game at all.
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { StyleSheet, Text, View, Pressable, Animated, Easing } from 'react-native';
+import { ActivityIndicator, StyleSheet, Text, View, Pressable, Animated, Easing } from 'react-native';
 import { useKISTheme } from '@/theme/useTheme';
 import { useResponsiveLayout } from '@/theme/responsive';
 import { KISIcon } from '@/constants/kisIcons';
 import GameShell from './GameShell';
-import { RoundComplete } from './GameFeedback';
-import { shuffledCuratedVerses } from '../../../screens/tabs/bible/games/curatedVerses';
+import { StageComplete } from './GameFeedback';
 import { getVerseText } from '../../../screens/tabs/bible/games/verseText';
-import { recordScore } from '../../../screens/tabs/bible/games/gameStorage';
+import {
+  completeCurrentStage,
+  getCurrentStageVerses,
+  recordScore,
+  STAGES_PER_GAME,
+  type GameKey,
+  type VerseRef,
+} from '../../../screens/tabs/bible/games/gameStorage';
+import { GAME_METADATA } from '../../../screens/tabs/bible/games/gameMetadata';
 
 const PAIR_COUNT = 6; // 12 cards total — a 3x4 or 4x3 grid, enough real matching without overwhelming
 
@@ -29,20 +36,27 @@ type CardData = {
   label: string;
 };
 
-function buildCards(): CardData[] {
-  const verses = shuffledCuratedVerses(PAIR_COUNT);
+function shuffle<T>(arr: T[]): T[] {
+  const copy = [...arr];
+  for (let i = copy.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [copy[i], copy[j]] = [copy[j], copy[i]];
+  }
+  return copy;
+}
+
+function buildCards(stageVerses: VerseRef[]): CardData[] {
+  const verses = shuffle(stageVerses).slice(0, PAIR_COUNT);
   const cards: CardData[] = [];
   for (const v of verses) {
+    const id = `${v.bookName}-${v.chapter}-${v.verse}`;
+    const reference = `${v.bookName} ${v.chapter}:${v.verse}`;
     const text = getVerseText(v.bookName, v.chapter, v.verse);
     const shortText = text.length > 70 ? `${text.slice(0, 67)}…` : text;
-    cards.push({ key: `${v.id}-ref`, pairId: v.id, kind: 'reference', label: v.reference });
-    cards.push({ key: `${v.id}-text`, pairId: v.id, kind: 'text', label: shortText });
+    cards.push({ key: `${id}-ref`, pairId: id, kind: 'reference', label: reference });
+    cards.push({ key: `${id}-text`, pairId: id, kind: 'text', label: shortText });
   }
-  for (let i = cards.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [cards[i], cards[j]] = [cards[j], cards[i]];
-  }
-  return cards;
+  return shuffle(cards);
 }
 
 function FlipCard({
@@ -115,26 +129,43 @@ function FlipCard({
   );
 }
 
-export default function VerseMatchGame({ onExit }: { onExit: () => void }) {
+const ROUNDS_PER_STAGE = 5;
+
+export default function VerseMatchGame({ gameKey, onExit, onOpenStats }: { gameKey: GameKey; onExit: () => void; onOpenStats: () => void }) {
+  const { palette } = useKISTheme();
   const responsive = useResponsiveLayout();
-  const [cards, setCards] = useState<CardData[]>(() => buildCards());
+  const meta = GAME_METADATA[gameKey];
+  const [stageVerses, setStageVerses] = useState<VerseRef[] | null>(null);
+  const [roundIndex, setRoundIndex] = useState(0);
+  const [cards, setCards] = useState<CardData[]>([]);
   const [flippedKeys, setFlippedKeys] = useState<string[]>([]);
   const [matchedPairIds, setMatchedPairIds] = useState<Set<string>>(new Set());
   const [moves, setMoves] = useState(0);
+  const [totalMoves, setTotalMoves] = useState(0);
   const [locked, setLocked] = useState(false);
+  const [stageResult, setStageResult] = useState<{ stagesCompleted: number; isFinalStage: boolean } | null>(null);
   const scoredRef = useRef(false);
 
   const columns = responsive.isCompactPhone || responsive.isWatch ? 3 : 4;
   const gap = 10;
   const cardSize = (responsive.contentMaxWidth - responsive.pageGutter * 2) / columns - gap;
 
+  useEffect(() => {
+    let active = true;
+    getCurrentStageVerses(gameKey).then((verses) => {
+      if (!active) return;
+      setStageVerses(verses);
+      setCards(buildCards(verses));
+    });
+    return () => { active = false; };
+  }, [gameKey]);
+
   const allMatched = matchedPairIds.size === PAIR_COUNT;
 
   useEffect(() => {
     if (allMatched && !scoredRef.current) {
       scoredRef.current = true;
-      // Fewer moves = better — score as "efficiency points", floor at 0.
-      recordScore('verse-match', Math.max(0, PAIR_COUNT * 4 - moves));
+      setTotalMoves((t) => t + moves);
     }
   }, [allMatched, moves]);
 
@@ -164,22 +195,46 @@ export default function VerseMatchGame({ onExit }: { onExit: () => void }) {
     [locked, flippedKeys, matchedPairIds, cards],
   );
 
-  const handlePlayAgain = () => {
-    setCards(buildCards());
+  const handleContinue = async () => {
+    if (!stageVerses) return;
+    const nextRound = roundIndex + 1;
+    if (nextRound >= ROUNDS_PER_STAGE) {
+      // Fewer total moves across the stage = better — score as "efficiency
+      // points", floor at 0.
+      const score = Math.max(0, ROUNDS_PER_STAGE * PAIR_COUNT * 4 - totalMoves);
+      await recordScore(gameKey, score);
+      const progress = await completeCurrentStage(gameKey);
+      setStageResult({ stagesCompleted: progress.stagesCompleted, isFinalStage: progress.stagesCompleted >= STAGES_PER_GAME });
+      return;
+    }
+    setRoundIndex(nextRound);
+    setCards(buildCards(stageVerses));
     setFlippedKeys([]);
     setMatchedPairIds(new Set());
     setMoves(0);
     scoredRef.current = false;
   };
 
-  if (allMatched) {
+  if (stageResult) {
     return (
-      <GameShell title="Verse Match" onBack={onExit}>
+      <GameShell title={meta.title} onBack={onExit}>
         <View style={styles.centerFill}>
-          <RoundComplete
-            title="All matched!"
-            scoreLine={`Completed in ${moves} moves`}
-            onPlayAgain={handlePlayAgain}
+          <StageComplete
+            gameTitle={meta.title}
+            scoreLine={`${totalMoves} total moves across ${ROUNDS_PER_STAGE} rounds`}
+            stagesCompleted={stageResult.stagesCompleted}
+            totalStages={STAGES_PER_GAME}
+            isFinalStage={stageResult.isFinalStage}
+            onContinue={() => {
+              setStageResult(null);
+              setRoundIndex(0);
+              setTotalMoves(0);
+              getCurrentStageVerses(gameKey).then((verses) => {
+                setStageVerses(verses);
+                setCards(buildCards(verses));
+              });
+            }}
+            onViewStats={onOpenStats}
             onExit={onExit}
           />
         </View>
@@ -187,10 +242,39 @@ export default function VerseMatchGame({ onExit }: { onExit: () => void }) {
     );
   }
 
+  if (allMatched) {
+    return (
+      <GameShell title={meta.title} onBack={onExit}>
+        <View style={styles.centerFill}>
+          <View style={[styles.roundCompleteCard, { backgroundColor: palette.card }]}>
+            <KISIcon name="checkmark-circle" size={40} color={palette.success} />
+            <Text style={[styles.roundCompleteTitle, { color: palette.text }]}>All matched!</Text>
+            <Text style={[styles.roundCompleteScore, { color: palette.subtext }]}>
+              Round {roundIndex + 1} of {ROUNDS_PER_STAGE} completed in {moves} moves
+            </Text>
+            <Pressable onPress={handleContinue} style={[styles.roundCompleteBtn, { backgroundColor: palette.goldReadable }]}>
+              <Text style={[styles.roundCompleteBtnText, { color: palette.onGold }]}>
+                {roundIndex + 1 >= ROUNDS_PER_STAGE ? 'Finish Stage' : 'Next Round'}
+              </Text>
+            </Pressable>
+          </View>
+        </View>
+      </GameShell>
+    );
+  }
+
+  if (!stageVerses || cards.length === 0) {
+    return (
+      <GameShell title={meta.title} onBack={onExit}>
+        <View style={styles.centerFill}><ActivityIndicator color={palette.primary} /></View>
+      </GameShell>
+    );
+  }
+
   return (
     <GameShell
-      title="Verse Match"
-      subtitle="Find the reference for each verse"
+      title={meta.title}
+      subtitle={`Round ${roundIndex + 1} of ${ROUNDS_PER_STAGE} — find the reference for each verse`}
       onBack={onExit}
       rightStat={{ label: 'Moves', value: moves }}
     >
@@ -212,6 +296,11 @@ export default function VerseMatchGame({ onExit }: { onExit: () => void }) {
 
 const styles = StyleSheet.create({
   centerFill: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  roundCompleteCard: { borderRadius: 20, padding: 24, alignItems: 'center', gap: 6 },
+  roundCompleteTitle: { fontSize: 20, fontWeight: '900', textAlign: 'center', marginTop: 8 },
+  roundCompleteScore: { fontSize: 14, fontWeight: '700', textAlign: 'center', marginBottom: 14 },
+  roundCompleteBtn: { alignSelf: 'stretch', borderRadius: 999, paddingVertical: 14, alignItems: 'center' },
+  roundCompleteBtnText: { fontSize: 15, fontWeight: '900' },
   grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center' },
   cardFace: {
     borderWidth: 1.5,

@@ -51,7 +51,8 @@ export type MessageKind =
   | 'location'
   | 'attachment'
   | 'call_event'
-  | 'bible_verse';
+  | 'bible_verse'
+  | 'bible_game_stats';
 
 /* ============================================================================
  * MESSAGE STATUS (STATE MACHINE)
@@ -256,6 +257,29 @@ export type BibleVerseMessage = {
   text?: string;
 };
 
+/** A point-in-time snapshot of Bible-games progress shared into chat — see
+ * src/components/Bible/games/bibleGameShare.ts. Games run fully offline
+ * (AsyncStorage only), so this embeds the actual numbers at share time
+ * rather than a reference the receiver's client would need to re-fetch. */
+export type BibleGameStatsMessage =
+  | {
+      scope: 'game';
+      gameKey: string;
+      gameTitle: string;
+      stagesCompleted: number;
+      totalStages: number;
+      verseCount: number;
+      bestScore?: number;
+    }
+  | {
+      scope: 'general';
+      totalBibleVerses: number;
+      versesCovered: number;
+      gamesCompleted: number;
+      totalGames: number;
+      timesCompletedBible: number;
+    };
+
 /* ============================================================================
  * READ RECEIPT (per-user, groups)
  * ============================================================================
@@ -392,6 +416,8 @@ export type ChatMessage = {
   location?: LocationMessage;
 
   bibleVerse?: BibleVerseMessage;
+
+  bibleGameStats?: BibleGameStatsMessage;
 
   replyToId?: string;
 

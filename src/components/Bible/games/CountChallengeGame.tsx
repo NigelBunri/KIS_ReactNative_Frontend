@@ -1,20 +1,20 @@
-// src/components/Bible/games/ScriptureTriviaGame.tsx
+// src/components/Bible/games/CountChallengeGame.tsx
 //
-// Game 4 of 6 (now 4 of 30): "Scripture Trivia" — multiple choice about
-// recognition/attribution rather than verbatim recall, the thing that made
-// this distinct from Complete the Verse/Word Weave. Two question types,
-// both universally derivable from ANY verse the partition engine assigns
-// (which book, which chapter) rather than the original curated-pool
-// version's "who said this" (that relied on hand-curated speaker
-// attribution that only ever existed for the original 68-verse pool, not
-// something derivable for an arbitrary stage of the whole Bible).
+// Game 21 of 30: "Count Challenge" — numeric multiple choice, two question
+// types, both derived purely from a verse's own text (no curated data, so
+// it works on any random slice of the Bible):
+//   - "How many words are in this verse?"
+//   - "How many times does the word '___' appear in this verse?" (picks a
+//     word that repeats at least twice - genealogies and legal lists,
+//     which repeat phrases like "begat"/"son of"/"shall", are especially
+//     well suited to this type, not just tolerated by it).
 
 import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View, Pressable, ScrollView } from 'react-native';
 import { useKISTheme } from '@/theme/useTheme';
 import GameShell from './GameShell';
 import { AnswerFeedback, StageComplete } from './GameFeedback';
-import { getVerseText } from '../../../screens/tabs/bible/games/verseText';
+import { getVerseText, normalizeWord, tokenizeVerse } from '../../../screens/tabs/bible/games/verseText';
 import {
   completeCurrentStage,
   getCurrentStageVerses,
@@ -25,15 +25,9 @@ import {
 } from '../../../screens/tabs/bible/games/gameStorage';
 import { GAME_METADATA } from '../../../screens/tabs/bible/games/gameMetadata';
 
-const ROUND_LENGTH = 10;
+const ROUND_LENGTH = 8;
 
-type Question = {
-  id: string;
-  verseText: string;
-  prompt: string;
-  choices: string[];
-  correctAnswer: string;
-};
+type Question = { id: string; verseText: string; prompt: string; correctCount: number; choices: number[] };
 
 function shuffle<T>(arr: T[]): T[] {
   const copy = [...arr];
@@ -44,84 +38,102 @@ function shuffle<T>(arr: T[]): T[] {
   return copy;
 }
 
-function distractorsFrom(pool: string[], correct: string, count: number): string[] {
-  const unique = Array.from(new Set(pool.filter((v) => v !== correct)));
-  return shuffle(unique).slice(0, count);
+function numericDistractors(correct: number): number[] {
+  const candidates = new Set<number>();
+  const deltas = [-2, -1, 1, 2, 3, -3];
+  for (const d of deltas) {
+    const v = correct + d;
+    if (v > 0 && v !== correct) candidates.add(v);
+    if (candidates.size >= 3) break;
+  }
+  return Array.from(candidates).slice(0, 3);
 }
 
-function buildQuestionPool(stageVerses: VerseRef[]): Question[] {
-  const allBookNames = Array.from(new Set(stageVerses.map((v) => v.bookName)));
+function mostRepeatedWord(words: string[]): { word: string; count: number } | null {
+  const counts = new Map<string, number>();
+  for (const w of words) {
+    const n = normalizeWord(w);
+    if (!n) continue;
+    counts.set(n, (counts.get(n) ?? 0) + 1);
+  }
+  let best: { word: string; count: number } | null = null;
+  for (const [word, count] of counts) {
+    if (count >= 2 && (!best || count > best.count)) best = { word, count };
+  }
+  return best;
+}
 
+function buildQuestions(stageVerses: VerseRef[]): Question[] {
   const questions: Question[] = [];
   for (const v of stageVerses) {
     const text = getVerseText(v.bookName, v.chapter, v.verse);
     if (!text) continue;
+    const words = tokenizeVerse(text);
     const id = `${v.bookName}-${v.chapter}-${v.verse}`;
 
-    // Type 1: which book is this from — needs at least 3 OTHER books
-    // present in this stage. A narrow stage (deep inside one large book)
-    // may not have enough - skipped for that verse rather than padding
-    // with fewer than 4 real choices.
-    const bookDistractors = distractorsFrom(allBookNames, v.bookName, 3);
-    if (bookDistractors.length === 3) {
-      questions.push({
-        id: `${id}-book`,
-        verseText: text,
-        prompt: 'Which book is this verse from?',
-        choices: shuffle([v.bookName, ...bookDistractors]),
-        correctAnswer: v.bookName,
-      });
+    if (words.length >= 3) {
+      const correct = words.length;
+      const distractors = numericDistractors(correct);
+      if (distractors.length === 3) {
+        questions.push({
+          id: `${id}-wordcount`,
+          verseText: text,
+          prompt: 'How many words are in this verse?',
+          correctCount: correct,
+          choices: shuffle([correct, ...distractors]),
+        });
+      }
     }
 
-    // Type 2: which chapter is this from — distractors are other chapter
-    // numbers of the SAME book present in this stage.
-    const sameBookChapters = Array.from(
-      new Set(stageVerses.filter((o) => o.bookName === v.bookName).map((o) => String(o.chapter))),
-    );
-    const chapterDistractors = distractorsFrom(sameBookChapters, String(v.chapter), 3);
-    if (chapterDistractors.length === 3) {
-      questions.push({
-        id: `${id}-chapter`,
-        verseText: text,
-        prompt: `Which chapter of ${v.bookName} is this verse from?`,
-        choices: shuffle([String(v.chapter), ...chapterDistractors]),
-        correctAnswer: String(v.chapter),
-      });
+    const repeated = mostRepeatedWord(words);
+    if (repeated) {
+      const distractors = numericDistractors(repeated.count);
+      if (distractors.length === 3) {
+        questions.push({
+          id: `${id}-wordoccurrence`,
+          verseText: text,
+          prompt: `How many times does "${repeated.word}" appear in this verse?`,
+          correctCount: repeated.count,
+          choices: shuffle([repeated.count, ...distractors]),
+        });
+      }
     }
   }
-  return questions;
+  return shuffle(questions).slice(0, ROUND_LENGTH);
 }
 
-export default function ScriptureTriviaGame({ gameKey, onExit, onOpenStats }: { gameKey: GameKey; onExit: () => void; onOpenStats: () => void }) {
+export default function CountChallengeGame({ gameKey, onExit, onOpenStats }: { gameKey: GameKey; onExit: () => void; onOpenStats: () => void }) {
   const { palette } = useKISTheme();
   const meta = GAME_METADATA[gameKey];
   const [round, setRound] = useState<Question[] | null>(null);
   const [index, setIndex] = useState(0);
-  const [selected, setSelected] = useState<string | null>(null);
+  const [selected, setSelected] = useState<number | null>(null);
   const [score, setScore] = useState(0);
   const [stageResult, setStageResult] = useState<{ stagesCompleted: number; isFinalStage: boolean } | null>(null);
 
   const loadRound = useCallback(async () => {
     const verses = await getCurrentStageVerses(gameKey);
-    const pool = buildQuestionPool(verses);
-    setRound(shuffle(pool).slice(0, ROUND_LENGTH));
+    setRound(buildQuestions(verses));
+    setIndex(0);
+    setSelected(null);
+    setScore(0);
   }, [gameKey]);
 
   useEffect(() => { loadRound(); }, [loadRound]);
 
   const current = round?.[index] ?? null;
 
-  const handleSelect = (choice: string) => {
-    if (selected || !current) return;
+  const handleSelect = (choice: number) => {
+    if (selected !== null || !current) return;
     setSelected(choice);
-    if (choice === current.correctAnswer) setScore((s) => s + 1);
+    if (choice === current.correctCount) setScore((s) => s + 1);
   };
 
   const handleNext = async () => {
     if (!round) return;
     const nextIndex = index + 1;
     if (nextIndex >= round.length) {
-      await recordScore(gameKey, score); // score already reflects this question's point, set by handleSelect
+      await recordScore(gameKey, score);
       const progress = await completeCurrentStage(gameKey);
       setStageResult({ stagesCompleted: progress.stagesCompleted, isFinalStage: progress.stagesCompleted >= STAGES_PER_GAME });
       return;
@@ -140,13 +152,7 @@ export default function ScriptureTriviaGame({ gameKey, onExit, onOpenStats }: { 
             stagesCompleted={stageResult.stagesCompleted}
             totalStages={STAGES_PER_GAME}
             isFinalStage={stageResult.isFinalStage}
-            onContinue={() => {
-              setStageResult(null);
-              setIndex(0);
-              setSelected(null);
-              setScore(0);
-              loadRound();
-            }}
+            onContinue={() => { setStageResult(null); loadRound(); }}
             onViewStats={onOpenStats}
             onExit={onExit}
           />
@@ -180,22 +186,10 @@ export default function ScriptureTriviaGame({ gameKey, onExit, onOpenStats }: { 
         <View style={styles.choices}>
           {current.choices.map((choice) => {
             const isSelected = selected === choice;
-            const isCorrectChoice = choice === current.correctAnswer;
+            const isCorrectChoice = choice === current.correctCount;
             const showState = selected !== null;
-            const bg = !showState
-              ? palette.card
-              : isCorrectChoice
-                ? '#16a34a20'
-                : isSelected
-                  ? '#dc262620'
-                  : palette.card;
-            const border = !showState
-              ? palette.selectedBg
-              : isCorrectChoice
-                ? '#16a34a'
-                : isSelected
-                  ? '#dc2626'
-                  : palette.selectedBg;
+            const bg = !showState ? palette.card : isCorrectChoice ? '#16a34a20' : isSelected ? '#dc262620' : palette.card;
+            const border = !showState ? palette.selectedBg : isCorrectChoice ? '#16a34a' : isSelected ? '#dc2626' : palette.selectedBg;
             return (
               <Pressable
                 key={choice}
@@ -209,10 +203,10 @@ export default function ScriptureTriviaGame({ gameKey, onExit, onOpenStats }: { 
           })}
         </View>
 
-        {selected ? (
+        {selected !== null ? (
           <AnswerFeedback
-            correct={selected === current.correctAnswer}
-            text={selected === current.correctAnswer ? 'Correct!' : `Correct answer: ${current.correctAnswer}`}
+            correct={selected === current.correctCount}
+            text={selected === current.correctCount ? 'Correct!' : `Correct answer: ${current.correctCount}`}
           />
         ) : null}
       </ScrollView>
@@ -220,11 +214,11 @@ export default function ScriptureTriviaGame({ gameKey, onExit, onOpenStats }: { 
       <View style={styles.footer}>
         <Pressable
           onPress={handleNext}
-          disabled={!selected}
-          style={[styles.actionBtn, { backgroundColor: selected ? palette.goldReadable : palette.selectedBg }]}
+          disabled={selected === null}
+          style={[styles.actionBtn, { backgroundColor: selected !== null ? palette.goldReadable : palette.selectedBg }]}
         >
-          <Text style={[styles.actionBtnText, { color: selected ? palette.onGold : palette.subtext }]}>
-            {index + 1 >= round.length ? 'See Results' : 'Next Question'}
+          <Text style={[styles.actionBtnText, { color: selected !== null ? palette.onGold : palette.subtext }]}>
+            {index + 1 >= round.length ? 'Finish Stage' : 'Next Question'}
           </Text>
         </Pressable>
       </View>
@@ -238,9 +232,9 @@ const styles = StyleSheet.create({
   verseCard: { borderRadius: 18, padding: 18 },
   verseText: { fontSize: 17, fontWeight: '600', lineHeight: 26, fontStyle: 'italic' },
   prompt: { fontSize: 14, fontWeight: '900' },
-  choices: { gap: 10 },
-  choiceRow: { borderWidth: 1.5, borderRadius: 14, paddingHorizontal: 16, paddingVertical: 14 },
-  choiceText: { fontSize: 15, fontWeight: '700' },
+  choices: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  choiceRow: { borderWidth: 1.5, borderRadius: 14, paddingHorizontal: 20, paddingVertical: 14, minWidth: 72, alignItems: 'center' },
+  choiceText: { fontSize: 17, fontWeight: '800' },
   footer: { paddingVertical: 14 },
   actionBtn: { borderRadius: 999, paddingVertical: 15, alignItems: 'center' },
   actionBtnText: { fontSize: 15, fontWeight: '900' },

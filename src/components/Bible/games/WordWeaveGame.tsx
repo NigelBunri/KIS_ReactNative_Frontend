@@ -1,9 +1,9 @@
 // src/components/Bible/games/WordWeaveGame.tsx
 //
-// Game 6 of 6: "Word Weave" — sentence reconstruction. A verse's words are
+// Game 6 of 30: "Word Weave" — sentence reconstruction. A verse's words are
 // shuffled into tappable tiles; the player taps them in order to rebuild
 // the verse exactly. Tests verbatim word-order recall specifically — the
-// closest of the 6 games to the classic "say the memory verse back
+// closest of the original 6 games to the classic "say the memory verse back
 // perfectly" skill, and deliberately not the same mechanic as Complete the
 // Verse (which only ever tests 1-2 missing words, not the whole sentence).
 //
@@ -11,18 +11,29 @@
 // (deliberately reused, not reinvented, for cross-game consistency) rather
 // than drag-and-drop, for the same ScrollView-gesture-conflict reason.
 //
-// Only curated verses between 5 and 20 words are eligible — long enough to
-// be a real reconstruction challenge, short enough that the tile tray
-// doesn't overflow into an unplayable wall of words.
+// Only verses between 5 and 20 words are eligible — long enough to be a
+// real reconstruction challenge, short enough that the tile tray doesn't
+// overflow into an unplayable wall of words. Since verse content is now
+// randomly assigned per stage, a narrow stage (e.g. deep in a genealogy of
+// short "and X begat Y" verses) may not have a full ROUND_LENGTH's worth of
+// eligible verses — the round simply plays with however many it finds,
+// same graceful-degradation approach used by the other migrated games.
 
-import React, { useCallback, useMemo, useState } from 'react';
-import { StyleSheet, Text, View, Pressable, ScrollView } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, StyleSheet, Text, View, Pressable, ScrollView } from 'react-native';
 import { useKISTheme } from '@/theme/useTheme';
 import GameShell from './GameShell';
-import { RoundComplete } from './GameFeedback';
-import { CURATED_VERSES, type CuratedVerseRef } from '../../../screens/tabs/bible/games/curatedVerses';
+import { StageComplete } from './GameFeedback';
 import { getVerseText, tokenizeVerse } from '../../../screens/tabs/bible/games/verseText';
-import { recordScore } from '../../../screens/tabs/bible/games/gameStorage';
+import {
+  completeCurrentStage,
+  getCurrentStageVerses,
+  recordScore,
+  STAGES_PER_GAME,
+  type GameKey,
+  type VerseRef,
+} from '../../../screens/tabs/bible/games/gameStorage';
+import { GAME_METADATA } from '../../../screens/tabs/bible/games/gameMetadata';
 
 const ROUND_LENGTH = 8;
 const MIN_WORDS = 5;
@@ -30,8 +41,12 @@ const MAX_WORDS = 20;
 
 type Tile = { key: string; word: string };
 
-function eligibleVerses(): CuratedVerseRef[] {
-  return CURATED_VERSES.filter((v) => {
+function referenceOf(ref: VerseRef): string {
+  return `${ref.bookName} ${ref.chapter}:${ref.verse}`;
+}
+
+function eligibleVerses(stageVerses: VerseRef[]): VerseRef[] {
+  return stageVerses.filter((v) => {
     const n = tokenizeVerse(getVerseText(v.bookName, v.chapter, v.verse)).length;
     return n >= MIN_WORDS && n <= MAX_WORDS;
   });
@@ -46,26 +61,36 @@ function shuffle<T>(arr: T[]): T[] {
   return copy;
 }
 
-function buildPuzzle(verse: CuratedVerseRef) {
+function buildPuzzle(verse: VerseRef) {
   const text = getVerseText(verse.bookName, verse.chapter, verse.verse);
   const words = tokenizeVerse(text);
   const tiles: Tile[] = words.map((word, i) => ({ key: `${i}-${word}`, word }));
   return { words, tray: shuffle(tiles) };
 }
 
-export default function WordWeaveGame({ onExit }: { onExit: () => void }) {
+export default function WordWeaveGame({ gameKey, onExit, onOpenStats }: { gameKey: GameKey; onExit: () => void; onOpenStats: () => void }) {
   const { palette } = useKISTheme();
-  const pool = useMemo(() => eligibleVerses(), []);
-  const [order, setOrder] = useState<CuratedVerseRef[]>(() => shuffle(pool).slice(0, ROUND_LENGTH));
+  const meta = GAME_METADATA[gameKey];
+  const [order, setOrder] = useState<VerseRef[] | null>(null);
   const [roundIndex, setRoundIndex] = useState(0);
   const [tray, setTray] = useState<Tile[]>([]);
   const [placed, setPlaced] = useState<Tile[]>([]);
   const [correctWords, setCorrectWords] = useState<string[]>([]);
   const [submitted, setSubmitted] = useState(false);
   const [score, setScore] = useState(0);
-  const [finished, setFinished] = useState(false);
+  const [stageResult, setStageResult] = useState<{ stagesCompleted: number; isFinalStage: boolean } | null>(null);
 
-  const setupRound = useCallback((verse: CuratedVerseRef) => {
+  const loadRound = useCallback(async () => {
+    const stageVerses = await getCurrentStageVerses(gameKey);
+    const pool = eligibleVerses(stageVerses);
+    setOrder(shuffle(pool).slice(0, ROUND_LENGTH));
+    setRoundIndex(0);
+    setScore(0);
+  }, [gameKey]);
+
+  useEffect(() => { loadRound(); }, [loadRound]);
+
+  const setupRound = useCallback((verse: VerseRef) => {
     const { words, tray: newTray } = buildPuzzle(verse);
     setCorrectWords(words);
     setTray(newTray);
@@ -73,11 +98,11 @@ export default function WordWeaveGame({ onExit }: { onExit: () => void }) {
     setSubmitted(false);
   }, []);
 
-  React.useEffect(() => {
-    if (order[roundIndex]) setupRound(order[roundIndex]);
+  useEffect(() => {
+    if (order && order[roundIndex]) setupRound(order[roundIndex]);
   }, [roundIndex, order, setupRound]);
 
-  const currentVerse = order[roundIndex];
+  const currentVerse = order?.[roundIndex];
 
   const handleTrayTap = (tile: Tile) => {
     if (submitted) return;
@@ -104,31 +129,33 @@ export default function WordWeaveGame({ onExit }: { onExit: () => void }) {
     if (isCorrect) setScore((s) => s + 1);
   };
 
-  const handleNext = () => {
+  const handleNext = async () => {
+    if (!order) return;
     const nextIndex = roundIndex + 1;
     if (nextIndex >= order.length) {
-      setFinished(true);
-      recordScore('word-weave', score); // score already reflects this round's point, set by handleSubmit
+      await recordScore(gameKey, score); // score already reflects this round's point, set by handleSubmit
+      const progress = await completeCurrentStage(gameKey);
+      setStageResult({ stagesCompleted: progress.stagesCompleted, isFinalStage: progress.stagesCompleted >= STAGES_PER_GAME });
       return;
     }
     setRoundIndex(nextIndex);
   };
 
-  const handlePlayAgain = () => {
-    setOrder(shuffle(pool).slice(0, ROUND_LENGTH));
-    setRoundIndex(0);
-    setScore(0);
-    setFinished(false);
-  };
-
-  if (finished) {
+  if (stageResult) {
     return (
-      <GameShell title="Word Weave" onBack={onExit}>
+      <GameShell title={meta.title} onBack={onExit}>
         <View style={styles.centerFill}>
-          <RoundComplete
-            title={score === ROUND_LENGTH ? 'Perfect round!' : 'Round complete'}
-            scoreLine={`${score} / ${ROUND_LENGTH} correct`}
-            onPlayAgain={handlePlayAgain}
+          <StageComplete
+            gameTitle={meta.title}
+            scoreLine={`${score} / ${order?.length ?? ROUND_LENGTH} correct this stage`}
+            stagesCompleted={stageResult.stagesCompleted}
+            totalStages={STAGES_PER_GAME}
+            isFinalStage={stageResult.isFinalStage}
+            onContinue={() => {
+              setStageResult(null);
+              loadRound();
+            }}
+            onViewStats={onOpenStats}
             onExit={onExit}
           />
         </View>
@@ -136,23 +163,23 @@ export default function WordWeaveGame({ onExit }: { onExit: () => void }) {
     );
   }
 
-  if (!currentVerse) {
+  if (!order || !currentVerse) {
     return (
-      <GameShell title="Word Weave" onBack={onExit}>
-        <View style={styles.centerFill} />
+      <GameShell title={meta.title} onBack={onExit}>
+        <View style={styles.centerFill}><ActivityIndicator color={palette.primary} /></View>
       </GameShell>
     );
   }
 
   return (
     <GameShell
-      title="Word Weave"
+      title={meta.title}
       subtitle={`Verse ${roundIndex + 1} of ${order.length}`}
       onBack={onExit}
       rightStat={{ label: 'Score', value: score }}
     >
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-        <Text style={[styles.reference, { color: palette.goldReadable }]}>{currentVerse.reference}</Text>
+        <Text style={[styles.reference, { color: palette.goldReadable }]}>{referenceOf(currentVerse)}</Text>
         <Text style={[styles.instructions, { color: palette.subtext }]}>
           Tap the words below to rebuild the verse in order.
         </Text>
@@ -211,7 +238,7 @@ export default function WordWeaveGame({ onExit }: { onExit: () => void }) {
         {submitted ? (
           <Pressable onPress={handleNext} style={[styles.actionBtn, { backgroundColor: palette.goldReadable }]}>
             <Text style={[styles.actionBtnText, { color: palette.onGold }]}>
-              {roundIndex + 1 >= order.length ? 'See Results' : 'Next Verse'}
+              {roundIndex + 1 >= order.length ? 'Finish Stage' : 'Next Verse'}
             </Text>
           </Pressable>
         ) : (
