@@ -64,6 +64,17 @@ type KCANBook = {
   cover_image?: string;
 };
 
+type KCANMinister = {
+  id: number;
+  name: string;
+  title: string;
+  bio: string;
+  photo_url: string | null;
+  status: string;
+  sort_order: number;
+  message_count: number;
+};
+
 type PrayerRequest = {
   id: number;
   title: string;
@@ -212,6 +223,7 @@ function SectionView({ section, palette }: { section: BibleSection; palette: any
     case 'courses':            return <CoursesSection palette={palette} />;
     case 'reading_plans':      return <ReadingPlansSection palette={palette} />;
     case 'analytics':          return <AnalyticsSection palette={palette} />;
+    case 'ministers':          return <MinistersSection palette={palette} />;
     default:                   return <GenericSection section={section} palette={palette} />;
   }
 }
@@ -657,6 +669,164 @@ function BooksSection({ palette }: { palette: any }) {
                   <Text style={[styles.cardMeta, { color: palette.subtext }]}>{item.language?.toUpperCase()}</Text>
                   {item.pdf_url ? <Text style={[styles.cardMeta, { color: palette.primary }]}>PDF</Text> : null}
                 </View>
+              </View>
+              <View style={styles.cardActions}>
+                <Pressable
+                  onPress={() => handlePublish(item)}
+                  style={[styles.actionBtn, { borderColor: item.status === 'published' ? (palette.success) : palette.primary }]}
+                >
+                  <Text style={{ color: item.status === 'published' ? (palette.success) : palette.primary, fontSize: 10, fontWeight: '800' }}>
+                    {item.status === 'published' ? 'Unpublish' : 'Publish'}
+                  </Text>
+                </Pressable>
+                <Pressable onPress={() => handleDelete(item)} style={{ padding: 4 }}>
+                  <Text style={{ color: palette.danger, fontWeight: '800', fontSize: 16 }}>×</Text>
+                </Pressable>
+              </View>
+            </View>
+          )}
+        />
+      )}
+    </SectionShell>
+  );
+}
+
+// ─── Ministers & Authors Section ───────────────────────────────────────────────
+// KCANMinisterListView (apps.bible.views) already had full GET/POST/PATCH/
+// DELETE - only the admin create/edit UI was missing, same as Books before
+// this. The serializer never exposes a writable `photo` field (only the
+// read-derived photo_url), so there is genuinely no photo-upload capability
+// on this endpoint yet - name/title/bio/status/sort_order only, matching
+// what the API actually accepts today rather than building a form for a
+// field that would silently no-op.
+
+function MinistersSection({ palette }: { palette: any }) {
+  const [items, setItems] = useState<KCANMinister[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [showForm, setShowForm] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [filter, setFilter] = useState('all');
+  // Form
+  const [name, setName] = useState('');
+  const [title, setTitle] = useState('');
+  const [bio, setBio] = useState('');
+
+  const load = useCallback(async () => {
+    setLoading(true); setError(null);
+    try {
+      const res: any = await getRequest((ROUTES as any).bible.kcanMinisters);
+      const d = res?.data ?? res;
+      setItems(Array.isArray(d) ? d : d?.results ?? []);
+    } catch (e: any) { setError(e?.message || 'Failed to load ministers.'); }
+    finally { setLoading(false); }
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  const handleCreate = async () => {
+    if (!name.trim()) { Alert.alert('Name required'); return; }
+    setSaving(true);
+    try {
+      const payload = { name: name.trim(), title: title.trim(), bio: bio.trim(), status: 'published' };
+      const res: any = await postRequest((ROUTES as any).bible.kcanMinisters, payload);
+      if (res?.id || res?.data?.id) {
+        setItems(prev => [res?.data ?? res, ...prev]);
+        setName(''); setTitle(''); setBio('');
+        setShowForm(false);
+      } else {
+        Alert.alert('Error', res?.message || 'Could not create minister.');
+      }
+    } catch (e: any) { Alert.alert('Error', e?.message || 'Failed.'); }
+    finally { setSaving(false); }
+  };
+
+  const handlePublish = async (item: KCANMinister) => {
+    try {
+      const newStatus = item.status === 'published' ? 'draft' : 'published';
+      await patchRequest(`${(ROUTES as any).bible.kcanMinisters}${item.id}/`, { status: newStatus });
+      setItems(prev => prev.map(m => m.id === item.id ? { ...m, status: newStatus } : m));
+    } catch (e: any) { Alert.alert('Error', e?.message || 'Could not update.'); }
+  };
+
+  const handleDelete = (item: KCANMinister) => {
+    Alert.alert('Delete minister', `Delete "${item.name}"?`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete', style: 'destructive',
+        onPress: async () => {
+          try {
+            await deleteRequest(`${(ROUTES as any).bible.kcanMinisters}${item.id}/`);
+            setItems(prev => prev.filter(m => m.id !== item.id));
+          } catch (e: any) { Alert.alert('Error', e?.message || 'Could not delete.'); }
+        },
+      },
+    ]);
+  };
+
+  const filtered =
+    filter === 'published' ? items.filter(m => m.status === 'published') :
+    filter === 'draft' ? items.filter(m => m.status !== 'published') :
+    items;
+
+  return (
+    <SectionShell palette={palette}>
+      <View style={[styles.filterRow, { borderBottomColor: palette.divider }]}>
+        <Chips
+          options={[
+            { key: 'all', label: `All (${items.length})` },
+            { key: 'published', label: `Published (${items.filter(m => m.status === 'published').length})` },
+            { key: 'draft', label: `Draft (${items.filter(m => m.status !== 'published').length})` },
+          ]}
+          selected={filter}
+          onSelect={setFilter}
+          palette={palette}
+        />
+      </View>
+      {loading ? (
+        <View style={styles.center}><ActivityIndicator color={palette.primary} /></View>
+      ) : error ? (
+        <SectionError message={error} onRetry={load} palette={palette} />
+      ) : (
+        <FlatList
+          initialNumToRender={20}
+          maxToRenderPerBatch={10}
+          windowSize={10}
+          removeClippedSubviews
+          data={filtered}
+          keyExtractor={item => String(item.id)}
+          contentContainerStyle={{ padding: 12, paddingBottom: 80, gap: 8 }}
+          ListEmptyComponent={<EmptyState icon="👤" text="No ministers yet." palette={palette} />}
+          ListFooterComponent={
+            <View style={{ marginTop: 8 }}>
+              <Pressable onPress={() => setShowForm(s => !s)} style={[styles.addBtn, { borderColor: palette.primary }]}>
+                <Text style={{ color: palette.primary, fontWeight: '800', fontSize: 13 }}>{showForm ? '↑ Cancel' : '+ Add minister'}</Text>
+              </Pressable>
+              {showForm && (
+                <View style={[styles.form, { borderColor: palette.divider, backgroundColor: palette.surface }]}>
+                  <Text style={[styles.formTitle, { color: palette.text }]}>Add Minister</Text>
+                  <FieldInput label="Name *" value={name} onChange={setName} placeholder="Full name" palette={palette} />
+                  <FieldInput label="Title" value={title} onChange={setTitle} placeholder="e.g. Pastor, Bishop, Dr." palette={palette} />
+                  <FieldInput label="Bio" value={bio} onChange={setBio} placeholder="Short biography..." multiline palette={palette} />
+                  <Pressable onPress={handleCreate} disabled={saving} style={[styles.saveBtn, { backgroundColor: palette.primary }]}>
+                    {saving ? <ActivityIndicator size="small" color="#fff" /> : (
+                      <Text style={{ color: '#fff', fontWeight: '800', fontSize: 13 }}>Add minister</Text>
+                    )}
+                  </Pressable>
+                </View>
+              )}
+            </View>
+          }
+          renderItem={({ item }) => (
+            <View style={[styles.card, { borderColor: palette.divider, backgroundColor: palette.surface }]}>
+              <View style={{ flex: 1 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                  <Text style={{ fontSize: 18 }}>👤</Text>
+                  <Text style={[styles.cardTitle, { color: palette.text, flex: 1 }]} numberOfLines={1}>{item.name}</Text>
+                  <StatusBadge status={item.status} palette={palette} />
+                </View>
+                {item.title ? <Text style={[styles.cardMeta, { color: palette.subtext }]}>{item.title}</Text> : null}
+                <Text style={[styles.cardMeta, { color: palette.subtext }]}>{item.message_count} message{item.message_count === 1 ? '' : 's'}</Text>
               </View>
               <View style={styles.cardActions}>
                 <Pressable
