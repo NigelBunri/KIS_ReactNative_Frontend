@@ -121,6 +121,7 @@ import { saveWallpaper, loadWallpaper, WALLPAPER_OPTIONS } from './componets/mai
 import { QuickRepliesBar } from './componets/main/QuickRepliesBar';
 import { normalizeChatDisplayText, normalizeChatSendText } from './safeChatText';
 import { useRawTopInset } from '@/hooks/useSafeTopInset';
+import { dismissNotificationsForConversation } from '@/services/pushNotificationDismissal';
 
 /* -------------------------------------------------------------------------- */
 /*                                   HELPERS                                  */
@@ -1237,6 +1238,11 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
     const convId = conversationId ?? chat?.id;
     if (!convId || markedReadRef.current === String(convId)) return;
     markedReadRef.current = String(convId);
+    // Also clear any OS push notifications still sitting in the tray for
+    // this conversation — reading it in-app (not tapping the notification
+    // itself) previously left them there indefinitely, since nothing in
+    // this app could reach back into the OS notification tray at all.
+    void dismissNotificationsForConversation(String(convId));
     postRequest(ROUTES.chat.markRead(String(convId)), {})
       .then(() => markAllMessagesRead())
       .catch(() => {

@@ -8,6 +8,7 @@ import { InAppNotificationToastRef } from './InAppNotificationToast';
 import { displayIncomingCall, callKeepAvailable } from '@/services/calls/callKitService';
 import { ensureDeviceId } from '@/security/e2ee';
 import { logCallDiagnostic } from '@/services/calls/callDiagnostics';
+import { dismissAllNotifications } from '@/services/pushNotificationDismissal';
 
 const PENDING_PUSH_TOKEN_KEY = 'KIS_PENDING_PUSH_TOKEN';
 // Nest's registration is tracked SEPARATELY from Django's above. They're two
@@ -375,6 +376,11 @@ export async function unregisterPushToken(): Promise<void> {
     AsyncStorage.removeItem(PENDING_NEST_PUSH_TOKEN_KEY).catch(() => {}),
     AsyncStorage.removeItem(PENDING_VOIP_PUSH_TOKEN_KEY).catch(() => {}),
   ]);
+
+  // Also clear whatever's still sitting in the OS notification tray for
+  // this account — a signed-out device shouldn't keep showing another
+  // user's notifications.
+  await dismissAllNotifications();
 }
 
 /**
