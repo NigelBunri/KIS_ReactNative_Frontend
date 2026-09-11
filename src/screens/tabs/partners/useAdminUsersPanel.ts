@@ -118,6 +118,16 @@ export const useAdminUsersPanel = (width: number) => {
     }
   }, []);
 
+  const wipeUserDevices = useCallback(async (userId: string) => {
+    setActionLoading(userId);
+    try {
+      const res = await postRequest((ROUTES as any).users?.wipeDevices?.(userId) ?? '', { reason: 'admin_console_reset' }, { errorMessage: '' });
+      return res.success ? (res.data?.deleted_count ?? 0) : false;
+    } finally {
+      setActionLoading(null);
+    }
+  }, []);
+
   const search = useCallback((q: string) => {
     setQuery(q);
     setPage(1);
@@ -142,6 +152,6 @@ export const useAdminUsersPanel = (width: number) => {
     users, pagination, loading, actionLoading, error,
     query, tierFilter, statusFilter, page,
     setQuery, setTierFilter, setStatusFilter, setPage,
-    search, load, banUser, unbanUser, setUserTier,
+    search, load, banUser, unbanUser, setUserTier, wipeUserDevices,
   };
 };

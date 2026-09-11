@@ -6,6 +6,7 @@
 import React, { useCallback } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Animated,
   Pressable,
   ScrollView,
@@ -34,6 +35,8 @@ type Props = {
   onOpenBibleAdmin: () => void;
   onOpenKISAppAdmin: () => void;
   onRefresh: () => void;
+  wiping: boolean;
+  onWipeAllDevices: () => Promise<{ users_affected: number; devices_deleted: number } | false>;
 };
 
 export default function AdminDashboardPanel({
@@ -54,10 +57,47 @@ export default function AdminDashboardPanel({
   onOpenBibleAdmin,
   onOpenKISAppAdmin,
   onRefresh,
+  wiping,
+  onWipeAllDevices,
 }: Props) {
   const { palette } = useKISTheme();
 
   if (!isOpen) return null;
+
+  const handleWipeAllDevices = () => {
+    Alert.alert(
+      'Force re-login for ALL users',
+      'This deletes every registered device for every account on the platform. Every user is signed out everywhere and their next login registers as a fresh device with no pairing/secondary-code prompt. Accounts are kept. This cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Continue',
+          style: 'destructive',
+          onPress: () => {
+            Alert.alert(
+              'Are you absolutely sure?',
+              'This affects every single account right now, with no way to undo it. Confirm one more time to proceed.',
+              [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                  text: 'Wipe every account’s devices',
+                  style: 'destructive',
+                  onPress: async () => {
+                    const result = await onWipeAllDevices();
+                    if (result) {
+                      Alert.alert('Done', `${result.devices_deleted} devices deleted across ${result.users_affected} accounts.`);
+                    } else {
+                      Alert.alert('Failed', 'The platform-wide device wipe did not complete. Check the audit trail and try again.');
+                    }
+                  },
+                },
+              ],
+            );
+          },
+        },
+      ],
+    );
+  };
 
   return (
     <Animated.View
@@ -230,6 +270,28 @@ export default function AdminDashboardPanel({
               palette={palette}
               onPress={onOpenKISAppAdmin}
             />
+
+            <Text style={[styles.sectionTitle, { color: palette.danger, marginTop: 8 }]}>Danger Zone</Text>
+            <View style={[styles.dangerCard, { borderColor: palette.danger, backgroundColor: palette.danger + '10' }]}>
+              <Text style={[styles.navCardTitle, { color: palette.text }]}>Force re-login for all users</Text>
+              <Text style={[styles.navCardDesc, { color: palette.subtext, marginBottom: 10 }]}>
+                Deletes every registered device for every account, platform-wide. Everyone is signed
+                out everywhere and their next login registers as a fresh device with no pairing/
+                secondary-code prompt. Accounts are kept. This cannot be undone.
+              </Text>
+              {wiping ? (
+                <ActivityIndicator color={palette.danger} />
+              ) : (
+                <Pressable
+                  onPress={handleWipeAllDevices}
+                  style={[styles.dangerBtn, { borderColor: palette.danger }]}
+                >
+                  <Text style={{ color: palette.danger, fontWeight: '800', fontSize: 13 }}>
+                    Wipe all devices…
+                  </Text>
+                </Pressable>
+              )}
+            </View>
           </>
         )}
       </ScrollView>
@@ -397,4 +459,6 @@ const styles = StyleSheet.create({
   barWrap: { flex: 1, alignItems: 'center', justifyContent: 'flex-end' },
   bar: { width: '70%', borderRadius: 3 },
   barLabel: { fontSize: 8, marginTop: 2 },
+  dangerCard: { borderRadius: 12, borderWidth: 1, padding: 14 },
+  dangerBtn: { alignSelf: 'flex-start', borderWidth: 1, borderRadius: 8, paddingHorizontal: 14, paddingVertical: 8 },
 });

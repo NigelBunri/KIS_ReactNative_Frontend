@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Animated } from 'react-native';
 import { getRequest } from '@/network/get';
+import { postRequest } from '@/network/post';
 import ROUTES from '@/network';
+
+const WIPE_ALL_CONFIRM_PHRASE = 'WIPE ALL DEVICES';
 
 export type AdminKPIs = {
   total_users: number;
@@ -50,6 +53,7 @@ export const useAdminDashboardPanel = (width: number) => {
   const [kpis, setKpis] = useState<AdminKPIs>(EMPTY_KPIS);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [wiping, setWiping] = useState(false);
 
   const panelWidth = useMemo(() => {
     if (width < 600) return width;
@@ -106,6 +110,20 @@ export const useAdminDashboardPanel = (width: number) => {
     }
   }, []);
 
+  const wipeAllDevices = useCallback(async (): Promise<{ users_affected: number; devices_deleted: number } | false> => {
+    setWiping(true);
+    try {
+      const res = await postRequest(
+        (ROUTES as any).control?.wipeAllDevices ?? '',
+        { confirm: WIPE_ALL_CONFIRM_PHRASE, reason: 'admin_console_platform_wide_reset' },
+        { errorMessage: '' },
+      );
+      return res.success ? res.data : false;
+    } finally {
+      setWiping(false);
+    }
+  }, []);
+
   const open = () => {
     setIsOpen(true);
     void load();
@@ -121,5 +139,5 @@ export const useAdminDashboardPanel = (width: number) => {
     });
   };
 
-  return { panelWidth, panelTranslateX, isOpen, open, close, kpis, loading, error, refresh: load };
+  return { panelWidth, panelTranslateX, isOpen, open, close, kpis, loading, error, refresh: load, wiping, wipeAllDevices };
 };

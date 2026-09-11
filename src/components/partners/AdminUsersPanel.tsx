@@ -34,6 +34,7 @@ type Props = {
   onBan: (id: string, reason: string, permanent: boolean) => Promise<boolean>;
   onUnban: (id: string) => Promise<boolean>;
   onSetTier: (id: string, tier: string) => Promise<boolean>;
+  onWipeDevices: (id: string) => Promise<number | false>;
   onLoadPage: (page: number) => void;
   onClose: () => void;
 };
@@ -52,6 +53,7 @@ export default function AdminUsersPanel({
   onBan,
   onUnban,
   onSetTier,
+  onWipeDevices,
   onLoadPage,
   onClose,
 }: Props) {
@@ -75,6 +77,21 @@ export default function AdminUsersPanel({
           text: 'Ban (permanent)',
           style: 'destructive',
           onPress: () => void onBan(user.id, 'Policy violation', true),
+        },
+      ],
+    );
+  };
+
+  const handleWipeDevices = (user: AdminUser) => {
+    Alert.alert(
+      'Reset devices',
+      `Delete every registered device for ${user.display_name ?? user.email}? They will be signed out everywhere and their next login will register as a fresh device with no pairing/secondary-code prompt. This cannot be undone.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Reset devices',
+          style: 'destructive',
+          onPress: () => void onWipeDevices(user.id),
         },
       ],
     );
@@ -178,6 +195,7 @@ export default function AdminUsersPanel({
               onBan={() => handleBan(item)}
               onUnban={() => void onUnban(item.id)}
               onChangeTier={() => handleTierChange(item)}
+              onWipeDevices={() => handleWipeDevices(item)}
               onSelect={() => setSelectedUser(selectedUser?.id === item.id ? null : item)}
               selected={selectedUser?.id === item.id}
             />
@@ -192,7 +210,7 @@ export default function AdminUsersPanel({
   );
 }
 
-function UserRow({ user, palette, isActioning, onBan, onUnban, onChangeTier, onSelect, selected }: any) {
+function UserRow({ user, palette, isActioning, onBan, onUnban, onChangeTier, onWipeDevices, onSelect, selected }: any) {
   const statusColor = user.status === 'active' ? palette.success
     : user.status === 'banned' ? palette.danger
     : '#f0ad4e';
@@ -234,6 +252,7 @@ function UserRow({ user, palette, isActioning, onBan, onUnban, onChangeTier, onS
               ) : (
                 <ActionBtn label="Unban" color={palette.success} onPress={onUnban} />
               )}
+              <ActionBtn label="Reset devices" color={palette.danger} onPress={onWipeDevices} />
             </>
           )}
         </View>

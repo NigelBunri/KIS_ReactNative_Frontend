@@ -1298,6 +1298,8 @@ export default function PartnersScreen({ setHidNav, onOpenInfo }: any) {
             onOpenBibleAdmin={openAdminBible}
             onOpenKISAppAdmin={openAdminKISApp}
             onRefresh={adminDashboard.refresh}
+            wiping={adminDashboard.wiping}
+            onWipeAllDevices={adminDashboard.wipeAllDevices}
           />
           <AdminUsersPanel
             isOpen={adminUsers.isOpen}
@@ -1313,6 +1315,7 @@ export default function PartnersScreen({ setHidNav, onOpenInfo }: any) {
             onBan={adminUsers.banUser}
             onUnban={adminUsers.unbanUser}
             onSetTier={adminUsers.setUserTier}
+            onWipeDevices={adminUsers.wipeUserDevices}
             onLoadPage={(p) => { adminUsers.setPage(p); void adminUsers.load({ p }); }}
             onClose={adminUsers.close}
           />

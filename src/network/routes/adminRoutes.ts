@@ -13,6 +13,7 @@ const adminRoutes = {
     monitoringAlerts: `${ADMIN_BASE}/monitoring/alerts/`,
     performance: `${ADMIN_BASE}/monitoring/performance/`,
     microApps: `${ADMIN_BASE}/micro/apps/`,
+    wipeAllDevices: `${ADMIN_BASE}/devices/wipe-all/`,
   },
 
   // ── User management ───────────────────────────────────────────────────
@@ -23,6 +24,7 @@ const adminRoutes = {
     ban: (id: string) => `${ADMIN_BASE}/users/${id}/ban/`,
     unban: (id: string) => `${ADMIN_BASE}/users/${id}/unban/`,
     setTier: (id: string) => `${ADMIN_BASE}/users/${id}/set-tier/`,
+    wipeDevices: (id: string) => `${ADMIN_BASE}/users/${id}/wipe-devices/`,
   },
 
   // ── Content moderation ────────────────────────────────────────────────
