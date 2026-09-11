@@ -7,7 +7,7 @@ jest.mock('@/security/authStorage', () => ({
 }));
 
 jest.mock('@/network', () => ({
-  NEST_API_BASE_URL: 'https://kis-nest-backend.onrender.com',
+  NEST_API_BASE_URL: 'https://chat.kingdomimpactventures.org',
 }));
 
 import { AttachmentDownloadError, requestAttachmentDownloadUrl } from '../attachmentDownload';
@@ -43,7 +43,7 @@ describe('requestAttachmentDownloadUrl', () => {
     const result = await requestAttachmentDownloadUrl('att-1');
 
     expect(fetchMock).toHaveBeenCalledWith(
-      'https://kis-nest-backend.onrender.com/uploads/att-1/download-url',
+      'https://chat.kingdomimpactventures.org/uploads/att-1/download-url',
       expect.objectContaining({
         method: 'GET',
         headers: expect.objectContaining({ Authorization: 'Bearer token-abc' }),

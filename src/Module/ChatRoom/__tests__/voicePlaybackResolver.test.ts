@@ -1,5 +1,5 @@
 jest.mock('@/network', () => ({
-  NEST_API_BASE_URL: 'https://kis-nest-backend.onrender.com',
+  NEST_API_BASE_URL: 'https://chat.kingdomimpactventures.org',
 }));
 
 jest.mock('@/security/authStorage', () => ({
@@ -41,7 +41,7 @@ describe('voicePlaybackResolver', () => {
     await resolveFreshVoicePlaybackUrl('msg-1');
 
     expect(fetchMock).toHaveBeenCalledWith(
-      'https://kis-nest-backend.onrender.com/chat/messages/msg-1/voice/playback-url',
+      'https://chat.kingdomimpactventures.org/chat/messages/msg-1/voice/playback-url',
       { headers: { Authorization: 'Bearer token-abc' } },
     );
   });

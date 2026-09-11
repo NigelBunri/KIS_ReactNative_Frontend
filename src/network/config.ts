@@ -18,9 +18,13 @@ const _localApiHost = DEV_BACKEND_HOST;
 const _localApiBase = `http://${_localApiHost}:${API_PORT}`;
 const _localChatBase = `http://${_localApiHost}:${CHAT_PORT}`;
 
-// Deployed Render backends
-const _deployedApiBase = 'https://kis-django-backend.onrender.com';
-const _deployedChatBase = 'https://kis-nest-backend.onrender.com';
+// Deployed production backends (AWS Lightsail) - real domains, not a
+// placeholder: this is the fallback API_BASE_URL/CHAT_BASE_URL resolve to
+// in production if KIS_DJANGO_BASE_URL/KIS_NEST_BASE_URL are ever unset,
+// so a stale/wrong host here would silently point a production build at
+// the wrong backend instead of failing loudly.
+const _deployedApiBase = 'https://api.kingdomimpactventures.org';
+const _deployedChatBase = 'https://chat.kingdomimpactventures.org';
 
 const _envApiBase = trim(APP_ENV.KIS_DJANGO_BASE_URL);
 const _envChatBase = trim(APP_ENV.KIS_NEST_BASE_URL);
