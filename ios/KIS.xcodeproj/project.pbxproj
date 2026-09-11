@@ -449,7 +449,7 @@
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.kingdomimpactventures.kis;
 				PRODUCT_NAME = KIS;
-				PROVISIONING_PROFILE = "2d6505f9-88b1-43ed-8506-d19b9787e2cd";
+				PROVISIONING_PROFILE = "ee6e7a76-f51d-4554-bda1-1644dd98f9c8";
 				PROVISIONING_PROFILE_SPECIFIER = "KIS App Store Distribution";
 				SWIFT_OBJC_BRIDGING_HEADER = "KIS/KIS-Bridging-Header.h";
 				SWIFT_VERSION = 5.0;
@@ -473,7 +473,7 @@
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.kingdomimpactventures.kis.RTCScreenSharingExtension;
 				PRODUCT_NAME = RTCScreenSharingExtension;
-				PROVISIONING_PROFILE = "a675b1aa-7c38-4ec4-bc4b-a4d6b6b283bd";
+				PROVISIONING_PROFILE = "b77360f9-00d1-4122-84b7-48cbb6d8ef9d";
 				PROVISIONING_PROFILE_SPECIFIER = "KIS RTCScreenSharingExtension App Store";
 				SDKROOT = iphoneos;
 				SKIP_INSTALL = YES;
