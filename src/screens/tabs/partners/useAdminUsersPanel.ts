@@ -12,6 +12,8 @@ export type AdminUser = {
   phone: string | null;
   tier: string;
   status: string;
+  is_active: boolean;
+  is_deleted: boolean;
   country: string;
   is_staff: boolean;
   is_superuser: boolean;
@@ -105,6 +107,45 @@ export const useAdminUsersPanel = (width: number) => {
     }
   }, []);
 
+  const blockUser = useCallback(async (userId: string) => {
+    setActionLoading(userId);
+    try {
+      const res = await postRequest((ROUTES as any).users?.block?.(userId) ?? '', { reason: 'admin_console' }, { errorMessage: '' });
+      if (res.success) {
+        setUsers(prev => prev.map(u => u.id === userId ? { ...u, status: 'blocked', is_active: false } : u));
+      }
+      return res.success;
+    } finally {
+      setActionLoading(null);
+    }
+  }, []);
+
+  const deleteUser = useCallback(async (userId: string) => {
+    setActionLoading(userId);
+    try {
+      const res = await postRequest((ROUTES as any).users?.delete?.(userId) ?? '', { reason: 'admin_console' }, { errorMessage: '' });
+      if (res.success) {
+        setUsers(prev => prev.map(u => u.id === userId ? { ...u, is_active: false, is_deleted: true } : u));
+      }
+      return res.success;
+    } finally {
+      setActionLoading(null);
+    }
+  }, []);
+
+  const restoreUser = useCallback(async (userId: string) => {
+    setActionLoading(userId);
+    try {
+      const res = await postRequest((ROUTES as any).users?.restore?.(userId) ?? '', {}, { errorMessage: '' });
+      if (res.success) {
+        setUsers(prev => prev.map(u => u.id === userId ? { ...u, status: 'active', is_active: true, is_deleted: false } : u));
+      }
+      return res.success;
+    } finally {
+      setActionLoading(null);
+    }
+  }, []);
+
   const setUserTier = useCallback(async (userId: string, tier: string) => {
     setActionLoading(userId);
     try {
@@ -152,6 +193,6 @@ export const useAdminUsersPanel = (width: number) => {
     users, pagination, loading, actionLoading, error,
     query, tierFilter, statusFilter, page,
     setQuery, setTierFilter, setStatusFilter, setPage,
-    search, load, banUser, unbanUser, setUserTier, wipeUserDevices,
+    search, load, banUser, unbanUser, blockUser, deleteUser, restoreUser, setUserTier, wipeUserDevices,
   };
 };

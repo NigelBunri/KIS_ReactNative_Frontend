@@ -33,6 +33,9 @@ type Props = {
   onSearch: (q: string) => void;
   onBan: (id: string, reason: string, permanent: boolean) => Promise<boolean>;
   onUnban: (id: string) => Promise<boolean>;
+  onBlock: (id: string) => Promise<boolean>;
+  onDelete: (id: string) => Promise<boolean>;
+  onRestore: (id: string) => Promise<boolean>;
   onSetTier: (id: string, tier: string) => Promise<boolean>;
   onWipeDevices: (id: string) => Promise<number | false>;
   onLoadPage: (page: number) => void;
@@ -52,6 +55,9 @@ export default function AdminUsersPanel({
   onSearch,
   onBan,
   onUnban,
+  onBlock,
+  onDelete,
+  onRestore,
   onSetTier,
   onWipeDevices,
   onLoadPage,
@@ -78,6 +84,28 @@ export default function AdminUsersPanel({
           style: 'destructive',
           onPress: () => void onBan(user.id, 'Policy violation', true),
         },
+      ],
+    );
+  };
+
+  const handleBlock = (user: AdminUser) => {
+    Alert.alert(
+      'Block account',
+      `Block ${user.display_name ?? user.email}? They will be signed out everywhere and unable to sign back in until restored.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Block', style: 'destructive', onPress: () => void onBlock(user.id) },
+      ],
+    );
+  };
+
+  const handleDelete = (user: AdminUser) => {
+    Alert.alert(
+      'Delete account',
+      `Delete ${user.display_name ?? user.email}? Deactivated immediately, permanently deleted after the grace period unless restored before then.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Delete', style: 'destructive', onPress: () => void onDelete(user.id) },
       ],
     );
   };
@@ -194,6 +222,9 @@ export default function AdminUsersPanel({
               isActioning={actionLoading === item.id}
               onBan={() => handleBan(item)}
               onUnban={() => void onUnban(item.id)}
+              onBlock={() => handleBlock(item)}
+              onDelete={() => handleDelete(item)}
+              onRestore={() => void onRestore(item.id)}
               onChangeTier={() => handleTierChange(item)}
               onWipeDevices={() => handleWipeDevices(item)}
               onSelect={() => setSelectedUser(selectedUser?.id === item.id ? null : item)}
@@ -210,10 +241,14 @@ export default function AdminUsersPanel({
   );
 }
 
-function UserRow({ user, palette, isActioning, onBan, onUnban, onChangeTier, onWipeDevices, onSelect, selected }: any) {
-  const statusColor = user.status === 'active' ? palette.success
-    : user.status === 'banned' ? palette.danger
+function UserRow({ user, palette, isActioning, onBan, onUnban, onBlock, onDelete, onRestore, onChangeTier, onWipeDevices, onSelect, selected }: any) {
+  const statusColor = user.status === 'active' && user.is_active !== false ? palette.success
+    : user.status === 'banned' || user.status === 'blocked' ? palette.danger
     : '#f0ad4e';
+  // Deletion doesn't change `status` (only is_active/is_deleted) - needs its
+  // own condition or a scheduled-for-deletion account looks unremarkable.
+  const needsRestore = user.status === 'banned' || user.status === 'suspended'
+    || user.status === 'blocked' || user.is_deleted || user.is_active === false;
 
   return (
     <Pressable onPress={onSelect} style={[styles.userRow, selected && { backgroundColor: palette.primarySoft + '18' }]}>
@@ -247,10 +282,14 @@ function UserRow({ user, palette, isActioning, onBan, onUnban, onChangeTier, onW
           ) : (
             <>
               <ActionBtn label="Tier" color={palette.primary} onPress={onChangeTier} />
-              {user.status === 'active' ? (
-                <ActionBtn label="Ban" color={palette.danger} onPress={onBan} />
+              {needsRestore ? (
+                <ActionBtn label="Restore" color={palette.success} onPress={onRestore} />
               ) : (
-                <ActionBtn label="Unban" color={palette.success} onPress={onUnban} />
+                <>
+                  <ActionBtn label="Ban" color={palette.danger} onPress={onBan} />
+                  <ActionBtn label="Block" color={palette.danger} onPress={onBlock} />
+                  <ActionBtn label="Delete" color={palette.danger} onPress={onDelete} />
+                </>
               )}
               <ActionBtn label="Reset devices" color={palette.danger} onPress={onWipeDevices} />
             </>

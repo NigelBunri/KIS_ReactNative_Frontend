@@ -1314,6 +1314,9 @@ export default function PartnersScreen({ setHidNav, onOpenInfo }: any) {
             onSearch={adminUsers.search}
             onBan={adminUsers.banUser}
             onUnban={adminUsers.unbanUser}
+            onBlock={adminUsers.blockUser}
+            onDelete={adminUsers.deleteUser}
+            onRestore={adminUsers.restoreUser}
             onSetTier={adminUsers.setUserTier}
             onWipeDevices={adminUsers.wipeUserDevices}
             onLoadPage={(p) => { adminUsers.setPage(p); void adminUsers.load({ p }); }}
