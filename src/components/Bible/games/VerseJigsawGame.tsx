@@ -18,14 +18,14 @@ import GameShell from './GameShell';
 import { StageComplete } from './GameFeedback';
 import { getVerseText } from '../../../screens/tabs/bible/games/verseText';
 import {
-  completeCurrentStage,
-  getCurrentStageVerses,
-  recordScore,
+  finishStage,
+  getStageVerses,
   STAGES_PER_GAME,
-  type GameKey,
+  type StageOutcome,
   type VerseRef,
 } from '../../../screens/tabs/bible/games/gameStorage';
 import { GAME_METADATA } from '../../../screens/tabs/bible/games/gameMetadata';
+import type { GameScreenProps } from '../../../screens/tabs/bible/games/gameScreenTypes';
 
 const ROUNDS_PER_STAGE = 6;
 const MIN_CHUNKS = 3;
@@ -83,7 +83,7 @@ function buildRound(stageVerses: VerseRef[]): { ref: VerseRef; correctOrder: Chu
   return { ref: picked.ref, correctOrder, tray: shuffle(correctOrder) };
 }
 
-export default function VerseJigsawGame({ gameKey, onExit, onOpenStats }: { gameKey: GameKey; onExit: () => void; onOpenStats: () => void }) {
+export default function VerseJigsawGame({ gameKey, stageIndex, isReplay, onExit, onOpenStats }: GameScreenProps) {
   const { palette } = useKISTheme();
   const meta = GAME_METADATA[gameKey];
   const [stageVerses, setStageVerses] = useState<VerseRef[] | null>(null);
@@ -94,13 +94,13 @@ export default function VerseJigsawGame({ gameKey, onExit, onOpenStats }: { game
   const [placed, setPlaced] = useState<Chunk[]>([]);
   const [submitted, setSubmitted] = useState(false);
   const [score, setScore] = useState(0);
-  const [stageResult, setStageResult] = useState<{ stagesCompleted: number; isFinalStage: boolean } | null>(null);
+  const [stageResult, setStageResult] = useState<StageOutcome | null>(null);
 
   useEffect(() => {
     let active = true;
-    getCurrentStageVerses(gameKey).then((verses) => { if (active) setStageVerses(verses); });
+    getStageVerses(gameKey, stageIndex).then((verses) => { if (active) setStageVerses(verses); });
     return () => { active = false; };
-  }, [gameKey]);
+  }, [gameKey, stageIndex]);
 
   const setupRound = useCallback((verses: VerseRef[]) => {
     const round = buildRound(verses);
@@ -145,9 +145,8 @@ export default function VerseJigsawGame({ gameKey, onExit, onOpenStats }: { game
   const handleNext = async () => {
     const nextRound = roundIndex + 1;
     if (nextRound >= ROUNDS_PER_STAGE) {
-      await recordScore(gameKey, score);
-      const progress = await completeCurrentStage(gameKey);
-      setStageResult({ stagesCompleted: progress.stagesCompleted, isFinalStage: progress.stagesCompleted >= STAGES_PER_GAME });
+      const outcome = await finishStage(gameKey, stageIndex, score);
+      setStageResult(outcome);
       return;
     }
     setRoundIndex(nextRound);
@@ -160,17 +159,18 @@ export default function VerseJigsawGame({ gameKey, onExit, onOpenStats }: { game
           <StageComplete
             gameTitle={meta.title}
             scoreLine={`${score} / ${ROUNDS_PER_STAGE} correct this stage`}
-            stagesCompleted={stageResult.stagesCompleted}
+            stageNumber={stageIndex + 1}
             totalStages={STAGES_PER_GAME}
             isFinalStage={stageResult.isFinalStage}
-            onContinue={() => {
+            isReplay={!stageResult.isNewCompletion}
+            onPlayAgain={() => {
               setStageResult(null);
               setRoundIndex(0);
               setScore(0);
-              getCurrentStageVerses(gameKey).then(setStageVerses);
+              getStageVerses(gameKey, stageIndex).then(setStageVerses);
             }}
+            onBackToJourney={onExit}
             onViewStats={onOpenStats}
-            onExit={onExit}
           />
         </View>
       </GameShell>
@@ -188,7 +188,7 @@ export default function VerseJigsawGame({ gameKey, onExit, onOpenStats }: { game
   return (
     <GameShell
       title={meta.title}
-      subtitle={`Round ${roundIndex + 1} of ${ROUNDS_PER_STAGE}`}
+      subtitle={`${isReplay ? 'Replay · ' : ''}Round ${roundIndex + 1} of ${ROUNDS_PER_STAGE}`}
       onBack={onExit}
       rightStat={{ label: 'Score', value: score }}
     >

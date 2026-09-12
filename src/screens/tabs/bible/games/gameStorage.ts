@@ -23,6 +23,7 @@ const KEY_BEST_SCORES = `${KEY_PREFIX}best_scores`;
 const KEY_MISSED_WORDS = `${KEY_PREFIX}missed_words`; // Complete the Verse's light spaced-repetition weighting
 const KEY_PARTITION_STATE = `${KEY_PREFIX}partition_state`;
 const KEY_GAME_PROGRESS = `${KEY_PREFIX}game_progress`;
+const KEY_STAGE_SCORES = `${KEY_PREFIX}stage_scores`; // per-stage best score, for the journey map's replay-to-improve UI
 
 // Order here fixes each game's position in the verse partition
 // (versePartition.ts assigns Bible content by numeric gameIndex, 0-29) -
@@ -146,12 +147,32 @@ export type PartitionState = {
   timesCompletedBible: number;
 };
 
+// Concurrent callers before a seed has ever been persisted (e.g. the hub and
+// a journey screen both mounting around the very first app launch, both
+// touching partition state before either write lands) must not each
+// generate and write their OWN seed - whichever write happened to land last
+// would silently become "the" seed, while calls already in flight against
+// an earlier generated-but-never-persisted seed would keep computing
+// partitions for content that was never actually saved, handing out
+// verses from a different game/stage bucket than what every other caller
+// sees. All concurrent creators share this one in-flight promise instead;
+// cleared once it resolves so a later legitimate reseed (resetAndReshuffle,
+// or a cleared store in tests) isn't stuck replaying a stale creation.
+let partitionStateInitPromise: Promise<PartitionState> | null = null;
+
 async function getOrCreatePartitionState(): Promise<PartitionState> {
   const existing = await readJson<PartitionState | null>(KEY_PARTITION_STATE, null);
   if (existing?.seed) return existing;
-  const fresh: PartitionState = { seed: generateSeed(), timesCompletedBible: 0 };
-  await writeJson(KEY_PARTITION_STATE, fresh);
-  return fresh;
+  if (!partitionStateInitPromise) {
+    partitionStateInitPromise = (async () => {
+      const fresh: PartitionState = { seed: generateSeed(), timesCompletedBible: 0 };
+      await writeJson(KEY_PARTITION_STATE, fresh);
+      return fresh;
+    })().finally(() => {
+      partitionStateInitPromise = null;
+    });
+  }
+  return partitionStateInitPromise;
 }
 
 export async function getPartitionState(): Promise<PartitionState> {
@@ -207,54 +228,185 @@ export async function areAllGamesCompleted(): Promise<boolean> {
   return ALL_GAME_KEYS.every((key) => isGameCompleted(all[key] ?? DEFAULT_GAME_STAGE_PROGRESS));
 }
 
-/** The verses assigned to a game's CURRENT stage, resolved from the stored
- * seed + that game's stored progress. This is the one function every game
- * screen should call to get its playable content - never read
- * versePartition.ts directly, so the stage-pinning behavior in
- * isGameCompleted/completeCurrentStage stays the single source of truth. */
-export async function getCurrentStageVerses(game: GameKey): Promise<VerseRef[]> {
-  const [state, progress] = await Promise.all([getOrCreatePartitionState(), getGameProgress(game)]);
+/** The verses assigned to one specific stage (0-9) of a game, resolved from
+ * the stored seed - never read versePartition.ts directly from a game
+ * screen, so this stays the single source of truth for "what content does
+ * stage N carry." Used both for playing forward (stage === currentStage)
+ * and for replaying an already-completed stage from the journey map -
+ * replay reads exactly the same verses the player originally cleared,
+ * since the partition is a pure function of the seed and never reshuffles
+ * until every game is fully complete (see resetAndReshuffle). */
+export async function getStageVerses(game: GameKey, stageIndex: number): Promise<VerseRef[]> {
+  const state = await getOrCreatePartitionState();
   const partition = getPartitionForSeed(state.seed);
   const gameIndex = ALL_GAME_KEYS.indexOf(game);
-  return partition.games[gameIndex]?.stages[progress.currentStage]?.verses ?? [];
+  const clamped = Math.max(0, Math.min(STAGES_PER_GAME - 1, stageIndex));
+  return partition.games[gameIndex]?.stages[clamped]?.verses ?? [];
+}
+
+/** The verses assigned to a game's CURRENT stage. Thin wrapper over
+ * getStageVerses for the common "just play whatever I'm on" case. */
+export async function getCurrentStageVerses(game: GameKey): Promise<VerseRef[]> {
+  const progress = await getGameProgress(game);
+  return getStageVerses(game, progress.currentStage);
+}
+
+// ─── Per-stage best scores (journey map "replay to improve" + stats) ──────
+// Separate from getBestScores' single all-time-best-across-every-play
+// number (kept as-is, unchanged, for backward compatibility with existing
+// stats screens) - this tracks a best PER STAGE so the journey map can show
+// "your best on Stage 4 was 8/10" on a stage the player revisits long after
+// moving on. Like every other number in this file, never cleared by
+// resetAndReshuffle - an all-time personal-best record, same philosophy as
+// getBestScores, even though a reshuffle changes what content that stage
+// slot carries next.
+
+export type StageScores = Partial<Record<GameKey, Partial<Record<number, number>>>>;
+
+async function readAllStageScores(): Promise<StageScores> {
+  return readJson<StageScores>(KEY_STAGE_SCORES, {});
+}
+
+export async function getStageScores(game: GameKey): Promise<Partial<Record<number, number>>> {
+  const all = await readAllStageScores();
+  return all[game] ?? {};
+}
+
+export async function recordStageScore(game: GameKey, stageIndex: number, score: number): Promise<void> {
+  const all = await readAllStageScores();
+  const gameScores = all[game] ?? {};
+  const existing = gameScores[stageIndex];
+  const next: StageScores = { ...all, [game]: { ...gameScores, [stageIndex]: Math.max(existing ?? 0, score) } };
+  await writeJson(KEY_STAGE_SCORES, next);
+}
+
+// ─── Journey map data (one call per game's journey screen) ────────────────
+
+export type StageStatus = 'completed' | 'current' | 'locked';
+
+export type StageDescriptor = {
+  index: number; // 0-9
+  status: StageStatus;
+  verseCount: number;
+  bestScore: number | null;
+};
+
+/** Everything a game's bespoke journey screen needs to render its 10 nodes:
+ * which are completed (tappable, replayable), which one is current
+ * (tappable, the only one that can still advance progress), and which are
+ * locked (not tappable - reaching them requires clearing every stage before
+ * them first, in order). */
+export async function getGameStageDescriptors(game: GameKey): Promise<StageDescriptor[]> {
+  const [state, progress, stageScores] = await Promise.all([
+    getOrCreatePartitionState(),
+    getGameProgress(game),
+    getStageScores(game),
+  ]);
+  const partition = getPartitionForSeed(state.seed);
+  const gamePartition = partition.games[ALL_GAME_KEYS.indexOf(game)];
+  return Array.from({ length: STAGES_PER_GAME }, (_, index) => {
+    // Order matters: a fully-completed game pins currentStage at the final
+    // index (see completeCurrentStage), so "completed" must be checked
+    // before "current" or the last stage would wrongly show as still-active.
+    const status: StageStatus =
+      index < progress.stagesCompleted ? 'completed' : index === progress.currentStage ? 'current' : 'locked';
+    return {
+      index,
+      status,
+      verseCount: gamePartition?.stages[index]?.verses.length ?? 0,
+      bestScore: stageScores[index] ?? null,
+    };
+  });
+}
+
+export type StageOutcome = {
+  stagesCompleted: number;
+  isFinalStage: boolean;
+  /** False when this call was a replay of an already-completed stage (or a
+   * no-op on a locked one) - only a fresh forward-completion advances the
+   * journey and deserves the "Stage complete!" progression framing instead
+   * of a plain "nice score" one. */
+  isNewCompletion: boolean;
+};
+
+/** The ONE function every game screen calls when a round of `stageIndex`
+ * finishes - replaces calling recordScore + completeCurrentStage directly.
+ * Handles all three cases a journey-map-driven game can hit:
+ *   - stageIndex is the game's current, not-yet-completed stage: records
+ *     the stage score AND advances progress (the original "forward play"
+ *     behavior every one of the first 13 games already had).
+ *   - stageIndex is an already-completed stage (replay from the journey
+ *     map): only updates that stage's best score - progress/currentStage
+ *     never move, so replaying an early stage can never re-trigger
+ *     "advance" or double-count towards completion.
+ *   - stageIndex is locked (> currentStage): a defense-in-depth no-op:
+ *     the journey map's own UI must never let a locked node be entered in
+ *     the first place, but this guarantees a bypass attempt still can't
+ *     write bogus progress even if one ever slipped through. */
+export async function finishStage(game: GameKey, stageIndex: number, score: number): Promise<StageOutcome> {
+  const progress = await getGameProgress(game);
+  const isLocked = stageIndex > progress.currentStage;
+  if (isLocked) {
+    return { stagesCompleted: progress.stagesCompleted, isFinalStage: isGameCompleted(progress), isNewCompletion: false };
+  }
+
+  await recordStageScore(game, stageIndex, score);
+
+  const isForwardPlay = stageIndex === progress.currentStage && !isGameCompleted(progress);
+  if (!isForwardPlay) {
+    return { stagesCompleted: progress.stagesCompleted, isFinalStage: isGameCompleted(progress), isNewCompletion: false };
+  }
+
+  await recordScore(game, score); // keep the legacy all-time best/playCount aggregate in sync
+  const next = await completeCurrentStage(game);
+  return { stagesCompleted: next.stagesCompleted, isFinalStage: isGameCompleted(next), isNewCompletion: true };
 }
 
 // ─── Verse Vault deck (SM-2-lite state per verse) ──────────────────────────
 // Unlike the other 29 games, Verse Vault's "round" isn't a fixed-length
-// batch — it's a spaced-repetition deck. Tying that deck to the current
-// stage (reseeded whenever the stage advances, same as every other game's
-// content) keeps it consistent with "completing this stage covers these
-// verses" instead of drifting into a separate, unbounded curated pool.
+// batch — it's a spaced-repetition deck, one per stage (reviewing an old
+// stage's deck again from the journey map is exactly the "keep it fresh"
+// use case spaced repetition is for, so - unlike a discrete quiz round -
+// there's real value in Verse Vault supporting replay the same as every
+// other game, not just its current stage).
 
 export type VaultDeck = Record<string, SrsCardState>; // keyed by `${bookName}-${chapter}-${verse}`
 
-type VaultDeckState = { stageIndex: number; deck: VaultDeck };
+type VaultDecksByStage = Record<number, VaultDeck>;
 
-/** Returns the deck for verse-vault's CURRENT stage, seeding one fresh
- * (one card per verse in the stage) the first time this stage is played or
- * whenever the stored deck belongs to a now-superseded stage. */
-export async function getOrSeedVaultDeck(): Promise<{ deck: VaultDeck; stageVerses: VerseRef[] }> {
-  const [progress, stageVerses] = await Promise.all([
-    getGameProgress('verse-vault'),
-    getCurrentStageVerses('verse-vault'),
-  ]);
-  const existing = await readJson<VaultDeckState | null>(KEY_VAULT_DECK, null);
-  if (existing && existing.stageIndex === progress.currentStage) {
-    return { deck: existing.deck, stageVerses };
+// Pre-journey-map shape: a single { stageIndex, deck } tied to whatever
+// stage happened to be "current" - migrated in place, best-effort, the
+// first time it's read after the per-stage map replaced it.
+type LegacyVaultDeckState = { stageIndex: number; deck: VaultDeck };
+
+async function readVaultDecks(): Promise<VaultDecksByStage> {
+  const raw = await readJson<VaultDecksByStage | LegacyVaultDeckState | null>(KEY_VAULT_DECK, null);
+  if (!raw) return {};
+  if ('stageIndex' in raw && 'deck' in raw) {
+    return { [raw.stageIndex]: raw.deck };
   }
+  return raw;
+}
+
+/** Returns the deck for one specific stage, seeding one fresh (one card per
+ * verse in that stage) the first time it's requested. */
+export async function getOrSeedVaultDeck(stageIndex: number): Promise<{ deck: VaultDeck; stageVerses: VerseRef[] }> {
+  const [stageVerses, decks] = await Promise.all([getStageVerses('verse-vault', stageIndex), readVaultDecks()]);
+  const existing = decks[stageIndex];
+  if (existing) return { deck: existing, stageVerses };
 
   const deck: VaultDeck = {};
   for (const ref of stageVerses) {
     const id = vaultCardId(ref);
     deck[id] = newCardState(id);
   }
-  await writeJson(KEY_VAULT_DECK, { stageIndex: progress.currentStage, deck });
+  await writeJson(KEY_VAULT_DECK, { ...decks, [stageIndex]: deck });
   return { deck, stageVerses };
 }
 
-export async function saveVaultDeck(deck: VaultDeck): Promise<void> {
-  const progress = await getGameProgress('verse-vault');
-  await writeJson(KEY_VAULT_DECK, { stageIndex: progress.currentStage, deck });
+export async function saveVaultDeck(stageIndex: number, deck: VaultDeck): Promise<void> {
+  const decks = await readVaultDecks();
+  await writeJson(KEY_VAULT_DECK, { ...decks, [stageIndex]: deck });
 }
 
 export function vaultCardId(ref: VerseRef): string {

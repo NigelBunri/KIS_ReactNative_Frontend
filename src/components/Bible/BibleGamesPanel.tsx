@@ -8,13 +8,15 @@
 // chain this replaced — that pattern was fine for 6 games and would not
 // have scaled to 30. GAME_REGISTRY is a Record<GameKey, GameDefinition>
 // keyed the same way every other lookup in this feature is (gameStorage.ts,
-// versePartition.ts). Built games are React.lazy-loaded (no existing lazy-
-// loading precedent elsewhere in this codebase — first use of the pattern
-// here, deliberately, since eagerly importing all 30 game screens into this
-// one hub's import graph does not scale even though it would still "work"
-// today with only 9 real components); not-yet-built games have
-// `Component: null` and render a plain "Coming soon" card instead of
-// crashing into a blank screen.
+// versePartition.ts). All 30 games are now built and React.lazy-loaded (no
+// existing lazy-loading precedent elsewhere in this codebase — first use of
+// the pattern here, deliberately, since eagerly importing all 30 game
+// screens into this one hub's import graph would bloat the initial bundle
+// even with every screen shipped). `Component: null` is kept as a supported
+// state in the type/registry (not deleted along with the last `null` entry)
+// so a future 31st game can land the same way these did — metadata first,
+// "Coming soon" card, then wired in once built — without another refactor
+// of this file's shape.
 //
 // Fully offline, always: every game reads from the bundled kjv.json (see
 // screens/tabs/bible/games/), never a network call. All games use the King
@@ -40,10 +42,11 @@ import {
   type GameKey,
 } from '../../screens/tabs/bible/games/gameStorage';
 import { GAME_METADATA } from '../../screens/tabs/bible/games/gameMetadata';
+import type { GameScreenProps } from '../../screens/tabs/bible/games/gameScreenTypes';
 import BibleGameStatsScreen from './games/BibleGameStatsScreen';
 import BibleGamesOverallStatsScreen from './games/BibleGamesOverallStatsScreen';
+import GameJourneyScreen from './games/journey/GameJourneyScreen';
 
-type GameScreenProps = { gameKey: GameKey; onExit: () => void; onOpenStats: () => void };
 type LazyGameComponent = React.LazyExoticComponent<React.ComponentType<GameScreenProps>>;
 
 export type GameDefinition = {
@@ -68,37 +71,42 @@ const GAME_COMPONENTS: Record<GameKey, LazyGameComponent | null> = {
   'scripture-trivia': React.lazy(() => import('./games/ScriptureTriviaGame')),
   'verse-vault': React.lazy(() => import('./games/VerseVaultGame')),
   'word-weave': React.lazy(() => import('./games/WordWeaveGame')),
-  'verse-race': null,
-  'chapter-scroll': null,
-  'flash-recall': null,
-  'first-letters': null,
+  'verse-race': React.lazy(() => import('./games/VerseRaceGame')),
+  'chapter-scroll': React.lazy(() => import('./games/ChapterScrollGame')),
+  'flash-recall': React.lazy(() => import('./games/FlashRecallGame')),
+  'first-letters': React.lazy(() => import('./games/FirstLettersGame')),
   'verse-jigsaw': React.lazy(() => import('./games/VerseJigsawGame')),
-  'punctuation-restore': null,
-  'letter-fill': null,
+  'punctuation-restore': React.lazy(() => import('./games/PunctuationRestoreGame')),
+  'letter-fill': React.lazy(() => import('./games/LetterFillGame')),
   'reference-rally': React.lazy(() => import('./games/ReferenceRallyGame')),
   'verse-locator': React.lazy(() => import('./games/VerseLocatorGame')),
   'chapter-sprint': React.lazy(() => import('./games/ChapterSprintGame')),
   'book-detective': React.lazy(() => import('./games/BookDetectiveGame')),
   'sequence-chain': React.lazy(() => import('./games/SequenceChainGame')),
-  'name-place-match': null,
-  'keyword-sort': null,
+  'name-place-match': React.lazy(() => import('./games/NamePlaceMatchGame')),
+  'keyword-sort': React.lazy(() => import('./games/KeywordSortGame')),
   'count-challenge': React.lazy(() => import('./games/CountChallengeGame')),
-  'verse-pairs': null,
-  'who-said-it': null,
-  'cross-reference-connect': null,
-  'listen-and-tap': null,
-  'audio-dictation': null,
-  'verse-crossword': null,
-  'word-search': null,
-  'anagram-unscramble': null,
-  'verse-ladder': null,
+  'verse-pairs': React.lazy(() => import('./games/VersePairsGame')),
+  'who-said-it': React.lazy(() => import('./games/WhoSaidItGame')),
+  'cross-reference-connect': React.lazy(() => import('./games/CrossReferenceConnectGame')),
+  'listen-and-tap': React.lazy(() => import('./games/ListenAndTapGame')),
+  'audio-dictation': React.lazy(() => import('./games/AudioDictationGame')),
+  'verse-crossword': React.lazy(() => import('./games/VerseCrosswordGame')),
+  'word-search': React.lazy(() => import('./games/WordSearchGame')),
+  'anagram-unscramble': React.lazy(() => import('./games/AnagramUnscrambleGame')),
+  'verse-ladder': React.lazy(() => import('./games/VerseLadderGame')),
 };
 
 const GAME_REGISTRY: Record<GameKey, GameDefinition> = Object.fromEntries(
   ALL_GAME_KEYS.map((key) => [key, { ...GAME_METADATA[key], Component: GAME_COMPONENTS[key] }]),
 ) as Record<GameKey, GameDefinition>;
 
-type ActiveView = { type: 'game'; key: GameKey } | { type: 'game-stats'; key: GameKey } | { type: 'overall-stats' } | null;
+type ActiveView =
+  | { type: 'journey'; key: GameKey }
+  | { type: 'game'; key: GameKey; stageIndex: number; isReplay: boolean }
+  | { type: 'game-stats'; key: GameKey }
+  | { type: 'overall-stats' }
+  | null;
 
 export default function BibleGamesPanel() {
   const { palette } = useKISTheme();
@@ -115,12 +123,28 @@ export default function BibleGamesPanel() {
 
   useEffect(() => { refresh(); }, [refresh]);
 
-  const handleExitGame = () => {
-    setActive(null);
-    refresh(); // refresh best-score/stage chips with whatever the round just recorded
+  // A finished round returns to the game's OWN journey map, not the hub -
+  // the player should immediately see the stage they just cleared light up
+  // and the next one unlock, not lose that context by bouncing all the way
+  // back out (see GameJourneyScreen.tsx / the product spec's "completing a
+  // level should naturally lead the player toward the next one").
+  const handleExitToJourney = (key: GameKey) => {
+    setActive({ type: 'journey', key });
+    refresh(); // keep the hub's own stage/best chips in sync for whenever the player does back out
   };
 
   const games = useMemo(() => ALL_GAME_KEYS.map((key) => GAME_REGISTRY[key]), []);
+
+  if (active?.type === 'journey') {
+    return (
+      <GameJourneyScreen
+        gameKey={active.key}
+        onExit={() => { setActive(null); refresh(); }}
+        onOpenStats={() => setActive({ type: 'game-stats', key: active.key })}
+        onEnterStage={(stageIndex, isReplay) => setActive({ type: 'game', key: active.key, stageIndex, isReplay })}
+      />
+    );
+  }
 
   if (active?.type === 'game') {
     const def = GAME_REGISTRY[active.key];
@@ -144,7 +168,9 @@ export default function BibleGamesPanel() {
       <Suspense fallback={<View style={[styles.center, { backgroundColor: palette.bg }]}><ActivityIndicator color={palette.primary} /></View>}>
         <GameComponent
           gameKey={active.key}
-          onExit={handleExitGame}
+          stageIndex={active.stageIndex}
+          isReplay={active.isReplay}
+          onExit={() => handleExitToJourney(active.key)}
           onOpenStats={() => setActive({ type: 'game-stats', key: active.key })}
         />
       </Suspense>
@@ -195,7 +221,7 @@ export default function BibleGamesPanel() {
             <Pressable
               key={game.key}
               disabled={comingSoon}
-              onPress={() => setActive({ type: 'game', key: game.key })}
+              onPress={() => setActive({ type: 'journey', key: game.key })}
               style={{ width: columns === 1 ? '100%' : `${100 / columns - 2}%`, opacity: comingSoon ? 0.55 : 1 }}
             >
               <BibleSectionCard style={styles.gameCard}>

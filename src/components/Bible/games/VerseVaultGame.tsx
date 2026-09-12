@@ -25,18 +25,18 @@ import GameShell from './GameShell';
 import { StageComplete } from './GameFeedback';
 import { getVerseText } from '../../../screens/tabs/bible/games/verseText';
 import {
-  completeCurrentStage,
+  finishStage,
   getOrSeedVaultDeck,
   saveVaultDeck,
   vaultCardId,
   STAGES_PER_GAME,
-  recordScore,
-  type GameKey,
+  type StageOutcome,
   type VaultDeck,
   type VerseRef,
 } from '../../../screens/tabs/bible/games/gameStorage';
 import { dueCards, reviewCard, type SrsCardState, type SrsRating } from '../../../screens/tabs/bible/games/srs';
 import { GAME_METADATA } from '../../../screens/tabs/bible/games/gameMetadata';
+import type { GameScreenProps } from '../../../screens/tabs/bible/games/gameScreenTypes';
 
 type Mode = 'loading' | 'menu' | 'reviewing' | 'sessionComplete';
 
@@ -47,7 +47,7 @@ const RATING_CONFIG: { rating: SrsRating; label: string; color: string; points: 
   { rating: 'easy', label: 'Easy', color: '#2563eb', points: 3 },
 ];
 
-export default function VerseVaultGame({ gameKey, onExit, onOpenStats }: { gameKey: GameKey; onExit: () => void; onOpenStats: () => void }) {
+export default function VerseVaultGame({ gameKey, stageIndex, isReplay, onExit, onOpenStats }: GameScreenProps) {
   const { palette } = useKISTheme();
   const meta = GAME_METADATA[gameKey];
   const [mode, setMode] = useState<Mode>('loading');
@@ -58,16 +58,16 @@ export default function VerseVaultGame({ gameKey, onExit, onOpenStats }: { gameK
   const [revealed, setRevealed] = useState(false);
   const [sessionReviewed, setSessionReviewed] = useState(0);
   const [sessionScore, setSessionScore] = useState(0);
-  const [stageResult, setStageResult] = useState<{ stagesCompleted: number; isFinalStage: boolean } | null>(null);
+  const [stageResult, setStageResult] = useState<StageOutcome | null>(null);
 
   const load = useCallback(async () => {
-    const { deck: freshDeck, stageVerses } = await getOrSeedVaultDeck();
+    const { deck: freshDeck, stageVerses } = await getOrSeedVaultDeck(stageIndex);
     setDeck(freshDeck);
     const byId: Record<string, VerseRef> = {};
     for (const ref of stageVerses) byId[vaultCardId(ref)] = ref;
     setStageVerseById(byId);
     setMode('menu');
-  }, []);
+  }, [stageIndex]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -92,7 +92,7 @@ export default function VerseVaultGame({ gameKey, onExit, onOpenStats }: { gameK
     const updatedCard = reviewCard(currentCard, rating);
     const nextDeck = { ...deck, [updatedCard.verseId]: updatedCard };
     setDeck(nextDeck);
-    await saveVaultDeck(nextDeck);
+    await saveVaultDeck(stageIndex, nextDeck);
     setSessionReviewed((n) => n + 1);
     const finalScore = sessionScore + points;
     setSessionScore(finalScore);
@@ -102,9 +102,8 @@ export default function VerseVaultGame({ gameKey, onExit, onOpenStats }: { gameK
 
     if (nextIndex >= queue.length) {
       if (allReviewedNow) {
-        await recordScore(gameKey, finalScore);
-        const progress = await completeCurrentStage(gameKey);
-        setStageResult({ stagesCompleted: progress.stagesCompleted, isFinalStage: progress.stagesCompleted >= STAGES_PER_GAME });
+        const outcome = await finishStage(gameKey, stageIndex, finalScore);
+        setStageResult(outcome);
       } else {
         setMode('sessionComplete');
       }
@@ -131,16 +130,17 @@ export default function VerseVaultGame({ gameKey, onExit, onOpenStats }: { gameK
           <StageComplete
             gameTitle={meta.title}
             scoreLine={`${totalCards} ${totalCards === 1 ? 'verse' : 'verses'} reviewed at least once`}
-            stagesCompleted={stageResult.stagesCompleted}
+            stageNumber={stageIndex + 1}
             totalStages={STAGES_PER_GAME}
             isFinalStage={stageResult.isFinalStage}
-            onContinue={() => {
+            isReplay={!stageResult.isNewCompletion}
+            onPlayAgain={() => {
               setStageResult(null);
               setMode('loading');
               load();
             }}
+            onBackToJourney={onExit}
             onViewStats={onOpenStats}
-            onExit={onExit}
           />
         </View>
       </GameShell>
@@ -179,7 +179,7 @@ export default function VerseVaultGame({ gameKey, onExit, onOpenStats }: { gameK
     return (
       <GameShell
         title={meta.title}
-        subtitle={`Card ${queueIndex + 1} of ${queue.length}`}
+        subtitle={`${isReplay ? 'Replay · ' : ''}Card ${queueIndex + 1} of ${queue.length}`}
         onBack={onExit}
         rightStat={{ label: 'Reviewed', value: sessionReviewed }}
       >

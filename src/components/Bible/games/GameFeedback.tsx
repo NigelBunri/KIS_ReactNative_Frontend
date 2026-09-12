@@ -5,8 +5,8 @@
 // quiz already uses, kept consistent rather than inventing a second one),
 // and a round-complete summary card with play-again/back actions.
 
-import React from 'react';
-import { StyleSheet, Text, View, Pressable } from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import { Animated, StyleSheet, Text, View, Pressable } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import { useKISTheme } from '@/theme/useTheme';
 import { KISIcon } from '@/constants/kisIcons';
@@ -24,65 +24,82 @@ export function AnswerFeedback({ correct, text }: { correct: boolean; text: stri
   );
 }
 
-/** Stage-aware completion card for the 30-game stage/partition system - the
- * "Play Again" framing RoundComplete uses doesn't fit here, since a
- * completed stage should advance to the NEXT slice of Scripture, not replay
- * the same one. Shows the real "X of 10" progress and switches to a
- * whole-game completion message once the final stage is done. */
+/** Stage-aware completion card shared by all 30 games - the ONE place a
+ * round's ending is presented, for both of the journey map's two entry
+ * modes (see gameStorage.ts's finishStage / BibleGamesPanel's ActiveView):
+ *   - forward play (isReplay=false): the current stage was just cleared for
+ *     the first time, progress advanced - "Stage N of 10 complete" (or the
+ *     whole-game "{gameTitle} complete!" framing on the final stage).
+ *   - replay (isReplay=true): an already-completed stage was played again
+ *     to improve its score - "Stage N replayed", progress untouched.
+ * Always offers the same two actions regardless of mode: Play Again (retry
+ * this exact stage, same verses) and Continue Journey (back to the journey
+ * map, where the newly-lit node and newly-unlocked next node are the real
+ * "what's next" - see GameJourneyScreen.tsx), rather than duplicating that
+ * progression logic here in 30 different call sites. */
 export function StageComplete({
   gameTitle,
   scoreLine,
-  stagesCompleted,
+  stageNumber,
   totalStages,
   isFinalStage,
-  onContinue,
+  isReplay = false,
+  onPlayAgain,
+  onBackToJourney,
   onViewStats,
-  onExit,
 }: {
   gameTitle: string;
   scoreLine: string;
-  stagesCompleted: number;
+  stageNumber: number; // 1-based
   totalStages: number;
   isFinalStage: boolean;
-  onContinue: () => void;
-  onViewStats: () => void;
-  onExit: () => void;
+  isReplay?: boolean;
+  onPlayAgain: () => void;
+  onBackToJourney: () => void;
+  onViewStats?: () => void;
 }) {
   const { palette } = useKISTheme();
   const metallicGold = [palette.royalInk, palette.goldDeep, palette.gold, palette.goldDeep];
+  const scale = useRef(new Animated.Value(0.6)).current;
+
+  useEffect(() => {
+    Animated.spring(scale, { toValue: 1, friction: 5, tension: 60, useNativeDriver: true }).start();
+  }, [scale]);
+
+  const title = isFinalStage && !isReplay
+    ? `${gameTitle} complete!`
+    : isReplay
+      ? `Stage ${stageNumber} replayed`
+      : `Stage ${stageNumber} of ${totalStages} complete`;
 
   return (
     <View style={[styles.completeCard, { backgroundColor: palette.card }]}>
-      <View style={[styles.trophyCircle, { backgroundColor: palette.selectedBg }]}>
+      <Animated.View style={[styles.trophyCircle, { backgroundColor: palette.selectedBg, transform: [{ scale }] }]}>
         <KISIcon name="trophy" size={30} color={palette.goldReadable} />
-      </View>
-      <Text style={[styles.completeTitle, { color: palette.text }]}>
-        {isFinalStage ? `${gameTitle} complete!` : `Stage ${stagesCompleted} of ${totalStages} complete`}
-      </Text>
+      </Animated.View>
+      <Text style={[styles.completeTitle, { color: palette.text }]}>{title}</Text>
       <Text style={[styles.completeScore, { color: palette.subtext }]}>{scoreLine}</Text>
-      {isFinalStage ? (
+      {isFinalStage && !isReplay ? (
         <Text style={[styles.completeScore, { color: palette.subtext, marginTop: -8 }]}>
           Every verse this game carries is done. Play the rest of the 30 games to cover the whole Bible.
         </Text>
       ) : null}
 
-      {isFinalStage ? (
-        <Pressable onPress={onViewStats} style={styles.primaryBtnWrap}>
-          <LinearGradient colors={metallicGold} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.primaryBtn}>
-            <Text style={[styles.primaryBtnText, { color: palette.ivory }]}>View Stats</Text>
-          </LinearGradient>
-        </Pressable>
-      ) : (
-        <Pressable onPress={onContinue} style={styles.primaryBtnWrap}>
-          <LinearGradient colors={metallicGold} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.primaryBtn}>
-            <Text style={[styles.primaryBtnText, { color: palette.ivory }]}>Next Stage</Text>
-          </LinearGradient>
-        </Pressable>
-      )}
-
-      <Pressable onPress={onExit} style={[styles.secondaryBtn, { borderColor: palette.selectedBg }]}>
-        <Text style={[styles.secondaryBtnText, { color: palette.text }]}>Back to Games</Text>
+      <Pressable onPress={onBackToJourney} style={styles.primaryBtnWrap}>
+        <LinearGradient colors={metallicGold} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.primaryBtn}>
+          <Text style={[styles.primaryBtnText, { color: palette.ivory }]}>Continue Journey</Text>
+        </LinearGradient>
       </Pressable>
+
+      <Pressable onPress={onPlayAgain} style={[styles.secondaryBtn, { borderColor: palette.selectedBg }]}>
+        <Text style={[styles.secondaryBtnText, { color: palette.text }]}>Play Again</Text>
+      </Pressable>
+
+      {isFinalStage && !isReplay && onViewStats ? (
+        <Pressable onPress={onViewStats} style={styles.statsLink} hitSlop={8}>
+          <Text style={{ color: palette.primary, fontWeight: '800', fontSize: 12 }}>View overall stats</Text>
+        </Pressable>
+      ) : null}
     </View>
   );
 }
@@ -167,4 +184,5 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   secondaryBtnText: { fontSize: 14, fontWeight: '800' },
+  statsLink: { marginTop: 12, padding: 4 },
 });

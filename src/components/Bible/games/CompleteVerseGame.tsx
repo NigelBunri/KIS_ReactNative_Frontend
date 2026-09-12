@@ -19,16 +19,16 @@ import GameShell from './GameShell';
 import { AnswerFeedback, StageComplete } from './GameFeedback';
 import { getVerseText, normalizeWord, tokenizeVerse } from '../../../screens/tabs/bible/games/verseText';
 import {
-  completeCurrentStage,
-  getCurrentStageVerses,
+  finishStage,
+  getStageVerses,
   getMissedWeights,
   recordVerseOutcome,
-  recordScore,
   STAGES_PER_GAME,
-  type GameKey,
+  type StageOutcome,
   type VerseRef,
 } from '../../../screens/tabs/bible/games/gameStorage';
 import { GAME_METADATA } from '../../../screens/tabs/bible/games/gameMetadata';
+import type { GameScreenProps } from '../../../screens/tabs/bible/games/gameScreenTypes';
 
 const ROUND_LENGTH = 10;
 const MIN_BLANK_WORD_LENGTH = 4; // skip blanking tiny connective words like "and"/"the"
@@ -101,7 +101,7 @@ function buildRound(stageVerses: VerseRef[], weights: Record<string, number>, ex
   return { verse, tokens, blankIndexes, choices, correctWords };
 }
 
-export default function CompleteVerseGame({ gameKey, onExit, onOpenStats }: { gameKey: GameKey; onExit: () => void; onOpenStats: () => void }) {
+export default function CompleteVerseGame({ gameKey, stageIndex, isReplay, onExit, onOpenStats }: GameScreenProps) {
   const { palette } = useKISTheme();
   const meta = GAME_METADATA[gameKey];
   const [stageVerses, setStageVerses] = useState<VerseRef[] | null>(null);
@@ -114,18 +114,18 @@ export default function CompleteVerseGame({ gameKey, onExit, onOpenStats }: { ga
   const [usedChoices, setUsedChoices] = useState<Set<number>>(new Set());
   const [submitted, setSubmitted] = useState(false);
   const [score, setScore] = useState(0);
-  const [stageResult, setStageResult] = useState<{ stagesCompleted: number; isFinalStage: boolean } | null>(null);
+  const [stageResult, setStageResult] = useState<StageOutcome | null>(null);
 
   useEffect(() => {
     let active = true;
-    Promise.all([getCurrentStageVerses(gameKey), getMissedWeights()]).then(([verses, w]) => {
+    Promise.all([getStageVerses(gameKey, stageIndex), getMissedWeights()]).then(([verses, w]) => {
       if (!active) return;
       setStageVerses(verses);
       setWeights(w);
       setWeightsLoaded(true);
     });
     return () => { active = false; };
-  }, [gameKey]);
+  }, [gameKey, stageIndex]);
 
   const startRound = useCallback((verses: VerseRef[], exclude: Set<string>, w: Record<string, number>) => {
     const next = buildRound(verses, w, exclude);
@@ -189,9 +189,8 @@ export default function CompleteVerseGame({ gameKey, onExit, onOpenStats }: { ga
     const nextIndex = roundIndex + 1;
     if (nextIndex >= ROUND_LENGTH) {
       setRoundIndex(nextIndex);
-      await recordScore(gameKey, score); // score already reflects this round's point, set by handleSubmit
-      const progress = await completeCurrentStage(gameKey);
-      setStageResult({ stagesCompleted: progress.stagesCompleted, isFinalStage: progress.stagesCompleted >= STAGES_PER_GAME });
+      const outcome = await finishStage(gameKey, stageIndex, score); // score already reflects this round's point, set by handleSubmit
+      setStageResult(outcome);
       return;
     }
     setRoundIndex(nextIndex);
@@ -205,19 +204,20 @@ export default function CompleteVerseGame({ gameKey, onExit, onOpenStats }: { ga
           <StageComplete
             gameTitle={meta.title}
             scoreLine={`${score} / ${ROUND_LENGTH} correct this stage`}
-            stagesCompleted={stageResult.stagesCompleted}
+            stageNumber={stageIndex + 1}
             totalStages={STAGES_PER_GAME}
             isFinalStage={stageResult.isFinalStage}
-            onContinue={() => {
+            isReplay={!stageResult.isNewCompletion}
+            onPlayAgain={() => {
               setStageResult(null);
               setRoundIndex(0);
               setSeenIds(new Set());
               setScore(0);
               setRound(null);
-              getCurrentStageVerses(gameKey).then(setStageVerses);
+              getStageVerses(gameKey, stageIndex).then(setStageVerses);
             }}
+            onBackToJourney={onExit}
             onViewStats={onOpenStats}
-            onExit={onExit}
           />
         </View>
       </GameShell>
@@ -235,7 +235,7 @@ export default function CompleteVerseGame({ gameKey, onExit, onOpenStats }: { ga
   return (
     <GameShell
       title={meta.title}
-      subtitle={`Verse ${roundIndex + 1} of ${ROUND_LENGTH}`}
+      subtitle={`${isReplay ? 'Replay · ' : ''}Verse ${roundIndex + 1} of ${ROUND_LENGTH}`}
       onBack={onExit}
       rightStat={{ label: 'Score', value: score }}
     >

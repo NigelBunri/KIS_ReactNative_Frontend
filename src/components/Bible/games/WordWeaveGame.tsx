@@ -26,14 +26,14 @@ import GameShell from './GameShell';
 import { StageComplete } from './GameFeedback';
 import { getVerseText, tokenizeVerse } from '../../../screens/tabs/bible/games/verseText';
 import {
-  completeCurrentStage,
-  getCurrentStageVerses,
-  recordScore,
+  finishStage,
+  getStageVerses,
   STAGES_PER_GAME,
-  type GameKey,
+  type StageOutcome,
   type VerseRef,
 } from '../../../screens/tabs/bible/games/gameStorage';
 import { GAME_METADATA } from '../../../screens/tabs/bible/games/gameMetadata';
+import type { GameScreenProps } from '../../../screens/tabs/bible/games/gameScreenTypes';
 
 const ROUND_LENGTH = 8;
 const MIN_WORDS = 5;
@@ -68,7 +68,7 @@ function buildPuzzle(verse: VerseRef) {
   return { words, tray: shuffle(tiles) };
 }
 
-export default function WordWeaveGame({ gameKey, onExit, onOpenStats }: { gameKey: GameKey; onExit: () => void; onOpenStats: () => void }) {
+export default function WordWeaveGame({ gameKey, stageIndex, isReplay, onExit, onOpenStats }: GameScreenProps) {
   const { palette } = useKISTheme();
   const meta = GAME_METADATA[gameKey];
   const [order, setOrder] = useState<VerseRef[] | null>(null);
@@ -78,15 +78,15 @@ export default function WordWeaveGame({ gameKey, onExit, onOpenStats }: { gameKe
   const [correctWords, setCorrectWords] = useState<string[]>([]);
   const [submitted, setSubmitted] = useState(false);
   const [score, setScore] = useState(0);
-  const [stageResult, setStageResult] = useState<{ stagesCompleted: number; isFinalStage: boolean } | null>(null);
+  const [stageResult, setStageResult] = useState<StageOutcome | null>(null);
 
   const loadRound = useCallback(async () => {
-    const stageVerses = await getCurrentStageVerses(gameKey);
+    const stageVerses = await getStageVerses(gameKey, stageIndex);
     const pool = eligibleVerses(stageVerses);
     setOrder(shuffle(pool).slice(0, ROUND_LENGTH));
     setRoundIndex(0);
     setScore(0);
-  }, [gameKey]);
+  }, [gameKey, stageIndex]);
 
   useEffect(() => { loadRound(); }, [loadRound]);
 
@@ -133,9 +133,8 @@ export default function WordWeaveGame({ gameKey, onExit, onOpenStats }: { gameKe
     if (!order) return;
     const nextIndex = roundIndex + 1;
     if (nextIndex >= order.length) {
-      await recordScore(gameKey, score); // score already reflects this round's point, set by handleSubmit
-      const progress = await completeCurrentStage(gameKey);
-      setStageResult({ stagesCompleted: progress.stagesCompleted, isFinalStage: progress.stagesCompleted >= STAGES_PER_GAME });
+      const outcome = await finishStage(gameKey, stageIndex, score); // score already reflects this round's point, set by handleSubmit
+      setStageResult(outcome);
       return;
     }
     setRoundIndex(nextIndex);
@@ -148,15 +147,16 @@ export default function WordWeaveGame({ gameKey, onExit, onOpenStats }: { gameKe
           <StageComplete
             gameTitle={meta.title}
             scoreLine={`${score} / ${order?.length ?? ROUND_LENGTH} correct this stage`}
-            stagesCompleted={stageResult.stagesCompleted}
+            stageNumber={stageIndex + 1}
             totalStages={STAGES_PER_GAME}
             isFinalStage={stageResult.isFinalStage}
-            onContinue={() => {
+            isReplay={!stageResult.isNewCompletion}
+            onPlayAgain={() => {
               setStageResult(null);
               loadRound();
             }}
+            onBackToJourney={onExit}
             onViewStats={onOpenStats}
-            onExit={onExit}
           />
         </View>
       </GameShell>
@@ -174,7 +174,7 @@ export default function WordWeaveGame({ gameKey, onExit, onOpenStats }: { gameKe
   return (
     <GameShell
       title={meta.title}
-      subtitle={`Verse ${roundIndex + 1} of ${order.length}`}
+      subtitle={`${isReplay ? 'Replay · ' : ''}Verse ${roundIndex + 1} of ${order.length}`}
       onBack={onExit}
       rightStat={{ label: 'Score', value: score }}
     >

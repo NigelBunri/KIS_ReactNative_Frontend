@@ -15,14 +15,14 @@ import GameShell from './GameShell';
 import { AnswerFeedback, StageComplete } from './GameFeedback';
 import { getVerseText } from '../../../screens/tabs/bible/games/verseText';
 import {
-  completeCurrentStage,
-  getCurrentStageVerses,
-  recordScore,
+  finishStage,
+  getStageVerses,
   STAGES_PER_GAME,
-  type GameKey,
+  type StageOutcome,
   type VerseRef,
 } from '../../../screens/tabs/bible/games/gameStorage';
 import { GAME_METADATA } from '../../../screens/tabs/bible/games/gameMetadata';
+import type { GameScreenProps } from '../../../screens/tabs/bible/games/gameScreenTypes';
 
 const ROUND_LENGTH = 10;
 const SECONDS_PER_QUESTION = 8;
@@ -59,7 +59,7 @@ function buildQuestions(stageVerses: VerseRef[]): Question[] {
   return shuffle(questions).slice(0, ROUND_LENGTH);
 }
 
-export default function ChapterSprintGame({ gameKey, onExit, onOpenStats }: { gameKey: GameKey; onExit: () => void; onOpenStats: () => void }) {
+export default function ChapterSprintGame({ gameKey, stageIndex, isReplay, onExit, onOpenStats }: GameScreenProps) {
   const { palette } = useKISTheme();
   const meta = GAME_METADATA[gameKey];
   const [round, setRound] = useState<Question[] | null>(null);
@@ -68,17 +68,17 @@ export default function ChapterSprintGame({ gameKey, onExit, onOpenStats }: { ga
   const [timedOut, setTimedOut] = useState(false);
   const [secondsLeft, setSecondsLeft] = useState(SECONDS_PER_QUESTION);
   const [score, setScore] = useState(0);
-  const [stageResult, setStageResult] = useState<{ stagesCompleted: number; isFinalStage: boolean } | null>(null);
+  const [stageResult, setStageResult] = useState<StageOutcome | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const loadRound = useCallback(async () => {
-    const verses = await getCurrentStageVerses(gameKey);
+    const verses = await getStageVerses(gameKey, stageIndex);
     setRound(buildQuestions(verses));
     setIndex(0);
     setSelected(null);
     setTimedOut(false);
     setScore(0);
-  }, [gameKey]);
+  }, [gameKey, stageIndex]);
 
   useEffect(() => { loadRound(); }, [loadRound]);
 
@@ -114,9 +114,8 @@ export default function ChapterSprintGame({ gameKey, onExit, onOpenStats }: { ga
     if (!round) return;
     const nextIndex = index + 1;
     if (nextIndex >= round.length) {
-      await recordScore(gameKey, score);
-      const progress = await completeCurrentStage(gameKey);
-      setStageResult({ stagesCompleted: progress.stagesCompleted, isFinalStage: progress.stagesCompleted >= STAGES_PER_GAME });
+      const outcome = await finishStage(gameKey, stageIndex, score);
+      setStageResult(outcome);
       return;
     }
     setIndex(nextIndex);
@@ -131,12 +130,13 @@ export default function ChapterSprintGame({ gameKey, onExit, onOpenStats }: { ga
           <StageComplete
             gameTitle={meta.title}
             scoreLine={`${score} / ${round?.length ?? ROUND_LENGTH} correct this stage`}
-            stagesCompleted={stageResult.stagesCompleted}
+            stageNumber={stageIndex + 1}
             totalStages={STAGES_PER_GAME}
             isFinalStage={stageResult.isFinalStage}
-            onContinue={() => { setStageResult(null); loadRound(); }}
+            isReplay={!stageResult.isNewCompletion}
+            onPlayAgain={() => { setStageResult(null); loadRound(); }}
+            onBackToJourney={onExit}
             onViewStats={onOpenStats}
-            onExit={onExit}
           />
         </View>
       </GameShell>
@@ -154,7 +154,7 @@ export default function ChapterSprintGame({ gameKey, onExit, onOpenStats }: { ga
   return (
     <GameShell
       title={meta.title}
-      subtitle={`Question ${index + 1} of ${round.length}`}
+      subtitle={`${isReplay ? 'Replay · ' : ''}Question ${index + 1} of ${round.length}`}
       onBack={onExit}
       rightStat={{ label: 'Score', value: score }}
     >

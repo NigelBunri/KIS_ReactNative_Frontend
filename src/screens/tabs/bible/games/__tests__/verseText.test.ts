@@ -1,4 +1,4 @@
-import { getVerseText, normalizeWord, tokenizeVerse } from '../verseText';
+import { extractCapitalizedWords, getChapterVerses, getVerseText, normalizeWord, tokenizeVerse } from '../verseText';
 import { CURATED_VERSES } from '../curatedVerses';
 
 describe('verseText', () => {
@@ -35,5 +35,38 @@ describe('verseText', () => {
   it('every curated verse reference is unique (no accidental id collisions)', () => {
     const ids = CURATED_VERSES.map((v) => v.id);
     expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  describe('getChapterVerses', () => {
+    it('returns every verse of a real chapter, in order', () => {
+      const verses = getChapterVerses('John', 3);
+      expect(verses.length).toBeGreaterThan(30); // John 3 has 36 verses
+      expect(verses.map((v) => v.verse)).toEqual([...verses].map((v) => v.verse).sort((a, b) => a - b));
+      const v16 = verses.find((v) => v.verse === 16);
+      expect(v16?.text).toContain('For God so loved the world');
+    });
+
+    it('returns an empty array for an unknown book or chapter, never throws', () => {
+      expect(getChapterVerses('Not A Real Book', 1)).toEqual([]);
+      expect(getChapterVerses('John', 999)).toEqual([]);
+    });
+  });
+
+  describe('extractCapitalizedWords', () => {
+    it('finds a mid-sentence proper noun but not the sentence-initial word', () => {
+      const found = extractCapitalizedWords('And the LORD said unto Moses, Speak unto Pharaoh.');
+      expect(found).toContain('Moses');
+      expect(found).toContain('Pharaoh');
+      expect(found).not.toContain('And');
+    });
+
+    it('excludes short words and all-caps words like LORD', () => {
+      const found = extractCapitalizedWords('And the LORD said unto Moses.');
+      expect(found).not.toContain('LORD');
+    });
+
+    it('returns an empty array for text with no qualifying capitalized words', () => {
+      expect(extractCapitalizedWords('and he begat sons and daughters')).toEqual([]);
+    });
   });
 });

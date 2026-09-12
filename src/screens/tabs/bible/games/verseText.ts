@@ -34,3 +34,44 @@ export function normalizeWord(word: string): string {
 export function tokenizeVerse(text: string): string[] {
   return text.split(/\s+/).filter(Boolean);
 }
+
+export type ChapterVerseEntry = { verse: number; text: string };
+
+/** Every verse of one chapter, in order - for the handful of games that
+ * present a whole chapter rather than a single verse (Chapter Scroll's
+ * scroll-through, Verse Crossword/Word Search's word pools drawn from a
+ * fuller span of text than one verse gives). Empty array if the book/chapter
+ * isn't found - never throws, same "content gap, not a crash" contract as
+ * getVerseText. */
+export function getChapterVerses(bookName: string, chapter: number): ChapterVerseEntry[] {
+  const chapterMap = BUNDLED_KJV[bookName];
+  if (!chapterMap) return [];
+  const verseMap = chapterMap[String(chapter)];
+  if (!verseMap) return [];
+  return Object.keys(verseMap)
+    .map(Number)
+    .sort((a, b) => a - b)
+    .map((verse) => ({ verse, text: String(verseMap[String(verse)] || '').trim() }));
+}
+
+/** Capitalized words that AREN'T just sentence-initial capitalization - a
+ * cheap proxy for "this is probably a name or place" without a real NLP
+ * dependency, so Name & Place Match and Anagram Unscramble can pick
+ * game-worthy words from whatever arbitrary passage the partition hands
+ * them (a curated names list would only ever cover famous passages). Not
+ * perfect (KJV capitalizes a few other things mid-sentence, e.g. "Spirit"),
+ * but a false positive here just means the game asks about a slightly
+ * unusual word, not a broken round. */
+export function extractCapitalizedWords(text: string): string[] {
+  const tokens = tokenizeVerse(text);
+  const found: string[] = [];
+  tokens.forEach((token, i) => {
+    const clean = token.replace(/^[^A-Za-z]+|[^A-Za-z]+$/g, '');
+    if (clean.length < 3 || !/^[A-Z][a-z]+$/.test(clean)) return;
+    const prevToken = tokens[i - 1];
+    const isSentenceInitial = i === 0 || (prevToken ? /[.!?:;]$/.test(prevToken) : false);
+    if (isSentenceInitial) return;
+    found.push(clean);
+  });
+  return found;
+}

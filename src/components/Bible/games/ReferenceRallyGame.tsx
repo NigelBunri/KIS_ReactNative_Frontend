@@ -20,14 +20,14 @@ import GameShell from './GameShell';
 import { AnswerFeedback, StageComplete } from './GameFeedback';
 import { getVerseText } from '../../../screens/tabs/bible/games/verseText';
 import {
-  completeCurrentStage,
-  getCurrentStageVerses,
-  recordScore,
+  finishStage,
+  getStageVerses,
   STAGES_PER_GAME,
-  type GameKey,
+  type StageOutcome,
   type VerseRef,
 } from '../../../screens/tabs/bible/games/gameStorage';
 import { GAME_METADATA } from '../../../screens/tabs/bible/games/gameMetadata';
+import type { GameScreenProps } from '../../../screens/tabs/bible/games/gameScreenTypes';
 
 const ROUND_LENGTH = 8;
 
@@ -73,19 +73,19 @@ function buildQuestions(stageVerses: VerseRef[]): Question[] {
   return questions;
 }
 
-export default function ReferenceRallyGame({ gameKey, onExit, onOpenStats }: { gameKey: GameKey; onExit: () => void; onOpenStats: () => void }) {
+export default function ReferenceRallyGame({ gameKey, stageIndex, isReplay, onExit, onOpenStats }: GameScreenProps) {
   const { palette } = useKISTheme();
   const meta = GAME_METADATA[gameKey];
   const [round, setRound] = useState<Question[] | null>(null);
   const [index, setIndex] = useState(0);
   const [selected, setSelected] = useState<string | null>(null);
   const [score, setScore] = useState(0);
-  const [stageResult, setStageResult] = useState<{ stagesCompleted: number; isFinalStage: boolean } | null>(null);
+  const [stageResult, setStageResult] = useState<StageOutcome | null>(null);
 
   const loadRound = useCallback(async () => {
-    const verses = await getCurrentStageVerses(gameKey);
+    const verses = await getStageVerses(gameKey, stageIndex);
     setRound(buildQuestions(verses));
-  }, [gameKey]);
+  }, [gameKey, stageIndex]);
 
   useEffect(() => { loadRound(); }, [loadRound]);
 
@@ -101,9 +101,8 @@ export default function ReferenceRallyGame({ gameKey, onExit, onOpenStats }: { g
     if (!round) return;
     const nextIndex = index + 1;
     if (nextIndex >= round.length) {
-      await recordScore(gameKey, score);
-      const progress = await completeCurrentStage(gameKey);
-      setStageResult({ stagesCompleted: progress.stagesCompleted, isFinalStage: progress.stagesCompleted >= STAGES_PER_GAME });
+      const outcome = await finishStage(gameKey, stageIndex, score);
+      setStageResult(outcome);
       return;
     }
     setIndex(nextIndex);
@@ -117,18 +116,19 @@ export default function ReferenceRallyGame({ gameKey, onExit, onOpenStats }: { g
           <StageComplete
             gameTitle={meta.title}
             scoreLine={`${score} / ${round?.length ?? ROUND_LENGTH} correct this stage`}
-            stagesCompleted={stageResult.stagesCompleted}
+            stageNumber={stageIndex + 1}
             totalStages={STAGES_PER_GAME}
             isFinalStage={stageResult.isFinalStage}
-            onContinue={() => {
+            isReplay={!stageResult.isNewCompletion}
+            onPlayAgain={() => {
               setStageResult(null);
               setIndex(0);
               setSelected(null);
               setScore(0);
               loadRound();
             }}
+            onBackToJourney={onExit}
             onViewStats={onOpenStats}
-            onExit={onExit}
           />
         </View>
       </GameShell>
@@ -146,7 +146,7 @@ export default function ReferenceRallyGame({ gameKey, onExit, onOpenStats }: { g
   return (
     <GameShell
       title={meta.title}
-      subtitle={`Question ${index + 1} of ${round.length}`}
+      subtitle={`${isReplay ? 'Replay · ' : ''}Question ${index + 1} of ${round.length}`}
       onBack={onExit}
       rightStat={{ label: 'Score', value: score }}
     >

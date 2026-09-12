@@ -1,13 +1,12 @@
-// src/components/Bible/games/VerseMatchGame.tsx
+// src/components/Bible/games/CrossReferenceConnectGame.tsx
 //
-// Game 3 of 6: "Verse Match" — memory/pairs. A face-down grid where half the
-// cards show a reference ("John 3:16") and half show that verse's text;
-// flip two at a time to find matching pairs. Spatial/associative memory —
-// deliberately not another recall-on-demand mechanic like games 1 and 6.
-//
-// Real flip animation (Animated rotateY, the standard two-face RN card-flip
-// pattern) rather than an instant show/hide swap — a memory-match game
-// without a flip animation barely reads as a game at all.
+// "Cross Reference Connect" — memory/pairs, same flip-card mechanic as
+// VerseMatchGame, but both halves of a pair show verse TEXT rather than a
+// reference+text pair. "Related" here means simply ADJACENT within the
+// stage's own verse list: since a stage is always a contiguous run of
+// Scripture, verse[i] and verse[i+1] genuinely are narratively connected.
+// Non-overlapping consecutive pairs (0,1), (2,3), (4,5)... are formed once
+// from the stage's own verses and never drawn from outside it.
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View, Pressable, Animated, Easing } from 'react-native';
@@ -27,12 +26,12 @@ import {
 import { GAME_METADATA } from '../../../screens/tabs/bible/games/gameMetadata';
 import type { GameScreenProps } from '../../../screens/tabs/bible/games/gameScreenTypes';
 
-const PAIR_COUNT = 6; // 12 cards total — a 3x4 or 4x3 grid, enough real matching without overwhelming
+const MAX_PAIRS_PER_ROUND = 5;
+const MAX_ROUNDS = 4;
 
 type CardData = {
   key: string;
   pairId: string;
-  kind: 'reference' | 'text';
   label: string;
 };
 
@@ -45,16 +44,47 @@ function shuffle<T>(arr: T[]): T[] {
   return copy;
 }
 
-function buildCards(stageVerses: VerseRef[]): CardData[] {
-  const verses = shuffle(stageVerses).slice(0, PAIR_COUNT);
+function verseId(ref: VerseRef): string {
+  return `${ref.bookName}-${ref.chapter}-${ref.verse}`;
+}
+
+function shortText(ref: VerseRef): string {
+  const text = getVerseText(ref.bookName, ref.chapter, ref.verse);
+  return text.length > 70 ? `${text.slice(0, 67)}…` : text;
+}
+
+/** Non-overlapping consecutive pairs of the stage's own verses, in order —
+ * verse[0]+verse[1], verse[2]+verse[3], etc. Capped to what MAX_ROUNDS *
+ * MAX_PAIRS_PER_ROUND can use so a huge stage doesn't build thousands of
+ * unused pairs; a small stage simply produces fewer pairs, which the round
+ * chunker below turns into fewer/smaller rounds rather than crashing. */
+function buildPairs(stageVerses: VerseRef[]): [VerseRef, VerseRef][] {
+  const pairs: [VerseRef, VerseRef][] = [];
+  const cap = MAX_ROUNDS * MAX_PAIRS_PER_ROUND * 2;
+  const limited = stageVerses.slice(0, cap);
+  for (let i = 0; i + 1 < limited.length; i += 2) {
+    pairs.push([limited[i], limited[i + 1]]);
+  }
+  return pairs;
+}
+
+/** Chunk the stage's pairs into up to MAX_ROUNDS rounds of up to
+ * MAX_PAIRS_PER_ROUND pairs each — a stage with only a handful of pairs
+ * gracefully produces just 1-2 short rounds instead of a broken screen. */
+function chunkIntoRounds(pairs: [VerseRef, VerseRef][]): [VerseRef, VerseRef][][] {
+  const rounds: [VerseRef, VerseRef][][] = [];
+  for (let i = 0; i < pairs.length && rounds.length < MAX_ROUNDS; i += MAX_PAIRS_PER_ROUND) {
+    rounds.push(pairs.slice(i, i + MAX_PAIRS_PER_ROUND));
+  }
+  return rounds;
+}
+
+function buildCards(roundPairs: [VerseRef, VerseRef][]): CardData[] {
   const cards: CardData[] = [];
-  for (const v of verses) {
-    const id = `${v.bookName}-${v.chapter}-${v.verse}`;
-    const reference = `${v.bookName} ${v.chapter}:${v.verse}`;
-    const text = getVerseText(v.bookName, v.chapter, v.verse);
-    const shortText = text.length > 70 ? `${text.slice(0, 67)}…` : text;
-    cards.push({ key: `${id}-ref`, pairId: id, kind: 'reference', label: reference });
-    cards.push({ key: `${id}-text`, pairId: id, kind: 'text', label: shortText });
+  for (const [a, b] of roundPairs) {
+    const id = `${verseId(a)}__${verseId(b)}`;
+    cards.push({ key: `${id}-a`, pairId: id, label: shortText(a) });
+    cards.push({ key: `${id}-b`, pairId: id, label: shortText(b) });
   }
   return shuffle(cards);
 }
@@ -89,7 +119,6 @@ function FlipCard({
 
   return (
     <Pressable onPress={onPress} disabled={isFlipped || isMatched} style={{ width: size, height: size }}>
-      {/* Back face (face-down, shown at rest) */}
       <Animated.View
         style={[
           styles.cardFace,
@@ -100,10 +129,9 @@ function FlipCard({
           },
         ]}
       >
-        <KISIcon name="book" size={22} color={palette.goldReadable} />
+        <KISIcon name="shuffle" size={22} color={palette.goldReadable} />
       </Animated.View>
 
-      {/* Front face (content, shown once flipped) */}
       <Animated.View
         style={[
           styles.cardFace,
@@ -115,13 +143,7 @@ function FlipCard({
           },
         ]}
       >
-        <Text
-          numberOfLines={card.kind === 'reference' ? 2 : 5}
-          style={[
-            card.kind === 'reference' ? styles.cardRefText : styles.cardBodyText,
-            { color: isMatched ? '#16a34a' : palette.text },
-          ]}
-        >
+        <Text numberOfLines={5} style={[styles.cardBodyText, { color: isMatched ? '#16a34a' : palette.text }]}>
           {card.label}
         </Text>
       </Animated.View>
@@ -129,13 +151,11 @@ function FlipCard({
   );
 }
 
-const ROUNDS_PER_STAGE = 5;
-
-export default function VerseMatchGame({ gameKey, stageIndex, isReplay, onExit, onOpenStats }: GameScreenProps) {
+export default function CrossReferenceConnectGame({ gameKey, stageIndex, isReplay, onExit, onOpenStats }: GameScreenProps) {
   const { palette } = useKISTheme();
   const responsive = useResponsiveLayout();
   const meta = GAME_METADATA[gameKey];
-  const [stageVerses, setStageVerses] = useState<VerseRef[] | null>(null);
+  const [rounds, setRounds] = useState<[VerseRef, VerseRef][][] | null>(null);
   const [roundIndex, setRoundIndex] = useState(0);
   const [cards, setCards] = useState<CardData[]>([]);
   const [flippedKeys, setFlippedKeys] = useState<string[]>([]);
@@ -150,17 +170,29 @@ export default function VerseMatchGame({ gameKey, stageIndex, isReplay, onExit, 
   const gap = 10;
   const cardSize = (responsive.contentMaxWidth - responsive.pageGutter * 2) / columns - gap;
 
-  useEffect(() => {
+  const load = useCallback(() => {
     let active = true;
     getStageVerses(gameKey, stageIndex).then((verses) => {
       if (!active) return;
-      setStageVerses(verses);
-      setCards(buildCards(verses));
+      const pairs = buildPairs(verses);
+      const chunked = chunkIntoRounds(pairs);
+      setRounds(chunked);
+      setRoundIndex(0);
+      setTotalMoves(0);
+      setCards(chunked.length ? buildCards(chunked[0]) : []);
+      setFlippedKeys([]);
+      setMatchedPairIds(new Set());
+      setMoves(0);
+      setStageResult(null);
+      scoredRef.current = false;
     });
     return () => { active = false; };
   }, [gameKey, stageIndex]);
 
-  const allMatched = matchedPairIds.size === PAIR_COUNT;
+  useEffect(() => load(), [load]);
+
+  const currentRoundPairs = rounds?.[roundIndex] ?? [];
+  const allMatched = currentRoundPairs.length > 0 && matchedPairIds.size === currentRoundPairs.length;
 
   useEffect(() => {
     if (allMatched && !scoredRef.current) {
@@ -181,7 +213,7 @@ export default function VerseMatchGame({ gameKey, stageIndex, isReplay, onExit, 
         const [firstKey, secondKey] = nextFlipped;
         const first = cards.find((c) => c.key === firstKey)!;
         const second = cards.find((c) => c.key === secondKey)!;
-        const isMatch = first.pairId === second.pairId && first.kind !== second.kind;
+        const isMatch = first.pairId === second.pairId;
 
         setTimeout(() => {
           if (isMatch) {
@@ -196,18 +228,17 @@ export default function VerseMatchGame({ gameKey, stageIndex, isReplay, onExit, 
   );
 
   const handleContinue = async () => {
-    if (!stageVerses) return;
+    if (!rounds) return;
     const nextRound = roundIndex + 1;
-    if (nextRound >= ROUNDS_PER_STAGE) {
-      // Fewer total moves across the stage = better — score as "efficiency
-      // points", floor at 0.
-      const score = Math.max(0, ROUNDS_PER_STAGE * PAIR_COUNT * 4 - totalMoves);
+    if (nextRound >= rounds.length) {
+      const totalPairs = rounds.reduce((sum, r) => sum + r.length, 0);
+      const score = Math.max(0, totalPairs * 4 - totalMoves);
       const outcome = await finishStage(gameKey, stageIndex, score);
       setStageResult(outcome);
       return;
     }
     setRoundIndex(nextRound);
-    setCards(buildCards(stageVerses));
+    setCards(buildCards(rounds[nextRound]));
     setFlippedKeys([]);
     setMatchedPairIds(new Set());
     setMoves(0);
@@ -220,23 +251,40 @@ export default function VerseMatchGame({ gameKey, stageIndex, isReplay, onExit, 
         <View style={styles.centerFill}>
           <StageComplete
             gameTitle={meta.title}
-            scoreLine={`${totalMoves} total moves across ${ROUNDS_PER_STAGE} rounds`}
+            scoreLine={`${totalMoves} total moves across ${rounds?.length ?? 0} round${(rounds?.length ?? 0) === 1 ? '' : 's'}`}
             stageNumber={stageIndex + 1}
             totalStages={STAGES_PER_GAME}
             isFinalStage={stageResult.isFinalStage}
             isReplay={!stageResult.isNewCompletion}
-            onPlayAgain={() => {
-              setStageResult(null);
-              setRoundIndex(0);
-              setTotalMoves(0);
-              getStageVerses(gameKey, stageIndex).then((verses) => {
-                setStageVerses(verses);
-                setCards(buildCards(verses));
-              });
-            }}
+            onPlayAgain={load}
             onBackToJourney={onExit}
             onViewStats={onOpenStats}
           />
+        </View>
+      </GameShell>
+    );
+  }
+
+  if (rounds === null) {
+    return (
+      <GameShell title={meta.title} onBack={onExit}>
+        <View style={styles.centerFill}><ActivityIndicator color={palette.primary} /></View>
+      </GameShell>
+    );
+  }
+
+  if (rounds.length === 0) {
+    return (
+      <GameShell title={meta.title} onBack={onExit}>
+        <View style={styles.centerFill}>
+          <View style={[styles.fallbackCard, { backgroundColor: palette.card }]}>
+            <Text style={[styles.fallbackText, { color: palette.text }]}>
+              This stage doesn't have enough verses to form connected pairs.
+            </Text>
+            <Pressable onPress={onExit} style={[styles.roundCompleteBtn, { backgroundColor: palette.goldReadable }]}>
+              <Text style={[styles.roundCompleteBtnText, { color: palette.onGold }]}>Back to Journey</Text>
+            </Pressable>
+          </View>
         </View>
       </GameShell>
     );
@@ -248,13 +296,13 @@ export default function VerseMatchGame({ gameKey, stageIndex, isReplay, onExit, 
         <View style={styles.centerFill}>
           <View style={[styles.roundCompleteCard, { backgroundColor: palette.card }]}>
             <KISIcon name="checkmark-circle" size={40} color={palette.success} />
-            <Text style={[styles.roundCompleteTitle, { color: palette.text }]}>All matched!</Text>
+            <Text style={[styles.roundCompleteTitle, { color: palette.text }]}>All connected!</Text>
             <Text style={[styles.roundCompleteScore, { color: palette.subtext }]}>
-              Round {roundIndex + 1} of {ROUNDS_PER_STAGE} completed in {moves} moves
+              Round {roundIndex + 1} of {rounds.length} completed in {moves} moves
             </Text>
             <Pressable onPress={handleContinue} style={[styles.roundCompleteBtn, { backgroundColor: palette.goldReadable }]}>
               <Text style={[styles.roundCompleteBtnText, { color: palette.onGold }]}>
-                {roundIndex + 1 >= ROUNDS_PER_STAGE ? 'Finish Stage' : 'Next Round'}
+                {roundIndex + 1 >= rounds.length ? 'Finish Stage' : 'Next Round'}
               </Text>
             </Pressable>
           </View>
@@ -263,7 +311,7 @@ export default function VerseMatchGame({ gameKey, stageIndex, isReplay, onExit, 
     );
   }
 
-  if (!stageVerses || cards.length === 0) {
+  if (cards.length === 0) {
     return (
       <GameShell title={meta.title} onBack={onExit}>
         <View style={styles.centerFill}><ActivityIndicator color={palette.primary} /></View>
@@ -274,7 +322,7 @@ export default function VerseMatchGame({ gameKey, stageIndex, isReplay, onExit, 
   return (
     <GameShell
       title={meta.title}
-      subtitle={`${isReplay ? 'Replay · ' : ''}Round ${roundIndex + 1} of ${ROUNDS_PER_STAGE} — find the reference for each verse`}
+      subtitle={`${isReplay ? 'Replay · ' : ''}Round ${roundIndex + 1} of ${rounds.length} — match adjacent verses`}
       onBack={onExit}
       rightStat={{ label: 'Moves', value: moves }}
     >
@@ -296,6 +344,8 @@ export default function VerseMatchGame({ gameKey, stageIndex, isReplay, onExit, 
 
 const styles = StyleSheet.create({
   centerFill: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  fallbackCard: { borderRadius: 20, padding: 24, alignItems: 'center', gap: 14 },
+  fallbackText: { fontSize: 15, fontWeight: '700', textAlign: 'center' },
   roundCompleteCard: { borderRadius: 20, padding: 24, alignItems: 'center', gap: 6 },
   roundCompleteTitle: { fontSize: 20, fontWeight: '900', textAlign: 'center', marginTop: 8 },
   roundCompleteScore: { fontSize: 14, fontWeight: '700', textAlign: 'center', marginBottom: 14 },
@@ -313,6 +363,5 @@ const styles = StyleSheet.create({
     height: '100%',
   },
   cardFaceAbsolute: { position: 'absolute', top: 0, left: 0 },
-  cardRefText: { fontSize: 12, fontWeight: '900', textAlign: 'center' },
   cardBodyText: { fontSize: 9, fontWeight: '700', textAlign: 'center', lineHeight: 12 },
 });

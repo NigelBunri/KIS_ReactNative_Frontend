@@ -21,14 +21,14 @@ import GameShell from './GameShell';
 import { StageComplete } from './GameFeedback';
 import { LOCAL_BIBLE_BOOKS } from '@/data/bibleLocalData';
 import {
-  completeCurrentStage,
-  getCurrentStageVerses,
-  recordScore,
+  finishStage,
+  getStageVerses,
   STAGES_PER_GAME,
-  type GameKey,
+  type StageOutcome,
   type VerseRef,
 } from '../../../screens/tabs/bible/games/gameStorage';
 import { GAME_METADATA } from '../../../screens/tabs/bible/games/gameMetadata';
+import type { GameScreenProps } from '../../../screens/tabs/bible/games/gameScreenTypes';
 
 const ROUNDS_PER_STAGE = 5;
 
@@ -78,7 +78,7 @@ function shuffle<T>(arr: T[]): T[] {
 
 const FULL_CANON_BOOKS: BookItem[] = LOCAL_BIBLE_BOOKS.map((b) => ({ code: b.code, name: b.name }));
 
-export default function BooksInOrderGame({ gameKey, onExit, onOpenStats }: { gameKey: GameKey; onExit: () => void; onOpenStats: () => void }) {
+export default function BooksInOrderGame({ gameKey, stageIndex, isReplay, onExit, onOpenStats }: GameScreenProps) {
   const { palette } = useKISTheme();
   const meta = GAME_METADATA[gameKey];
   const [bookPool, setBookPool] = useState<BookItem[] | null>(null);
@@ -89,11 +89,11 @@ export default function BooksInOrderGame({ gameKey, onExit, onOpenStats }: { gam
   const [submitted, setSubmitted] = useState(false);
   const [rounds, setRounds] = useState(0);
   const [correctRounds, setCorrectRounds] = useState(0);
-  const [stageResult, setStageResult] = useState<{ stagesCompleted: number; isFinalStage: boolean } | null>(null);
+  const [stageResult, setStageResult] = useState<StageOutcome | null>(null);
 
   useEffect(() => {
     let active = true;
-    getCurrentStageVerses(gameKey).then((verses) => {
+    getStageVerses(gameKey, stageIndex).then((verses) => {
       if (!active) return;
       const stageBooks = booksInStage(verses);
       // A stage narrow enough to touch only 1 book (e.g. deep inside a
@@ -104,7 +104,7 @@ export default function BooksInOrderGame({ gameKey, onExit, onOpenStats }: { gam
       setBookPool(stageBooks.length >= 2 ? stageBooks : FULL_CANON_BOOKS);
     });
     return () => { active = false; };
-  }, [gameKey]);
+  }, [gameKey, stageIndex]);
 
   const startRound = useCallback((diff: Difficulty, pool: BookItem[]) => {
     const seq = pickSequence(pool, diff.length);
@@ -145,9 +145,8 @@ export default function BooksInOrderGame({ gameKey, onExit, onOpenStats }: { gam
     if (!difficulty || !bookPool) return;
     const roundsSoFar = rounds; // rounds state updates async via handleSubmit's setter; this render already reflects it
     if (roundsSoFar >= ROUNDS_PER_STAGE) {
-      await recordScore(gameKey, correctRounds);
-      const progress = await completeCurrentStage(gameKey);
-      setStageResult({ stagesCompleted: progress.stagesCompleted, isFinalStage: progress.stagesCompleted >= STAGES_PER_GAME });
+      const outcome = await finishStage(gameKey, stageIndex, correctRounds);
+      setStageResult(outcome);
       return;
     }
     startRound(difficulty, bookPool);
@@ -160,21 +159,22 @@ export default function BooksInOrderGame({ gameKey, onExit, onOpenStats }: { gam
           <StageComplete
             gameTitle={meta.title}
             scoreLine={`${correctRounds} / ${rounds} rounds correct this stage`}
-            stagesCompleted={stageResult.stagesCompleted}
+            stageNumber={stageIndex + 1}
             totalStages={STAGES_PER_GAME}
             isFinalStage={stageResult.isFinalStage}
-            onContinue={() => {
+            isReplay={!stageResult.isNewCompletion}
+            onPlayAgain={() => {
               setStageResult(null);
               setDifficulty(null);
               setRounds(0);
               setCorrectRounds(0);
-              getCurrentStageVerses(gameKey).then((verses) => {
+              getStageVerses(gameKey, stageIndex).then((verses) => {
                 const stageBooks = booksInStage(verses);
                 setBookPool(stageBooks.length >= 2 ? stageBooks : FULL_CANON_BOOKS);
               });
             }}
+            onBackToJourney={onExit}
             onViewStats={onOpenStats}
-            onExit={onExit}
           />
         </View>
       </GameShell>
@@ -211,7 +211,7 @@ export default function BooksInOrderGame({ gameKey, onExit, onOpenStats }: { gam
   return (
     <GameShell
       title={meta.title}
-      subtitle={`${difficulty.label} · Round ${Math.min(rounds + 1, ROUNDS_PER_STAGE)} of ${ROUNDS_PER_STAGE}`}
+      subtitle={`${isReplay ? 'Replay · ' : ''}${difficulty.label} · Round ${Math.min(rounds + 1, ROUNDS_PER_STAGE)} of ${ROUNDS_PER_STAGE}`}
       onBack={onExit}
       rightStat={{ label: 'Score', value: `${correctRounds}/${rounds}` }}
     >
