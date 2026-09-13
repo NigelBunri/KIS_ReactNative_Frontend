@@ -619,36 +619,34 @@ export const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({
                 </View>
               </LinearGradient>
             </Pressable>
-          </View>
 
-          <Pressable
-            style={({ pressed }) => [
-              styles.footerSendButtonWrap,
-              pressed && hasContent && { transform: [{ scale: 0.98 }] },
-            ]}
-            onPress={handleSend}
-            disabled={!hasContent}
-          >
-            {hasContent ? (
-              <LinearGradient
-                colors={[...gradients.header]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.footerSendButton}
-              >
-                <KISIcon name="send" size={16} color="#fff" />
-                <Text style={styles.footerSendTextEnabled}>
-                  Send {previewSource.length ? `(${previewSource.length})` : ""}
-                </Text>
-              </LinearGradient>
-            ) : (
-              <View style={[styles.footerSendButton, styles.footerSendButtonDisabled, { backgroundColor: palette.card, borderColor: palette.border }]}>
-                <Text style={[styles.footerSendTextDisabled, { color: palette.subtext }]}>
-                  Send
-                </Text>
-              </View>
-            )}
-          </Pressable>
+            <Pressable
+              onPress={handleSend}
+              disabled={!hasContent}
+              style={({ pressed }) => [
+                styles.sideButton,
+                { overflow: 'hidden' },
+                !hasContent && { backgroundColor: palette.card, borderColor: palette.border, borderWidth: 1 },
+                pressed && hasContent && { opacity: KIS_TOKENS.opacity.pressed },
+              ]}
+            >
+              {hasContent ? (
+                <LinearGradient
+                  colors={[...gradients.header]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={StyleSheet.absoluteFillObject}
+                />
+              ) : null}
+              <KISIcon name="send" size={20} color={hasContent ? '#fff' : palette.subtext} />
+              <Text style={[styles.sideButtonLabel, { color: hasContent ? '#fff' : palette.subtext }]}>Send</Text>
+              {hasContent && previewSource.length > 0 ? (
+                <View style={[styles.sendBadge, { backgroundColor: palette.royalInk }]}>
+                  <Text style={styles.sendBadgeText}>{previewSource.length}</Text>
+                </View>
+              ) : null}
+            </Pressable>
+          </View>
         </View>
 
         </ScrollView>
@@ -866,7 +864,7 @@ const styles = StyleSheet.create({
   captionInput: { flex: 1, minHeight: 20, maxHeight: 90, fontSize: KIS_TOKENS.typography.input, paddingTop: 0 },
 
   footer: { paddingHorizontal: KIS_TOKENS.spacing.md, paddingTop: KIS_TOKENS.spacing.md, paddingBottom: KIS_TOKENS.spacing.sm, borderTopWidth: 1, flexShrink: 0 },
-  footerRowMain: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: KIS_TOKENS.spacing['2xl'] },
+  footerRowMain: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   sideButton: {
     width: 64,
     height: 60,
@@ -896,18 +894,18 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
 
-  footerSendButtonWrap: { marginTop: KIS_TOKENS.spacing.md, borderRadius: KIS_TOKENS.radius.pill, overflow: 'hidden' },
-  footerSendButton: {
-    paddingVertical: 14,
-    borderRadius: KIS_TOKENS.radius.pill,
+  sendBadge: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
+    paddingHorizontal: 3,
     alignItems: 'center',
     justifyContent: 'center',
-    flexDirection: 'row',
-    gap: KIS_TOKENS.spacing.sm,
   },
-  footerSendButtonDisabled: { borderWidth: 1 },
-  footerSendTextEnabled: { color: '#fff', fontWeight: KIS_TOKENS.typography.weight.extrabold, fontSize: KIS_TOKENS.typography.label },
-  footerSendTextDisabled: { fontWeight: KIS_TOKENS.typography.weight.extrabold, fontSize: KIS_TOKENS.typography.label },
+  sendBadgeText: { color: '#fff', fontSize: 9, fontWeight: KIS_TOKENS.typography.weight.extrabold },
 });
 
 export default CameraCaptureModal;
