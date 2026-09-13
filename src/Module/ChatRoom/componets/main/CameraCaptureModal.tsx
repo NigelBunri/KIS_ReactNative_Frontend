@@ -382,6 +382,18 @@ export const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({
           </Pressable>
         </View>
 
+        {/* Header stays pinned outside the scroll (close/gallery buttons
+            should always be reachable); everything below it — preview,
+            thumb strip, caption, footer — scrolls as one page so a tall
+            combination (media selected + thumb strip + caption text) can
+            never force the send button to compress or fall off-screen; the
+            flexShrink: 0 on those sections is a second line of defense for
+            the case where content still fits without scrolling. */}
+        <ScrollView
+          style={styles.scrollBody}
+          contentContainerStyle={styles.scrollBodyContent}
+          keyboardShouldPersistTaps="handled"
+        >
 
         {/* PREVIEW */}
         <Pressable
@@ -639,6 +651,7 @@ export const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({
           </Pressable>
         </View>
 
+        </ScrollView>
 
         {/* EDITOR MODAL */}
         <MediaEditModal
@@ -661,6 +674,8 @@ export const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
+  scrollBody: { flex: 1 },
+  scrollBodyContent: { flexGrow: 1 },
   header: {
     paddingHorizontal: KIS_TOKENS.spacing.md,
     paddingVertical: KIS_TOKENS.spacing.sm,
