@@ -209,7 +209,7 @@ export default function BroadcastScreen() {
   // matches the approximate natural height of the vision + testimony content
   // so animations finish just as those elements scroll off screen.
   const ANIM_END = 160;
-  const { scrollY, onScroll: scrollHandler, onHeaderLayout, collapseStyle: innerCollapseStyle } = useCollapsingGoldHeader(ANIM_END);
+  const { scrollY, onScroll: scrollHandler, onHeaderLayout, collapseStyle: innerCollapseStyle, onScrollSettle } = useCollapsingGoldHeader(ANIM_END);
 
   // Our Vision button (and the header title bar it's grouped with) fades +
   // scales down as it scrolls toward the top. This content sits inside
@@ -733,6 +733,8 @@ export default function BroadcastScreen() {
        */}
       <Animated.ScrollView
         onScroll={scrollHandler}
+        onScrollEndDrag={onScrollSettle}
+        onMomentumScrollEnd={onScrollSettle}
         scrollEventThrottle={1}
         keyboardShouldPersistTaps="handled"
         style={{ flex: 1, backgroundColor: palette.bg, }}
