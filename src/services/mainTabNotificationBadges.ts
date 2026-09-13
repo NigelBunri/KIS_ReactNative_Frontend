@@ -1,15 +1,9 @@
 import { DeviceEventEmitter } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import ROUTES from '@/network';
 import { getRequest } from '@/network/get';
 import { postRequest } from '@/network/post';
-import { fetchConversationsForCurrentUser } from '@/Module/ChatRoom/normalizeConversation';
-import { Chat } from '@/Module/ChatRoom/messagesUtils';
-import {
-  fetchInAppNotifications,
-  IN_APP_NOTIFICATIONS_UPDATED_EVENT,
-  InAppNotification,
-} from '@/services/inAppNotificationService';
-import { readLocalBibleEvents } from '@/services/bibleUserPersistence';
+import { IN_APP_NOTIFICATIONS_UPDATED_EVENT } from '@/services/inAppNotificationService';
 
 export type MainTabBadgeRoute = 'Partners' | 'Bible' | 'Messages' | 'Broadcast' | 'Profile';
 export type MainTabBadgeCounts = Record<MainTabBadgeRoute, number>;
@@ -59,9 +53,6 @@ const clampCount = (value: unknown) => {
   return Number.isFinite(num) && num > 0 ? Math.min(999, Math.floor(num)) : 0;
 };
 
-const unreadFromConversation = (chat: Chat) => clampCount(chat.unreadCount ?? 0);
-
-
 const toBackendCounts = (payload: any): MainTabBadgeCounts | null => {
   const raw = payload?.counts ?? payload?.data?.counts ?? null;
   if (!raw || typeof raw !== 'object') return null;
@@ -82,89 +73,57 @@ const fetchBackendMainTabBadgeCounts = async (): Promise<MainTabBadgeCounts | nu
   return toBackendCounts(res.data ?? res);
 };
 
-const isPartnerConversation = (chat: Chat) => {
-  const kind = String(chat.kind ?? '').toLowerCase();
-  const name = String(chat.name ?? chat.title ?? '').toLowerCase();
-  return (
-    kind.includes('partner') ||
-    name.includes('partner') ||
-    Boolean((chat as any).partnerId ?? (chat as any).partner_id)
-  );
+// Last known-good counts, so a failed refresh degrades to "unchanged"
+// instead of a second, independently-computed number. This used to be a
+// full client-side recomputation from fetchInAppNotifications() +
+// fetchConversationsForCurrentUser() + local Bible events — but that was a
+// second formula for the same tab badges that had already drifted from the
+// backend's (get_main_tab_badge_counts in Django): no partner_notification_
+// unread equivalent, no comment-room-broadcast unread logic, and a narrower
+// Bible keyword match than the backend's. Two formulas for one number can
+// only ever be kept in sync by accident, and a wrong-but-plausible number is
+// worse than a stale-but-previously-correct one, since nothing told the user
+// which kind of number they were looking at. In-memory first (cheap, covers
+// the common case of a mid-session network blip); AsyncStorage as a second
+// layer only consulted when nothing's been fetched yet this session, so a
+// cold start with a flaky first request still shows the last real counts
+// from before the app was closed rather than an empty tab bar.
+const LAST_GOOD_COUNTS_STORAGE_KEY = 'KIS_MAIN_TAB_BADGE_COUNTS_LAST_GOOD_V1';
+let lastGoodCountsInMemory: MainTabBadgeCounts | null = null;
+
+const persistLastGoodCounts = (counts: MainTabBadgeCounts) => {
+  lastGoodCountsInMemory = counts;
+  // Fire-and-forget: this is a best-effort cache, not something worth
+  // blocking or failing a badge refresh over.
+  AsyncStorage.setItem(LAST_GOOD_COUNTS_STORAGE_KEY, JSON.stringify(counts)).catch(() => undefined);
 };
 
-const isBroadcastNotification = (item: InAppNotification) => {
-  const haystack = `${item.kind ?? ''} ${item.title ?? ''} ${item.body ?? ''}`.toLowerCase();
-  return [
-    'broadcast',
-    'channel',
-    'course',
-    'lesson',
-    'product',
-    'market',
-    'shop',
-    'event',
-    'education',
-    'health',
-    'institution',
-  ].some((token) => haystack.includes(token));
+const loadPersistedLastGoodCounts = async (): Promise<MainTabBadgeCounts | null> => {
+  try {
+    const raw = await AsyncStorage.getItem(LAST_GOOD_COUNTS_STORAGE_KEY);
+    if (!raw) return null;
+    return toBackendCounts({ counts: JSON.parse(raw) });
+  } catch {
+    return null;
+  }
 };
 
-const isBibleNotification = (item: InAppNotification) => {
-  const haystack = `${item.kind ?? ''} ${item.title ?? ''} ${item.body ?? ''}`.toLowerCase();
-  return haystack.includes('bible') || haystack.includes('reading reminder') || haystack.includes('meditation');
-};
-
-const countMissedBibleSchedules = async () => {
-  const events = await readLocalBibleEvents();
-  const now = Date.now();
-  return events.filter((event) => {
-    if (event.status === 'missed') return true;
-    if (event.status !== 'scheduled') return false;
-    const startsAt = event.start_at ? new Date(event.start_at).getTime() : NaN;
-    return Number.isFinite(startsAt) && startsAt < now;
-  }).length;
-};
-
-export const fetchMainTabBadgeCounts = async (currentUserId?: string | null): Promise<MainTabBadgeCounts> => {
+export const fetchMainTabBadgeCounts = async (_currentUserId?: string | null): Promise<MainTabBadgeCounts> => {
   const backendCounts = await fetchBackendMainTabBadgeCounts().catch(() => null);
-  if (backendCounts) return backendCounts;
+  if (backendCounts) {
+    persistLastGoodCounts(backendCounts);
+    return backendCounts;
+  }
 
-  // fetchUnreadInAppNotificationsCount() previously ran alongside
-  // fetchInAppNotifications() here, but it calls fetchInAppNotifications()
-  // internally - every fallback-triggered badge refresh was hitting
-  // /notifications/ twice in parallel for the same data. The unread count
-  // is just the unread subset of the list we already fetch below.
-  const [notifications, conversations, missedBibleSchedules] = await Promise.all([
-    fetchInAppNotifications().catch(() => []),
-    fetchConversationsForCurrentUser([], currentUserId ?? undefined, true).catch(() => []),
-    countMissedBibleSchedules().catch(() => 0),
-  ]);
+  if (lastGoodCountsInMemory) return lastGoodCountsInMemory;
 
-  const unreadNotifications = notifications.filter((item) => !item.readAt);
-  const profileUnread = unreadNotifications.length;
-  const bibleUnread = unreadNotifications.filter(isBibleNotification).length + missedBibleSchedules;
-  const broadcastUnread = unreadNotifications.filter(isBroadcastNotification).length;
+  const persisted = await loadPersistedLastGoodCounts();
+  if (persisted) {
+    lastGoodCountsInMemory = persisted;
+    return persisted;
+  }
 
-  const partnersUnread = conversations
-    .filter(isPartnerConversation)
-    .reduce((sum, chat) => sum + unreadFromConversation(chat), 0);
-
-  const isCommentRoom = (chat: Chat) => {
-    const kind = String((chat as any).kind ?? '').toLowerCase();
-    return kind === 'post' || kind === 'thread';
-  };
-
-  const messageUnread = conversations
-    .filter((chat) => !isPartnerConversation(chat) && !isCommentRoom(chat))
-    .reduce((sum, chat) => sum + unreadFromConversation(chat), 0);
-
-  return {
-    Partners: clampCount(partnersUnread),
-    Bible: clampCount(bibleUnread),
-    Messages: clampCount(messageUnread),
-    Broadcast: clampCount(broadcastUnread),
-    Profile: clampCount(profileUnread),
-  };
+  return emptyMainTabBadgeCounts();
 };
 
 export const emitMainTabBadgeRefresh = (reason?: string) => {
