@@ -2654,7 +2654,7 @@ const handleOpenChatFromAddContacts = useCallback((chat: Chat) => {
               tabBarIcon: ({ color }: { color: string }) => <KISIcon name="radio" size={16} color={color} />,
             }}
             children={() => (
-              <UpdatesTab ref={updatesTabRef} searchTerm={query} onOpenChat={onOpenChat} onScroll={handleTabScroll} />
+              <UpdatesTab ref={updatesTabRef} searchTerm={query} onOpenChat={onOpenChat} onScroll={handleTabScroll} onScrollSettle={onScrollSettle} />
             )}
           />
           <Tab.Screen
@@ -2663,7 +2663,7 @@ const handleOpenChatFromAddContacts = useCallback((chat: Chat) => {
               tabBarLabel: translateString('Calls'),
               tabBarIcon: ({ color }: { color: string }) => <KISIcon name="phone" size={16} color={color} />,
             }}
-            children={() => <CallsTab ref={callsTabRef} searchTerm={query} onScroll={handleTabScroll} />}
+            children={() => <CallsTab ref={callsTabRef} searchTerm={query} onScroll={handleTabScroll} onScrollSettle={onScrollSettle} />}
           />
           <Tab.Screen
             name="Communities"
@@ -2672,7 +2672,7 @@ const handleOpenChatFromAddContacts = useCallback((chat: Chat) => {
               tabBarIcon: ({ color }: { color: string }) => <KISIcon name="users" size={16} color={color} />,
             }}
             children={() => (
-              <CommunitiesTab ref={communitiesTabRef} onOpenChat={onOpenChat} onScroll={handleTabScroll} />
+              <CommunitiesTab ref={communitiesTabRef} onOpenChat={onOpenChat} onScroll={handleTabScroll} onScrollSettle={onScrollSettle} />
             )}
           />
         </Tab.Navigator>

@@ -82,6 +82,7 @@ type Group = {
 type CommunitiesTabProps = {
   onOpenChat?: (chat: Chat) => void;
   onScroll?: (e: NativeSyntheticEvent<NativeScrollEvent>) => void;
+  onScrollSettle?: (e: NativeSyntheticEvent<NativeScrollEvent>) => void;
 };
 
 // Matches NewCommunityForm.tsx's own option set/values exactly - the
@@ -173,7 +174,7 @@ function formatPostTimestamp(iso: string): string {
   return 'Just now';
 }
 
-const CommunitiesTab = forwardRef<ScrollableHandle, CommunitiesTabProps>(function CommunitiesTab({ onOpenChat, onScroll }: CommunitiesTabProps, ref) {
+const CommunitiesTab = forwardRef<ScrollableHandle, CommunitiesTabProps>(function CommunitiesTab({ onOpenChat, onScroll, onScrollSettle }: CommunitiesTabProps, ref) {
   const { palette, gradients } = useKISTheme();
   const insets = useSafeAreaInsets();
   const topInset = useSafeTopInset();
@@ -826,6 +827,8 @@ const CommunitiesTab = forwardRef<ScrollableHandle, CommunitiesTabProps>(functio
                 removeClippedSubviews
                 ref={feedListRef}
                 onScroll={onScroll}
+                onScrollEndDrag={onScrollSettle}
+                onMomentumScrollEnd={onScrollSettle}
                 scrollEventThrottle={16}
                 data={posts}
                 keyExtractor={(item) => item.id}
@@ -882,6 +885,8 @@ const CommunitiesTab = forwardRef<ScrollableHandle, CommunitiesTabProps>(functio
                 removeClippedSubviews
                 ref={groupsListRef}
                 onScroll={onScroll}
+                onScrollEndDrag={onScrollSettle}
+                onMomentumScrollEnd={onScrollSettle}
                 scrollEventThrottle={16}
                 data={groups}
                 keyExtractor={(item) => item.id}
@@ -917,6 +922,8 @@ const CommunitiesTab = forwardRef<ScrollableHandle, CommunitiesTabProps>(functio
           removeClippedSubviews
           ref={communitiesListRef}
           onScroll={onScroll}
+          onScrollEndDrag={onScrollSettle}
+          onMomentumScrollEnd={onScrollSettle}
           scrollEventThrottle={16}
           data={communities}
           keyExtractor={(item) => item.id}

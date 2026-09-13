@@ -210,6 +210,7 @@ type UpdatesTabProps = {
   searchTerm?: string;
   onOpenChat?: (chat: Chat) => void;
   onScroll?: (e: NativeSyntheticEvent<NativeScrollEvent>) => void;
+  onScrollSettle?: (e: NativeSyntheticEvent<NativeScrollEvent>) => void;
 };
 
 // Rectangular story-tray card (Facebook Stories-style) rather than a small
@@ -321,6 +322,7 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
   searchTerm = '',
   onOpenChat,
   onScroll,
+  onScrollSettle,
 }: UpdatesTabProps, ref) {
   const { palette, gradients } = useKISTheme();
   const responsive = useResponsiveLayout();
@@ -1727,6 +1729,8 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
       <ScrollView
         ref={scrollRef}
         onScroll={onScroll}
+        onScrollEndDrag={onScrollSettle}
+        onMomentumScrollEnd={onScrollSettle}
         scrollEventThrottle={16}
         contentContainerStyle={{ paddingBottom: responsive.isWatch ? 90 : 120 }}
         refreshControl={

@@ -41,6 +41,7 @@ import CallDiagnosticsModal from '@/screens/calls/CallDiagnosticsModal';
 type CallsTabProps = {
   searchTerm?: string;
   onScroll?: (e: NativeSyntheticEvent<NativeScrollEvent>) => void;
+  onScrollSettle?: (e: NativeSyntheticEvent<NativeScrollEvent>) => void;
 };
 
 const buildStatusColor = (p: any): Record<string, string> => ({
@@ -87,7 +88,7 @@ function formatScheduledFor(iso: string | null): string {
   return `in ${h}h${m > 0 ? ` ${m}m` : ''}`;
 }
 
-const CallsTab = forwardRef<ScrollableHandle, CallsTabProps>(function CallsTab({ searchTerm = '', onScroll }: CallsTabProps, ref) {
+const CallsTab = forwardRef<ScrollableHandle, CallsTabProps>(function CallsTab({ searchTerm = '', onScroll, onScrollSettle }: CallsTabProps, ref) {
   const { palette, gradients } = useKISTheme();
   const STATUS_COLOR = buildStatusColor(palette);
   const responsive = useResponsiveLayout();
@@ -572,6 +573,8 @@ const CallsTab = forwardRef<ScrollableHandle, CallsTabProps>(function CallsTab({
         <SectionList
           ref={listRef}
           onScroll={onScroll}
+          onScrollEndDrag={onScrollSettle}
+          onMomentumScrollEnd={onScrollSettle}
           scrollEventThrottle={16}
           sections={sections}
           keyExtractor={(item, index) => item.id ?? item.callId ?? String(index)}
