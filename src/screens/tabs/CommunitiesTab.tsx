@@ -22,8 +22,11 @@ import {
 import NetInfo from '@react-native-community/netinfo';
 import { launchImageLibrary } from 'react-native-image-picker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import LinearGradient from 'react-native-linear-gradient';
 import { useKISTheme } from '@/theme/useTheme';
 import { useResponsiveLayout } from '@/theme/responsive';
+import { KIS_TOKENS } from '@/theme/constants';
+import KISButton from '@/constants/KISButton';
 import ROUTES from '@/network';
 import { getRequest } from '@/network/get';
 import { postRequest } from '@/network/post';
@@ -156,8 +159,22 @@ function CreateCommunityPolicyPicker<T extends string>({
   );
 }
 
+function formatPostTimestamp(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  const diff = Date.now() - d.getTime();
+  const m = Math.floor(diff / 60000);
+  const h = Math.floor(diff / 3600000);
+  const days = Math.floor(diff / 86400000);
+  if (days > 7) return d.toLocaleDateString();
+  if (days >= 1) return `${days}d ago`;
+  if (h >= 1) return `${h}h ago`;
+  if (m >= 1) return `${m}m ago`;
+  return 'Just now';
+}
+
 const CommunitiesTab = forwardRef<ScrollableHandle, CommunitiesTabProps>(function CommunitiesTab({ onOpenChat, onScroll }: CommunitiesTabProps, ref) {
-  const { palette } = useKISTheme();
+  const { palette, gradients } = useKISTheme();
   const insets = useSafeAreaInsets();
   const topInset = useSafeTopInset();
   const { width } = useWindowDimensions();
@@ -740,6 +757,7 @@ const CommunitiesTab = forwardRef<ScrollableHandle, CommunitiesTabProps>(functio
               style={[
                 styles.communityCard,
                 { borderColor: palette.inputBorder, backgroundColor: palette.card },
+                KIS_TOKENS.elevation.card,
               ]}
             >
               <View style={styles.communityRow}>
@@ -754,30 +772,37 @@ const CommunitiesTab = forwardRef<ScrollableHandle, CommunitiesTabProps>(functio
         </View>
       ) : selected ? (
         <View style={{ flex: 1 }}>
-          <View style={styles.segmentRow}>
-            <Pressable
-              onPress={() => setTab('feed')}
-              style={[
-                styles.segment,
-                { borderColor: palette.inputBorder, backgroundColor: tab === 'feed' ? palette.surface : 'transparent' },
-              ]}
-            >
-              <Text style={{ color: palette.text }}>Feed</Text>
-            </Pressable>
-            <Pressable
-              onPress={() => setTab('groups')}
-              style={[
-                styles.segment,
-                { borderColor: palette.inputBorder, backgroundColor: tab === 'groups' ? palette.surface : 'transparent' },
-              ]}
-            >
-              <Text style={{ color: palette.text }}>Groups</Text>
-            </Pressable>
+          <View style={[styles.segmentRow, { backgroundColor: palette.surfaceSoft ?? palette.surface }]}>
+            {(['feed', 'groups'] as const).map((key) => {
+              const active = tab === key;
+              return (
+                <Pressable key={key} onPress={() => setTab(key)} style={styles.segment}>
+                  {active && (
+                    <LinearGradient
+                      colors={gradients.tabSelected as unknown as string[]}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      style={StyleSheet.absoluteFillObject}
+                    />
+                  )}
+                  <Text style={{ color: active ? palette.royalInk : palette.subtext, fontWeight: active ? '800' : '600' }}>
+                    {key === 'feed' ? 'Feed' : 'Groups'}
+                  </Text>
+                </Pressable>
+              );
+            })}
           </View>
 
           {tab === 'feed' ? (
             <View style={{ flex: 1 }}>
-              <View style={[styles.composer, { borderColor: palette.inputBorder }]}> 
+              <View
+                style={[
+                  styles.composer,
+                  { borderColor: palette.inputBorder, backgroundColor: palette.card },
+                  KIS_TOKENS.elevation.card,
+                ]}
+              >
+                <ImagePlaceholder size={32} radius={16} />
                 <TextInput
                   placeholder="Write a post..."
                   placeholderTextColor={palette.subtext}
@@ -785,8 +810,13 @@ const CommunitiesTab = forwardRef<ScrollableHandle, CommunitiesTabProps>(functio
                   value={composerText}
                   onChangeText={setComposerText}
                 />
-                <Pressable onPress={createPost} style={styles.iconBtn}>
-                  <KISIcon name="send" size={18} color={palette.primary} />
+                <Pressable
+                  onPress={createPost}
+                  disabled={!composerText.trim()}
+                  style={[styles.composerSend, { backgroundColor: composerText.trim() ? palette.gold : 'transparent' }]}
+                  hitSlop={6}
+                >
+                  <KISIcon name="send" size={16} color={composerText.trim() ? palette.royalInk : palette.subtext} />
                 </Pressable>
               </View>
               <FlatList
@@ -800,18 +830,34 @@ const CommunitiesTab = forwardRef<ScrollableHandle, CommunitiesTabProps>(functio
                 data={posts}
                 keyExtractor={(item) => item.id}
                 ListEmptyComponent={
-                  <View style={{ alignItems: 'center', paddingVertical: 40 }}>
-                    <Text style={{ color: palette.subtext, fontSize: 14 }}>No posts yet. Be the first!</Text>
+                  <View style={styles.emptyState}>
+                    <KISIcon name="message" size={36} color={palette.subtext} />
+                    <Text style={[styles.emptyTitle, { color: palette.text }]}>No posts yet</Text>
+                    <Text style={[styles.emptySubtitle, { color: palette.subtext }]}>Be the first to share something with this community.</Text>
                   </View>
                 }
                 renderItem={({ item }) => (
                     <View
-                      style={[styles.card, { backgroundColor: palette.card, borderColor: palette.inputBorder }]}
+                      style={[
+                        styles.card,
+                        { backgroundColor: palette.card, borderColor: palette.inputBorder },
+                        KIS_TOKENS.elevation.card,
+                      ]}
                     >
-                      <Text style={{ color: palette.text, fontWeight: '600' }} numberOfLines={1}>
-                        {item.author?.display_name ?? 'Member'}
-                      </Text>
-                      <Text style={{ color: palette.text, marginTop: 6 }} numberOfLines={5}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                        <ImagePlaceholder size={30} radius={15} />
+                        <View style={{ flex: 1 }}>
+                          <Text style={{ color: palette.text, fontWeight: '700' }} numberOfLines={1}>
+                            {item.author?.display_name ?? 'Member'}
+                          </Text>
+                          {item.created_at ? (
+                            <Text style={{ color: palette.subtext, fontSize: 11 }}>
+                              {formatPostTimestamp(item.created_at)}
+                            </Text>
+                          ) : null}
+                        </View>
+                      </View>
+                      <Text style={{ color: palette.text, marginTop: 8 }} numberOfLines={5}>
                         {getFeedPlainText(item)}
                       </Text>
                     </View>
@@ -821,9 +867,14 @@ const CommunitiesTab = forwardRef<ScrollableHandle, CommunitiesTabProps>(functio
             </View>
           ) : (
             <View style={{ flex: 1 }}>
-              <Pressable onPress={openCreateGroup} style={[styles.primaryBtn, { backgroundColor: palette.primary }]}> 
-                <Text style={{ color: palette.bg, fontWeight: '600' }}>Create Group</Text>
-              </Pressable>
+              <KISButton
+                variant="primary"
+                size="sm"
+                onPress={openCreateGroup}
+                left={<KISIcon name="add" size={16} color={palette.onGold} />}
+                title="Create Group"
+                style={styles.primaryBtn}
+              />
               <FlatList
                 initialNumToRender={20}
                 maxToRenderPerBatch={10}
@@ -840,6 +891,7 @@ const CommunitiesTab = forwardRef<ScrollableHandle, CommunitiesTabProps>(functio
                     style={[
                       chatListStyles.row,
                       { backgroundColor: palette.card, borderColor: palette.inputBorder },
+                      KIS_TOKENS.elevation.card,
                     ]}
                   >
                     <ImagePlaceholder size={44} radius={22} style={chatListStyles.avatar} />
@@ -883,6 +935,7 @@ const CommunitiesTab = forwardRef<ScrollableHandle, CommunitiesTabProps>(functio
               style={[
                 chatListStyles.row,
                 { backgroundColor: palette.card, borderColor: palette.inputBorder },
+                KIS_TOKENS.elevation.card,
               ]}
             >
               <ImagePlaceholder size={44} radius={22} style={chatListStyles.avatar} />
@@ -893,21 +946,34 @@ const CommunitiesTab = forwardRef<ScrollableHandle, CommunitiesTabProps>(functio
                 </Text>
               </View>
               <View style={{ flexDirection: 'row', gap: 6, alignItems: 'center' }}>
-                <Text style={{ color: palette.subtext, fontSize: 11, fontWeight: '600' }}>
-                  {item.is_owner
-                    ? 'Owner'
-                    : item.current_user_role
-                    ? item.current_user_role.replace(/^./, (value: string) => value.toUpperCase())
-                    : 'Member'}
-                </Text>
+                <View
+                  style={[
+                    styles.roleBadge,
+                    { backgroundColor: item.is_owner ? palette.goldSoft : palette.surfaceSoft ?? palette.surface },
+                  ]}
+                >
+                  <Text style={{ color: item.is_owner ? palette.goldDeep : palette.subtext, fontSize: 11, fontWeight: '700' }}>
+                    {item.is_owner
+                      ? 'Owner'
+                      : item.current_user_role
+                      ? item.current_user_role.replace(/^./, (value: string) => value.toUpperCase())
+                      : 'Member'}
+                  </Text>
+                </View>
                 <KISIcon name="chevron-right" size={16} color={palette.subtext} />
               </View>
             </Pressable>
           )}
           ListEmptyComponent={
-            <Text style={{ color: loadError ? (palette.danger) : palette.subtext, padding: 8 }}>
-              {loadError ?? 'No communities yet.'}
-            </Text>
+            <View style={styles.emptyState}>
+              <KISIcon name={loadError ? 'alert-circle' : 'users'} size={36} color={loadError ? palette.danger : palette.subtext} />
+              <Text style={[styles.emptyTitle, { color: loadError ? palette.danger : palette.text }]}>
+                {loadError ? 'Couldn’t load communities' : 'No communities yet'}
+              </Text>
+              <Text style={[styles.emptySubtitle, { color: palette.subtext }]}>
+                {loadError ?? 'Create one or discover a community to join.'}
+              </Text>
+            </View>
           }
           ListFooterComponent={
             communitiesHasMore && !loading && communities.length > 0
@@ -1287,19 +1353,24 @@ export default CommunitiesTab;
 const styles = StyleSheet.create({
   container: { flex: 1, padding: 12 },
   headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
-  title: { fontSize: 18, fontWeight: '700' },
-  card: { padding: 12, borderRadius: 12, borderWidth: 2, marginBottom: 10 },
-  communityCard: { padding: 12, borderRadius: 12, borderWidth: 2, marginBottom: 10 },
+  title: { fontSize: 18, fontWeight: '800', letterSpacing: 0.2 },
+  card: { padding: 12, borderRadius: 14, borderWidth: 1, marginBottom: 10 },
+  communityCard: { padding: 12, borderRadius: 14, borderWidth: 1, marginBottom: 10 },
   communityRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   iconBtn: { padding: 6, minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
-  segmentRow: { flexDirection: 'row', gap: 8, marginBottom: 12 },
-  segment: { flex: 1, paddingVertical: 8, borderRadius: 10, borderWidth: 2, alignItems: 'center' },
-  composer: { flexDirection: 'row', alignItems: 'center', borderWidth: 2, borderRadius: 10, paddingHorizontal: 8, marginBottom: 12 },
-  input: { flex: 1, paddingVertical: 8, paddingHorizontal: 8 },
-  primaryBtn: { paddingVertical: 10, borderRadius: 10, alignItems: 'center', marginBottom: 12 },
+  segmentRow: { flexDirection: 'row', gap: 4, marginBottom: 12, borderRadius: 999, padding: 4 },
+  segment: { flex: 1, paddingVertical: 9, borderRadius: 999, alignItems: 'center', overflow: 'hidden' },
+  composer: { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderRadius: 20, paddingHorizontal: 10, paddingVertical: 6, marginBottom: 12 },
+  input: { flex: 1, paddingVertical: 8, paddingHorizontal: 4 },
+  composerSend: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
+  primaryBtn: { marginBottom: 12 },
+  roleBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999 },
+  emptyState: { alignItems: 'center', paddingVertical: 48, paddingHorizontal: 32, gap: 8 },
+  emptyTitle: { fontSize: 15, fontWeight: '700', textAlign: 'center' },
+  emptySubtitle: { fontSize: 13, textAlign: 'center' },
   overlay: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 },
   modalOverlay: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  modalCard: { width: '88%', borderRadius: 14, borderWidth: 2, padding: 16 },
+  modalCard: { width: '88%', borderRadius: 20, borderWidth: 1, padding: 16, ...KIS_TOKENS.elevation.popover },
   // Wider/taller variant for the create-community modal specifically - it
   // has real content (avatar + 2 text fields + 3 pill-picker rows), unlike
   // the plainer name-only modals styles.modalCard's base size was tuned

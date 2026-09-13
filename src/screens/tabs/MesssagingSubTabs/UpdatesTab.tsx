@@ -22,6 +22,7 @@ import {
   DeviceEventEmitter,
 } from 'react-native';
 import { useKISTheme } from '@/theme/useTheme';
+import { KIS_TOKENS } from '@/theme/constants';
 import { useResponsiveLayout } from '@/theme/responsive';
 import { KISIcon, type KISIconName } from '@/constants/kisIcons';
 import ROUTES, { buildMediaSource, useMediaHeaders } from '@/network';
@@ -32,6 +33,7 @@ import NewChannelForm from '@/Module/AddContacts/components/NewChannelForm';
 import { Chat } from '@/Module/ChatRoom/messagesUtils';
 import Skeleton from '@/components/common/Skeleton';
 import KISText from '@/components/common/KISText';
+import KISButton from '@/constants/KISButton';
 import { launchImageLibrary } from 'react-native-image-picker';
 import { uploadStatusMedia, type StatusMediaPurpose } from '@/services/uploadStatusMedia';
 import {
@@ -320,7 +322,7 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
   onOpenChat,
   onScroll,
 }: UpdatesTabProps, ref) {
-  const { palette } = useKISTheme();
+  const { palette, gradients } = useKISTheme();
   const responsive = useResponsiveLayout();
   // Raw device inset (status bar/notch/Dynamic Island), Android-15+-bug-
   // corrected - used for the Status viewer's overlay controls below, since
@@ -1572,10 +1574,16 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
         accessibilityLabel="Add or manage status"
         style={[
           styles.statusAddBadge,
-          { backgroundColor: palette.primaryStrong, borderColor: palette.bg },
+          { borderColor: palette.bg, overflow: 'hidden' },
         ]}
       >
-        <KISIcon name="add" size={16} color={palette.onPrimary} />
+        <LinearGradient
+          colors={gradients.tabSelected as unknown as string[]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={StyleSheet.absoluteFillObject}
+        />
+        <KISIcon name="add" size={16} color={palette.onGold} />
       </Pressable>
     );
     const thumbFill = { width: '100%' as const, height: '100%' as const, alignItems: 'center' as const, justifyContent: 'center' as const };
@@ -1633,19 +1641,24 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
             height: STATUS_CARD_HEIGHT,
             borderRadius: 20,
             borderWidth: 2,
-            borderColor: palette.divider,
+            borderColor: palette.goldBorder,
             borderStyle: 'dashed',
+            backgroundColor: palette.goldSoft,
             alignItems: 'center',
             justifyContent: 'center',
             gap: 8,
           }}
         >
-          <View
-            style={[styles.statusAdd, { backgroundColor: palette.primarySoft }]}
-          >
-            <KISIcon name="add" size={16} color={palette.primaryStrong} />
+          <View style={[styles.statusAdd, { overflow: 'hidden' }]}>
+            <LinearGradient
+              colors={gradients.tabSelected as unknown as string[]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={StyleSheet.absoluteFillObject}
+            />
+            <KISIcon name="add" size={16} color={palette.onGold} />
           </View>
-          <Text style={{ color: palette.subtext, fontSize: 12 }}>My status</Text>
+          <Text style={{ color: palette.goldDeep, fontSize: 12, fontWeight: '700' }}>My status</Text>
         </View>
       );
     }
@@ -1764,9 +1777,10 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.statusRow}
             ListEmptyComponent={
-              <Text style={{ color: palette.subtext, paddingHorizontal: 16, paddingVertical: 8 }}>
-                No updates yet.
-              </Text>
+              <View style={styles.inlineEmptyState}>
+                <KISIcon name="camera" size={22} color={palette.subtext} />
+                <Text style={{ color: palette.subtext }}>No updates yet.</Text>
+              </View>
             }
             renderItem={({ item }) => (
               <Pressable
@@ -1799,11 +1813,9 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
 
         {/* Channels list */}
         <View style={[styles.sectionHeader, { marginTop: 10 }]}>
-          <Text
-            style={{ color: palette.text, fontSize: 18, fontWeight: '700' }}
-          >
+          <KISText preset="h3" color={palette.text}>
             Channels
-          </Text>
+          </KISText>
         </View>
         {(channelsLoading && channels.length === 0) ||
         (isChannelSearchActive && channelSearchLoading && channelSearchResults === null) ? (
@@ -1839,20 +1851,24 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
             <Text style={{ color: palette.subtext, textAlign: 'center' }}>
               Couldn't load channels.
             </Text>
-            <Pressable
+            <KISButton
+              variant="secondary"
+              size="sm"
+              title="Retry"
               onPress={() => loadChannels(true)}
-              style={[styles.subscribeButton, { backgroundColor: palette.primary }]}
-            >
-              <Text style={{ color: palette.onPrimary, fontWeight: '700' }}>Retry</Text>
-            </Pressable>
+            />
           </View>
         ) : displayedChannels.length === 0 ? (
-          <View style={{ paddingHorizontal: 16, paddingVertical: 24, alignItems: 'center' }}>
-            <Text style={{ color: palette.subtext, textAlign: 'center' }}>
-              {isChannelSearchActive
-                ? 'No channels match your search.'
-                : 'No channels yet.'}
+          <View style={styles.emptyState}>
+            <KISIcon name={isChannelSearchActive ? 'search' : 'megaphone'} size={32} color={palette.subtext} />
+            <Text style={[styles.emptyTitle, { color: palette.text }]}>
+              {isChannelSearchActive ? 'No channels match your search' : 'No channels yet'}
             </Text>
+            {!isChannelSearchActive && (
+              <Text style={[styles.emptySubtitle, { color: palette.subtext }]}>
+                Tap the gold "+" button to create one.
+              </Text>
+            )}
           </View>
         ) : (
           <>
@@ -1867,6 +1883,7 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
                     borderColor: palette.inputBorder,
                     backgroundColor: palette.card,
                   },
+                  KIS_TOKENS.elevation.card,
                 ]}
               >
                 <View style={styles.channelRow}>
@@ -1901,11 +1918,11 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
                         {ch.name}
                       </Text>
                       {ch.partner ? (
-                        <Text
-                          style={{ color: palette.primaryStrong, fontSize: 11 }}
-                        >
-                          Partner
-                        </Text>
+                        <View style={[styles.pillBadge, { backgroundColor: palette.goldSoft }]}>
+                          <Text style={{ color: palette.goldDeep, fontSize: 10, fontWeight: '800' }}>
+                            PARTNER
+                          </Text>
+                        </View>
                       ) : null}
                     </View>
                     {ch.description ? (
@@ -1917,15 +1934,11 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
                       </Text>
                     ) : null}
                     {ch.role || ch.membership_role || ch.access ? (
-                      <Text
-                        style={{
-                          color: palette.subtext,
-                          marginTop: 6,
-                          fontSize: 11,
-                        }}
-                      >
-                        {(ch.role ?? ch.membership_role ?? ch.access) as string}
-                      </Text>
+                      <View style={[styles.pillBadge, { backgroundColor: palette.surfaceSoft ?? palette.surface, marginTop: 6, alignSelf: 'flex-start' }]}>
+                        <Text style={{ color: palette.subtext, fontSize: 10, fontWeight: '700' }}>
+                          {((ch.role ?? ch.membership_role ?? ch.access) as string).toUpperCase()}
+                        </Text>
+                      </View>
                     ) : null}
                   </View>
                   <Pressable
@@ -1968,9 +1981,15 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
       {/* Floating create channel button */}
       <Pressable
         onPress={() => setShowCreateChannel(true)}
-        style={[styles.fab, { backgroundColor: palette.primary, right: responsive.pageGutter, width: responsive.isWatch ? 46 : 52, height: responsive.isWatch ? 46 : 52, borderRadius: responsive.isWatch ? 23 : 26 }]}
+        style={[styles.fab, KIS_TOKENS.elevation.popover, { right: responsive.pageGutter, width: responsive.isWatch ? 46 : 52, height: responsive.isWatch ? 46 : 52, borderRadius: responsive.isWatch ? 23 : 26, overflow: 'hidden' }]}
       >
-        <KISIcon name="add" size={18} color={palette.onPrimary} />
+        <LinearGradient
+          colors={gradients.tabSelected as unknown as string[]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={StyleSheet.absoluteFillObject}
+        />
+        <KISIcon name="add" size={18} color={palette.onGold} />
       </Pressable>
 
       {/* Channel preview + subscribe */}
@@ -2017,25 +2036,13 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
                 )}
               </View>
             ) : null}
-            <Pressable
+            <KISButton
+              variant="primary"
+              title={channelSubscribing ? 'Subscribing…' : 'Subscribe'}
               onPress={handleSubscribeChannel}
-              style={({ pressed }) => [
-                styles.subscribeButton,
-                {
-                  backgroundColor: palette.primary,
-                  opacity: pressed ? 0.85 : 1,
-                },
-              ]}
-            >
-              <Text
-                style={{
-                  color: palette.onPrimary,
-                  fontWeight: '700',
-                }}
-              >
-                {channelSubscribing ? 'Subscribing…' : 'Subscribe'}
-              </Text>
-            </Pressable>
+              loading={channelSubscribing}
+              style={styles.subscribeButton}
+            />
           </View>
         </View>
       </Modal>
@@ -2101,59 +2108,35 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
               ) : null}
             </View>
 
-            <Pressable
+            <KISButton
+              variant={channelDetail?.is_subscribed ? 'secondary' : 'primary'}
+              title={
+                channelDetail?.member_role === 'owner'
+                  ? 'You own this channel'
+                  : channelDetail?.is_subscribed
+                    ? 'Following · Tap to unfollow'
+                    : 'Follow'
+              }
+              loading={channelFollowBusy}
+              disabled={channelFollowBusy || channelDetail?.member_role === 'owner'}
               onPress={() =>
                 channelDetail?.is_subscribed
                   ? handleUnsubscribeChannel(channelDetail)
                   : handleFollowChannel(channelDetail)
               }
-              disabled={channelFollowBusy || channelDetail?.member_role === 'owner'}
-              style={({ pressed }) => [
-                styles.subscribeButton,
-                {
-                  backgroundColor: channelDetail?.is_subscribed
-                    ? palette.surfaceElevated
-                    : palette.primary,
-                  opacity: pressed || channelFollowBusy ? 0.75 : 1,
-                  marginTop: 16,
-                },
-              ]}
-            >
-              <Text
-                style={{
-                  color: channelDetail?.is_subscribed ? palette.text : palette.onPrimary,
-                  fontWeight: '700',
-                }}
-              >
-                {channelDetail?.member_role === 'owner'
-                  ? 'You own this channel'
-                  : channelFollowBusy
-                    ? 'Please wait…'
-                    : channelDetail?.is_subscribed
-                      ? 'Following · Tap to unfollow'
-                      : 'Follow'}
-              </Text>
-            </Pressable>
+              style={[styles.subscribeButton, { marginTop: 16 }]}
+            />
 
             {channelDetail?.is_subscribed ? (
-              <Pressable
+              <KISButton
+                variant="outline"
+                title="Open channel"
                 onPress={() => {
                   setChannelDetailOpen(false);
                   handleOpenChannel(channelDetail);
                 }}
-                style={({ pressed }) => [
-                  styles.subscribeButton,
-                  {
-                    backgroundColor: 'transparent',
-                    borderWidth: 1,
-                    borderColor: palette.inputBorder,
-                    opacity: pressed ? 0.75 : 1,
-                    marginTop: 8,
-                  },
-                ]}
-              >
-                <Text style={{ color: palette.text, fontWeight: '700' }}>Open channel</Text>
-              </Pressable>
+                style={[styles.subscribeButton, { marginTop: 8 }]}
+              />
             ) : null}
           </View>
         </View>
@@ -3538,9 +3521,12 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
             {seenByLoading ? (
               <ActivityIndicator color={palette.primaryStrong} style={{ marginVertical: 20 }} />
             ) : seenByViewers.length === 0 ? (
-              <Text style={[styles.sheetSubtitle, { color: palette.subtext, marginVertical: 12 }]}>
-                No one has viewed this status yet.
-              </Text>
+              <View style={{ alignItems: 'center', gap: 8, marginVertical: 16 }}>
+                <KISIcon name="eye" size={22} color={palette.subtext} />
+                <Text style={[styles.sheetSubtitle, { color: palette.subtext }]}>
+                  No one has viewed this status yet.
+                </Text>
+              </View>
             ) : (
               <ScrollView showsVerticalScrollIndicator={false} style={{ marginTop: 4 }}>
                 {seenByViewers.map((viewer: any, idx: number) => {
@@ -3614,7 +3600,7 @@ const styles = StyleSheet.create({
   channelCard: {
     marginHorizontal: 16,
     marginBottom: 12,
-    borderWidth: 2,
+    borderWidth: 1,
     borderRadius: 16,
     padding: 12,
   },
@@ -3633,7 +3619,34 @@ const styles = StyleSheet.create({
   channelInfo: {
     flex: 1,
   },
-  channelHeader: { flexDirection: 'row', justifyContent: 'space-between' },
+  channelHeader: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  pillBadge: {
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 999,
+  },
+  inlineEmptyState: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  emptyState: {
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 32,
+    gap: 8,
+  },
+  emptyTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  emptySubtitle: {
+    fontSize: 13,
+    textAlign: 'center',
+  },
   fab: {
     position: 'absolute',
     right: 18,
