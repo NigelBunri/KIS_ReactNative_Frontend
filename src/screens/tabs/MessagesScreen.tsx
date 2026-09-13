@@ -1635,7 +1635,7 @@ const handleSelectAllChats = useCallback(() => {
   // The tab bar (Chats/Updates/Calls/Communities) is permanent navigation
   // and must never hide — users need to always know where they are.
   const MESSAGES_COLLAPSE_DISTANCE = 110;
-  const { scrollY, onHeaderLayout, collapseStyle } = useCollapsingGoldHeader(MESSAGES_COLLAPSE_DISTANCE);
+  const { scrollY, onHeaderLayout, collapseStyle, onScrollSettle } = useCollapsingGoldHeader(MESSAGES_COLLAPSE_DISTANCE);
 
   // Shared by every sub-tab's own scrollable (Chats/Updates/Calls/Communities)
   // so the gold header's search+filter row collapses/reveals consistently no
@@ -2618,6 +2618,7 @@ const handleOpenChatFromAddContacts = useCallback((chat: Chat) => {
                 onOpenStatus={handleOpenStatusFromChat}
                 onOpenAvatarPreview={handleOpenAvatarPreviewFromChat}
                 onScroll={handleTabScroll}
+                onScrollSettle={onScrollSettle}
                 onEndReached={handleChatsEndReached}
                 onOpenChat={handleOpenChat}
                 selectedChat={selectedChat}

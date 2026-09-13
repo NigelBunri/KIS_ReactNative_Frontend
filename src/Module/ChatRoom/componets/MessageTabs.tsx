@@ -67,6 +67,7 @@ type ChatsTabProps = {
   onOpenAvatarPreview?: (payload: { avatarUrl: string; chat: Chat; userId?: string | null }) => void;
 
   onScroll?: (e: NativeSyntheticEvent<NativeScrollEvent>) => void;
+  onScrollSettle?: (e: NativeSyntheticEvent<NativeScrollEvent>) => void;
   onEndReached?: () => void;
   onOpenChat?: (chat: Chat) => void;
   onRefresh?: () => void;
@@ -521,6 +522,7 @@ export const ChatsTab = forwardRef<ScrollableHandle, ChatsTabProps>(function Cha
   onOpenStatus,
   onOpenAvatarPreview,
   onScroll,
+  onScrollSettle,
   onEndReached,
   onOpenChat,
   onRefresh,
@@ -945,6 +947,8 @@ export const ChatsTab = forwardRef<ScrollableHandle, ChatsTabProps>(function Cha
       data={listData}
       keyExtractor={chatListKeyExtractor}
       onScroll={onScroll}
+      onScrollEndDrag={onScrollSettle}
+      onMomentumScrollEnd={onScrollSettle}
       scrollEventThrottle={16}
       onEndReached={onEndReached}
       onEndReachedThreshold={0.2}
