@@ -478,9 +478,10 @@ export const styles = StyleSheet.create({
   /* Chips */
   chipsRow: {
     flexDirection: 'row',
+    alignItems: 'center',
     gap: 7,
     marginTop: 10,
-    flexWrap: 'wrap',
+    paddingRight: 4,
   },
   chip: {
     paddingHorizontal: 13,
