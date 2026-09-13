@@ -47,9 +47,29 @@ export async function saveDecryptedMessage(
   const ids = messageIds(message);
   if (!userId || !ids.length) return;
   const payload = JSON.stringify(patch);
-  await Promise.all(
-    ids.map((id) => EncryptedStorage.setItem(storageKey(userId, id), payload)),
-  );
+  // Best-effort persistence cache, not a correctness-critical step — the
+  // caller already has the real decrypted patch in memory and is about to
+  // hand it to the UI regardless of whether this write succeeds. Native
+  // Keychain/EncryptedSharedPreferences storage has a real (and on iOS,
+  // undocumented and lower-than-advertised) size ceiling per item, and a
+  // large attachments/media payload (image/video messages carry more
+  // metadata per attachment than a single voice note) can exceed it. This
+  // call previously threw straight out of saveDecryptedMessage with no
+  // handling; since callers await it BEFORE patching the UI with the
+  // decrypted content, a native storage failure here was indistinguishable
+  // from a genuine decrypt failure to the caller's try/catch — surfacing as
+  // "This message could not be decrypted" even though decryption had
+  // already succeeded. Swallow so a caching failure can never block or
+  // misreport delivery of content we've already successfully decrypted.
+  try {
+    await Promise.all(
+      ids.map((id) => EncryptedStorage.setItem(storageKey(userId, id), payload)),
+    );
+  } catch (error) {
+    if (__DEV__) {
+      console.warn('[decryptedMessageStorage] saveDecryptedMessage failed (non-fatal)', error);
+    }
+  }
 }
 
 export async function loadDecryptedMessage(
