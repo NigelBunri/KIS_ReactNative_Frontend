@@ -27,10 +27,7 @@ import { useCollapsingGoldHeader } from '@/hooks/useCollapsingGoldHeader';
 import { useHeaderDragToScroll, type ScrollableHandle } from '@/hooks/useHeaderDragToScroll';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRawTopInset } from '@/hooks/useSafeTopInset';
-import {
-  createMaterialTopTabNavigator,
-  MaterialTopTabBar,
-} from '@react-navigation/material-top-tabs';
+import { createMaterialTopTabNavigator } from '@react-navigation/material-top-tabs';
 import { useKISTheme } from '../../theme/useTheme';
 import { KIS_TOKENS } from '../../theme/constants';
 import { useStatusBarStyle } from '../../theme/useStatusBarStyle';
@@ -1749,8 +1746,18 @@ const handleSelectAllChats = useCallback(() => {
     onScrollTo: scrollActiveContentTo,
   });
 
+  // Custom pill-style bar instead of MaterialTopTabBar's default underline
+  // indicator + plain label — the active tab gets the same gold-gradient
+  // fill used for every other "selected" affordance in this app (Calls'
+  // join button, Communities' Feed/Groups segmented control), so this bar
+  // reads as one consistent design language instead of a bare stock tab
+  // strip. tabBarIcon still comes from each Tab.Screen's own options, same
+  // signature MaterialTopTabBar would have called it with, so no changes
+  // needed there.
+  const topTabLabelSize = responsive.isWatch ? 9 : responsive.isCompactPhone ? 10 : 11;
   const AnimatedTopBar = (tabProps: any) => {
-    const nextTab = tabProps?.state?.routes?.[tabProps.state.index]?.name;
+    const { state, descriptors, navigation } = tabProps;
+    const nextTab = state?.routes?.[state.index]?.name;
     useEffect(() => {
       if (nextTab === 'Chats' || nextTab === 'Updates' || nextTab === 'Calls' || nextTab === 'Communities') {
         setActiveTopTab(nextTab);
@@ -1758,15 +1765,54 @@ const handleSelectAllChats = useCallback(() => {
     }, [nextTab]);
     return (
       <View style={{ backgroundColor: messageTopPanelBg, borderBottomWidth: 0, borderBottomColor: 'transparent' }}>
-        <MaterialTopTabBar
-          {...tabProps}
-          style={{ backgroundColor: messageTopPanelBg, elevation: 0 }}
-          indicatorStyle={{ backgroundColor: palette.goldLight, height: 3, borderRadius: 3 }}
-          labelStyle={{ fontWeight: '700', textTransform: 'none', fontSize: responsive.isWatch ? 7 : responsive.isCompactPhone ? 8 : 9, marginTop: 1 }}
-          tabStyle={{ paddingTop: 4, paddingBottom: 1 }}
-          activeTintColor={palette.onGold}
-          inactiveTintColor="rgba(255,244,184,0.76)"
-        />
+        <View style={{ flexDirection: 'row', paddingHorizontal: responsive.pageGutter, paddingVertical: 8, gap: 6 }}>
+          {state.routes.map((route: { key: string; name: string }, index: number) => {
+            const { options } = descriptors[route.key];
+            const isFocused = state.index === index;
+            const tintColor = isFocused ? palette.onGold : 'rgba(255,244,184,0.76)';
+            const onPress = () => {
+              const event = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
+              if (!isFocused && !event.defaultPrevented) {
+                navigation.navigate(route.name);
+              }
+            };
+            return (
+              <Pressable
+                key={route.key}
+                onPress={onPress}
+                style={({ pressed }) => [
+                  {
+                    flex: 1,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 5,
+                    minHeight: 34,
+                    borderRadius: 999,
+                    overflow: 'hidden',
+                  },
+                  pressed && !isFocused && { backgroundColor: 'rgba(255,244,184,0.10)' },
+                ]}
+              >
+                {isFocused ? (
+                  <LinearGradient
+                    colors={[...messageGoldGradient]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                    style={StyleSheet.absoluteFill}
+                  />
+                ) : null}
+                {options.tabBarIcon?.({ focused: isFocused, color: tintColor, size: 15 })}
+                <Text
+                  numberOfLines={1}
+                  style={{ color: tintColor, fontWeight: '700', fontSize: topTabLabelSize }}
+                >
+                  {typeof options.tabBarLabel === 'string' ? options.tabBarLabel : route.name}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
       </View>
     );
   };
