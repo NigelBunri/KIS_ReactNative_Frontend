@@ -17,6 +17,7 @@ import {
 import { check, request, PERMISSIONS, RESULTS } from 'react-native-permissions';
 import LinearGradient from 'react-native-linear-gradient';
 import { SafeAreaView } from '@/components/common/SafeAreaViewWithTopPadding';
+import { useRawTopInset } from '@/hooks/useSafeTopInset';
 
 import {
   launchCamera,
@@ -81,6 +82,14 @@ export const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({
   onCapture,
 }) => {
   const { gradients } = useKISTheme();
+  // This Modal renders in its own native layer, where
+  // react-native-safe-area-context's auto-detected top inset is unreliable
+  // (worse on Android 15+, see useRawTopInset's doc comment) — the generic
+  // SafeAreaViewWithTopPadding wrapper doesn't carry that correction, which
+  // left the close button sitting too close to the status bar/notch to
+  // reliably tap. Compute the inset explicitly instead of trusting the
+  // wrapper for the top edge.
+  const topInset = useRawTopInset();
 
   /** ORIGINAL ASSETS — ALWAYS UNTOUCHED */
   const [assets, setAssets] = useState<ImagePickerAsset[]>([]);
@@ -303,12 +312,13 @@ export const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({
       transparent={false}
       onRequestClose={onClose}
     >
-      <SafeAreaView style={[styles.root, { backgroundColor: palette.bg }]} edges={['top', 'bottom']}>
+      <SafeAreaView style={[styles.root, { backgroundColor: palette.bg }]} edges={['bottom']}>
 
         {/* HEADER */}
-        <View style={[styles.header, { borderBottomColor: palette.divider, backgroundColor: palette.card }, KIS_TOKENS.elevation.card]}>
+        <View style={[styles.header, { paddingTop: topInset + KIS_TOKENS.spacing.sm, borderBottomColor: palette.divider, backgroundColor: palette.card }, KIS_TOKENS.elevation.card]}>
           <Pressable
             onPress={onClose}
+            hitSlop={12}
             style={({ pressed }) => [
               styles.headerIconButton,
               { backgroundColor: palette.surface },
@@ -341,7 +351,11 @@ export const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({
 
 
         {/* PREVIEW */}
-        <View style={styles.content}>
+        <Pressable
+          style={styles.content}
+          disabled={!!previewAsset}
+          onPress={previewAsset ? undefined : onClose}
+        >
           {previewAsset ? (
             <View style={[styles.previewCard, { backgroundColor: palette.surfaceElevated }, KIS_TOKENS.elevation.modal]}>
               {isImage ? (
@@ -410,7 +424,7 @@ export const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({
               </View>
             </View>
           )}
-        </View>
+        </Pressable>
 
 
         {/* THUMB STRIP */}
@@ -620,6 +634,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     flexDirection: 'row',
     alignItems: 'center',
+    flexShrink: 0,
   },
   headerIconButton: {
     width: 38,
@@ -718,7 +733,7 @@ const styles = StyleSheet.create({
   videoLabel: { fontSize: KIS_TOKENS.typography.label, fontWeight: KIS_TOKENS.typography.weight.semibold },
   videoDuration: { fontSize: KIS_TOKENS.typography.helper, marginTop: 2 },
 
-  galleryStrip: { paddingVertical: KIS_TOKENS.spacing.sm, borderTopWidth: 1 },
+  galleryStrip: { paddingVertical: KIS_TOKENS.spacing.sm, borderTopWidth: 1, flexShrink: 0 },
   galleryStripContent: { paddingHorizontal: KIS_TOKENS.spacing.sm, gap: KIS_TOKENS.spacing.sm },
   galleryItem: {
     width: 68,
@@ -785,6 +800,7 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     paddingHorizontal: KIS_TOKENS.spacing.md,
     paddingVertical: KIS_TOKENS.spacing.sm,
+    flexShrink: 0,
   },
   captionPill: {
     flexDirection: 'row',
@@ -797,7 +813,7 @@ const styles = StyleSheet.create({
   },
   captionInput: { flex: 1, minHeight: 20, maxHeight: 90, fontSize: KIS_TOKENS.typography.input, paddingTop: 0 },
 
-  footer: { paddingHorizontal: KIS_TOKENS.spacing.md, paddingTop: KIS_TOKENS.spacing.md, paddingBottom: KIS_TOKENS.spacing.sm, borderTopWidth: 1 },
+  footer: { paddingHorizontal: KIS_TOKENS.spacing.md, paddingTop: KIS_TOKENS.spacing.md, paddingBottom: KIS_TOKENS.spacing.sm, borderTopWidth: 1, flexShrink: 0 },
   footerRowMain: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: KIS_TOKENS.spacing['2xl'] },
   sideButton: {
     width: 64,
