@@ -240,7 +240,6 @@ export type RootStackParamList = {
   TrendingScreen: undefined;
   CategoryBrowsePage: { categorySlug?: string; categoryName?: string };
   BroadcastSearchScreen: { query?: string } | undefined;
-  ActivityNotifications: { channelId: string; channelName?: string };
   ChannelMembersScreen: { channelId: string; channelName?: string };
   Membership: { channelId: string; channelName?: string };
   ViewProfile: { userId: string; displayName?: string };

@@ -97,7 +97,6 @@ import ClipsListScreen from '@/screens/broadcast/channels/ClipsListScreen';
 import TrendingScreen from '@/screens/broadcast/channels/TrendingScreen';
 import CategoryBrowsePage from '@/screens/broadcast/channels/CategoryBrowsePage';
 import BroadcastSearchScreen from '@/screens/broadcast/channels/BroadcastSearchScreen';
-import ActivityNotificationsScreen from '@/screens/broadcast/channels/ActivityNotificationsScreen';
 import ChannelMembersScreen from '@/screens/broadcast/channels/ChannelMembersScreen';
 import MembershipScreen from '@/screens/broadcast/channels/MembershipScreen';
 import PartnerInsightsScreen from './src/screens/insights/PartnerInsightsScreen';
@@ -1459,10 +1458,6 @@ function AppContent() {
                       name="BroadcastSearchScreen"
                       getComponent={() => BroadcastSearchScreen}
                       options={{ title: 'Search' }}
-                    />
-                    <RootStack.Screen
-                      name="ActivityNotifications"
-                      getComponent={() => ActivityNotificationsScreen}
                     />
                     <RootStack.Screen
                       name="ChannelMembersScreen"
