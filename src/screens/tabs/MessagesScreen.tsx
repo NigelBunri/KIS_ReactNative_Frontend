@@ -1747,8 +1747,8 @@ const handleSelectAllChats = useCallback(() => {
           {...tabProps}
           style={{ backgroundColor: messageTopPanelBg, elevation: 0 }}
           indicatorStyle={{ backgroundColor: palette.goldLight, height: 3, borderRadius: 3 }}
-          labelStyle={{ fontWeight: '700', textTransform: 'none', fontSize: responsive.isWatch ? 8 : responsive.isCompactPhone ? 9 : 10, marginTop: 2 }}
-          tabStyle={{ paddingTop: 4, paddingBottom: 2 }}
+          labelStyle={{ fontWeight: '700', textTransform: 'none', fontSize: responsive.isWatch ? 7 : responsive.isCompactPhone ? 8 : 9, marginTop: 1 }}
+          tabStyle={{ paddingTop: 4, paddingBottom: 1 }}
           activeTintColor={palette.onGold}
           inactiveTintColor="rgba(255,244,184,0.76)"
         />
