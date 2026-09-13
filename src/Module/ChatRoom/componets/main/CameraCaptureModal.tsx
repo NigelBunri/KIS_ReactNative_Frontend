@@ -10,6 +10,7 @@ import {
   Alert,
   Platform,
   ScrollView,
+  KeyboardAvoidingView,
   TextInput,
   Linking,
   ActivityIndicator,
@@ -388,7 +389,19 @@ export const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({
             combination (media selected + thumb strip + caption text) can
             never force the send button to compress or fall off-screen; the
             flexShrink: 0 on those sections is a second line of defense for
-            the case where content still fits without scrolling. */}
+            the case where content still fits without scrolling.
+
+            KeyboardAvoidingView wraps it too — this Modal renders in its
+            own native layer, and unlike the main app window (Android's
+            windowSoftInputMode="adjustResize" already handles that one),
+            UIKit never auto-resizes a Modal's content for the keyboard, so
+            without this the caption's TextInput would let the keyboard
+            cover the footer entirely on iOS. behavior is iOS-only since
+            adjustResize already covers Android here. */}
+        <KeyboardAvoidingView
+          style={styles.scrollBody}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        >
         <ScrollView
           style={styles.scrollBody}
           contentContainerStyle={styles.scrollBodyContent}
@@ -635,7 +648,7 @@ export const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({
                   colors={[...gradients.header]}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
-                  style={StyleSheet.absoluteFillObject}
+                  style={StyleSheet.absoluteFill}
                 />
               ) : null}
               <KISIcon name="send" size={20} color={hasContent ? '#fff' : palette.subtext} />
@@ -650,6 +663,7 @@ export const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({
         </View>
 
         </ScrollView>
+        </KeyboardAvoidingView>
 
         {/* EDITOR MODAL */}
         <MediaEditModal
