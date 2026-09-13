@@ -1,6 +1,8 @@
 // src/screens/tabs/MesssagingSubTabs/CallsTab.tsx
 import { useKISTheme } from '@/theme/useTheme';
 import { useResponsiveLayout } from '@/theme/responsive';
+import { KIS_TOKENS } from '@/theme/constants';
+import KISButton from '@/constants/KISButton';
 import React, { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import {
   View,
@@ -14,6 +16,7 @@ import {
   NativeSyntheticEvent,
   Alert,
 } from 'react-native';
+import LinearGradient from 'react-native-linear-gradient';
 import type { ScrollableHandle } from '@/hooks/useHeaderDragToScroll';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { KISIcon } from '@/constants/kisIcons';
@@ -85,7 +88,7 @@ function formatScheduledFor(iso: string | null): string {
 }
 
 const CallsTab = forwardRef<ScrollableHandle, CallsTabProps>(function CallsTab({ searchTerm = '', onScroll }: CallsTabProps, ref) {
-  const { palette } = useKISTheme();
+  const { palette, gradients } = useKISTheme();
   const STATUS_COLOR = buildStatusColor(palette);
   const responsive = useResponsiveLayout();
   const insets = useSafeAreaInsets();
@@ -382,7 +385,11 @@ const CallsTab = forwardRef<ScrollableHandle, CallsTabProps>(function CallsTab({
 
     return (
       <Pressable
-        style={[styles.row, { borderColor: palette.inputBorder, backgroundColor: palette.card }]}
+        style={[
+          styles.row,
+          { borderColor: palette.inputBorder, backgroundColor: palette.card },
+          KIS_TOKENS.elevation.card,
+        ]}
         onPress={isStandalone
           ? undefined
           : () => DeviceEventEmitter.emit('chat.open', { conversationId: item.conversationId, name })}
@@ -390,7 +397,7 @@ const CallsTab = forwardRef<ScrollableHandle, CallsTabProps>(function CallsTab({
         <View style={[
           styles.iconWrap,
           {
-            backgroundColor: isMissed ? `${palette.danger}1E` : isActive ? `${palette.success}1E` : palette.surface,
+            backgroundColor: isMissed ? palette.dangerSoft : isActive ? palette.successSoft : palette.surface,
             width: iconSize + 16,
             height: iconSize + 16,
             borderRadius: (iconSize + 16) / 2,
@@ -475,11 +482,15 @@ const CallsTab = forwardRef<ScrollableHandle, CallsTabProps>(function CallsTab({
     const timeStr = item.scheduledFor ? formatScheduledFor(item.scheduledFor) : '';
     return (
       <Pressable
-        style={[styles.scheduledRow, { backgroundColor: `${palette.gold}10`, borderColor: `${palette.gold}40` }]}
+        style={[
+          styles.scheduledRow,
+          { backgroundColor: palette.goldSoft, borderColor: palette.goldBorder },
+          KIS_TOKENS.elevation.card,
+        ]}
         onPress={() => handleJoinScheduled(item)}
       >
-        <View style={[styles.scheduledIcon, { backgroundColor: `${palette.gold}26` }]}>
-          <KISIcon name="calendar" size={16} color={palette.gold} />
+        <View style={[styles.scheduledIcon, { backgroundColor: palette.goldMuted }]}>
+          <KISIcon name="calendar" size={16} color={palette.goldDeep} />
         </View>
         <View style={styles.content}>
           <Text style={[styles.name, { color: palette.text }]} numberOfLines={1}>
@@ -495,7 +506,13 @@ const CallsTab = forwardRef<ScrollableHandle, CallsTabProps>(function CallsTab({
             ) : null}
           </View>
         </View>
-        <View style={[styles.joinBtn, { backgroundColor: palette.gold }]}>
+        <View style={styles.joinBtn}>
+          <LinearGradient
+            colors={gradients.tabSelected as unknown as string[]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={StyleSheet.absoluteFillObject}
+          />
           <Text style={[styles.joinText, { color: palette.royalInk }]}>Join</Text>
         </View>
       </Pressable>
@@ -527,21 +544,22 @@ const CallsTab = forwardRef<ScrollableHandle, CallsTabProps>(function CallsTab({
           <Pressable onPress={() => loadCalls()} style={styles.iconBtn} hitSlop={8}>
             <KISIcon name="refresh-cw" size={17} color={palette.text} />
           </Pressable>
-          <Pressable
+          <KISButton
+            variant="primary"
+            size="sm"
             onPress={() => setShowNewCallSheet(true)}
-            style={[styles.newCallBtn, { backgroundColor: palette.gold }]}
-            accessibilityLabel="New call"
-          >
-            <KISIcon name="phone" size={15} color={palette.royalInk} />
-            <Text style={[styles.newCallText, { color: palette.royalInk }]}>New call</Text>
-          </Pressable>
+            style={styles.newCallBtn}
+            left={<KISIcon name="phone" size={15} color={palette.onGold} />}
+            title="New call"
+            textStyle={styles.newCallText}
+          />
         </View>
       </View>
 
       {loading ? (
         <View style={{ gap: 10 }}>
           {Array.from({ length: 6 }).map((_, i) => (
-            <View key={i} style={[styles.row, { borderColor: palette.inputBorder, backgroundColor: palette.card }]}>
+            <View key={i} style={[styles.row, { borderColor: palette.inputBorder, backgroundColor: palette.card }, KIS_TOKENS.elevation.card]}>
               <Skeleton width={48} height={48} radius={24} />
               <View style={{ flex: 1, gap: 6 }}>
                 <Skeleton width="55%" height={13} radius={6} />
@@ -573,10 +591,14 @@ const CallsTab = forwardRef<ScrollableHandle, CallsTabProps>(function CallsTab({
           ListEmptyComponent={
             rows.length === 0 && scheduled.length === 0 ? (
               <View style={styles.empty}>
-                <KISIcon name="phone" size={40} color={palette.subtext} />
-                <Text style={[styles.emptyText, { color: palette.subtext }]}>No calls yet</Text>
+                <KISIcon name={searchTerm.trim() ? 'search' : 'phone'} size={40} color={palette.subtext} />
+                <Text style={[styles.emptyText, { color: palette.subtext }]}>
+                  {searchTerm.trim() ? 'No calls match your search' : 'No calls yet'}
+                </Text>
                 <Text style={[styles.emptySubtext, { color: palette.subtext }]}>
-                  Tap "New call" to start or schedule one.
+                  {searchTerm.trim()
+                    ? 'Try a different name or keyword.'
+                    : 'Tap "New call" to start or schedule one.'}
                 </Text>
               </View>
             ) : null
@@ -624,18 +646,9 @@ const styles = StyleSheet.create({
   headerActions: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   iconBtn: { padding: 6, minWidth: 40, minHeight: 40, alignItems: 'center', justifyContent: 'center' },
   newCallBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    borderRadius: 20,
     paddingHorizontal: 14,
-    paddingVertical: 9,
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 6,
   },
-  newCallText: { fontSize: 13, fontWeight: '800' },
+  newCallText: { fontSize: 13 },
   sectionHeader: {
     fontSize: 11,
     fontWeight: '800',
@@ -692,6 +705,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 8,
     flexShrink: 0,
+    overflow: 'hidden',
   },
   joinText: { fontSize: 13, fontWeight: '800' },
   liveBadge: {
