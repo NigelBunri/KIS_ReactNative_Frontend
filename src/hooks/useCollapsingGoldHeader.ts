@@ -1,6 +1,6 @@
 // src/hooks/useCollapsingGoldHeader.ts
 import { useCallback, useEffect, useRef } from 'react';
-import type { LayoutChangeEvent } from 'react-native';
+import type { LayoutChangeEvent, NativeScrollEvent, NativeSyntheticEvent } from 'react-native';
 import {
   Extrapolation,
   interpolate,
@@ -160,5 +160,38 @@ export function useCollapsingGoldHeader(collapseDistance: number) {
     ),
   }));
 
-  return { scrollY, naturalHeight, onScroll, onHeaderLayout, collapseStyle };
+  // Decide where a settled scroll should snap to, or null if it's already
+  // resting at an extreme (no snap needed).
+  //
+  // The `maxExtent <= collapseDistance` branch matters more than it looks:
+  // scrollY can only ever reach as high as the list's own real scrollable
+  // range (contentSize - layoutMeasurement). A short list — few contacts,
+  // few results, whatever — can have a max extent well under
+  // collapseDistance, meaning the header could NEVER reach full collapse
+  // through normal scrolling at all, no matter how the user scrolls: it'd
+  // permanently rest partway open, capped by the list's own content height
+  // rather than by user intent. Once the user has scrolled to the list's
+  // real end, there's no more real scroll to give the header — snapping it
+  // the rest of the way closed is the only way "fully fold" is even
+  // reachable for short lists.
+  const onScrollSettle = useCallback(
+    (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+      const { contentOffset, contentSize, layoutMeasurement } = e.nativeEvent;
+      const offsetY = contentOffset.y;
+      const maxExtent = Math.max(0, contentSize.height - layoutMeasurement.height);
+      const target =
+        offsetY <= 0 || offsetY >= collapseDistance
+          ? null
+          : maxExtent <= collapseDistance && offsetY >= maxExtent - 1
+            ? collapseDistance
+            : offsetY < collapseDistance / 2
+              ? 0
+              : collapseDistance;
+      if (target == null) return;
+      scrollY.value = withTiming(target, { duration: 220 });
+    },
+    [collapseDistance, scrollY],
+  );
+
+  return { scrollY, naturalHeight, onScroll, onHeaderLayout, collapseStyle, onScrollSettle };
 }
