@@ -78,7 +78,15 @@ export function useCollapsingGoldHeader(collapseDistance: number) {
     () => scrollY.value,
     (current) => {
       if (Math.abs(current - collapseScrollY.value) > 6) {
-        collapseScrollY.value = withTiming(current, { duration: 160 });
+        // Duration only controls how long each individual catch-up step
+        // takes once the 6px threshold above has already fired — it does
+        // NOT change how often a step fires, so tuning it can't reintroduce
+        // the every-frame vibration bug the threshold above exists to
+        // prevent. 160ms read as visibly laggy during a continuous scroll
+        // (the header perceptibly trailing the finger); 90ms keeps a real
+        // eased transition (no instant snap) while cutting that lag nearly
+        // in half.
+        collapseScrollY.value = withTiming(current, { duration: 90 });
       }
     },
   );
