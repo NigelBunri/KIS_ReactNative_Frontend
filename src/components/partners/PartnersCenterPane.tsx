@@ -192,7 +192,7 @@ export default function PartnersCenterPane({
     }).start();
   }, [contentAnim, selectedPartner?.id]);
 
-  const { onScroll, onHeaderLayout, collapseStyle } = useCollapsingGoldHeader(140);
+  const { onScroll, onHeaderLayout, collapseStyle, onScrollSettle } = useCollapsingGoldHeader(140);
 
   // Gated on selectedPartner?.id (not registered unconditionally) - this
   // header's own content (tagline, the verified pill vs. "Verify this
@@ -264,6 +264,8 @@ export default function PartnersCenterPane({
     >
       <ReanimatedScroll.ScrollView
         onScroll={onScroll}
+        onScrollEndDrag={onScrollSettle}
+        onMomentumScrollEnd={onScrollSettle}
         scrollEventThrottle={16}
         style={{ flex: 1 }}
         contentContainerStyle={{ paddingBottom: compact ? 28 : 42 }}
