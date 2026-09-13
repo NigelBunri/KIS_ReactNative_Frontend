@@ -12,8 +12,10 @@ import {
   ScrollView,
   TextInput,
   Linking,
+  ActivityIndicator,
 } from 'react-native';
 import { check, request, PERMISSIONS, RESULTS } from 'react-native-permissions';
+import LinearGradient from 'react-native-linear-gradient';
 import { SafeAreaView } from '@/components/common/SafeAreaViewWithTopPadding';
 
 import {
@@ -30,6 +32,7 @@ import {
   KIS_TOKENS,
   kisRadius,
 } from '@/theme/constants';
+import { useKISTheme } from '@/theme/useTheme';
 
 import type { FilesType } from './AttachmentSheet';
 import { MediaEditModal } from './FroCamer/MediaEditModal';
@@ -56,6 +59,14 @@ const ensureCameraPermission = async () => {
   return nextStatus === RESULTS.GRANTED || nextStatus === RESULTS.LIMITED;
 };
 
+const formatDuration = (seconds?: number) => {
+  if (!seconds || !Number.isFinite(seconds)) return null;
+  const total = Math.round(seconds);
+  const mm = Math.floor(total / 60);
+  const ss = total % 60;
+  return `${mm}:${ss.toString().padStart(2, '0')}`;
+};
+
 type CameraCaptureModalProps = {
   visible: boolean;
   palette: KISPalette;
@@ -69,6 +80,7 @@ export const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({
   onClose,
   onCapture,
 }) => {
+  const { gradients } = useKISTheme();
 
   /** ORIGINAL ASSETS — ALWAYS UNTOUCHED */
   const [assets, setAssets] = useState<ImagePickerAsset[]>([]);
@@ -78,7 +90,6 @@ export const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({
 
   const [selectedAssetIndex, setSelectedAssetIndex] = useState<number | null>(null);
   const [_galleryAssets, setGalleryAssets] = useState<ImagePickerAsset[]>([]);
-  const [cameraType, setCameraType] = useState<'back' | 'front'>('back');
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [caption, setCaption] = useState("");
   const [isOpeningCamera, setIsOpeningCamera] = useState(false);
@@ -121,7 +132,7 @@ export const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({
           mediaType === 'photo'
             ? {
                 mediaType,
-                cameraType,
+                cameraType: 'back',
                 saveToPhotos: true,
                 includeExtra: true,
                 quality: 0.8,
@@ -129,7 +140,7 @@ export const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({
               }
             : {
                 mediaType,
-                cameraType,
+                cameraType: 'back',
                 saveToPhotos: true,
                 includeExtra: true,
                 videoQuality: 'high',
@@ -167,7 +178,7 @@ export const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({
         setIsOpeningCamera(false);
       }
     },
-    [cameraType], // isOpeningCamera intentionally excluded — guarded by ref above
+    [], // isOpeningCamera intentionally excluded — guarded by ref above
   );
 
   const openGallery = useCallback(async () => {
@@ -278,9 +289,12 @@ export const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({
 
   const isImage = previewAsset?.type?.startsWith("image/");
   const isVideo = previewAsset?.type?.startsWith("video/");
+  const previewDuration = formatDuration(previewAsset?.duration);
 
-  /** Thumbnails also show edited versions */
-  const stripAssets = previewSource.slice(0, 5);
+  /** Thumbnails show every selected asset (gallery allows up to 20; strip scrolls). */
+  const stripAssets = previewSource;
+
+  const hasContent = previewSource.length > 0 || caption.trim() !== "";
 
   return (
     <Modal
@@ -289,19 +303,39 @@ export const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({
       transparent={false}
       onRequestClose={onClose}
     >
-      <SafeAreaView style={[styles.root, { backgroundColor: palette.bg, }]} edges={['top', 'bottom']}>
-
+      <SafeAreaView style={[styles.root, { backgroundColor: palette.bg }]} edges={['top', 'bottom']}>
 
         {/* HEADER */}
-        <View style={[styles.header, { borderBottomColor: palette.divider, backgroundColor: palette.card }]}>
-          <Pressable onPress={onClose} style={styles.headerIconButton}>
-            <KISIcon name="close" size={22} color={palette.subtext} />
+        <View style={[styles.header, { borderBottomColor: palette.divider, backgroundColor: palette.card }, KIS_TOKENS.elevation.card]}>
+          <Pressable
+            onPress={onClose}
+            style={({ pressed }) => [
+              styles.headerIconButton,
+              { backgroundColor: palette.surface },
+              pressed && { opacity: KIS_TOKENS.opacity.pressed },
+            ]}
+          >
+            <KISIcon name="close" size={20} color={palette.text} />
           </Pressable>
 
-          <Text style={styles.headerTitle}>Camera</Text>
+          <View style={styles.headerTitleWrap}>
+            <Text style={[styles.headerTitle, { color: palette.text }]}>Camera</Text>
+            {previewSource.length > 0 ? (
+              <Text style={[styles.headerSubtitle, { color: palette.subtext }]}>
+                {previewSource.length} {previewSource.length === 1 ? 'item' : 'items'} selected
+              </Text>
+            ) : null}
+          </View>
 
-          <Pressable onPress={openGallery} style={styles.headerIconButton}>
-            <KISIcon name="image" size={22} color={palette.subtext} />
+          <Pressable
+            onPress={openGallery}
+            style={({ pressed }) => [
+              styles.headerIconButton,
+              { backgroundColor: palette.surface },
+              pressed && { opacity: KIS_TOKENS.opacity.pressed },
+            ]}
+          >
+            <KISIcon name="image" size={20} color={palette.text} />
           </Pressable>
         </View>
 
@@ -309,21 +343,31 @@ export const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({
         {/* PREVIEW */}
         <View style={styles.content}>
           {previewAsset ? (
-            <>
+            <View style={[styles.previewCard, { backgroundColor: palette.surfaceElevated }, KIS_TOKENS.elevation.modal]}>
               {isImage ? (
                 <Image source={{ uri: previewAsset.uri }} style={styles.previewImage} resizeMode="cover" />
               ) : isVideo ? (
-                <View style={styles.videoPlaceholder}>
-                  <KISIcon name="video" size={40} color={palette.subtext} />
-                  <Text style={styles.videoLabel}>Video selected</Text>
+                <View style={[styles.videoPlaceholder, { backgroundColor: palette.surfaceElevated }]}>
+                  <View style={styles.videoPlayBadge}>
+                    <KISIcon name="play" size={30} color="#fff" />
+                  </View>
+                  <Text style={[styles.videoLabel, { color: palette.text }]}>Video ready to send</Text>
+                  {previewDuration ? (
+                    <Text style={[styles.videoDuration, { color: palette.subtext }]}>{previewDuration}</Text>
+                  ) : null}
                 </View>
               ) : null}
-            </>
+            </View>
           ) : (
             <View style={[styles.emptyState, { borderColor: palette.divider, backgroundColor: palette.surface }]}>
-              <View style={[styles.emptyIcon, { backgroundColor: palette.primarySoft }]}>
-                <KISIcon name="camera" size={34} color={palette.primary} />
-              </View>
+              <LinearGradient
+                colors={[...gradients.tabSelected]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.emptyIcon}
+              >
+                <KISIcon name="camera" size={32} color="#fff" />
+              </LinearGradient>
               <Text style={[styles.emptyTitle, { color: palette.text }]}>Take a photo or video</Text>
               <Text style={[styles.emptySubtitle, { color: palette.subtext }]}>
                 Use your camera or choose from your gallery. Media is checked before it is sent.
@@ -332,14 +376,33 @@ export const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({
                 <Pressable
                   onPress={() => openSystemCamera('photo')}
                   disabled={isOpeningCamera}
-                  style={[styles.emptyActionButton, { backgroundColor: palette.primary }]}
+                  style={({ pressed }) => [
+                    styles.emptyActionButtonWrap,
+                    pressed && { transform: [{ scale: 0.97 }] },
+                    isOpeningCamera && { opacity: KIS_TOKENS.opacity.disabled },
+                  ]}
                 >
-                  <KISIcon name="camera" size={18} color={palette.onPrimary} />
-                  <Text style={[styles.emptyActionText, { color: palette.onPrimary }]}>Photo</Text>
+                  <LinearGradient
+                    colors={[...gradients.header]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.emptyActionButton}
+                  >
+                    {isOpeningCamera ? (
+                      <ActivityIndicator size="small" color="#fff" />
+                    ) : (
+                      <KISIcon name="camera" size={18} color="#fff" />
+                    )}
+                    <Text style={styles.emptyActionTextPrimary}>Photo</Text>
+                  </LinearGradient>
                 </Pressable>
                 <Pressable
                   onPress={openGallery}
-                  style={[styles.emptyActionButton, { backgroundColor: palette.card, borderColor: palette.border, borderWidth: 1 }]}
+                  style={({ pressed }) => [
+                    styles.emptyActionButton,
+                    { backgroundColor: palette.card, borderColor: palette.border, borderWidth: 1 },
+                    pressed && { opacity: KIS_TOKENS.opacity.pressed },
+                  ]}
                 >
                   <KISIcon name="image" size={18} color={palette.text} />
                   <Text style={[styles.emptyActionText, { color: palette.text }]}>Gallery</Text>
@@ -351,135 +414,181 @@ export const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({
 
 
         {/* THUMB STRIP */}
-        <View style={[styles.galleryStrip, { borderTopColor: palette.divider, backgroundColor: palette.card }]}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+        {stripAssets.length > 0 ? (
+          <View style={[styles.galleryStrip, { borderTopColor: palette.divider, backgroundColor: palette.card }]}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.galleryStripContent}
+            >
+              {stripAssets.map((asset, idx) => {
+                const selected = previewAsset?.uri === asset.uri;
+                const isThumbImage = asset.type?.startsWith("image/");
 
-            {stripAssets.map((asset, idx) => {
-              const selected = previewAsset?.uri === asset.uri;
-              const isThumbImage = asset.type?.startsWith("image/");
-
-              return (
-                <View
-                  key={asset.uri ?? idx}
-                  style={[
-                    styles.galleryItem,
-                    { borderColor: selected ? palette.primary : palette.border, borderWidth: selected ? 2 : 1 },
-                  ]}
-                >
-                  {/* Select preview */}
-                  <Pressable
-                    style={StyleSheet.absoluteFill}
-                    onPress={() => {
-                      const base = previewSource;
-                      const indexInBase = base.findIndex(a => a.uri === asset.uri);
-                      if (indexInBase >= 0) setSelectedAssetIndex(indexInBase);
-                    }}
+                return (
+                  <View
+                    key={asset.uri ?? idx}
+                    style={[
+                      styles.galleryItem,
+                      {
+                        borderColor: selected ? palette.primary : palette.border,
+                        borderWidth: selected ? 3 : 1,
+                        backgroundColor: palette.surface,
+                      },
+                      selected && KIS_TOKENS.elevation.popover,
+                    ]}
                   >
-                    {isThumbImage ? (
-                      <Image source={{ uri: asset.uri }} style={styles.galleryThumb} />
-                    ) : (
-                      <View style={styles.galleryThumbCenter}>
-                        <KISIcon name="video" size={18} color={palette.subtext} />
-                      </View>
-                    )}
-                  </Pressable>
+                    {/* Select preview */}
+                    <Pressable
+                      style={StyleSheet.absoluteFill}
+                      onPress={() => {
+                        const base = previewSource;
+                        const indexInBase = base.findIndex(a => a.uri === asset.uri);
+                        if (indexInBase >= 0) setSelectedAssetIndex(indexInBase);
+                      }}
+                    >
+                      {isThumbImage ? (
+                        <Image source={{ uri: asset.uri }} style={styles.galleryThumb} />
+                      ) : (
+                        <View style={styles.galleryThumbCenter}>
+                          <KISIcon name="video" size={18} color={palette.subtext} />
+                        </View>
+                      )}
+                      {!isThumbImage ? (
+                        <View style={styles.thumbPlayBadge}>
+                          <KISIcon name="play" size={11} color="#fff" />
+                        </View>
+                      ) : null}
+                    </Pressable>
 
-                  {/* EDIT */}
-                  <Pressable
-                    style={styles.thumbEditButton}
-                    onPress={() => {
-                      const base = previewSource;
-                      const idxInBase = base.findIndex(a => a.uri === asset.uri);
-                      if (idxInBase >= 0) {
-                        setSelectedAssetIndex(idxInBase);
-                        setEditingIndex(idxInBase);
-                      }
-                    }}
-                  >
-                    <KISIcon name="edit" size={14} color="#fff" />
-                  </Pressable>
+                    {/* EDIT */}
+                    <Pressable
+                      style={styles.thumbEditButton}
+                      onPress={() => {
+                        const base = previewSource;
+                        const idxInBase = base.findIndex(a => a.uri === asset.uri);
+                        if (idxInBase >= 0) {
+                          setSelectedAssetIndex(idxInBase);
+                          setEditingIndex(idxInBase);
+                        }
+                      }}
+                    >
+                      <KISIcon name="edit" size={13} color="#fff" />
+                    </Pressable>
 
-                  {/* REMOVE */}
-                  <Pressable
-                    style={styles.thumbRemoveButton}
-                    onPress={() => removeAsset(asset.uri!)}
-                  >
-                    <KISIcon name="close" size={14} color="#fff" />
-                  </Pressable>
-                </View>
-              );
-            })}
+                    {/* REMOVE */}
+                    <Pressable
+                      style={styles.thumbRemoveButton}
+                      onPress={() => removeAsset(asset.uri!)}
+                    >
+                      <KISIcon name="close" size={13} color="#fff" />
+                    </Pressable>
+                  </View>
+                );
+              })}
 
-            {/* GALLERY BUTTON */}
-            <Pressable onPress={openGallery} style={[styles.galleryItem, { borderColor: palette.border }]}>
-              <KISIcon name="image" size={22} color={palette.text} />
-              <Text style={styles.galleryLabel}>Gallery</Text>
-            </Pressable>
-
-          </ScrollView>
-        </View>
+              {/* ADD MORE FROM GALLERY */}
+              <Pressable
+                onPress={openGallery}
+                style={({ pressed }) => [
+                  styles.addMoreItem,
+                  { borderColor: palette.primary },
+                  pressed && { opacity: KIS_TOKENS.opacity.pressed },
+                ]}
+              >
+                <KISIcon name="add" size={22} color={palette.primary} />
+                <Text style={[styles.galleryLabel, { color: palette.primary }]}>Add</Text>
+              </Pressable>
+            </ScrollView>
+          </View>
+        ) : null}
 
 
         {/* CAPTION */}
-        <View style={[styles.captionContainer, { borderTopColor: palette.divider }]}>
-          <TextInput
-            value={caption}
-            onChangeText={setCaption}
-            placeholder="Add a message..."
-            placeholderTextColor={palette.subtext}
-            style={[styles.captionInput, { color: palette.text }]}
-            multiline
-          />
+        <View style={[styles.captionContainer, { borderTopColor: palette.divider, backgroundColor: palette.bg }]}>
+          <View style={[styles.captionPill, { backgroundColor: palette.inputBg, borderColor: palette.inputBorder }]}>
+            <KISIcon name="chat" size={16} color={palette.subtext} />
+            <TextInput
+              value={caption}
+              onChangeText={setCaption}
+              placeholder="Add a message..."
+              placeholderTextColor={palette.subtext}
+              style={[styles.captionInput, { color: palette.text }]}
+              multiline
+            />
+          </View>
         </View>
 
 
         {/* FOOTER */}
-        <View style={[styles.footer, { borderTopColor: palette.divider }]}>
+        <View style={[styles.footer, { borderTopColor: palette.divider, backgroundColor: palette.card }, KIS_TOKENS.elevation.modal]}>
           <View style={styles.footerRowMain}>
-           
+
             <Pressable
-              style={[styles.footerButton, { backgroundColor: palette.card }]}
+              style={({ pressed }) => [
+                styles.sideButton,
+                { backgroundColor: palette.surface },
+                pressed && { opacity: KIS_TOKENS.opacity.pressed },
+              ]}
               onPress={() => openSystemCamera('video')}
             >
-              <KISIcon name="video" size={18} color={palette.text} />
-              <Text style={[styles.footerButtonLabel, { color: palette.text }]}>Video</Text>
+              <KISIcon name="video" size={20} color={palette.text} />
+              <Text style={[styles.sideButtonLabel, { color: palette.text }]}>Video</Text>
             </Pressable>
-
-             <Pressable
-              style={[styles.footerButton, { backgroundColor: palette.primary }]}
-              onPress={() => openSystemCamera('photo')}
-            >
-              <KISIcon name="camera" size={18} color={palette.onPrimary} />
-            </Pressable>
-
 
             <Pressable
-              style={[styles.footerButton, { backgroundColor: palette.card }]}
-              onPress={() => setCameraType(t => (t === 'back' ? 'front' : 'back'))}
+              onPress={() => openSystemCamera('photo')}
+              disabled={isOpeningCamera}
+              style={({ pressed }) => [
+                styles.shutterWrap,
+                pressed && { transform: [{ scale: 0.95 }] },
+                isOpeningCamera && { opacity: KIS_TOKENS.opacity.disabled },
+              ]}
             >
-              <KISIcon name="refresh" size={18} color={palette.text} />
-              <Text style={[styles.footerButtonLabel, { color: palette.text }]}>Flip</Text>
+              <LinearGradient
+                colors={[...gradients.header]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.shutterRing}
+              >
+                <View style={[styles.shutterInner, { backgroundColor: palette.bg }]}>
+                  {isOpeningCamera ? (
+                    <ActivityIndicator size="small" color={palette.primary} />
+                  ) : (
+                    <KISIcon name="camera" size={26} color={palette.primary} />
+                  )}
+                </View>
+              </LinearGradient>
             </Pressable>
           </View>
 
           <Pressable
-            style={[
-              styles.footerSendButton,
-              { backgroundColor: previewSource.length || caption.trim() ? palette.primary : palette.border },
+            style={({ pressed }) => [
+              styles.footerSendButtonWrap,
+              pressed && hasContent && { transform: [{ scale: 0.98 }] },
             ]}
             onPress={handleSend}
-            disabled={!previewSource.length && caption.trim() === ""}
+            disabled={!hasContent}
           >
-            <Text
-              style={{
-                color: previewSource.length || caption.trim()
-                  ? palette.onPrimary
-                  : palette.subtext,
-                fontWeight: '600',
-              }}
-            >
-              Send {previewSource.length ? `(${previewSource.length})` : ""}
-            </Text>
+            {hasContent ? (
+              <LinearGradient
+                colors={[...gradients.header]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.footerSendButton}
+              >
+                <KISIcon name="send" size={16} color="#fff" />
+                <Text style={styles.footerSendTextEnabled}>
+                  Send {previewSource.length ? `(${previewSource.length})` : ""}
+                </Text>
+              </LinearGradient>
+            ) : (
+              <View style={[styles.footerSendButton, styles.footerSendButtonDisabled, { backgroundColor: palette.card, borderColor: palette.border }]}>
+                <Text style={[styles.footerSendTextDisabled, { color: palette.subtext }]}>
+                  Send
+                </Text>
+              </View>
+            )}
           </Pressable>
         </View>
 
@@ -506,149 +615,231 @@ export const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({
 const styles = StyleSheet.create({
   root: { flex: 1 },
   header: {
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+    paddingHorizontal: KIS_TOKENS.spacing.md,
+    paddingVertical: KIS_TOKENS.spacing.sm,
     borderBottomWidth: 1,
     flexDirection: 'row',
     alignItems: 'center',
   },
-  headerIconButton: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
+  headerIconButton: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerTitleWrap: { flex: 1, alignItems: 'center' },
   headerTitle: {
-    flex: 1,
-    textAlign: 'center',
     fontSize: KIS_TOKENS.typography.title,
-    fontWeight: '700'
+    fontWeight: KIS_TOKENS.typography.weight.bold,
+  },
+  headerSubtitle: {
+    marginTop: 2,
+    fontSize: KIS_TOKENS.typography.tiny,
+    fontWeight: KIS_TOKENS.typography.weight.medium,
   },
 
-  content: { flex: 1, padding: 12, justifyContent: 'center', alignItems: 'center' },
-  previewImage: { width: '100%', height: '100%', borderRadius: kisRadius.lg },
+  content: { flex: 1, padding: KIS_TOKENS.spacing.md, justifyContent: 'center', alignItems: 'center' },
+  previewCard: {
+    width: '100%',
+    height: '100%',
+    borderRadius: kisRadius.xl,
+    overflow: 'hidden',
+  },
+  previewImage: { width: '100%', height: '100%' },
+
   emptyState: {
     width: '100%',
-    minHeight: '70%',
+    minHeight: '72%',
     borderWidth: 1,
-    borderRadius: kisRadius.lg,
+    borderRadius: kisRadius.xl,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 24,
+    padding: KIS_TOKENS.spacing.xl,
   },
   emptyIcon: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
+    width: 76,
+    height: 76,
+    borderRadius: 38,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 16,
+    marginBottom: KIS_TOKENS.spacing.lg,
   },
   emptyTitle: {
-    fontSize: 18,
-    fontWeight: '800',
+    fontSize: KIS_TOKENS.typography.h3,
+    fontWeight: KIS_TOKENS.typography.weight.extrabold,
     textAlign: 'center',
   },
   emptySubtitle: {
-    marginTop: 8,
-    fontSize: 13,
+    marginTop: KIS_TOKENS.spacing.xs,
+    fontSize: KIS_TOKENS.typography.helper,
     lineHeight: 19,
     textAlign: 'center',
+    maxWidth: 260,
   },
   emptyActions: {
     flexDirection: 'row',
-    gap: 10,
-    marginTop: 18,
+    gap: KIS_TOKENS.spacing.sm,
+    marginTop: KIS_TOKENS.spacing.xl,
+  },
+  emptyActionButtonWrap: {
+    borderRadius: kisRadius.lg,
+    overflow: 'hidden',
   },
   emptyActionButton: {
-    minWidth: 108,
-    minHeight: 46,
+    minWidth: 112,
+    minHeight: 48,
     borderRadius: kisRadius.lg,
     alignItems: 'center',
     justifyContent: 'center',
     flexDirection: 'row',
-    gap: 8,
-    paddingHorizontal: 14,
+    gap: KIS_TOKENS.spacing.sm,
+    paddingHorizontal: KIS_TOKENS.spacing.lg,
   },
-  emptyActionText: {
-    fontWeight: '800',
-  },
+  emptyActionText: { fontWeight: KIS_TOKENS.typography.weight.extrabold },
+  emptyActionTextPrimary: { fontWeight: KIS_TOKENS.typography.weight.extrabold, color: '#fff' },
 
   videoPlaceholder: {
     width: '100%',
-    height: '80%',
-    borderRadius: kisRadius.lg,
+    height: '100%',
     justifyContent: 'center',
-    alignItems: 'center'
+    alignItems: 'center',
+    gap: KIS_TOKENS.spacing.xs,
   },
-  videoLabel: { marginTop: 8 },
+  videoPlayBadge: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: KIS_TOKENS.spacing.sm,
+    backgroundColor: 'rgba(0,0,0,0.42)',
+  },
+  videoLabel: { fontSize: KIS_TOKENS.typography.label, fontWeight: KIS_TOKENS.typography.weight.semibold },
+  videoDuration: { fontSize: KIS_TOKENS.typography.helper, marginTop: 2 },
 
-  galleryStrip: { paddingVertical: 8, paddingHorizontal: 8, borderTopWidth: 1 },
+  galleryStrip: { paddingVertical: KIS_TOKENS.spacing.sm, borderTopWidth: 1 },
+  galleryStripContent: { paddingHorizontal: KIS_TOKENS.spacing.sm, gap: KIS_TOKENS.spacing.sm },
   galleryItem: {
-    width: 60,
-    height: 60,
-    borderRadius: kisRadius.md,
-    marginRight: 8,
+    width: 68,
+    height: 68,
+    borderRadius: kisRadius.lg,
     overflow: 'hidden',
     alignItems: 'center',
-    justifyContent: 'center'
+    justifyContent: 'center',
   },
   galleryThumb: { width: '100%', height: '100%' },
   galleryThumbCenter: {
     width: '100%',
     height: '100%',
     alignItems: 'center',
-    justifyContent: 'center'
+    justifyContent: 'center',
+  },
+  thumbPlayBadge: {
+    position: 'absolute',
+    bottom: 4,
+    left: 4,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 
   thumbEditButton: {
     position: 'absolute',
     top: 4,
     right: 4,
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    backgroundColor: 'rgba(0,0,0,0.6)',
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: 'rgba(0,0,0,0.55)',
     alignItems: 'center',
-    justifyContent: 'center'
+    justifyContent: 'center',
   },
   thumbRemoveButton: {
     position: 'absolute',
     top: 4,
     left: 4,
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    backgroundColor: 'rgba(255,0,0,0.7)',
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: 'rgba(220,38,38,0.85)',
     alignItems: 'center',
-    justifyContent: 'center'
+    justifyContent: 'center',
   },
 
-  galleryLabel: { marginTop: 4, fontSize: 11 },
+  addMoreItem: {
+    width: 68,
+    height: 68,
+    borderRadius: kisRadius.lg,
+    borderWidth: 1.5,
+    borderStyle: 'dashed',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  galleryLabel: { marginTop: 3, fontSize: KIS_TOKENS.typography.tiny, fontWeight: KIS_TOKENS.typography.weight.semibold },
 
   captionContainer: {
     borderTopWidth: 1,
-    padding: 8
+    paddingHorizontal: KIS_TOKENS.spacing.md,
+    paddingVertical: KIS_TOKENS.spacing.sm,
   },
-  captionInput: { minHeight: 40, maxHeight: 90, fontSize: 14 },
+  captionPill: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: KIS_TOKENS.spacing.sm,
+    borderWidth: 1,
+    borderRadius: KIS_TOKENS.radius.pill,
+    paddingHorizontal: KIS_TOKENS.spacing.lg,
+    paddingVertical: 10,
+  },
+  captionInput: { flex: 1, minHeight: 20, maxHeight: 90, fontSize: KIS_TOKENS.typography.input, paddingTop: 0 },
 
-  footer: { paddingHorizontal: 12, paddingVertical: 10, borderTopWidth: 1 },
-  footerRowMain: { flexDirection: 'row', justifyContent: 'space-between' },
-  footerButton: {
-    flex: 1,
-    minHeight: 52,
-    marginHorizontal: 4,
-    padding: 10,
+  footer: { paddingHorizontal: KIS_TOKENS.spacing.md, paddingTop: KIS_TOKENS.spacing.md, paddingBottom: KIS_TOKENS.spacing.sm, borderTopWidth: 1 },
+  footerRowMain: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: KIS_TOKENS.spacing['2xl'] },
+  sideButton: {
+    width: 64,
+    height: 60,
     borderRadius: kisRadius.lg,
     alignItems: 'center',
     justifyContent: 'center',
     gap: 4,
   },
-  footerButtonLabel: {
-    fontSize: 11,
-    fontWeight: '800',
+  sideButtonLabel: {
+    fontSize: KIS_TOKENS.typography.tiny,
+    fontWeight: KIS_TOKENS.typography.weight.bold,
   },
+
+  shutterWrap: { alignItems: 'center', justifyContent: 'center' },
+  shutterRing: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  shutterInner: {
+    width: 68,
+    height: 68,
+    borderRadius: 34,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  footerSendButtonWrap: { marginTop: KIS_TOKENS.spacing.md, borderRadius: KIS_TOKENS.radius.pill, overflow: 'hidden' },
   footerSendButton: {
-    marginTop: 8,
-    paddingVertical: 12,
-    borderRadius: kisRadius.lg,
-    alignItems: 'center'
+    paddingVertical: 14,
+    borderRadius: KIS_TOKENS.radius.pill,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    gap: KIS_TOKENS.spacing.sm,
   },
+  footerSendButtonDisabled: { borderWidth: 1 },
+  footerSendTextEnabled: { color: '#fff', fontWeight: KIS_TOKENS.typography.weight.extrabold, fontSize: KIS_TOKENS.typography.label },
+  footerSendTextDisabled: { fontWeight: KIS_TOKENS.typography.weight.extrabold, fontSize: KIS_TOKENS.typography.label },
 });
 
 export default CameraCaptureModal;
