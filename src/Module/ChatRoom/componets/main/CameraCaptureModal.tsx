@@ -702,7 +702,12 @@ const styles = StyleSheet.create({
     fontWeight: KIS_TOKENS.typography.weight.medium,
   },
 
-  content: { flex: 1, padding: KIS_TOKENS.spacing.md, justifyContent: 'center', alignItems: 'center' },
+  // minHeight matters now that this sits inside a ScrollView (19da909): once
+  // total content genuinely overflows the viewport, `content`'s flex:1 has no
+  // guaranteed resolved size to hand previewCard's height:'100% — without a
+  // floor it can shrink toward zero instead of just scrolling past, hiding
+  // the preview entirely instead of the sheet growing scrollable.
+  content: { flex: 1, minHeight: 220, padding: KIS_TOKENS.spacing.md, justifyContent: 'center', alignItems: 'center' },
   previewCard: {
     width: '100%',
     height: '100%',
