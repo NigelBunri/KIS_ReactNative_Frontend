@@ -172,6 +172,21 @@ export default function MessagesScreen({ onOpenChat, onOpenInfo, appName, header
   // Search & menus
   const [query, setQuery] = useState('');
   const [menuVisible, setMenuVisible] = useState(false);
+  // Measured live (not a hardcoded constant) so the dropdown sits right
+  // under the Golden Section header regardless of its current collapsed
+  // height on this screen — see goldHeaderRef below.
+  const [menuTop, setMenuTop] = useState<number | null>(null);
+  const goldHeaderRef = useRef<View>(null);
+  const toggleMenu = useCallback(() => {
+    if (menuVisible) {
+      setMenuVisible(false);
+      return;
+    }
+    goldHeaderRef.current?.measureInWindow((_x, y, _w, h) => {
+      setMenuTop(y + h);
+      setMenuVisible(true);
+    });
+  }, [menuVisible]);
   const [globalSearchResults, setGlobalSearchResults] = useState<GlobalSearchResult[]>([]);
   const [globalSearchLoading, setGlobalSearchLoading] = useState(false);
   const [cameraShareVisible, setCameraShareVisible] = useState(false);
@@ -2021,7 +2036,7 @@ const handleOpenChatFromAddContacts = useCallback((chat: Chat) => {
   // opening underneath the still-visible gold header.
   useGoldenSectionContent(chatVisible || addVisible ? null : {
     content: (
-      <View {...headerPanHandlers}>
+      <View {...headerPanHandlers} ref={goldHeaderRef}>
 
       {/* ------------ Top App Bar ------------ */}
         {selectMode ? (
@@ -2114,7 +2129,7 @@ const handleOpenChatFromAddContacts = useCallback((chat: Chat) => {
               ))}
 
               <Pressable
-                onPress={() => setMenuVisible((v) => !v)}
+                onPress={toggleMenu}
                 hitSlop={8}
                 style={({ pressed }) => [
                   {
@@ -2200,7 +2215,7 @@ const handleOpenChatFromAddContacts = useCallback((chat: Chat) => {
                   icon: activeTopTab === 'Chats' ? 'camera' : activeTopTab === 'Communities' ? 'globe' : 'search',
                   onPress: handleHeaderCameraPress,
                 },
-                { key: 'menu', icon: 'menu', onPress: () => setMenuVisible((v) => !v) },
+                { key: 'menu', icon: 'menu', onPress: toggleMenu },
               ].map(action => (
                 <Pressable
                   key={action.key}
@@ -2249,7 +2264,7 @@ const handleOpenChatFromAddContacts = useCallback((chat: Chat) => {
             {
               position: 'absolute',
               right: messageHeaderPaddingX,
-              top: topInset + (isTinyDevice ? 62 : 72),
+              top: (menuTop ?? topInset + (isTinyDevice ? 62 : 72)) + 8,
               borderColor: palette.gold,
               backgroundColor: palette.card,
               shadowColor: palette.shadow,
