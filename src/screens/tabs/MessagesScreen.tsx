@@ -1747,7 +1747,8 @@ const handleSelectAllChats = useCallback(() => {
           {...tabProps}
           style={{ backgroundColor: messageTopPanelBg, elevation: 0 }}
           indicatorStyle={{ backgroundColor: palette.goldLight, height: 3, borderRadius: 3 }}
-          labelStyle={{ fontWeight: '700', textTransform: 'none', fontSize: responsive.isWatch ? 11 : responsive.isCompactPhone ? 12 : 14 }}
+          labelStyle={{ fontWeight: '700', textTransform: 'none', fontSize: responsive.isWatch ? 8 : responsive.isCompactPhone ? 9 : 10, marginTop: 2 }}
+          tabStyle={{ paddingTop: 4, paddingBottom: 2 }}
           activeTintColor={palette.onGold}
           inactiveTintColor="rgba(255,244,184,0.76)"
         />
@@ -2510,7 +2511,10 @@ const handleOpenChatFromAddContacts = useCallback((chat: Chat) => {
         >
           <Tab.Screen
             name="Chats"
-            options={{ tabBarLabel: translateString('Chats') }}
+            options={{
+              tabBarLabel: translateString('Chats'),
+              tabBarIcon: ({ color }: { color: string }) => <KISIcon name="chat" size={16} color={color} />,
+            }}
             children={() => (
               <ChatsTab
                 ref={chatsTabRef}
@@ -2545,19 +2549,28 @@ const handleOpenChatFromAddContacts = useCallback((chat: Chat) => {
           />
           <Tab.Screen
             name="Updates"
-            options={{ tabBarLabel: translateString('Updates') }}
+            options={{
+              tabBarLabel: translateString('Updates'),
+              tabBarIcon: ({ color }: { color: string }) => <KISIcon name="radio" size={16} color={color} />,
+            }}
             children={() => (
               <UpdatesTab ref={updatesTabRef} searchTerm={query} onOpenChat={onOpenChat} onScroll={handleTabScroll} />
             )}
           />
           <Tab.Screen
             name="Calls"
-            options={{ tabBarLabel: translateString('Calls') }}
+            options={{
+              tabBarLabel: translateString('Calls'),
+              tabBarIcon: ({ color }: { color: string }) => <KISIcon name="phone" size={16} color={color} />,
+            }}
             children={() => <CallsTab ref={callsTabRef} searchTerm={query} onScroll={handleTabScroll} />}
           />
           <Tab.Screen
             name="Communities"
-            options={{ tabBarLabel: translateString('Communities') }}
+            options={{
+              tabBarLabel: translateString('Communities'),
+              tabBarIcon: ({ color }: { color: string }) => <KISIcon name="users" size={16} color={color} />,
+            }}
             children={() => (
               <CommunitiesTab ref={communitiesTabRef} onOpenChat={onOpenChat} onScroll={handleTabScroll} />
             )}
