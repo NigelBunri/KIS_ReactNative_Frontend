@@ -16,6 +16,7 @@ import {
   AppState,
   useWindowDimensions,
   Modal,
+  ScrollView,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import LinearGradient from 'react-native-linear-gradient';
@@ -78,11 +79,10 @@ const Tab = createMaterialTopTabNavigator();
 // time, unavoidable since AsyncStorage has no synchronous read API), but on
 // every subsequent mount of this screen within the same session (switching
 // tabs away and back), the same async round-trip repeated for data that was
-// already known a moment ago, popping the same chips in again and changing
-// styles.chipsRow's (flexWrap) wrap state - a real, visible Golden Section
-// height change on every tab revisit, not just once at cold boot. Seeding
-// from this cache means every mount after the first one this session
-// already has the right answer before first paint.
+// already known a moment ago, popping the same chips into the scrollable
+// chipsRow a beat late on every tab revisit, not just once at cold boot.
+// Seeding from this cache means every mount after the first one this
+// session already has the right answer before first paint.
 let cachedCustomFilters: CustomFilter[] | null = null;
 
 type MessagesScreenProps = {
@@ -2397,46 +2397,52 @@ const handleOpenChatFromAddContacts = useCallback((chat: Chat) => {
           ) : null}
 
           {/* Quick chips + Custom filter row */}
-          {activeTopTab === 'Chats' ? <View style={styles.chipsRow}>
-            {(['Unread', 'Groups', 'Channels', 'Favourites', 'Community', 'Mentions', 'Archived', 'Blocked'] as LocalQuick[]).map(
-              (chip) => (
+          {activeTopTab === 'Chats' ? (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.chipsRow}
+            >
+              {(['Unread', 'Groups', 'Channels', 'Favourites', 'Community', 'Mentions', 'Archived', 'Blocked'] as LocalQuick[]).map(
+                (chip) => (
+                  <ToggleChip
+                    key={chip}
+                    label={chip}
+                    active={activeQuick.has(chip)}
+                    onPress={() => quickToggle(chip)}
+                    palette={palette}
+                  />
+                )
+              )}
+
+              {customFilters.map((f) => (
                 <ToggleChip
-                  key={chip}
-                  label={chip}
-                  active={activeQuick.has(chip)}
-                  onPress={() => quickToggle(chip)}
+                  key={f.id}
+                  label={f.label}
+                  active={activeCustom === f.id}
+                  onPress={() => setActiveCustom((cur) => (cur === f.id ? null : f.id))}
                   palette={palette}
                 />
-              )
-            )}
+              ))}
 
-            {customFilters.map((f) => (
-              <ToggleChip
-                key={f.id}
-                label={f.label}
-                active={activeCustom === f.id}
-                onPress={() => setActiveCustom((cur) => (cur === f.id ? null : f.id))}
-                palette={palette}
-              />
-            ))}
-
-            <Pressable
-              onPress={() => setFilterMgrOpen(true)}
-              style={({ pressed }) => [
-                styles.chip,
-                {
-                  backgroundColor: pressed ? palette.surface : palette.card,
-                  borderColor: palette.inputBorder,
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  gap: 6,
-                },
-              ]}
-            >
-              <KISIcon name="add" size={18} color={palette.text} />
-              <Text style={{ color: palette.text, fontSize: 13 }}>Create</Text>
-            </Pressable>
-          </View> : null}
+              <Pressable
+                onPress={() => setFilterMgrOpen(true)}
+                style={({ pressed }) => [
+                  styles.chip,
+                  {
+                    backgroundColor: pressed ? palette.surface : palette.card,
+                    borderColor: palette.inputBorder,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 6,
+                  },
+                ]}
+              >
+                <KISIcon name="add" size={18} color={palette.text} />
+                <Text style={{ color: palette.text, fontSize: 13 }}>Create</Text>
+              </Pressable>
+            </ScrollView>
+          ) : null}
         </View>
         </ReAnimated.View>
       )}
