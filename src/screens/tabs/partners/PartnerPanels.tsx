@@ -31,6 +31,7 @@ import PartnerTrainingTracksPanel from '@/components/partners/PartnerTrainingTra
 import PartnerEventsCalendarPanel from '@/components/partners/PartnerEventsCalendarPanel';
 import PartnerBroadcastCenterPanel from '@/components/partners/PartnerBroadcastCenterPanel';
 import PartnerSupportInboxPanel from '@/components/partners/PartnerSupportInboxPanel';
+import PartnerActivityPanel from '@/components/partners/PartnerActivityPanel';
 import PartnerPostTemplatesPanel from '@/components/partners/PartnerPostTemplatesPanel';
 import PartnerSurveysPanel from '@/components/partners/PartnerSurveysPanel';
 import PartnerBudgetTrackingPanel from '@/components/partners/PartnerBudgetTrackingPanel';
@@ -230,6 +231,12 @@ type Props = {
     onClose: () => void;
     canManage?: boolean;
   };
+  activityPanel: {
+    isOpen: boolean;
+    panelWidth: number;
+    panelTranslateX: any;
+    onClose: () => void;
+  };
   postTemplatesPanel: {
     isOpen: boolean;
     panelWidth: number;
@@ -374,6 +381,7 @@ export default function PartnerPanels({
   eventsCalendarPanel,
   broadcastCenterPanel,
   supportInboxPanel,
+  activityPanel,
   postTemplatesPanel,
   surveysPanel,
   budgetTrackingPanel,
@@ -631,6 +639,14 @@ export default function PartnerPanels({
         partnerId={selectedPartnerId}
         canManage={supportInboxPanel.canManage}
         onClose={supportInboxPanel.onClose}
+      />
+
+      <PartnerActivityPanel
+        isOpen={activityPanel.isOpen}
+        panelWidth={activityPanel.panelWidth}
+        panelTranslateX={activityPanel.panelTranslateX}
+        partnerId={selectedPartnerId}
+        onClose={activityPanel.onClose}
       />
 
       <PartnerPostTemplatesPanel

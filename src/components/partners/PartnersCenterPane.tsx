@@ -51,6 +51,8 @@ type Props = {
   onCommunityFeedPress: (communityId: string) => void;
   onPartnerHeaderPress: () => void;
   onInfoPress?: () => void;
+  onActivityPress?: () => void;
+  hasUnreadActivity?: boolean;
   isKcanAdmin?: boolean;
   onOpenAdminDashboard?: () => void;
   onOpenInsights?: () => void;
@@ -77,6 +79,8 @@ export default function PartnersCenterPane({
   onCommunityFeedPress,
   onPartnerHeaderPress,
   onInfoPress,
+  onActivityPress,
+  hasUnreadActivity,
   isKcanAdmin,
   onOpenAdminDashboard,
   onOpenInsights,
@@ -215,6 +219,8 @@ export default function PartnersCenterPane({
           pageGutter={responsive.pageGutter}
           onSettingsPress={onPartnerHeaderPress}
           onInfoPress={onInfoPress}
+          onActivityPress={onActivityPress}
+          hasUnreadActivity={hasUnreadActivity}
           verificationSummary={partnerVerificationSummary}
         />
         <ReanimatedScroll.View style={[collapseStyle, { overflow: 'hidden' }]}>
@@ -715,6 +721,8 @@ type CompactGoldBarProps = {
   pageGutter: number;
   onSettingsPress?: () => void;
   onInfoPress?: () => void;
+  onActivityPress?: () => void;
+  hasUnreadActivity?: boolean;
   verificationSummary?: any;
 };
 
@@ -724,6 +732,8 @@ function PartnerCompactGoldBar({
   pageGutter,
   onSettingsPress,
   onInfoPress,
+  onActivityPress,
+  hasUnreadActivity,
   verificationSummary,
 }: CompactGoldBarProps) {
   const { palette } = useKISTheme();
@@ -772,6 +782,33 @@ function PartnerCompactGoldBar({
           {roleName}{verificationSummary?.verified ? ' · Verified ✓' : ''}
         </Text>
       </Pressable>
+
+      {onActivityPress && (
+        <Pressable
+          onPress={onActivityPress}
+          hitSlop={8}
+          style={({ pressed }) => [
+            localHeaderStyles.compactIconBtn,
+            { opacity: pressed ? 0.75 : 1 },
+          ]}
+          accessibilityLabel="Partner activity"
+        >
+          <KISIcon name="bell" size={18} color="rgba(255,244,184,0.92)" />
+          {hasUnreadActivity ? (
+            <View
+              style={{
+                position: 'absolute',
+                top: 6,
+                right: 6,
+                width: 8,
+                height: 8,
+                borderRadius: 4,
+                backgroundColor: palette.danger,
+              }}
+            />
+          ) : null}
+        </Pressable>
+      )}
 
       {onSettingsPress && (
         <Pressable

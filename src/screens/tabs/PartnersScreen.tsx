@@ -39,6 +39,10 @@ import { usePartnerTrainingTracksPanel } from './partners/usePartnerTrainingTrac
 import { usePartnerEventsCalendarPanel } from './partners/usePartnerEventsCalendarPanel';
 import { usePartnerBroadcastCenterPanel } from './partners/usePartnerBroadcastCenterPanel';
 import { usePartnerSupportInboxPanel } from './partners/usePartnerSupportInboxPanel';
+import { usePartnerActivityPanel } from './partners/usePartnerActivityPanel';
+import { fetchInAppNotifications } from '@/services/inAppNotificationService';
+import { matchesPartnerTokens } from '@/components/partners/PartnerActivityPanel';
+import { bindMainTabBadgeSourceEvents } from '@/services/mainTabNotificationBadges';
 import { usePartnerPostTemplatesPanel } from './partners/usePartnerPostTemplatesPanel';
 import { usePartnerSurveysPanel } from './partners/usePartnerSurveysPanel';
 import { usePartnerBudgetTrackingPanel } from './partners/usePartnerBudgetTrackingPanel';
@@ -523,6 +527,25 @@ export default function PartnersScreen({ setHidNav, onOpenInfo }: any) {
     close: closeSupportInboxPanel,
   } = usePartnerSupportInboxPanel(shellContentWidth);
   const {
+    panelWidth: activityPanelWidth,
+    panelTranslateX: activityPanelTranslateX,
+    isOpen: isActivityPanelOpen,
+    open: openActivityPanel,
+    close: closeActivityPanel,
+  } = usePartnerActivityPanel(shellContentWidth);
+  // Small unread dot for the header's activity bell — a lightweight local
+  // signal, not a replacement for the real tab-badge math (badge_counts.py
+  // also folds in the partner's main_conversation unread count, which this
+  // doesn't try to replicate). Good enough to tell the user "there's
+  // something to check here"; opening the panel is what actually clears it.
+  const [hasUnreadPartnerActivity, setHasUnreadPartnerActivity] = React.useState(false);
+  const checkUnreadPartnerActivity = useCallback(async () => {
+    const all = await fetchInAppNotifications();
+    setHasUnreadPartnerActivity(all.some((item) => !item.readAt && matchesPartnerTokens(item)));
+  }, []);
+  useFocusEffect(useCallback(() => { checkUnreadPartnerActivity(); }, [checkUnreadPartnerActivity]));
+  useEffect(() => bindMainTabBadgeSourceEvents(checkUnreadPartnerActivity), [checkUnreadPartnerActivity]);
+  const {
     panelWidth: postTemplatesPanelWidth,
     panelTranslateX: postTemplatesPanelTranslateX,
     isOpen: isPostTemplatesPanelOpen,
@@ -957,6 +980,8 @@ export default function PartnersScreen({ setHidNav, onOpenInfo }: any) {
         onCommunityFeedPress={onCommunityFeedPress}
         onPartnerHeaderPress={onPartnerHeaderPress}
         onInfoPress={handleOpenPartnerInfo}
+        onActivityPress={openActivityPanel}
+        hasUnreadActivity={hasUnreadPartnerActivity}
         width={width}
         messagesOffsetAnim={messagesOffsetAnim}
         messagePanHandlers={messagePanHandlers}
@@ -1166,6 +1191,12 @@ export default function PartnersScreen({ setHidNav, onOpenInfo }: any) {
             panelTranslateX: supportInboxPanelTranslateX,
             onClose: closeSupportInboxPanel,
             canManage: canManageOrganizationApps,
+          },
+          activityPanel: {
+            isOpen: isActivityPanelOpen,
+            panelWidth: activityPanelWidth,
+            panelTranslateX: activityPanelTranslateX,
+            onClose: closeActivityPanel,
           },
           postTemplatesPanel: {
             isOpen: isPostTemplatesPanelOpen,

@@ -39,6 +39,8 @@ type Props = {
   onCommunityFeedPress: (id: string) => void;
   onPartnerHeaderPress: () => void;
   onInfoPress?: () => void;
+  onActivityPress?: () => void;
+  hasUnreadActivity?: boolean;
   width: number;
   messagesOffsetAnim: any;
   messagePanHandlers: Record<string, any>;
@@ -90,6 +92,7 @@ type Props = {
     eventsCalendarPanel: any;
     broadcastCenterPanel: any;
     supportInboxPanel: any;
+    activityPanel: any;
     postTemplatesPanel: any;
     surveysPanel: any;
     budgetTrackingPanel: any;
@@ -141,6 +144,8 @@ export default function PartnerLayout({
   onCommunityFeedPress,
   onPartnerHeaderPress,
   onInfoPress,
+  onActivityPress,
+  hasUnreadActivity,
   width,
   messagesOffsetAnim,
   messagePanHandlers,
@@ -259,6 +264,8 @@ export default function PartnerLayout({
         onCommunityFeedPress={onCommunityFeedPress}
         onPartnerHeaderPress={onPartnerHeaderPress}
         onInfoPress={onInfoPress}
+        onActivityPress={onActivityPress}
+        hasUnreadActivity={hasUnreadActivity}
         isKcanAdmin={isKcanAdmin}
         onOpenAdminDashboard={onOpenAdminDashboard}
         onOpenInsights={onOpenInsights}
@@ -370,6 +377,7 @@ export default function PartnerLayout({
         eventsCalendarPanel={panels.eventsCalendarPanel}
         broadcastCenterPanel={panels.broadcastCenterPanel}
         supportInboxPanel={panels.supportInboxPanel}
+        activityPanel={panels.activityPanel}
         postTemplatesPanel={panels.postTemplatesPanel}
         surveysPanel={panels.surveysPanel}
         budgetTrackingPanel={panels.budgetTrackingPanel}
