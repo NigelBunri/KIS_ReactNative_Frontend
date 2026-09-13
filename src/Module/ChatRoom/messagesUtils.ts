@@ -418,8 +418,8 @@ export const styles = StyleSheet.create({
   messageGoldPanel: {
     overflow: 'hidden',
     backgroundColor: '#6B4334',
-    borderBottomLeftRadius: 24,
-    borderBottomRightRadius: 24,
+    borderBottomLeftRadius: 0,
+    borderBottomRightRadius: 0,
   },
 
   /* App Bar */

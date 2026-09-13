@@ -1764,12 +1764,23 @@ const handleSelectAllChats = useCallback(() => {
       }
     }, [nextTab]);
     return (
-      <View style={{ backgroundColor: messageTopPanelBg, borderBottomWidth: 0, borderBottomColor: 'transparent' }}>
+      <View style={{ overflow: 'hidden', borderBottomWidth: 0, borderBottomColor: 'transparent' }}>
+        <LinearGradient
+          colors={[...messageGoldGradient]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={StyleSheet.absoluteFill}
+        />
         <View style={{ flexDirection: 'row', paddingHorizontal: responsive.pageGutter, paddingVertical: 8, gap: 6 }}>
           {state.routes.map((route: { key: string; name: string }, index: number) => {
             const { options } = descriptors[route.key];
             const isFocused = state.index === index;
-            const tintColor = isFocused ? palette.onGold : 'rgba(255,244,184,0.76)';
+            // Bar background is now the same bright gold as the header
+            // above it, so the active pill inverts to a dark fill (rather
+            // than reusing the gold gradient, which would nearly vanish
+            // against its own background) — same dark-on-gold contrast
+            // already used for this screen's app-bar icon circles.
+            const tintColor = isFocused ? palette.onGold : 'rgba(23,17,31,0.62)';
             const onPress = () => {
               const event = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
               if (!isFocused && !event.defaultPrevented) {
@@ -1791,16 +1802,11 @@ const handleSelectAllChats = useCallback(() => {
                     borderRadius: 999,
                     overflow: 'hidden',
                   },
-                  pressed && !isFocused && { backgroundColor: 'rgba(255,244,184,0.10)' },
+                  pressed && !isFocused && { backgroundColor: 'rgba(23,17,31,0.08)' },
                 ]}
               >
                 {isFocused ? (
-                  <LinearGradient
-                    colors={[...messageGoldGradient]}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 0 }}
-                    style={StyleSheet.absoluteFill}
-                  />
+                  <View style={[StyleSheet.absoluteFill, { backgroundColor: palette.royalInk }]} />
                 ) : null}
                 {options.tabBarIcon?.({ focused: isFocused, color: tintColor, size: 15 })}
                 <Text
@@ -1995,8 +2001,6 @@ const handleOpenChatFromAddContacts = useCallback((chat: Chat) => {
       },
     ],
   } as const;
-
-  const messageTopPanelBg = tone === 'dark' ? palette.goldDeep : palette.royalInk;
 
   // goldHeader starts with bright gold so the transparent status bar shows the
   // app's gold theme, not a dark void. The diagonal direction keeps the luxury
