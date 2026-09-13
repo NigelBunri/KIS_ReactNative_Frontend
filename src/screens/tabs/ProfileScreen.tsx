@@ -251,7 +251,7 @@ export default function ProfileScreen() {
   // ProfileHeroCard keeps its own bespoke collapseStyle/stickyBarStyle (its
   // two-state crossfade needs a seeded natural-height to avoid an on-mount
   // stutter, which the hook's own collapseStyle doesn't support).
-  const { scrollY: profileScrollY, onScroll: profileScrollHandler } = useCollapsingGoldHeader(HERO_COLLAPSE_DISTANCE);
+  const { scrollY: profileScrollY, onScroll: profileScrollHandler, onScrollSettle: profileScrollSettle } = useCollapsingGoldHeader(HERO_COLLAPSE_DISTANCE);
   // ProfileHeroCard's collapse animates a real layout property (maxHeight) on
   // a box that sits above this same ScrollView as a normal-flow flex sibling
   // (the gold header is no longer a position:absolute overlay), so shrinking
@@ -2656,6 +2656,8 @@ export default function ProfileScreen() {
     <View style={[styles.wrap, { backgroundColor: palette.bg}]}>
       <ReanimatedScroll.ScrollView
         onScroll={profileScrollHandler}
+        onScrollEndDrag={profileScrollSettle}
+        onMomentumScrollEnd={profileScrollSettle}
         scrollEventThrottle={16}
         contentContainerStyle={[
           styles.scroll,
