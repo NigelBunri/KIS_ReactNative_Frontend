@@ -1764,7 +1764,21 @@ const handleSelectAllChats = useCallback(() => {
       }
     }, [nextTab]);
     return (
-      <View style={{ overflow: 'hidden', borderBottomWidth: 0, borderBottomColor: 'transparent' }}>
+      <View
+        style={{
+          overflow: 'hidden',
+          borderBottomWidth: 0,
+          borderBottomColor: 'transparent',
+          // Header above this no longer rounds its own bottom corners (they'd
+          // interrupt the header/tab-bar seam now that both share one gold
+          // background) — the combined gold block's true bottom edge is
+          // here now, so the rounded-card look Bible/Broadcast/Partners/
+          // Profile's gold sections all have moves to this component
+          // instead, at the same radius GoldHeaderShell uses by default.
+          borderBottomLeftRadius: 24,
+          borderBottomRightRadius: 24,
+        }}
+      >
         <LinearGradient
           colors={[...messageGoldGradient]}
           start={{ x: 0, y: 0 }}
