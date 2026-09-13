@@ -105,6 +105,15 @@ export const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({
   // Use a ref for the guard so it doesn't cause openSystemCamera to be recreated,
   // which would retrigger the visibility effect in an infinite loop.
   const isOpeningCameraRef = useRef(false);
+  // launchCamera()'s promise can be lost entirely on Android if the hosting
+  // Activity is recreated while the system camera is in the foreground (a
+  // known react-native-image-picker/OS interaction, not something this
+  // component can prevent) — without a bound, that leaves isOpeningCamera
+  // stuck true forever, which is exactly the "keeps loading" symptom.
+  // requestIdRef lets a stale attempt's finally block (or a very late real
+  // resolution after the timeout already fired) recognize it's no longer
+  // the active one and avoid clobbering whatever came after it.
+  const requestIdRef = useRef(0);
 
   /** Helper to update assets after new camera/gallery selection */
   const setNewAssetsAndSelectFirst = (newAssets: ImagePickerAsset[]) => {
@@ -118,6 +127,18 @@ export const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({
       if (isOpeningCameraRef.current) return;
       isOpeningCameraRef.current = true;
       setIsOpeningCamera(true);
+      const requestId = ++requestIdRef.current;
+      let timedOut = false;
+      let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        // Generous — this only exists to bound the "lost callback" failure
+        // mode above, not to rush a real photo/video capture. Video capture
+        // itself is already capped at durationLimit (60s) below.
+        timeoutHandle = setTimeout(() => {
+          timedOut = true;
+          reject(new Error('camera-timeout'));
+        }, 120000);
+      });
       try {
         const hasCameraPermission = await ensureCameraPermission();
         if (!hasCameraPermission) {
@@ -157,7 +178,8 @@ export const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({
                 presentationStyle: 'fullScreen',
               };
 
-        const result = await launchCamera(options);
+        const result = await Promise.race([launchCamera(options), timeoutPromise]);
+        if (requestId !== requestIdRef.current) return; // superseded by a newer attempt
         if (result.didCancel) return;
         if (result.errorCode) {
           const message = result.errorMessage || 'Could not open camera.';
@@ -181,10 +203,21 @@ export const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({
 
         setNewAssetsAndSelectFirst(newAssets);
       } catch {
-        Alert.alert('Camera Error', 'Could not open camera.');
+        if (requestId !== requestIdRef.current) return; // superseded by a newer attempt
+        if (timedOut) {
+          Alert.alert(
+            'Camera took too long',
+            "The camera didn't respond in time. Please try again.",
+          );
+        } else {
+          Alert.alert('Camera Error', 'Could not open camera.');
+        }
       } finally {
-        isOpeningCameraRef.current = false;
-        setIsOpeningCamera(false);
+        clearTimeout(timeoutHandle);
+        if (requestId === requestIdRef.current) {
+          isOpeningCameraRef.current = false;
+          setIsOpeningCamera(false);
+        }
       }
     },
     [], // isOpeningCamera intentionally excluded — guarded by ref above
@@ -665,7 +698,6 @@ const styles = StyleSheet.create({
 
   emptyState: {
     width: '100%',
-    minHeight: '72%',
     borderWidth: 1,
     borderRadius: kisRadius.xl,
     justifyContent: 'center',
