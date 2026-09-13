@@ -51,7 +51,6 @@ import {
   channelContentEndScreenEndpoint,
   channelContentCardsEndpoint,
   channelContentClipDetailEndpoint,
-  channelActivityEndpoint,
   channelSubscribersEndpoint,
   liveStreamPollsEndpoint,
   livePollVoteEndpoint,
@@ -641,13 +640,6 @@ export const fetchContentSubtitles = async (contentId: string) => {
 // Related content
 export const fetchRelatedContent = async (contentId: string): Promise<BroadcastChannelContent[]> => {
   const response = await getRequest(channelContentRelatedEndpoint(contentId), { errorMessage: 'Unable to load related content.' });
-  if (!response?.success) return [];
-  return Array.isArray(response.data?.results) ? response.data.results : response.data ?? [];
-};
-
-// Activity feed
-export const fetchChannelActivity = async (channelId: string) => {
-  const response = await getRequest(channelActivityEndpoint(channelId), { errorMessage: 'Unable to load activity.' });
   if (!response?.success) return [];
   return Array.isArray(response.data?.results) ? response.data.results : response.data ?? [];
 };
