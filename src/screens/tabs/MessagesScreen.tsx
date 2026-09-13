@@ -1768,19 +1768,24 @@ const handleSelectAllChats = useCallback(() => {
         <LinearGradient
           colors={[...messageGoldGradient]}
           start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
+          end={{ x: 1, y: 0 }}
           style={StyleSheet.absoluteFill}
         />
         <View style={{ flexDirection: 'row', paddingHorizontal: responsive.pageGutter, paddingVertical: 8, gap: 6 }}>
           {state.routes.map((route: { key: string; name: string }, index: number) => {
             const { options } = descriptors[route.key];
             const isFocused = state.index === index;
-            // Bar background is now the same bright gold as the header
-            // above it, so the active pill inverts to a dark fill (rather
-            // than reusing the gold gradient, which would nearly vanish
-            // against its own background) — same dark-on-gold contrast
-            // already used for this screen's app-bar icon circles.
-            const tintColor = isFocused ? palette.onGold : 'rgba(23,17,31,0.62)';
+            // messageGoldGradient runs from bright gold to notably dark
+            // (see its shade() stops in theme/constants.ts) across this
+            // bar's full width, so no single flat tint reads well against
+            // every tab's position in it — a dark tint (this used to be
+            // rgba(23,17,31,0.62)) disappears wherever a tab happens to
+            // fall over the gradient's brighter end. White text plus a
+            // dark text shadow (below) reads correctly regardless of which
+            // part of the gradient sits behind it; the active tab's own
+            // opaque dark pill makes this moot for it specifically, but
+            // using the same scheme for both keeps one consistent rule.
+            const tintColor = isFocused ? palette.onGold : 'rgba(255,255,255,0.82)';
             const onPress = () => {
               const event = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
               if (!isFocused && !event.defaultPrevented) {
@@ -1802,7 +1807,7 @@ const handleSelectAllChats = useCallback(() => {
                     borderRadius: 999,
                     overflow: 'hidden',
                   },
-                  pressed && !isFocused && { backgroundColor: 'rgba(23,17,31,0.08)' },
+                  pressed && !isFocused && { backgroundColor: 'rgba(255,255,255,0.10)' },
                 ]}
               >
                 {isFocused ? (
@@ -1811,7 +1816,14 @@ const handleSelectAllChats = useCallback(() => {
                 {options.tabBarIcon?.({ focused: isFocused, color: tintColor, size: 15 })}
                 <Text
                   numberOfLines={1}
-                  style={{ color: tintColor, fontWeight: '700', fontSize: topTabLabelSize }}
+                  style={{
+                    color: tintColor,
+                    fontWeight: '700',
+                    fontSize: topTabLabelSize,
+                    textShadowColor: 'rgba(0,0,0,0.45)',
+                    textShadowOffset: { width: 0, height: 1 },
+                    textShadowRadius: 2,
+                  }}
                 >
                   {typeof options.tabBarLabel === 'string' ? options.tabBarLabel : route.name}
                 </Text>
@@ -2516,6 +2528,14 @@ const handleOpenChatFromAddContacts = useCallback((chat: Chat) => {
     ),
     colors: messageGoldGradient,
     shellStyle: styles.messageGoldPanel,
+    // Horizontal instead of the usual diagonal — AnimatedTopBar below uses
+    // the exact same colors + horizontal direction for its own background,
+    // and a horizontal gradient's color only varies by x, never by y, so
+    // the two independently-rendered boxes blend with zero seam regardless
+    // of either box's height (a diagonal can't guarantee that — see
+    // GoldHeaderShell's doc comment on this prop).
+    gradientStart: { x: 0, y: 0 },
+    gradientEnd: { x: 1, y: 0 },
   });
 
   return (

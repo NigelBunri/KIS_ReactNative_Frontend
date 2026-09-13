@@ -377,7 +377,13 @@ function GoldenSection() {
           simultaneous-gradient rendering (Partners) wedging the shared native
           view so it stays blank for every screen after, until this remounts
           it. */}
-      <GoldHeaderShell key={ownerKey} colors={payload.colors} style={payload.shellStyle}>
+      <GoldHeaderShell
+        key={ownerKey}
+        colors={payload.colors}
+        style={payload.shellStyle}
+        gradientStart={payload.gradientStart}
+        gradientEnd={payload.gradientEnd}
+      >
         {payload.content}
       </GoldHeaderShell>
       <NetworkStatusPill />

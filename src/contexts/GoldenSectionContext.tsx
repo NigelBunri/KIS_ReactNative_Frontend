@@ -18,6 +18,11 @@ export type GoldenSectionPayload = {
   colors?: readonly string[];
   /** Merged onto the shared GoldHeaderShell (radius/shadow tweaks per page). */
   shellStyle?: StyleProp<ViewStyle>;
+  /** Passthrough to GoldHeaderShell's own gradientStart/gradientEnd override
+   *  — see that component's doc comment for when a screen needs this
+   *  (matching a gradient below the shell that must seam with it exactly). */
+  gradientStart?: { x: number; y: number };
+  gradientEnd?: { x: number; y: number };
 };
 
 // A unique token per registering screen instance. Lets a blurring screen's

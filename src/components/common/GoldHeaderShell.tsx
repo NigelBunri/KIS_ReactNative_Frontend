@@ -4,10 +4,22 @@ import LinearGradient from 'react-native-linear-gradient';
 
 import { useKISTheme } from '@/theme/useTheme';
 
+type GradientPoint = { x: number; y: number };
+
 type GoldHeaderShellProps = {
   children?: React.ReactNode;
   style?: StyleProp<ViewStyle>;
   colors?: readonly string[];
+  /** Defaults to the diagonal every screen has always used. Override only
+   * when this shell's gradient must seam perfectly with another gradient
+   * box below it (e.g. a tab bar sharing the same colors) — a diagonal's
+   * color at its bottom edge depends on this box's own height, so two
+   * independently-diagonal boxes stacked vertically can never match at
+   * their border. A shared horizontal direction (same y for start/end) has
+   * no such dependency: color only varies by x, so any two boxes using the
+   * same colors/start/end blend perfectly regardless of each box's height. */
+  gradientStart?: GradientPoint;
+  gradientEnd?: GradientPoint;
 };
 
 /**
@@ -26,14 +38,14 @@ type GoldHeaderShellProps = {
  * with no per-device offset to hand-tune, unlike the old negative-marginTop
  * approach this replaces.
  */
-export function GoldHeaderShell({ children, style, colors }: GoldHeaderShellProps) {
+export function GoldHeaderShell({ children, style, colors, gradientStart, gradientEnd }: GoldHeaderShellProps) {
   const { gradients } = useKISTheme();
   return (
     <View style={[styles.base, style]}>
       <LinearGradient
         colors={(colors ?? gradients.header) as string[]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
+        start={gradientStart ?? { x: 0, y: 0 }}
+        end={gradientEnd ?? { x: 1, y: 1 }}
         style={StyleSheet.absoluteFillObject}
       />
       <View style={{ marginTop: 20 }}>
