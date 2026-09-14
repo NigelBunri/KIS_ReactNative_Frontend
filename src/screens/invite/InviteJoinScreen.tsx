@@ -142,7 +142,21 @@ export default function InviteJoinScreen({ route, navigation }: Props) {
       });
     }
 
-    navigation.replace('MainTabs');
+    // navigation.navigate (not .replace) - InviteJoin is reached by
+    // pushing on top of an already-mounted MainTabs (either the in-app
+    // "tap an invite link" path, or the join/:type/:token deep link
+    // opened while the app was already running with MainTabs behind it).
+    // .replace('MainTabs') would create a SECOND, freshly-mounted
+    // MainTabs instance with its own empty chatHistory state, leaving the
+    // chat.open event above stranded on the original (now-hidden)
+    // instance - the user would land on this new, chat-less MainTabs
+    // instead of the group they just joined, and any chat it did show
+    // would be whatever stale state that fresh instance happened to
+    // derive from elsewhere, not the new group. navigate() pops back to
+    // the existing MainTabs instance (preserving the chatHistory the
+    // event above just set) when one is already in the stack, and falls
+    // back to pushing a new one on a true cold start where none exists.
+    navigation.navigate('MainTabs');
   };
 
   const label = type === 'contact' ? 'this person' : type === 'group' ? 'group' : 'community';
@@ -190,7 +204,7 @@ export default function InviteJoinScreen({ route, navigation }: Props) {
             <Text style={[styles.title, { color: palette.text }]}>Unable to join</Text>
             <Text style={[styles.subtitle, { color: palette.subtext }]}>{message}</Text>
             <Pressable
-              onPress={() => navigation.replace('MainTabs')}
+              onPress={() => navigation.navigate('MainTabs')}
               style={({ pressed }) => [
                 styles.btn,
                 { backgroundColor: palette.surface, borderWidth: 1, borderColor: palette.borderMuted, opacity: pressed ? 0.7 : 1 },
