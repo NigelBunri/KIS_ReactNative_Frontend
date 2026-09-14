@@ -96,19 +96,58 @@ export const handleSend = async ({
   const text = draft.trim();
   if (!text || !chat) return;
 
-  const convId = await ensureConversationId(text);
-  if (!convId) return;
+  // Capture what we're sending, then clear the input immediately - before
+  // ensureConversationId/encryption/network even start, not after they
+  // finish. The message pipeline below (editMessage/replyToMessage/
+  // sendTextMessage -> sendRichMessage) already inserts an optimistic
+  // bubble into the chat instantly and resolves the network round-trip in
+  // the background regardless of how long that takes - the input box has
+  // no reason to wait on it too. This also means the user is free to type
+  // and send another message immediately; each send is independent and
+  // lands whenever its own network call completes, in whatever order that
+  // turns out to be, rather than the box staying populated (or, worse,
+  // getting silently wiped by a LATER completion of an EARLIER send
+  // clobbering whatever the user had since typed).
+  const wasEditing = editing;
+  const wasReplyTo = replyTo;
+  setDraft('');
+  setDraftsByKey((prev: any) => ({
+    ...prev,
+    [draftKey]: '',
+  }));
+  setEditing(null);
+  setReplyTo(null);
 
-  if (editing) {
-    await editMessage(editing.id, {
+  // ensureConversationId is a no-op/instant read for any conversation that
+  // already exists (the overwhelming majority of sends) - it only makes a
+  // real network call the first time two people ever message each other.
+  // That's also the one failure mode with no optimistic message bubble to
+  // show a retry/failed state on (editMessage/sendTextMessage's own
+  // failure handling covers everything past this point), so on failure
+  // here specifically, restore what the user typed instead of discarding
+  // it - ensureConversationId already surfaces its own Alert on failure,
+  // this just stops that failure from silently eating their draft too.
+  const convId = await ensureConversationId(text);
+  if (!convId) {
+    setDraft(text);
+    setDraftsByKey((prev: any) => ({
+      ...prev,
+      [draftKey]: text,
+    }));
+    if (wasEditing) setEditing(wasEditing);
+    if (wasReplyTo) setReplyTo(wasReplyTo);
+    return;
+  }
+
+  if (wasEditing) {
+    await editMessage(wasEditing.id, {
       text,
       isEdited: true,
       status: 'pending',
       conversationId: convId,
     });
-    setEditing(null);
-  } else if (replyTo) {
-    await replyToMessage(replyTo, text, {
+  } else if (wasReplyTo) {
+    await replyToMessage(wasReplyTo, text, {
       kind: 'text',
       fromMe: true,
       senderId: currentUserId,
@@ -116,7 +155,6 @@ export const handleSend = async ({
       ...(linkPreview ? { linkPreview } : {}),
       ...(viewOnce ? { viewOnce } : {}),
     });
-    setReplyTo(null);
 
     if (dmRole === 'recipient') {
       setHasLocallyAcceptedRequest(true);
@@ -131,12 +169,6 @@ export const handleSend = async ({
       ...(viewOnce ? { viewOnce } : {}),
     });
   }
-
-  setDraft('');
-  setDraftsByKey((prev: any) => ({
-    ...prev,
-    [draftKey]: '',
-  }));
 };
 
 /* =========================================================
