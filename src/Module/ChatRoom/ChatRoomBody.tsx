@@ -64,6 +64,8 @@ type Props = {
   senderName?: string;
   conversationIdForMentions?: string;
   onLoadOlder?: () => void;
+  isLoadingOlder?: boolean;
+  hasMoreOlder?: boolean;
 
   // New features
   onSendGif?: (gif: { url: string; previewUrl: string; width: number; height: number }) => void;
@@ -148,6 +150,8 @@ export default function ChatRoomBody({
   senderName,
   conversationIdForMentions,
   onLoadOlder,
+  isLoadingOlder,
+  hasMoreOlder,
   onSendGif,
   onSendLocation,
   onScheduleSend,
@@ -227,6 +231,8 @@ export default function ChatRoomBody({
         startAtBottom={startAtBottom}
         onVisibleMessageIds={onVisibleMessageIds}
         onLoadOlder={onLoadOlder}
+        isLoadingOlder={isLoadingOlder}
+        hasMoreOlder={hasMoreOlder}
         onStarMessage={onStarMessage}
         onShowReadReceipts={onShowReadReceipts}
         onViewOnce={onViewOnce}
