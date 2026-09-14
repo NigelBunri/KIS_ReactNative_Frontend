@@ -19,6 +19,7 @@ class MainApplication : Application(), ReactApplication {
           add(DeviceIdPackage())
           add(RestoreCredentialPackage())
           add(CallPiPPackage())
+          add(TranslationPackage())
         },
     )
   }

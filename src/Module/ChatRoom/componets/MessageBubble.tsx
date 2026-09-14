@@ -26,6 +26,8 @@ import { AttachmentDownloadError, requestAttachmentDownloadUrl } from '../attach
 import { classifyVoicePlaybackReadiness, resolveEmbeddedVoicePlaybackUri } from '../voiceAttachment';
 import { cachedVoicePlaybackUrl, describeVoicePlaybackError, resolveFreshVoicePlaybackUrl } from '../voicePlaybackResolver';
 import { ViewOnceViewerModal, type ViewOnceContentSnapshot } from './ViewOnceViewerModal';
+import { useMessageTranslation } from '../hooks/useMessageTranslation';
+import { MessageTranslationBlock } from './MessageTranslationBlock';
 import {
   BIBLE_REFERENCE_RE,
   BIBLE_QUOTE_BLOCK_RE,
@@ -192,6 +194,11 @@ type MessageBubbleProps = {
   participantAvatarMap?: Record<string, string>;
   senderId?: string;
   onUpdateMessage?: (message: ChatMessage) => void;
+
+  // Bumped by InteractiveMessageRow's "Translate" action-sheet item to
+  // trigger the same on-device translation this bubble's inline "🌐
+  // Translate" link also drives - see useMessageTranslation.ts.
+  translateRequestToken?: number;
 };
 
 const formatTimeFromMs = (ms: number) => {
@@ -248,6 +255,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   participantAvatarMap,
   senderId,
   onUpdateMessage,
+  translateRequestToken,
 }) => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   // Fullscreen viewers below (video/image/PDF) position their close button
@@ -1064,41 +1072,33 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   const [expanded, setExpanded] = useState(false);
   const displayText = isLongText && !expanded ? text!.slice(0, READ_MORE_THRESHOLD) : text;
 
-  // Translation — uses the language the user set in their profile
-  const [translatedText, setTranslatedText] = useState<string | null>(null);
-  const [translating, setTranslating] = useState(false);
+  // On-device translation (manual only - never automatic). See
+  // useMessageTranslation.ts's header for the full on-device/no-network
+  // invariant. This REPLACES a previous implementation that auto-translated
+  // every incoming message by POSTing the decrypted plaintext to Django's
+  // /api/v1/translate/, which forwarded it to Google's cloud Translation
+  // API - a live E2EE violation removed entirely as of this change.
+  const messageTranslationId = String((message as any).serverId ?? (message as any).id ?? '');
+  const messageTranslation = useMessageTranslation({
+    messageId: messageTranslationId,
+    text: text ?? '',
+    targetLanguageCode: userLanguage,
+  });
 
-  const handleTranslate = useCallback(async () => {
-    if (!text || translating) return;
-    setTranslating(true);
-    try {
-      const { postRequest: post } = await import('@/network/post');
-      const ROUTES_mod = await import('@/network');
-      const res = await post(
-        ROUTES_mod.default.translate,
-        { text, target_lang: userLanguage },
-        {},
-      );
-      if (res?.data?.translated && res.data.translated !== text) {
-        setTranslatedText(res.data.translated);
-      }
-    } catch { /* silent */ } finally {
-      setTranslating(false);
+  // The message-action sheet (InteractiveMessageRow) drives the same
+  // translation via this token instead of duplicating the hook there -
+  // see InteractiveMessageRow.tsx's "Translate" action. Guarded so the
+  // initial render (token 0/undefined) never auto-fires a translation.
+  const prevTranslateRequestTokenRef = useRef(translateRequestToken ?? 0);
+  useEffect(() => {
+    const prev = prevTranslateRequestTokenRef.current;
+    const next = translateRequestToken ?? 0;
+    prevTranslateRequestTokenRef.current = next;
+    if (next !== prev && next > 0) {
+      void messageTranslation.translate();
     }
-  }, [text, translating, userLanguage]);
-
-  // Auto-translate incoming messages when the user's language is not English
-  useEffect(() => {
-    if (!text || isMe || translatedText || userLanguage === 'en') return;
-    handleTranslate();
-  // Only run when language changes or a new message arrives (text changes)
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [text, userLanguage]);
-
-  // Reset translation when language changes so it is re-fetched in the new language
-  useEffect(() => {
-    setTranslatedText(null);
-  }, [userLanguage]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [translateRequestToken]);
 
   // Link preview
   const serverLinkPreview = (message as any).linkPreview as
@@ -4152,33 +4152,14 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
           <Text style={{ fontSize: 13, color: metaColor, fontStyle: 'italic' }}>🔒</Text>
         )}
 
-        {/* Translation */}
-        {text && text.length > 15 && !isMe && !translatedText && (
-          <Pressable
-            onPress={() => void handleTranslate()}
-            style={{ marginTop: 4, opacity: translating ? 0.5 : 1 }}
-            disabled={translating}
-          >
-            <Text style={{ color: palette.subtext, fontSize: 11 }}>
-              {translating ? `🌐 ${t('Translating...')}` : `🌐 ${t('Translate')}`}
-            </Text>
-          </Pressable>
-        )}
-        {translating && isMe && (
-          <Text style={{ fontSize: 11, color: palette.subtext, marginTop: 4 }}>🌐 {t('Translating...')}</Text>
-        )}
-        {translatedText && (
-          <View style={{ marginTop: 6, paddingTop: 6, borderTopWidth: 1, borderTopColor: 'rgba(128,128,128,0.2)' }}>
-            <Text style={{ fontSize: 10, color: palette.subtext, marginBottom: 2 }}>
-              🌐 {t('Translation')}
-            </Text>
-            <Text style={{ color: isMe ? '#fff' : (palette.text), fontSize: 14 }}>{translatedText}</Text>
-            <Pressable onPress={() => setTranslatedText(null)}>
-              <Text style={{ fontSize: 10, color: palette.subtext, marginTop: 2 }}>
-                {t('Hide')}
-              </Text>
-            </Pressable>
-          </View>
+        {/* On-device translation - manual only, see useMessageTranslation.ts */}
+        {!!text && text.length > 1 && (
+          <MessageTranslationBlock
+            translation={messageTranslation}
+            isMe={isMe}
+            palette={palette}
+            showInlineTrigger={text.length > 15}
+          />
         )}
 
         {/* Link preview card */}

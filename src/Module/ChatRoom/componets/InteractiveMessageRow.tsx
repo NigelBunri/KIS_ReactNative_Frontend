@@ -161,6 +161,11 @@ export const InteractiveMessageRow: React.FC<Props> = ({
   const sheetSlide = useRef(new Animated.Value(0)).current;
 
   const [actionSheetVisible, setActionSheetVisible] = useState(false);
+  // Bumped to trigger MessageBubble's on-device translation from the
+  // action sheet rather than duplicating the translation hook/state here -
+  // see useMessageTranslation.ts and MessageBubble.tsx's
+  // translateRequestToken prop.
+  const [translateRequestToken, setTranslateRequestToken] = useState(0);
 
   const openSheet = () => {
     setActionSheetVisible(true);
@@ -322,6 +327,16 @@ export const InteractiveMessageRow: React.FC<Props> = ({
       });
     }
 
+    if (hasText) {
+      actions.push({
+        type: 'action',
+        key: 'translate',
+        icon: 'globe-outline',
+        label: 'Translate',
+        onPress: () => closeSheet(() => setTranslateRequestToken((prev) => prev + 1)),
+      });
+    }
+
     if (onPinMessage && hasServerId) {
       actions.push({
         type: 'action',
@@ -410,6 +425,7 @@ export const InteractiveMessageRow: React.FC<Props> = ({
             participantAvatarMap={participantAvatarMap}
             senderId={(message as any).senderId}
             onUpdateMessage={onUpdateMessage}
+            translateRequestToken={translateRequestToken}
           />
         </Pressable>
       </Animated.View>
