@@ -109,6 +109,60 @@ function NotificationPreferencesPanel() {
     }
   }, [loadRules]);
 
+  // channels_json is a full replacement list (create_notification treats a
+  // non-empty rule.channels_json as the SOLE set of delivery channels, not
+  // additive on top of the template's default), so turning email on/off has
+  // to preserve whatever channels were already implied rather than just
+  // writing ["EMAIL"] alone and silently dropping in-app/push delivery.
+  // Nothing in this app has ever set channels_json before this — every rule
+  // is created with the model's default (empty list), which is exactly why
+  // EMAIL delivery has never been reachable despite the backend already
+  // fully supporting it end to end.
+  const toggleEmail = useCallback(async (rule: NotificationRule) => {
+    const current = Array.isArray(rule.channels_json) && rule.channels_json.length
+      ? rule.channels_json
+      : ['IN_APP', 'PUSH'];
+    const emailOn = current.includes('EMAIL');
+    const nextChannels = emailOn
+      ? current.filter((c) => c !== 'EMAIL')
+      : [...current, 'EMAIL'];
+
+    setToggling(`${rule.id}:email`);
+    setRules((prev) =>
+      prev.length > 0
+        ? prev.map((r) => r.id === rule.id ? { ...r, channels_json: nextChannels } : r)
+        : prev,
+    );
+    try {
+      if (rule._isPlaceholder) {
+        await queueableJsonRequest({
+          domain: 'Settings',
+          kind: 'settings.notification_rule',
+          method: 'POST',
+          url: ROUTES.notificationRules.list,
+          body: { type: rule.type, enabled: rule.enabled, channels_json: nextChannels },
+          dedupeKey: `settings:notification-rule-create:${rule.type}`,
+          replaceExisting: true,
+        });
+        void loadRules();
+      } else {
+        await queueableJsonRequest({
+          domain: 'Settings',
+          kind: 'settings.notification_rule',
+          method: 'PATCH',
+          url: ROUTES.notificationRules.detail(rule.id),
+          body: { channels_json: nextChannels },
+          dedupeKey: `settings:notification-rule-email:${rule.id}`,
+          replaceExisting: true,
+        });
+      }
+    } catch {
+      setRules((prev) => prev.map((r) => r.id === rule.id ? { ...r, channels_json: rule.channels_json } : r));
+    } finally {
+      setToggling(null);
+    }
+  }, [loadRules]);
+
   const displayRules = useMemo((): NotificationRule[] => {
     if (rules.length > 0) return rules;
     // Return placeholder rules that will create real backend rules when toggled
@@ -144,6 +198,7 @@ function NotificationPreferencesPanel() {
           {displayRules.map((rule, idx) => {
             const label = RULE_LABELS[rule.type ?? ''] ?? (rule.type ?? 'Unknown');
             const isLast = idx === displayRules.length - 1;
+            const emailOn = Array.isArray(rule.channels_json) && rule.channels_json.includes('EMAIL');
             return (
               <View
                 key={rule.id}
@@ -159,13 +214,26 @@ function NotificationPreferencesPanel() {
                 }}
               >
                 <Text style={{ color: palette.text, fontSize: 14 }}>{label}</Text>
-                <Switch
-                  value={rule.enabled}
-                  onValueChange={() => toggle(rule)}
-                  disabled={toggling === rule.id}
-                  trackColor={{ false: palette.divider, true: palette.primary }}
-                  thumbColor={palette.ivory}
-                />
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, opacity: rule.enabled ? 1 : 0.4 }}>
+                    <Text style={{ color: palette.subtext, fontSize: 12 }}>Email</Text>
+                    <Switch
+                      value={emailOn}
+                      onValueChange={() => toggleEmail(rule)}
+                      disabled={toggling === `${rule.id}:email` || !rule.enabled}
+                      trackColor={{ false: palette.divider, true: palette.primarySoft ?? palette.primary }}
+                      thumbColor={emailOn ? palette.primary : palette.ivory}
+                      style={{ transform: [{ scaleX: 0.85 }, { scaleY: 0.85 }] }}
+                    />
+                  </View>
+                  <Switch
+                    value={rule.enabled}
+                    onValueChange={() => toggle(rule)}
+                    disabled={toggling === rule.id}
+                    trackColor={{ false: palette.divider, true: palette.primary }}
+                    thumbColor={palette.ivory}
+                  />
+                </View>
               </View>
             );
           })}
