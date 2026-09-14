@@ -30,8 +30,6 @@ import {
   bulkUpdateMessages,
   clearMessages,
   filterLocallyDeletedMessages,
-  getChatHistorySyncState,
-  setChatHistorySyncState,
   rememberLocallyDeletedMessageIds,
   removeMessage,
 } from '../Storage/chatStorage';
@@ -274,7 +272,6 @@ export function useChatMessaging({
   // dropping messages that arrived while that other chat wasn't open.
   const historySyncRef = useRef<Record<string, number>>({});
   const flushInFlightRef = useRef(false);
-  const historyLoadRef = useRef(false);
   const lastKnownSeqRef = useRef<Record<string, number>>({});
   const decryptInFlightRef = useRef<Set<string>>(new Set());
   const decryptFailedAtRef = useRef<Map<string, number>>(new Map());
@@ -387,9 +384,6 @@ export function useChatMessaging({
     ChatMessage[]
   > = useRef(messages);
   const deviceIdRef = useRef<string | null>(null);
-  // Tracks whether the initial full-history load has run for the current conversation.
-  // Reconnects reuse syncHistory (delta) rather than re-fetching all history.
-  const hasInitialLoadRef = useRef(false);
 
   useEffect(() => {
     messagesRef.current = messages;
@@ -419,8 +413,6 @@ export function useChatMessaging({
     useRef<string | null>(conversationId);
   useEffect(() => {
     if (conversationIdRef.current !== conversationId) {
-      // New conversation — allow full history load for this room.
-      hasInitialLoadRef.current = false;
       if (conversationId) delete lastKnownSeqRef.current[conversationId];
     }
     conversationIdRef.current = conversationId;
@@ -1306,90 +1298,6 @@ export function useChatMessaging({
     [socket, isConnected, conversationId],
   );
 
-  const loadFullHistory = useCallback(async () => {
-    if (historyLoadRef.current) return;
-    historyLoadRef.current = true;
-
-    const roomId = String(storageRoomId);
-    const pageSize = 500;
-    try {
-      const syncState = await getChatHistorySyncState(roomId, currentUserId);
-      if (syncState.olderHistoryComplete) return;
-
-      const existingServerDates = messagesRef.current
-        .filter((message) => message.serverId && !message.isLocalOnly)
-        .map((message) => message.createdAt)
-        .filter((value): value is string =>
-          typeof value === 'string' && !Number.isNaN(Date.parse(value)),
-        )
-        .sort((left, right) => Date.parse(left) - Date.parse(right));
-
-      let before = existingServerDates[0];
-      let page = 0;
-      while (true) {
-        const items = await requestHistoryBatch({ before, limit: pageSize });
-        if (!items.length) {
-          await setChatHistorySyncState(
-            roomId,
-            {
-              olderHistoryComplete: true,
-              oldestServerCreatedAt: before,
-              completedAt: new Date().toISOString(),
-            },
-            currentUserId,
-          );
-          break;
-        }
-
-        let mapped = items.map((message: any) => mapServerMessage(message));
-        mapped = await filterLocallyDeletedMessages(roomId, mapped, currentUserId);
-        if (mapped.length) {
-          // Persist every page immediately. A network interruption therefore
-          // resumes from the oldest durable page instead of starting over.
-          await replaceMessages(mapped);
-          mapped.forEach((message: ChatMessage) => {
-            void decryptChatMessage(message);
-          });
-        }
-
-        const oldest = items[0]?.createdAt ?? items[0]?.created_at;
-        if (!oldest || oldest === before) break;
-        before = String(oldest);
-        page += 1;
-
-        if (items.length < pageSize) {
-          await setChatHistorySyncState(
-            roomId,
-            {
-              olderHistoryComplete: true,
-              oldestServerCreatedAt: before,
-              completedAt: new Date().toISOString(),
-            },
-            currentUserId,
-          );
-          break;
-        }
-
-        // Yield periodically so long histories do not monopolize the JS thread.
-        if (page % 4 === 0) {
-          await new Promise<void>((resolve) => setTimeout(resolve, 0));
-        }
-      }
-    } catch {
-      // Offline/timeouts are expected. Successfully stored pages remain and
-      // the next reconnect resumes from the oldest persisted message.
-    } finally {
-      historyLoadRef.current = false;
-    }
-  }, [
-    requestHistoryBatch,
-    replaceMessages,
-    mapServerMessage,
-    decryptChatMessage,
-    storageRoomId,
-    currentUserId,
-  ]);
-
   const syncHistory = useCallback(() => {
     const convId = conversationIdRef.current ?? conversationId;
     if (!convId) return;
@@ -1420,11 +1328,18 @@ export function useChatMessaging({
 
     if (lastLocal) {
       requestHistory({ after: lastLocal, limit: 200 });
-      requestHistory({ before: lastLocal, limit: 50 });
+      // Backward reconciliation (small gap-fill, not history pagination
+      // proper - that's MessageList's onLoadOlder) - capped at 30 to match
+      // the same per-request ceiling everywhere else history gets fetched.
+      requestHistory({ before: lastLocal, limit: 30 });
       return;
     }
 
-    requestHistory({ limit: 50 });
+    // No local cache at all - this is the real initial load. Capped at 30
+    // so opening any chat, first time or not, only ever pulls the latest
+    // page up front; MessageList's onLoadOlder backfills everything older
+    // as the user actually scrolls there.
+    requestHistory({ limit: 30 });
   }, [conversationId, requestHistory]);
 
   // Loose conversationId match: accepts messages whose stored conversationId or
@@ -1550,16 +1465,31 @@ export function useChatMessaging({
 
     joinConversation(conversationId);
 
-    // Wait for local storage load to complete before fetching full history.
-    // This ensures mergeMessages can find the existing cached messages (with
-    // delivered/read statuses) and won't downgrade them to 'sent'.
+    // Wait for local storage load to complete before reconciling with the
+    // server. This ensures mergeMessages can find the existing cached
+    // messages (with delivered/read statuses) and won't downgrade them to
+    // 'sent'.
+    //
+    // A loadFullHistory() function used to run here unconditionally on
+    // every first socket-connect per conversation - a while(true) loop
+    // fetching 500-message pages until the ENTIRE conversation was synced
+    // locally. That directly contradicts "load only the latest page up
+    // front": opening any chat with real history eagerly pulled the whole
+    // thing before the user could interact, which is also why the message
+    // list used to visibly render oldest-first before jump-scrolling to the
+    // bottom. The paginated MessageList (inverted FlatList + onLoadOlder)
+    // now backfills everything older, 30 messages at a time, only as the
+    // user actually scrolls there - syncHistory()'s own "no local history
+    // yet" branch already covers fetching a fresh initial batch, so
+    // removing loadFullHistory (rather than just leaving it unused) didn't
+    // need a replacement here. A future deliberate background-sync/export
+    // feature would need its own trigger and UI anyway, so nothing of value
+    // was lost by deleting the old implementation outright instead of
+    // leaving it as dead code - it's still there in git history if useful
+    // as a reference.
     if (!isLoading) {
       void markAllMessagesRead();
       syncHistory();
-      if (!hasInitialLoadRef.current) {
-        hasInitialLoadRef.current = true;
-        loadFullHistory();
-      }
     }
 
     return () => {
@@ -1576,7 +1506,6 @@ export function useChatMessaging({
     mapServerMessage,
     storageRoomId,
     syncHistory,
-    loadFullHistory,
     markAllMessagesRead,
   ]);
 

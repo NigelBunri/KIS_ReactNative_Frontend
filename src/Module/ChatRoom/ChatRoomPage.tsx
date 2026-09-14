@@ -1220,6 +1220,11 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
   const [autoScrollEnabled, setAutoScrollEnabled] = useState(true);
   const unreadCount = typeof chat?.unreadCount === 'number' ? chat.unreadCount : 0;
   const startAtBottom = unreadCount <= 2;
+  // Pagination UI state for MessageList's inverted FlatList. Reset whenever
+  // the conversation changes (below) so switching chats doesn't carry over
+  // a stale "reached the beginning" flag from the previous conversation.
+  const [isLoadingOlderMessages, setIsLoadingOlderMessages] = useState(false);
+  const [hasMoreOlderMessages, setHasMoreOlderMessages] = useState(true);
 
   useEffect(() => {
     searchResultsRef.current = searchResults;
@@ -1227,6 +1232,8 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
 
   useEffect(() => {
     setAutoScrollEnabled(true);
+    setIsLoadingOlderMessages(false);
+    setHasMoreOlderMessages(true);
   }, [conversationId]);
 
   // HTTP mark-read — guarantees Django persists the read state even if socket receipts are lost.
@@ -2476,16 +2483,27 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
           canSend={canSend}
           callHistory={callHistory}
           onCallHistoryCallback={handleCallHistoryCallback}
+          isLoadingOlder={isLoadingOlderMessages}
+          hasMoreOlder={hasMoreOlderMessages}
           onLoadOlder={() => {
             const oldest = messages[0];
-            if (!oldest?.createdAt) return;
-            requestHistoryBatch({ before: oldest.createdAt, limit: 50 })
+            if (!oldest?.createdAt || isLoadingOlderMessages || !hasMoreOlderMessages) return;
+            setIsLoadingOlderMessages(true);
+            // Per the pagination contract: at most 30 messages per request.
+            requestHistoryBatch({ before: oldest.createdAt, limit: 30 })
               .then((items: any[]) => {
+                // Fewer than a full page (including empty) means this was
+                // the true start of the conversation - stop requesting more.
+                if (items.length < 30) setHasMoreOlderMessages(false);
                 if (!items.length) return;
                 const mapped = items.map((m: any) => mapServerMessage(m));
+                // replaceMessages merges+dedupes against the existing list
+                // (mergeMessages in useChatPersistence.ts), so a retried or
+                // overlapping page can't introduce duplicates.
                 replaceMessages([...mapped, ...messages]);
               })
-              .catch(() => {});
+              .catch(() => {})
+              .finally(() => setIsLoadingOlderMessages(false));
           }}
         />
       </ImageBackground>

@@ -11,6 +11,7 @@ import {
   FlatList,
   Pressable,
   Animated,
+  ActivityIndicator,
   NativeSyntheticEvent,
   NativeScrollEvent,
 } from 'react-native';
@@ -61,8 +62,19 @@ type MessageListProps = {
   startAtBottom?: boolean;
   onVisibleMessageIds?: (messageIds: string[]) => void;
 
-  /** Called when the user scrolls near the top to load older messages. */
+  /** Called when the user scrolls up toward the oldest loaded message,
+   * to fetch the next batch of older history. */
   onLoadOlder?: () => void;
+  /** True while a batch of older messages is in flight — shows a small
+   * spinner at the oldest edge of the list. Older-message loading is the
+   * only pagination state that should ever show a loading indicator here;
+   * the initial batch must never show one. */
+  isLoadingOlder?: boolean;
+  /** False once a load-older request has come back with fewer than a full
+   * page (or empty) — stops firing further onLoadOlder calls once the true
+   * start of the conversation has been reached. Defaults to true so a
+   * screen that doesn't pass this prop keeps the previous behavior. */
+  hasMoreOlder?: boolean;
 
   onStarMessage?: (message: ChatMessage) => void;
   onShowReadReceipts?: (message: ChatMessage) => void;
@@ -102,6 +114,8 @@ export const MessageList: React.FC<MessageListProps> = ({
   startAtBottom = true,
   onVisibleMessageIds,
   onLoadOlder,
+  isLoadingOlder = false,
+  hasMoreOlder = true,
   onStarMessage,
   onShowReadReceipts,
   onViewOnce,
@@ -159,6 +173,18 @@ export const MessageList: React.FC<MessageListProps> = ({
     });
   }, [messages, callHistory]);
 
+  // FlatList's `data` for the inverted list — newest first, so it renders
+  // at the visual bottom with the oldest loaded item at the visual top,
+  // matching how every other chat app's initial-load/scroll-up-for-history
+  // pattern works. `timelineItems` itself stays chronological (ascending)
+  // since messagesById and the reply/highlight lookups below are simpler
+  // expressed against that order — this is purely a render-time view over
+  // the same data, not a second copy of app state.
+  const reversedTimelineItems = useMemo(
+    () => [...timelineItems].reverse(),
+    [timelineItems],
+  );
+
   // O(1) reply-source lookup — renderItem previously ran messages.find(...)
   // for every rendered row with a replyToId, an O(n) linear scan of the
   // *entire* conversation per row. For a long, reply-heavy chat that's
@@ -192,7 +218,13 @@ export const MessageList: React.FC<MessageListProps> = ({
   const loadOlderThrottleRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const suppressAutoScrollRef = useRef(false);
   const isAtBottomRef = useRef(startAtBottom);
-  const prevMessageCountRef = useRef(messages.length);
+  // Identity (not just count) of the newest loaded item, so a genuinely new
+  // message arriving can be told apart from an older-history page landing.
+  // Both grow `timelineItems`, but only the former should ever move the
+  // scroll position or bump the unread badge - conflating the two (the
+  // previous implementation compared array length alone) meant loading an
+  // older page while scrolled up incorrectly counted as unread activity.
+  const newestItemKeyRef = useRef<string | null>(null);
   const lastStartAtBottomRef = useRef<boolean | null>(startAtBottom);
   const viewabilityConfigRef = useRef({
     viewAreaCoveragePercentThreshold: 60,
@@ -229,15 +261,32 @@ export const MessageList: React.FC<MessageListProps> = ({
     isAtBottomRef.current = !!startAtBottom;
   }, [startAtBottom]);
 
-  // Track new messages arriving while scrolled up
+  // Fires only when the newest loaded item actually changes - i.e. a real
+  // new message arrived (send or receive), never when an older-history page
+  // was prepended (the newest item's identity is untouched by that). The
+  // inverted list already renders the newest item at the visual bottom
+  // with zero scroll calls needed on mount or on an older-page load; this
+  // is the one case that still needs an explicit scroll, because RN does
+  // not auto-follow new data appended to an inverted list the way it does
+  // for a normal list's scrollToEnd-on-content-grow pattern.
   useEffect(() => {
-    const newCount = messages.length;
-    const added = newCount - prevMessageCountRef.current;
-    prevMessageCountRef.current = newCount;
-    if (added > 0 && !isAtBottomRef.current) {
-      setUnreadCount((n) => n + added);
+    const newest = timelineItems[timelineItems.length - 1];
+    const newestKey = newest
+      ? newest.type === 'message'
+        ? String(newest.message.serverId ?? newest.message.id ?? newest.message.clientId)
+        : `call:${newest.call.callId}`
+      : null;
+    const prevKey = newestItemKeyRef.current;
+    newestItemKeyRef.current = newestKey;
+
+    if (prevKey === null || newestKey === null || newestKey === prevKey) return;
+
+    if (autoScrollEnabled && !suppressAutoScrollRef.current && isAtBottomRef.current) {
+      listRef.current?.scrollToOffset({ offset: 0, animated: true });
+    } else {
+      setUnreadCount((n) => n + 1);
     }
-  }, [messages.length]);
+  }, [timelineItems, autoScrollEnabled]);
 
   // Animate jump-to-latest button in/out
   useEffect(() => {
@@ -272,20 +321,14 @@ export const MessageList: React.FC<MessageListProps> = ({
     };
   }, [onVisibleMessageIds]);
 
-  const handleContentSizeChange = () => {
-    if (!listRef.current) return;
-    if (!autoScrollEnabled) return;
-    if (suppressAutoScrollRef.current) return;
-    if (!isAtBottomRef.current) return;
-    listRef.current.scrollToEnd({ animated: true });
-  };
-
+  // Inverted list: the newest message renders at the visual bottom, which
+  // corresponds to contentOffset.y near 0 (the START of the scroll range),
+  // not near contentSize.height the way a normal list's "bottom" would be.
   const handleScroll = useCallback(
     (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-      const { contentOffset, contentSize, layoutMeasurement } = e.nativeEvent;
+      const { contentOffset } = e.nativeEvent;
       const padding = 48;
-      const atBottom =
-        layoutMeasurement.height + contentOffset.y >= contentSize.height - padding;
+      const atBottom = contentOffset.y <= padding;
       isAtBottomRef.current = atBottom;
       if (atBottom) {
         setShowJumpToLatest(false);
@@ -293,22 +336,29 @@ export const MessageList: React.FC<MessageListProps> = ({
       } else {
         setShowJumpToLatest(true);
       }
-
-      // Detect scroll near top to load older messages
-      if (onLoadOlder && contentOffset.y < 100 && !loadOlderThrottleRef.current) {
-        loadOlderThrottleRef.current = setTimeout(() => {
-          loadOlderThrottleRef.current = null;
-        }, 2000);
-        onLoadOlder();
-      }
     },
-    [onLoadOlder],
+    [],
   );
+
+  // Fires when the user scrolls up far enough to reach the oldest loaded
+  // message - in an inverted list that's the native "end" of the list, so
+  // FlatList's own onEndReached (well-tested, purpose-built for exactly
+  // this) replaces the old hand-rolled contentOffset.y < 100 heuristic.
+  // hasMoreOlder stops this from firing once the true start of the
+  // conversation has already been reached.
+  const handleEndReached = useCallback(() => {
+    if (!onLoadOlder || !hasMoreOlder || isLoadingOlder) return;
+    if (loadOlderThrottleRef.current) return;
+    loadOlderThrottleRef.current = setTimeout(() => {
+      loadOlderThrottleRef.current = null;
+    }, 2000);
+    onLoadOlder();
+  }, [onLoadOlder, hasMoreOlder, isLoadingOlder]);
 
   const scrollToMessage = useCallback(
     (messageId: string) => {
       if (!listRef.current) return;
-      const index = timelineItems.findIndex((entry) => {
+      const ascendingIndex = timelineItems.findIndex((entry) => {
         if (entry.type !== 'message') return false;
         const m = entry.message;
         return (
@@ -317,7 +367,10 @@ export const MessageList: React.FC<MessageListProps> = ({
           m.clientId === messageId
         );
       });
-      if (index < 0) return;
+      if (ascendingIndex < 0) return;
+      // The rendered data is timelineItems reversed (inverted list), so the
+      // index FlatList actually needs is mirrored from the ascending one.
+      const index = timelineItems.length - 1 - ascendingIndex;
 
       try {
         suppressAutoScrollRef.current = true;
@@ -380,7 +433,8 @@ export const MessageList: React.FC<MessageListProps> = ({
   }, [onMessageLocatorReady, scrollToMessage, highlightMessage]);
 
   const jumpToLatest = useCallback(() => {
-    listRef.current?.scrollToEnd({ animated: true });
+    // Newest message is at the visual bottom == offset 0 in an inverted list.
+    listRef.current?.scrollToOffset({ offset: 0, animated: true });
     setShowJumpToLatest(false);
     setUnreadCount(0);
   }, []);
@@ -412,7 +466,10 @@ export const MessageList: React.FC<MessageListProps> = ({
   // refreshing, etc.
   const renderTimelineItem = useCallback(
     ({ item: timelineItem, index }: { item: TimelineItem; index: number }) => {
-      const previousTimelineItem = timelineItems[index - 1];
+      // `index` is into reversedTimelineItems (newest-first), so the
+      // chronologically-previous item is the NEXT array slot, not the prior
+      // one - mirrored from how this worked against the ascending array.
+      const previousTimelineItem = reversedTimelineItems[index + 1];
       const showTimestampHeader = shouldShowTimestampHeader(
         previousTimelineItem?.createdAt,
         timelineItem.createdAt,
@@ -449,7 +506,7 @@ export const MessageList: React.FC<MessageListProps> = ({
       const previous = previousTimelineItem?.type === 'message'
         ? previousTimelineItem.message
         : undefined;
-      const nextTimelineItem = timelineItems[index + 1];
+      const nextTimelineItem = reversedTimelineItems[index - 1];
       const next = nextTimelineItem?.type === 'message'
         ? nextTimelineItem.message
         : undefined;
@@ -520,7 +577,7 @@ export const MessageList: React.FC<MessageListProps> = ({
       );
     },
     [
-      timelineItems,
+      reversedTimelineItems,
       palette,
       currentUserId,
       onCallHistoryCallback,
@@ -566,7 +623,18 @@ export const MessageList: React.FC<MessageListProps> = ({
     );
   }
 
-  const E2EEBanner = isE2EE ? (
+  // Rendered as ListFooterComponent — in an inverted list that's the visual
+  // TOP, i.e. the oldest edge, which is exactly where "loading more history"
+  // and "this is the start of the conversation" both belong. Only one of
+  // the three shows at a time: a spinner while a page is in flight, the
+  // E2EE notice once the true beginning has actually been reached
+  // (hasMoreOlder false — showing it earlier would claim to be the start of
+  // the conversation before it actually is), otherwise nothing.
+  const ListTopEdge = isLoadingOlder ? (
+    <View style={{ paddingVertical: 16, alignItems: 'center' }}>
+      <ActivityIndicator size="small" color={palette.subtext} />
+    </View>
+  ) : !hasMoreOlder && isE2EE ? (
     <View style={{
       alignSelf: 'center',
       flexDirection: 'row',
@@ -591,19 +659,21 @@ export const MessageList: React.FC<MessageListProps> = ({
     <View style={{ flex: 1 }}>
       <FlatList
         ref={listRef}
-        data={timelineItems}
+        inverted
+        data={reversedTimelineItems}
         keyExtractor={(item) =>
           item.type === 'message' ? `message:${item.message.id}` : `call:${item.call.callId}`
         }
         style={styles.messagesList}
         contentContainerStyle={styles.messagesListContent}
-        ListHeaderComponent={E2EEBanner}
-        onContentSizeChange={handleContentSizeChange}
+        ListFooterComponent={ListTopEdge}
         onScroll={handleScroll}
         scrollEventThrottle={32}
+        onEndReached={handleEndReached}
+        onEndReachedThreshold={0.5}
         onViewableItemsChanged={onViewableItemsChangedRef.current}
         viewabilityConfig={viewabilityConfigRef.current}
-        initialNumToRender={20}
+        initialNumToRender={30}
         maxToRenderPerBatch={10}
         windowSize={10}
         removeClippedSubviews
