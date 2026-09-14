@@ -56,9 +56,24 @@ export function useHeaderDragToScroll({
         onPanResponderRelease: (_, gesture) => {
           const distance = Math.max(collapseDistance.value, 1);
           const nextOffset = Math.max(0, Math.min(distance, gestureStartOffsetRef.current - gesture.dy));
-          const shouldCollapse = gesture.vy < -0.35 || nextOffset > distance * 0.45;
-          const shouldExpand = gesture.vy > 0.35 || nextOffset < distance * 0.18;
-          const target = shouldExpand ? 0 : shouldCollapse ? distance : nextOffset;
+          // Always resolves to a full extreme - 0 (expanded) or `distance`
+          // (collapsed) - never partway, no matter how small the drag was.
+          // The previous version had shouldCollapse (>45%) and shouldExpand
+          // (<18%) as separate conditions with a dead zone between them
+          // where NEITHER fired and target fell through to the raw
+          // `nextOffset` - a small drag landing in that 18-45% gap (which a
+          // small drag does, by construction) left the header stuck exactly
+          // where the finger released, with the search row faded out
+          // (opacity's interpolation range ends well before maxHeight's
+          // does - see collapseStyle in useCollapsingGoldHeader.ts) but the
+          // tab row still fully visible below it. A decisive flick still
+          // wins outright regardless of how far the drag actually traveled;
+          // otherwise this falls back to whichever extreme the release
+          // position is nearer to - there is no third outcome.
+          const target =
+            gesture.vy < -0.35 ? distance :
+            gesture.vy > 0.35 ? 0 :
+            nextOffset >= distance / 2 ? distance : 0;
           scrollY.value = withSpring(target, { damping: 16, stiffness: 140 });
           // Let the ScrollView's own native scroll animation carry the
           // content to the same resting offset, rather than trying to mirror
@@ -68,7 +83,11 @@ export function useHeaderDragToScroll({
         },
         onPanResponderTerminate: () => {
           const distance = Math.max(collapseDistance.value, 1);
-          const target = Math.max(0, Math.min(distance, scrollY.value));
+          const current = Math.max(0, Math.min(distance, scrollY.value));
+          // Same "always a full extreme" rule as release above - a
+          // terminated gesture (another responder stole it mid-drag) isn't
+          // a special case that gets to leave the header stuck partway.
+          const target = current >= distance / 2 ? distance : 0;
           scrollY.value = withSpring(target, { damping: 16, stiffness: 140 });
           onScrollTo(target, true);
         },
