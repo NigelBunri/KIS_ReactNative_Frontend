@@ -615,7 +615,41 @@ export const encryptForUser = async (recipientUserId: string, plaintext: string)
   };
 };
 
-export const encryptPayloadForRecipients = async (
+// Clearing the compose box the instant send is pressed (see
+// ChatRoomHandlers.tsx's handleSend) means a user can now fire off several
+// messages back-to-back without waiting for each one's network round-trip -
+// which makes concurrent calls into this function a normal occurrence
+// instead of a rare edge case. cipher.encrypt() internally does
+// loadSession -> advance the ratchet -> storeSession for each recipient
+// device; two overlapping calls encrypting for the SAME device can both
+// load the same starting session state, each advance it independently, and
+// then race to store - whichever finishes last wins, silently discarding
+// the other's ratchet step even though its ciphertext already went out
+// using it. That's not a transient failure a retry fixes - it desyncs the
+// session, and the discarded message (or messages after it) can become
+// permanently undecryptable for that device. Serializing every call
+// through one promise chain makes the actual session-touching work happen
+// one at a time regardless of how many sends were fired concurrently; each
+// step is local crypto (no network), so this adds imperceptible latency,
+// not the kind of wait this whole fix is about removing.
+let encryptSerializationTail: Promise<unknown> = Promise.resolve();
+
+export const encryptPayloadForRecipients = (
+  senderUserId: string,
+  recipientUserIds: string[],
+  payload: Record<string, any>,
+) => {
+  const run = encryptSerializationTail.then(() =>
+    encryptPayloadForRecipientsSerialized(senderUserId, recipientUserIds, payload),
+  );
+  // Keep the chain alive regardless of this call's outcome - one rejected
+  // encrypt (a genuinely unreachable recipient, say) must not permanently
+  // wedge every later send behind a dead promise.
+  encryptSerializationTail = run.catch(() => undefined);
+  return run;
+};
+
+const encryptPayloadForRecipientsSerialized = async (
   senderUserId: string,
   recipientUserIds: string[],
   payload: Record<string, any>,
