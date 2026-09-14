@@ -149,6 +149,16 @@ dependencies {
     implementation("androidx.credentials:credentials-play-services-auth:1.5.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.0")
 
+    // On-device message translation (TranslationModule.kt) — Google ML Kit's
+    // Translate and Language ID APIs run entirely on-device: text never
+    // leaves the phone, and each language's model is a separate,
+    // independently downloadable asset (not bundled into the app) fetched
+    // only when TranslationModule.downloadModel() is explicitly called.
+    // See src/services/translation/TranslationService.ts for the client-side
+    // contract this backs.
+    implementation("com.google.mlkit:translate:17.0.3")
+    implementation("com.google.mlkit:language-id:17.0.6")
+
     if (hermesEnabled.toBoolean()) {
         implementation("com.facebook.react:hermes-android")
     } else {
