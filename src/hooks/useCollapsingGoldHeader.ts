@@ -174,6 +174,24 @@ export function useCollapsingGoldHeader(collapseDistance: number) {
   // real end, there's no more real scroll to give the header — snapping it
   // the rest of the way closed is the only way "fully fold" is even
   // reachable for short lists.
+  // onScrollEndDrag fires the instant the finger lifts - if the release had
+  // any residual velocity, the list is still physically decelerating under
+  // native momentum at that exact moment, which keeps firing real onScroll
+  // frames that overwrite scrollY.value with the still-changing position,
+  // silently clobbering a snap committed right now. onMomentumScrollEnd
+  // fires later, once that's genuinely finished, and is what should win -
+  // but plain scrollY.value assignments have no ordering guarantee against
+  // whatever the tail of a momentum scroll is still doing. Delaying the
+  // actual commit by a beat (same shape as onHeaderLayout's
+  // pendingLayoutTimer below, same reasoning: don't act on an event that a
+  // closely-following one might still supersede) means the write happens
+  // once the scroll view has had time to genuinely finish, not at the
+  // instant this particular callback fired.
+  const pendingSettleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => {
+    if (pendingSettleTimer.current) clearTimeout(pendingSettleTimer.current);
+  }, []);
+
   const onScrollSettle = useCallback(
     (e: NativeSyntheticEvent<NativeScrollEvent>) => {
       const { contentOffset, contentSize, layoutMeasurement } = e.nativeEvent;
@@ -188,7 +206,11 @@ export function useCollapsingGoldHeader(collapseDistance: number) {
               ? 0
               : collapseDistance;
       if (target == null) return;
-      scrollY.value = withTiming(target, { duration: 220 });
+      if (pendingSettleTimer.current) clearTimeout(pendingSettleTimer.current);
+      pendingSettleTimer.current = setTimeout(() => {
+        pendingSettleTimer.current = null;
+        scrollY.value = withTiming(target, { duration: 220 });
+      }, 120);
     },
     [collapseDistance, scrollY],
   );
