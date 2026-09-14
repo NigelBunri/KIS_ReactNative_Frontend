@@ -205,6 +205,22 @@ type MessageLocator = {
   highlightMessage: (messageId: string) => void;
 };
 
+/**
+ * Pure predicate for onLoadOlder's pagination-stop check, extracted for
+ * unit-testability. Everything at/before the current user's own
+ * membership.joined_at is guaranteed either filtered out client-side
+ * (isPreJoinHidden, see MessageList's buildTimelineItems) or would
+ * decrypt-fail identically, so fetching further back once this returns
+ * true is pure waste.
+ */
+export function shouldStopPaginationAtJoinBoundary(
+  oldestLoadedCreatedAt: string | null | undefined,
+  myJoinedAt: string | null | undefined,
+): boolean {
+  if (!myJoinedAt || !oldestLoadedCreatedAt) return false;
+  return oldestLoadedCreatedAt <= myJoinedAt;
+}
+
 /* ========================================================================== */
 /*                                MAIN COMPONENT                              */
 /* ========================================================================== */
@@ -1225,6 +1241,10 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
   // a stale "reached the beginning" flag from the previous conversation.
   const [isLoadingOlderMessages, setIsLoadingOlderMessages] = useState(false);
   const [hasMoreOlderMessages, setHasMoreOlderMessages] = useState(true);
+  // chat.participants is missing on the very first render right after
+  // joining a group via invite link (see the fetch effect further below,
+  // near currentMembership) — this backs that proactive fetch.
+  const [fetchedParticipants, setFetchedParticipants] = useState<any[] | null>(null);
 
   useEffect(() => {
     searchResultsRef.current = searchResults;
@@ -1234,6 +1254,7 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
     setAutoScrollEnabled(true);
     setIsLoadingOlderMessages(false);
     setHasMoreOlderMessages(true);
+    setFetchedParticipants(null);
   }, [conversationId]);
 
   // HTTP mark-read — guarantees Django persists the read state even if socket receipts are lost.
@@ -1411,8 +1432,29 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
     return () => clearTimeout(timer);
   }, [searchQuery, searchVisible, runSearch]);
 
-  const currentMembership = useMemo(() => {
+  // chat.participants is missing on the very first render right after
+  // joining a group via invite link — InviteJoinScreen's handleContinue
+  // emits chat.open with only {conversationId, name, kind} (no
+  // participants), and AppNavigator's listener builds a bare Chat object
+  // from that. That's exactly the moment this matters most: the user's
+  // first open of a group right after joining it, when the pre-join
+  // history boundary needs to be drawn correctly. Mirrors ChatInfoPage's
+  // identical proactive-fetch-on-missing-field pattern.
+  useEffect(() => {
     const participants = (chat as any)?.participants;
+    const hasParticipants = Array.isArray(participants) && participants.length > 0;
+    if (hasParticipants || fetchedParticipants || !conversationId) return;
+    getRequest(ROUTES.chat.conversationDetail(conversationId)).then((res) => {
+      const raw = res?.data ?? res;
+      if (Array.isArray(raw?.participants)) setFetchedParticipants(raw.participants);
+    }).catch(() => {});
+  }, [chat, conversationId, fetchedParticipants]);
+
+  const currentMembership = useMemo(() => {
+    const participants =
+      (chat as any)?.participants && (chat as any).participants.length > 0
+        ? (chat as any).participants
+        : fetchedParticipants;
     if (!Array.isArray(participants) || !currentUserId) return null;
     return (
       participants.find(
@@ -1422,7 +1464,9 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
           p?.id === currentUserId,
       ) ?? null
     );
-  }, [chat, currentUserId]);
+  }, [chat, fetchedParticipants, currentUserId]);
+
+  const myJoinedAt: string | null = currentMembership?.joined_at ?? currentMembership?.joinedAt ?? null;
 
   const isMuted =
     muteOverride ??
@@ -2485,9 +2529,21 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
           onCallHistoryCallback={handleCallHistoryCallback}
           isLoadingOlder={isLoadingOlderMessages}
           hasMoreOlder={hasMoreOlderMessages}
+          myJoinedAt={myJoinedAt}
           onLoadOlder={() => {
             const oldest = messages[0];
             if (!oldest?.createdAt || isLoadingOlderMessages || !hasMoreOlderMessages) return;
+            // Everything older than myJoinedAt is guaranteed either
+            // filtered out client-side (isPreJoinHidden) or would decrypt-
+            // fail identically - fetching further back is pure waste once
+            // the boundary itself has been reached. Reuses the same
+            // hasMoreOlder flag MessageList's handleEndReached already
+            // checks, so "reached my join boundary" is treated exactly
+            // like "no more older messages for me" - no new signal needed.
+            if (shouldStopPaginationAtJoinBoundary(oldest.createdAt, myJoinedAt)) {
+              setHasMoreOlderMessages(false);
+              return;
+            }
             setIsLoadingOlderMessages(true);
             // Per the pagination contract: at most 30 messages per request.
             requestHistoryBatch({ before: oldest.createdAt, limit: 30 })

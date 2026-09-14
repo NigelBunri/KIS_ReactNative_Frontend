@@ -598,13 +598,17 @@ export function useChatMessaging({
           }
           if (recipients.length > 0 && !recipientCipher) {
             // No envelope for this user/device — the message was encrypted
-            // before this user joined the group (forward secrecy). Show a clear
-            // informational placeholder (WhatsApp-style) so the user isn't
-            // confused by an indefinite lock icon.
+            // before this user joined the group (forward secrecy: joining
+            // never grants access to messages encrypted before you were a
+            // recipient). isPreJoinHidden lets MessageList filter these out
+            // of the rendered timeline entirely in favor of a single
+            // "you joined here" boundary marker, rather than repeating a
+            // "sent before you joined" bubble on every one of them. `text`
+            // is still set too, as a safe fallback for any older code path
+            // that reads it directly instead of the flag.
             const PRE_JOIN_TEXT = '🔒 This message was sent before you joined the group.';
             const alreadyPatched = messagesRef.current.find(
-              (m) => (m.serverId === messageId || m.id === messageId) &&
-                typeof m.text === 'string' && m.text === PRE_JOIN_TEXT,
+              (m) => (m.serverId === messageId || m.id === messageId) && m.isPreJoinHidden === true,
             );
             if (__DEV__) {
               console.warn('[useChatMessaging] no recipient envelope for this user/device', {
@@ -614,7 +618,7 @@ export function useChatMessaging({
               });
             }
             if (!alreadyPatched) {
-              const patch = { text: PRE_JOIN_TEXT };
+              const patch = { text: PRE_JOIN_TEXT, isPreJoinHidden: true };
               await saveDecryptedMessage(String(currentUserId), mapped, patch);
               await patchDecryptedMessage(messageId, patch);
             }

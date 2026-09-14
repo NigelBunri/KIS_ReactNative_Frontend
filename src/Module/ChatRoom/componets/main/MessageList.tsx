@@ -25,7 +25,87 @@ import type { CallHistoryEntry } from '../CallHistoryRow';
 
 type TimelineItem =
   | { type: 'message'; message: ChatMessage; createdAt: string }
-  | { type: 'call'; call: CallHistoryEntry; createdAt: string };
+  | { type: 'call'; call: CallHistoryEntry; createdAt: string }
+  | { type: 'joinBoundary'; createdAt: string };
+
+/**
+ * Pure builder for the chronologically-sorted timeline, extracted out of
+ * MessageList's own useMemo so the pre-join-filter/join-boundary logic is
+ * unit-testable without rendering the component (which pulls in native
+ * FlatList/vector-icon/InteractiveMessageRow dependencies).
+ *
+ * - Messages flagged isPreJoinHidden (useChatMessaging.ts: no decryption
+ *   envelope for this user/device, because they were encrypted before this
+ *   user joined the group) are excluded entirely, never rendered as
+ *   individual bubbles.
+ * - Exactly one joinBoundary item is inserted at myJoinedAt, but only when
+ *   there's actually something before it to mark a transition against —
+ *   a conversation with no history older than the user's own join needs
+ *   no boundary at all.
+ */
+export function buildTimelineItems(
+  messages: ChatMessage[],
+  callHistory: CallHistoryEntry[],
+  myJoinedAt?: string | null,
+): TimelineItem[] {
+  const regularMessages: TimelineItem[] = [];
+  const inlineCallItems: TimelineItem[] = [];
+  let hasPreJoinMessage = false;
+
+  for (const message of messages) {
+    if (message.isPreJoinHidden) {
+      hasPreJoinMessage = true;
+      continue;
+    }
+    if (message.kind === 'call_event' && message.callEvent) {
+      const ce = message.callEvent;
+      inlineCallItems.push({
+        type: 'call',
+        call: {
+          callId: ce.callId,
+          conversationId: message.conversationId ?? '',
+          callType: ce.callType ?? 'voice',
+          status: ce.status ?? 'completed',
+          startedAt: message.createdAt,
+          endedAt: message.createdAt,
+          duration: ce.duration ?? null,
+          participantCount: ce.participantCount,
+          createdBy: ce.initiatedBy ?? message.senderId ?? '',
+        } as CallHistoryEntry,
+        createdAt: message.createdAt,
+      });
+    } else {
+      regularMessages.push({ type: 'message', message, createdAt: message.createdAt });
+    }
+  }
+
+  // callHistory prop holds entries fetched from the server separately; merge and
+  // deduplicate by callId so a call never appears twice.
+  const seenCallIds = new Set(inlineCallItems.map((i) => (i as any).call.callId));
+  const legacyCallItems: TimelineItem[] = callHistory
+    .filter((c) => !seenCallIds.has(c.callId))
+    .map((call) => ({ type: 'call', call, createdAt: call.startedAt }));
+
+  const hasOlderThanJoin =
+    hasPreJoinMessage ||
+    regularMessages.some((item) => item.createdAt < String(myJoinedAt));
+  const boundaryItems: TimelineItem[] =
+    myJoinedAt && hasOlderThanJoin ? [{ type: 'joinBoundary', createdAt: myJoinedAt }] : [];
+
+  return [...regularMessages, ...inlineCallItems, ...legacyCallItems, ...boundaryItems].sort((a, b) => {
+    const timeDiff = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+    if (timeDiff !== 0) return timeDiff;
+    // A same-timestamp tie against the boundary itself always sorts the
+    // boundary first (i.e. presented as "the start of what you can
+    // see") rather than depending on id comparison, which neither side
+    // of a boundary/non-boundary pair has in common.
+    if (a.type === 'joinBoundary') return -1;
+    if (b.type === 'joinBoundary') return 1;
+    const aKey = a.type === 'message' ? a.message.id : a.call.callId;
+    const bKey = b.type === 'message' ? b.message.id : b.call.callId;
+    return String(aKey).localeCompare(String(bKey));
+  });
+}
 
 type MessageListProps = {
   messages: ChatMessage[];
@@ -76,6 +156,16 @@ type MessageListProps = {
    * screen that doesn't pass this prop keeps the previous behavior. */
   hasMoreOlder?: boolean;
 
+  /** The current user's own membership.joined_at for this group
+   * conversation (server-side, see apps/groups/views.py's
+   * _reactivate_group_membership). When set, messages created before it
+   * are filtered out (they're already flagged isPreJoinHidden by
+   * useChatMessaging's decrypt path — this is a display concern, not a
+   * decryption one) and a single joinBoundary timeline item is inserted
+   * at the transition instead of a per-message banner. Undefined/null
+   * means no boundary is drawn — matches the previous behavior. */
+  myJoinedAt?: string | null;
+
   onStarMessage?: (message: ChatMessage) => void;
   onShowReadReceipts?: (message: ChatMessage) => void;
   onViewOnce?: (messageId: string) => void;
@@ -116,6 +206,7 @@ export const MessageList: React.FC<MessageListProps> = ({
   onLoadOlder,
   isLoadingOlder = false,
   hasMoreOlder = true,
+  myJoinedAt,
   onStarMessage,
   onShowReadReceipts,
   onViewOnce,
@@ -129,49 +220,10 @@ export const MessageList: React.FC<MessageListProps> = ({
   onCallHistoryCallback,
 }) => {
   const listRef = useRef<FlatList<TimelineItem>>(null);
-  const timelineItems = useMemo<TimelineItem[]>(() => {
-    // Separate call_event messages from regular messages so they render as call rows.
-    const regularMessages: TimelineItem[] = [];
-    const inlineCallItems: TimelineItem[] = [];
-
-    for (const message of messages) {
-      if (message.kind === 'call_event' && message.callEvent) {
-        const ce = message.callEvent;
-        inlineCallItems.push({
-          type: 'call',
-          call: {
-            callId: ce.callId,
-            conversationId: message.conversationId ?? '',
-            callType: ce.callType ?? 'voice',
-            status: ce.status ?? 'completed',
-            startedAt: message.createdAt,
-            endedAt: message.createdAt,
-            duration: ce.duration ?? null,
-            participantCount: ce.participantCount,
-            createdBy: ce.initiatedBy ?? message.senderId ?? '',
-          } as CallHistoryEntry,
-          createdAt: message.createdAt,
-        });
-      } else {
-        regularMessages.push({ type: 'message', message, createdAt: message.createdAt });
-      }
-    }
-
-    // callHistory prop holds entries fetched from the server separately; merge and
-    // deduplicate by callId so a call never appears twice.
-    const seenCallIds = new Set(inlineCallItems.map((i) => (i as any).call.callId));
-    const legacyCallItems: TimelineItem[] = callHistory
-      .filter((c) => !seenCallIds.has(c.callId))
-      .map((call) => ({ type: 'call', call, createdAt: call.startedAt }));
-
-    return [...regularMessages, ...inlineCallItems, ...legacyCallItems].sort((a, b) => {
-      const timeDiff = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
-      if (timeDiff !== 0) return timeDiff;
-      const aKey = a.type === 'message' ? a.message.id : a.call.callId;
-      const bKey = b.type === 'message' ? b.message.id : b.call.callId;
-      return String(aKey).localeCompare(String(bKey));
-    });
-  }, [messages, callHistory]);
+  const timelineItems = useMemo<TimelineItem[]>(
+    () => buildTimelineItems(messages, callHistory, myJoinedAt),
+    [messages, callHistory, myJoinedAt],
+  );
 
   // FlatList's `data` for the inverted list — newest first, so it renders
   // at the visual bottom with the oldest loaded item at the visual top,
@@ -274,7 +326,9 @@ export const MessageList: React.FC<MessageListProps> = ({
     const newestKey = newest
       ? newest.type === 'message'
         ? String(newest.message.serverId ?? newest.message.id ?? newest.message.clientId)
-        : `call:${newest.call.callId}`
+        : newest.type === 'call'
+          ? `call:${newest.call.callId}`
+          : `boundary:${newest.createdAt}`
       : null;
     const prevKey = newestItemKeyRef.current;
     newestItemKeyRef.current = newestKey;
@@ -502,6 +556,33 @@ export const MessageList: React.FC<MessageListProps> = ({
         );
       }
 
+      if (timelineItem.type === 'joinBoundary') {
+        // Same pill visual language as the E2EE notice below (ListTopEdge)
+        // rather than inventing new styling — a single marker at the
+        // transition point instead of repeating a banner on every
+        // pre-join message.
+        return (
+          <View style={{
+            alignSelf: 'center',
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 6,
+            backgroundColor: 'rgba(0,0,0,0.08)',
+            borderRadius: 12,
+            paddingHorizontal: 12,
+            paddingVertical: 7,
+            marginTop: 12,
+            marginBottom: 4,
+            marginHorizontal: 24,
+          }}>
+            <Ionicons name="people-outline" size={12} color={palette.subtext} />
+            <Text style={{ fontSize: 12, color: palette.subtext, textAlign: 'center', flexShrink: 1 }}>
+              Messages before this point aren't shown — you joined the group.
+            </Text>
+          </View>
+        );
+      }
+
       const item = timelineItem.message;
       const previous = previousTimelineItem?.type === 'message'
         ? previousTimelineItem.message
@@ -662,7 +743,11 @@ export const MessageList: React.FC<MessageListProps> = ({
         inverted
         data={reversedTimelineItems}
         keyExtractor={(item) =>
-          item.type === 'message' ? `message:${item.message.id}` : `call:${item.call.callId}`
+          item.type === 'message'
+            ? `message:${item.message.id}`
+            : item.type === 'call'
+              ? `call:${item.call.callId}`
+              : `boundary:${item.createdAt}`
         }
         style={styles.messagesList}
         contentContainerStyle={styles.messagesListContent}

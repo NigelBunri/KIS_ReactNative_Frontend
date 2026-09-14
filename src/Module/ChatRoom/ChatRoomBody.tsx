@@ -66,6 +66,7 @@ type Props = {
   onLoadOlder?: () => void;
   isLoadingOlder?: boolean;
   hasMoreOlder?: boolean;
+  myJoinedAt?: string | null;
 
   // New features
   onSendGif?: (gif: { url: string; previewUrl: string; width: number; height: number }) => void;
@@ -152,6 +153,7 @@ export default function ChatRoomBody({
   onLoadOlder,
   isLoadingOlder,
   hasMoreOlder,
+  myJoinedAt,
   onSendGif,
   onSendLocation,
   onScheduleSend,
@@ -233,6 +235,7 @@ export default function ChatRoomBody({
         onLoadOlder={onLoadOlder}
         isLoadingOlder={isLoadingOlder}
         hasMoreOlder={hasMoreOlder}
+        myJoinedAt={myJoinedAt}
         onStarMessage={onStarMessage}
         onShowReadReceipts={onShowReadReceipts}
         onViewOnce={onViewOnce}

@@ -37,6 +37,7 @@ export type DecryptedMessagePatch = Pick<
   | 'sticker'
   | 'replyToId'
   | 'kind'
+  | 'isPreJoinHidden'
 >;
 
 export async function saveDecryptedMessage(

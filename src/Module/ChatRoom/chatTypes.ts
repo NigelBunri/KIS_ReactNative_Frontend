@@ -425,6 +425,17 @@ export type ChatMessage = {
   isDeleted?: boolean;
 
   /**
+   * Set when this message's encryptionMeta.recipients has envelopes for
+   * other participants but none for the current user/device - i.e. it was
+   * encrypted before the current user joined the group, so there is no
+   * cryptographic path to decrypt it (see useChatMessaging.ts's
+   * PRE_JOIN_TEXT branch). Used to filter these out of the rendered
+   * timeline in favor of a single join-boundary marker, instead of
+   * repeating a "sent before you joined" bubble on every such message.
+   */
+  isPreJoinHidden?: boolean;
+
+  /**
    * True if message has never been accepted by server.
    */
   isLocalOnly?: boolean;
