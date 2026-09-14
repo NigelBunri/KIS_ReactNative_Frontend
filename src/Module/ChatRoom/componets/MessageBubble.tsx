@@ -28,6 +28,7 @@ import { cachedVoicePlaybackUrl, describeVoicePlaybackError, resolveFreshVoicePl
 import { ViewOnceViewerModal, type ViewOnceContentSnapshot } from './ViewOnceViewerModal';
 import { useMessageTranslation } from '../hooks/useMessageTranslation';
 import { MessageTranslationBlock } from './MessageTranslationBlock';
+import { useDetachedChatOverlayProps } from '@/contexts/DetachedChatOverlayContext';
 import {
   BIBLE_REFERENCE_RE,
   BIBLE_QUOTE_BLOCK_RE,
@@ -258,6 +259,14 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   translateRequestToken,
 }) => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  // The chat-room overlay (see DetachedChatOverlayContext.tsx) is a
+  // top-level sibling painted OUTSIDE NavigationContainer, above every
+  // RootStack screen - so navigating to 'InviteJoin' from inside an open
+  // chat pushes it onto the stack underneath the still-visible overlay,
+  // where the user can never actually see or tap it. Closing the chat
+  // first (see the two "Tap to join" handlers below) makes the invite/
+  // welcome screen visible the way any other navigation would be.
+  const closeChatOverlay = useDetachedChatOverlayProps()?.closeChat;
   // Fullscreen viewers below (video/image/PDF) position their close button
   // with `position: absolute` inside a SafeAreaView - absolutely-positioned
   // children ignore their parent's own safe-area padding in RN's layout
@@ -2103,10 +2112,13 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
               return (
                 <Pressable
                   key={i}
-                  onPress={() => navigation.navigate('InviteJoin', {
-                    type: inviteMatch[1] as 'group' | 'community',
-                    token: inviteMatch[2],
-                  })}
+                  onPress={() => {
+                    closeChatOverlay?.();
+                    navigation.navigate('InviteJoin', {
+                      type: inviteMatch[1] as 'group' | 'community',
+                      token: inviteMatch[2],
+                    });
+                  }}
                 >
                   <Text style={{ color: inviteColor, fontWeight: '700', textDecorationLine: 'underline' }}>{token.text}</Text>
                 </Pressable>
@@ -4222,7 +4234,10 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
             : (palette.primary);
           return (
             <Pressable
-              onPress={() => navigation.navigate('InviteJoin', inviteInfo)}
+              onPress={() => {
+                closeChatOverlay?.();
+                navigation.navigate('InviteJoin', inviteInfo);
+              }}
               style={{
                 marginTop: 8,
                 borderRadius: 12,
