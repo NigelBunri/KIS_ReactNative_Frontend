@@ -169,6 +169,32 @@ const SocketContext = createContext<SocketContextValue>({
 
 export const useSocket = () => useContext(SocketContext);
 
+/**
+ * Pure decision for the in-call "End" button, extracted for unit-testability.
+ * Only the call's host or a group admin/owner/moderator may end a call for
+ * everyone — a plain participant can only ever leave. Previously this
+ * decision had a bug: anyone who wasn't the host fell into the same branch
+ * as "nobody has joined the call yet" and unconditionally ended the call for
+ * the entire group.
+ */
+export type EndCallAction = 'leave' | 'choice' | 'endAll';
+
+export function resolveEndCallAction(args: {
+  isHost: boolean;
+  isGroupAdmin: boolean;
+  otherJoined: number;
+  callIsLive: boolean;
+}): EndCallAction {
+  const { isHost, isGroupAdmin, otherJoined, callIsLive } = args;
+  const canEndForAll = isHost || isGroupAdmin;
+  if (!canEndForAll) return 'leave';
+  if (otherJoined > 0 && callIsLive) return 'choice';
+  // Privileged caller, but nobody has joined yet (still dialing/ringing) —
+  // cancel the outgoing call for everyone so callees' IncomingCallScreen /
+  // ring-tone is dismissed immediately.
+  return 'endAll';
+}
+
 /* ============================================================================
  * HELPERS
  * ============================================================================ */
@@ -3002,15 +3028,53 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         <ActiveCallScreen
           session={activeCall}
           actions={{
-            onEnd: () => {
+            onEnd: async () => {
               const session = activeCallRef.current;
               const localP = session?.participants.find(p => p.isLocal);
               const isHost = localP?.role === 'host';
               const otherJoined = session?.participants.filter(p => !p.isLocal).length ?? 0;
               const callIsLive = session?.state === 'active' || session?.state === 'reconnecting';
 
-              if (isHost && otherJoined > 0 && callIsLive) {
-                // Host with others already in the call — give the choice to leave vs end for all.
+              // Only the call's host or a group admin/owner/moderator may end
+              // it for everyone — everyone else can only leave. A plain
+              // participant tapping "End" used to fall into the branch below
+              // and call endCallForAll() unconditionally, so ANY participant
+              // could terminate the call for the entire group.
+              //
+              // Group-admin status isn't tracked on the call session itself
+              // (only the call-local host/audience role is), so it's checked
+              // here, on demand, only for the rare case of a non-host tapping
+              // End on a live group call — a fresh, tiny fetch at the moment
+              // of a deliberate user action, rather than adding a network
+              // round-trip to every call's start/join/answer path just to
+              // pre-populate a flag most calls will never need. A failed or
+              // slow check fails closed (treated as non-admin, i.e. leave
+              // only) rather than risking an accidental grant of
+              // end-for-everyone power.
+              let isGroupAdmin = false;
+              if (!isHost && session?.conversationId) {
+                try {
+                  const res = await getRequest(ROUTES.chat.conversationDetail(session.conversationId));
+                  const raw = res?.data ?? res;
+                  const participants = Array.isArray(raw?.participants) ? raw.participants : [];
+                  const meId = currentUserIdRef.current ? String(currentUserIdRef.current) : null;
+                  const me = participants.find((p: any) => {
+                    const uid = p?.user?.id ?? p?.user;
+                    return meId && uid && String(uid) === meId;
+                  });
+                  const role = String(me?.base_role ?? '').toLowerCase();
+                  isGroupAdmin = role === 'owner' || role === 'admin' || role === 'moderator';
+                } catch {
+                  // Network failure — fail closed, treated as non-admin below.
+                }
+              }
+
+              const action = resolveEndCallAction({ isHost: !!isHost, isGroupAdmin, otherJoined, callIsLive });
+              if (action === 'leave') {
+                void leaveCall();
+              } else if (action === 'choice') {
+                // Host or group admin with others already in the call —
+                // give the choice to leave vs end for all.
                 Alert.alert(
                   'Leave or end call?',
                   '',
@@ -3021,9 +3085,10 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                   ],
                 );
               } else {
-                // Nobody has joined yet (still dialing/connecting) OR we are not the host.
-                // Use endCallForAll so call.end is broadcast to every callee and their
-                // IncomingCallScreen / ring-tone is dismissed immediately.
+                // Privileged caller, but nobody has joined yet (still
+                // dialing/ringing) — cancel the outgoing call for everyone
+                // so callees' IncomingCallScreen / ring-tone is dismissed
+                // immediately.
                 void endCallForAll();
               }
             },
