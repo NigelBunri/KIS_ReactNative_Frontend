@@ -19,6 +19,7 @@ import { audioRouteManager } from '@/services/calls/audioRouteManager';
 import { KISIcon } from '@/constants/kisIcons';
 import { SafeAreaView } from '@/components/common/SafeAreaViewWithTopPadding';
 import { useKISTheme } from '@/theme/useTheme';
+import { useResponsiveLayout } from '@/theme/responsive';
 
 // Per call type, resolve accent from palette tokens only — no hardcoded hex.
 // voice-group → palette.info (sky blue), video-group → palette.info,
@@ -42,6 +43,15 @@ const VIBRATE_PATTERN = [0, 400, 200, 400];
 export default function IncomingCallScreen({ session, onAnswer, onDecline }: Props) {
   const { palette } = useKISTheme();
   const { width: screenWidth } = useWindowDimensions();
+  const { isTablet, isLargeTablet } = useResponsiveLayout();
+  // These Math.min(...) caps below used to be phone-only literals — on a
+  // tablet, screenWidth*0.44 etc. easily exceeds them, so Math.min always
+  // picked the phone-sized constant regardless of the actual (much larger)
+  // screen, leaving a phone-scaled ring/avatar/button cluster centered in
+  // a mostly-empty tablet canvas. Scaling the cap itself keeps the same
+  // "don't exceed a sane fraction of the screen" safety property while
+  // actually using the extra tablet space.
+  const scale = isLargeTablet ? 1.45 : isTablet ? 1.25 : 1;
 
   const ring1 = useRef(new Animated.Value(1)).current;
   const ring2 = useRef(new Animated.Value(1)).current;
@@ -100,11 +110,16 @@ export default function IncomingCallScreen({ session, onAnswer, onDecline }: Pro
   const isVideo = session.callType === 'video' || session.callType === 'video-group';
   const extraCount = session.participants.length;
 
-  // Screen-relative ring sizes — capped to prevent overflow on narrow devices
-  const ringSize = Math.min(168, screenWidth * 0.44);
+  // Screen-relative ring sizes — capped to prevent overflow on narrow devices,
+  // with the cap itself scaled up on tablet (see `scale` above).
+  const ringSize = Math.min(168 * scale, screenWidth * 0.44);
   const ringRadius = ringSize / 2;
-  const ringsWrapSize = Math.min(200, screenWidth * 0.53);
-  const glowSize = Math.min(380, screenWidth - 16);
+  const ringsWrapSize = Math.min(200 * scale, screenWidth * 0.53);
+  const glowSize = Math.min(380 * scale, screenWidth - 16);
+  const avatarBorderSize = 128 * scale;
+  const avatarSize = 116 * scale;
+  const actionBtnSize = 82 * scale;
+  const actionsGap = 88 * scale;
 
   return (
     <Modal visible animationType="fade" transparent={false} statusBarTranslucent>
@@ -159,9 +174,28 @@ export default function IncomingCallScreen({ session, onAnswer, onDecline }: Pro
 
               {/* Avatar bordered by accent colour */}
               <Animated.View
-                style={[styles.avatarBorder, { borderColor: accent, transform: [{ scale: avatarPulse }] }]}
+                style={[
+                  styles.avatarBorder,
+                  {
+                    width: avatarBorderSize,
+                    height: avatarBorderSize,
+                    borderRadius: avatarBorderSize / 2,
+                    borderColor: accent,
+                    transform: [{ scale: avatarPulse }],
+                  },
+                ]}
               >
-                <View style={[styles.avatar, { backgroundColor: accent + 'CC' }]}>
+                <View
+                  style={[
+                    styles.avatar,
+                    {
+                      width: avatarSize,
+                      height: avatarSize,
+                      borderRadius: avatarSize / 2,
+                      backgroundColor: accent + 'CC',
+                    },
+                  ]}
+                >
                   <Text style={[styles.avatarText, { color: palette.card }]}>{initials}</Text>
                 </View>
               </Animated.View>
@@ -210,7 +244,7 @@ export default function IncomingCallScreen({ session, onAnswer, onDecline }: Pro
           </View>
 
           {/* ── Answer / Decline ── */}
-          <View style={styles.actionsSection}>
+          <View style={[styles.actionsSection, { gap: actionsGap }]}>
             <CallActionButton
               icon="phone-off"
               label="Decline"
@@ -219,6 +253,7 @@ export default function IncomingCallScreen({ session, onAnswer, onDecline }: Pro
               labelColor={`${palette.text}99`}
               onPress={onDecline}
               accessibilityLabel="Decline call"
+              size={actionBtnSize}
             />
             <CallActionButton
               icon={isVideo ? 'video' : 'phone'}
@@ -228,6 +263,7 @@ export default function IncomingCallScreen({ session, onAnswer, onDecline }: Pro
               labelColor={`${palette.text}99`}
               onPress={() => onAnswer()}
               accessibilityLabel="Accept call"
+              size={actionBtnSize}
             />
           </View>
 
@@ -245,6 +281,7 @@ function CallActionButton({
   labelColor,
   onPress,
   accessibilityLabel,
+  size,
 }: {
   icon: string;
   label: string;
@@ -253,6 +290,7 @@ function CallActionButton({
   labelColor: string;
   onPress: () => void;
   accessibilityLabel: string;
+  size: number;
 }) {
   return (
     <View style={styles.actionCol}>
@@ -262,7 +300,7 @@ function CallActionButton({
         accessibilityRole="button"
         style={({ pressed }) => [
           styles.actionBtn,
-          { backgroundColor: color, shadowColor: color },
+          { width: size, height: size, borderRadius: size / 2, backgroundColor: color, shadowColor: color },
           pressed && { opacity: 0.85, transform: [{ scale: 0.94 }] },
         ]}
         android_ripple={{ color: 'rgba(255,255,255,0.25)', borderless: true, radius: 40 }}

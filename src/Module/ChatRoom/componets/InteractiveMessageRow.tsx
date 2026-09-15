@@ -21,6 +21,13 @@ type Props = {
   message: ChatMessage;
   palette: any;
   currentUserId?: string;
+  /** Actual measured width of the message list's own container — see
+   * MessageList.tsx's onLayout. Passed through to MessageBubble so its
+   * attachment grid sizes against the real available space instead of the
+   * raw device width (which can be much wider than this row's actual
+   * container on tablet, e.g. inside TabletDialogOverlay/
+   * PartnersMessagesPane). */
+  paneWidth?: number;
 
   onReplyToMessage?: (message: ChatMessage) => void;
   onEditMessage?: (message: ChatMessage) => void;
@@ -129,6 +136,7 @@ export const InteractiveMessageRow: React.FC<Props> = ({
   message,
   palette,
   currentUserId,
+  paneWidth,
   onReplyToMessage,
   onEditMessage,
   onForwardMessage,
@@ -406,6 +414,7 @@ export const InteractiveMessageRow: React.FC<Props> = ({
             message={message}
             palette={palette}
             currentUserId={currentUserId}
+            paneWidth={paneWidth}
             onReact={onReactMessage}
             onVotePoll={onVotePoll ? (msgId, optId) => onVotePoll(message, optId) : undefined}
             onRetry={onRetryMessage}

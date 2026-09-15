@@ -167,6 +167,14 @@ type MessageBubbleProps = {
   message: ChatMessage | ServerMessageLike;
   palette: any;
   currentUserId?: string;
+  /** Actual measured width of the message list's own container (see
+   * MessageList.tsx's onLayout), passed down through InteractiveMessageRow.
+   * Used instead of the raw device width for attachment-grid/voice-bubble
+   * sizing, since this bubble's real available space can be much narrower
+   * than the full screen on tablet (TabletDialogOverlay's capped dialog,
+   * PartnersMessagesPane's capped pane) — falls back to the raw device
+   * width if not yet measured/provided, matching the previous behavior. */
+  paneWidth?: number;
   onReact?: (message: ChatMessage, emoji: string) => void;
   onVotePoll?: (messageId: string, optionId: string) => void;
   onRetry?: (message: ChatMessage) => void;
@@ -239,6 +247,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   message,
   palette,
   currentUserId,
+  paneWidth,
   onReact,
   onVotePoll,
   onRetry,
@@ -1067,7 +1076,15 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   };
 
   const responsive = useResponsiveLayout();
-  const width = responsive.width || Dimensions.get('window').width;
+  // Prefer the measured pane width (this bubble's actual rendered
+  // container — see MessageBubbleProps.paneWidth's doc comment) over the
+  // raw device width. On phone these are normally the same value; on
+  // tablet, when this chat is embedded inside something narrower than the
+  // full screen (TabletDialogOverlay's capped dialog, PartnersMessagesPane's
+  // capped pane), they can differ substantially — using the raw width there
+  // computed an attachment grid wider than the bubble's real available
+  // space, so tiles rendered past the bubble's edge.
+  const width = paneWidth || responsive.width || Dimensions.get('window').width;
   const bubbleMaxWidth = responsive.isTablet ? '68%' : responsive.isWatch ? '92%' : responsive.isCompactPhone ? '88%' : '80%';
   const bubblePaddingX = responsive.isWatch ? 8 : 10;
   const bubbleTextSize = responsive.bodyFontSize;

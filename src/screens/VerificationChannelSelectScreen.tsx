@@ -20,6 +20,7 @@ import { postRequest } from '@/network/post';
 import ROUTES from '@/network';
 import KISText from '@/components/common/KISText';
 import { useKISTheme } from '@/theme/useTheme';
+import { useResponsiveLayout } from '@/theme/responsive';
 import { KIS_TOKENS } from '@/theme/constants';
 
 type RouteParams = {
@@ -33,7 +34,7 @@ type Channels = {
   whatsapp: boolean;
 };
 
-const createStyles = (tokens: typeof KIS_TOKENS) =>
+const createStyles = (tokens: typeof KIS_TOKENS, contentMaxWidth: number) =>
   StyleSheet.create({
     flex: { flex: 1 },
     topBar: {
@@ -53,6 +54,9 @@ const createStyles = (tokens: typeof KIS_TOKENS) =>
       gap: tokens.spacing.xl,
       flexGrow: 1,
       justifyContent: 'center',
+      width: '100%',
+      maxWidth: contentMaxWidth,
+      alignSelf: 'center',
     },
     headerBlock: {
       gap: tokens.spacing.sm,
@@ -114,7 +118,8 @@ export default function VerificationChannelSelectScreen({ navigation }: any) {
   const purpose = params.purpose || 'register';
 
   const { palette, tokens, tone } = useKISTheme();
-  const styles = useMemo(() => createStyles(tokens), [tokens]);
+  const responsive = useResponsiveLayout();
+  const styles = useMemo(() => createStyles(tokens, responsive.contentMaxWidth), [tokens, responsive.contentMaxWidth]);
 
   const [channels, setChannels] = useState<Channels | null>(null);
   const [loadingChannels, setLoadingChannels] = useState(true);

@@ -220,6 +220,15 @@ export const MessageList: React.FC<MessageListProps> = ({
   onCallHistoryCallback,
 }) => {
   const listRef = useRef<FlatList<TimelineItem>>(null);
+  // Actual rendered width of this list's own container — measured, not
+  // assumed. MessageBubble previously sized its attachment grid off the
+  // raw device width, which is wrong whenever this chat renders inside
+  // something narrower than the full screen (TabletDialogOverlay's capped
+  // dialog, PartnersMessagesPane's capped pane on tablet/desktop) — the
+  // grid computed itself wider than the bubble's real available space and
+  // overflowed past the bubble's edge. Passed down as `paneWidth` so
+  // MessageBubble can size against it instead.
+  const [paneWidth, setPaneWidth] = useState(0);
   const timelineItems = useMemo<TimelineItem[]>(
     () => buildTimelineItems(messages, callHistory, myJoinedAt),
     [messages, callHistory, myJoinedAt],
@@ -628,6 +637,7 @@ export const MessageList: React.FC<MessageListProps> = ({
             message={item}
             palette={palette}
             currentUserId={currentUserId}
+            paneWidth={paneWidth || undefined}
             replySource={replySource}
             isHighlighted={isHighlighted}
             isSelected={isSelected}
@@ -661,6 +671,7 @@ export const MessageList: React.FC<MessageListProps> = ({
       reversedTimelineItems,
       palette,
       currentUserId,
+      paneWidth,
       onCallHistoryCallback,
       messagesById,
       highlightedMessageId,
@@ -737,7 +748,13 @@ export const MessageList: React.FC<MessageListProps> = ({
   ) : null;
 
   return (
-    <View style={{ flex: 1 }}>
+    <View
+      style={{ flex: 1 }}
+      onLayout={(e) => {
+        const w = Math.round(e.nativeEvent.layout.width);
+        if (w > 0 && w !== paneWidth) setPaneWidth(w);
+      }}
+    >
       <FlatList
         ref={listRef}
         inverted

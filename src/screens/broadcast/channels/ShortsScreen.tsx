@@ -2,7 +2,6 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Animated,
   ActivityIndicator,
-  Dimensions,
   FlatList,
   Image,
   Modal,
@@ -11,6 +10,7 @@ import {
   Share,
   StyleSheet,
   Text,
+  useWindowDimensions,
   Vibration,
   View,
   ViewToken,
@@ -31,8 +31,6 @@ import { resolveBackendAssetUrl } from '@/network';
 import type { BroadcastChannelContent } from '@/screens/broadcast/channels/api/channels.types';
 import { reactToChannelContent, shareChannelContent, toggleChannelSubscription } from '@/screens/broadcast/channels/hooks/useChannelsData';
 import ChannelCommentsPanel from '@/screens/broadcast/channels/components/ChannelCommentsPanel';
-
-const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 type ShortsItem = BroadcastChannelContent & {
   videoUrl?: string;
@@ -72,6 +70,7 @@ type ShortCardProps = {
 function ShortCard({ item, isVisible, shouldPreload, onLike, onDislike, onShare, onCommentPress, onSubscribe, subscribedChannels }: ShortCardProps) {
   const { palette } = useKISTheme();
   const { minTouchTarget } = useResponsiveLayout();
+  const { height: screenHeight } = useWindowDimensions();
   const { bottom: bottomInset } = useSafeAreaInsets();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const liked = Boolean(item.localLiked);
@@ -95,7 +94,7 @@ function ShortCard({ item, isVisible, shouldPreload, onLike, onDislike, onShare,
   }, [item.id, onLike]);
 
   return (
-    <View style={[styles.card, { height: SCREEN_HEIGHT }]}>
+    <View style={[styles.card, { height: screenHeight }]}>
       <View style={StyleSheet.absoluteFillObject}>
         {item.videoUrl && (isVisible || shouldPreload) ? (
           <KISVideo
@@ -192,6 +191,7 @@ function ShortCard({ item, isVisible, shouldPreload, onLike, onDislike, onShare,
 
 export default function ShortsScreen() {
   const { palette } = useKISTheme();
+  const { height: screenHeight } = useWindowDimensions();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [items, setItems] = useState<ShortsItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -333,11 +333,11 @@ export default function ShortsScreen() {
         )}
         pagingEnabled
         showsVerticalScrollIndicator={false}
-        snapToInterval={SCREEN_HEIGHT}
+        snapToInterval={screenHeight}
         decelerationRate="fast"
         onViewableItemsChanged={onViewableItemsChanged}
         viewabilityConfig={viewabilityConfig.current}
-        getItemLayout={(_, index) => ({ length: SCREEN_HEIGHT, offset: SCREEN_HEIGHT * index, index })}
+        getItemLayout={(_, index) => ({ length: screenHeight, offset: screenHeight * index, index })}
         // Bounds how many cards FlatList keeps mounted around the visible
         // one to roughly match shouldPreload's own ±1 window above - wide
         // enough that the immediate neighbor (the only one shouldPreload
@@ -370,7 +370,7 @@ export default function ShortsScreen() {
                 transform: [{
                   translateY: commentsAnim.interpolate({
                     inputRange: [0, 1],
-                    outputRange: [SCREEN_HEIGHT * 0.65, 0],
+                    outputRange: [screenHeight * 0.65, 0],
                   }),
                 }],
               },

@@ -1,6 +1,5 @@
 import React, { useMemo, useState } from 'react';
 import {
-  Dimensions,
   FlatList,
   Image,
   Modal,
@@ -8,11 +7,13 @@ import {
   Pressable,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View,
 } from 'react-native';
 
 import { KISIcon } from '@/constants/kisIcons';
 import { useSafeTopInset } from '@/hooks/useSafeTopInset';
+import { useResponsiveLayout } from '@/theme/responsive';
 
 export type MediaGalleryProps = {
   visible: boolean;
@@ -31,10 +32,6 @@ type MediaItem = {
   originalName?: string;
   tab: MediaTab;
 };
-
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const COLUMN_COUNT = 3;
-const ITEM_SIZE = Math.floor((SCREEN_WIDTH - 4) / COLUMN_COUNT);
 
 const TABS: MediaTab[] = ['Images', 'Videos', 'Documents'];
 
@@ -97,8 +94,22 @@ export const MediaGallery: React.FC<MediaGalleryProps> = ({
   onClose,
 }) => {
   const topInset = useSafeTopInset();
+  const { width: screenWidth } = useWindowDimensions();
+  const { columns } = useResponsiveLayout();
   const [activeTab, setActiveTab] = useState<MediaTab>('Images');
   const [fullscreenItem, setFullscreenItem] = useState<MediaItem | null>(null);
+
+  // Was a module-level `const` computed once from Dimensions.get('window')
+  // at import time — frozen for the app's lifetime, never updated on
+  // rotation or iPadOS Split View/Slide Over resize, so the grid's actual
+  // row width (screenWidth) could drift out of sync with itemSize (still
+  // whatever it was at first import), leaving a gap on one side of every
+  // row or clipping the last column. Recomputed on every render off the
+  // live window width instead. columnCount is tablet-aware (columns.dense)
+  // rather than a hardcoded 3, so a wide tablet screen fills with more,
+  // reasonably-sized tiles instead of the same 3 stretched wide.
+  const columnCount = Math.max(3, columns.dense);
+  const itemSize = Math.floor((screenWidth - 4) / columnCount);
 
   const allMedia = useMemo(() => extractMediaItems(messages), [messages]);
   const filtered = useMemo(
@@ -115,7 +126,7 @@ export const MediaGallery: React.FC<MediaGalleryProps> = ({
         onPress={() => setFullscreenItem(item)}
         style={[
           styles.gridItem,
-          { backgroundColor: palette.surfaceSoft ?? palette.surface },
+          { width: itemSize, height: itemSize, backgroundColor: palette.surfaceSoft ?? palette.surface },
         ]}
       >
         {isDocument ? (
@@ -221,13 +232,18 @@ export const MediaGallery: React.FC<MediaGalleryProps> = ({
           </View>
         ) : (
           <FlatList
+            // Re-keyed on column-count change - RN's FlatList requires a
+            // remount (not just a numColumns prop update) to actually
+            // relayout into a new column count, same pattern already used
+            // by the broadcast grids elsewhere in the app.
+            key={`grid-${columnCount}`}
             initialNumToRender={20}
             maxToRenderPerBatch={10}
             windowSize={10}
             removeClippedSubviews
             data={filtered}
             keyExtractor={(item) => item.key}
-            numColumns={COLUMN_COUNT}
+            numColumns={columnCount}
             renderItem={renderGridItem}
             contentContainerStyle={styles.grid}
           />
@@ -293,8 +309,9 @@ const styles = StyleSheet.create({
   tabText: { fontSize: 14 },
   grid: { paddingBottom: 24 },
   gridItem: {
-    width: ITEM_SIZE,
-    height: ITEM_SIZE,
+    // width/height are applied inline per-render (see itemSize) rather
+    // than fixed here, so the grid stays in sync with the live window
+    // width on rotation/resize instead of whatever it was at import time.
     margin: 1,
     overflow: 'hidden',
     alignItems: 'center',

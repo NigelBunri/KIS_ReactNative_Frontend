@@ -18,6 +18,7 @@ import KISButton from '@/constants/KISButton';
 import { postRequest } from '@/network/post';
 import ROUTES from '@/network';
 import { useKISTheme } from '@/theme/useTheme';
+import { useResponsiveLayout } from '@/theme/responsive';
 import KISText from '@/components/common/KISText';
 import { KIS_TOKENS } from '@/theme/constants';
 import { useAuth } from '../../App';
@@ -31,7 +32,7 @@ type RouteParams = {
   channel?: 'sms' | 'email' | 'whatsapp';
 };
 
-const makeStyles = (tokens: typeof KIS_TOKENS) =>
+const makeStyles = (tokens: typeof KIS_TOKENS, contentMaxWidth: number) =>
   StyleSheet.create({
     flex: { flex: 1 },
     container: {
@@ -39,6 +40,9 @@ const makeStyles = (tokens: typeof KIS_TOKENS) =>
       gap: tokens.spacing.xl,
       flexGrow: 1,
       justifyContent: 'center',
+      width: '100%',
+      maxWidth: contentMaxWidth,
+      alignSelf: 'center',
     },
     headerBlock: {
       gap: tokens.spacing.sm,
@@ -69,7 +73,8 @@ export default function DeviceVerificationScreen({ navigation, setLoad }: any) {
   const params: RouteParams = route?.params || {};
 
   const { palette, tokens } = useKISTheme();
-  const styles = useMemo(() => makeStyles(tokens), [tokens]);
+  const responsive = useResponsiveLayout();
+  const styles = useMemo(() => makeStyles(tokens, responsive.contentMaxWidth), [tokens, responsive.contentMaxWidth]);
 
   const [phone] = useState<string>(String(params.phone || ''));
   const [purpose] = useState<'register' | 'login' | 'reset'>(params.purpose || 'register');
