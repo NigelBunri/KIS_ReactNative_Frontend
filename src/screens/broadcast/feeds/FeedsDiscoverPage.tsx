@@ -16,6 +16,7 @@ import Clipboard from '@react-native-clipboard/clipboard';
 import { useIsFocused, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useKISTheme } from '@/theme/useTheme';
+import { useResponsiveLayout } from '@/theme/responsive';
 import ROUTES from '@/network';
 import { postRequest } from '@/network/post';
 import type { RootStackParamList } from '@/navigation/types';
@@ -89,6 +90,7 @@ export default function FeedsDiscoverPage({
   filterDuration: filterDurationProp,
 }: Props) {
   const { palette } = useKISTheme();
+  const responsive = useResponsiveLayout();
   const navigation =
     useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const isFocused = useIsFocused();
@@ -556,7 +558,7 @@ export default function FeedsDiscoverPage({
         </ScrollView>
       )}
 
-      <View style={{ paddingHorizontal: 12, gap: 12 }}>
+      <View style={{ paddingHorizontal: 12, gap: 12, width: '100%', maxWidth: responsive.contentMaxWidth, alignSelf: 'center' }}>
         {/* Feed settings row — quick access to blocked users management */}
         <Pressable
           onPress={() => navigation.navigate('BlockedContacts')}

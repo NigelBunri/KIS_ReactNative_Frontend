@@ -54,6 +54,11 @@ const DEPT_TYPE_ICONS: Record<string, string> = {
 export default function MinistryScreen({ navigation }: Props) {
   const { palette } = useKISTheme();
   const layout = useResponsiveLayout();
+  // Was hardcoded to 2 regardless of device class — deptCard is flex:1,
+  // so on tablet that produced very wide, short cards with large empty
+  // horizontal space inside each. columns.dense gives the app's standard
+  // tablet-aware count; min 2 keeps phone behavior identical to before.
+  const columnCount = Math.max(2, layout.columns.dense);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedDept, setSelectedDept] = useState<Department | null>(null);
@@ -129,13 +134,14 @@ export default function MinistryScreen({ navigation }: Props) {
         </View>
       ) : (
         <FlatList
+          key={`depts-${columnCount}`}
           initialNumToRender={20}
           maxToRenderPerBatch={10}
           windowSize={10}
           removeClippedSubviews
           data={departments}
           keyExtractor={d => d.id}
-          numColumns={2}
+          numColumns={columnCount}
           contentContainerStyle={styles.grid}
           columnWrapperStyle={styles.columnWrapper}
           renderItem={renderDept}

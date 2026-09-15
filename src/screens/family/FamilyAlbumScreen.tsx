@@ -71,7 +71,13 @@ export default function FamilyAlbumScreen({ navigation: _navigation }: Props) {
 
   const gutter = layout.pageGutter;
   const colGap = 10;
-  const cardSize = (layout.width - gutter * 2 - colGap) / 2;
+  // Was hardcoded to 2 columns regardless of device class — on a tablet
+  // that produced huge (~485pt+) square album tiles with only 2 per row.
+  // layout.columns.dense already gives the app's standard tablet-aware
+  // column count (2 phone / 3 tablet / 4 largeTablet); min 2 keeps phone
+  // behavior identical to before.
+  const columnCount = Math.max(2, layout.columns.dense);
+  const cardSize = (layout.width - gutter * 2 - colGap * (columnCount - 1)) / columnCount;
 
   async function handleCreateAlbum() {
     if (!newName.trim()) {
@@ -108,7 +114,11 @@ export default function FamilyAlbumScreen({ navigation: _navigation }: Props) {
   // Photo grid view
   if (selectedAlbum) {
     const photos = selectedAlbum.photos ?? [];
-    const photoSize = (layout.width - gutter * 2 - 6) / 3;
+    // Was hardcoded to 3 columns — same tablet fix as the album grid
+    // above (columns.cards, since this is a flexWrap layout not a
+    // FlatList numColumns, no remount/key concern here).
+    const photoColumnCount = Math.max(3, layout.columns.dense);
+    const photoSize = (layout.width - gutter * 2 - 3 * (photoColumnCount - 1)) / photoColumnCount;
     return (
       <SafeAreaView style={[styles.flex, { backgroundColor: palette.bg, }]}>
         <View style={[styles.albumHeader, { paddingHorizontal: gutter }]}>
@@ -155,13 +165,14 @@ export default function FamilyAlbumScreen({ navigation: _navigation }: Props) {
   return (
     <SafeAreaView style={[styles.flex, { backgroundColor: palette.bg, }]}>
       <FlatList
+        key={`albums-${columnCount}`}
         initialNumToRender={20}
         maxToRenderPerBatch={10}
         windowSize={10}
         removeClippedSubviews
         data={albums}
         keyExtractor={(item) => item.id}
-        numColumns={2}
+        numColumns={columnCount}
         columnWrapperStyle={{ gap: colGap }}
         contentContainerStyle={{ paddingHorizontal: gutter, paddingTop: 20, paddingBottom: 80, gap: colGap }}
         ListHeaderComponent={

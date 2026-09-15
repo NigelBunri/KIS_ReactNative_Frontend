@@ -350,7 +350,14 @@ function makeStyles(palette: any, responsive: ResponsiveLayout) {
       fontWeight: '800',
       textAlign: 'center',
     },
-    content: { padding: gutter, gap: 16, paddingBottom: 24 },
+    content: {
+      padding: gutter,
+      gap: 16,
+      paddingBottom: 24,
+      width: '100%',
+      maxWidth: responsive.contentMaxWidth,
+      alignSelf: 'center',
+    },
     section: {
       borderRadius: 16,
       borderWidth: 1,

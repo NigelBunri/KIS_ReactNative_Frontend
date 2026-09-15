@@ -81,6 +81,11 @@ export default function ImpactReportScreen({ navigation }: Props) {
   const [loadingPrev, setLoadingPrev] = useState(true);
 
   const styles = useMemo(() => makeStyles(palette, layout), [palette, layout]);
+  // Was hardcoded to 2 regardless of device class — metricCard is flex:1,
+  // so on tablet that produced wide, sparse metric cards with wasted
+  // horizontal space. columns.dense gives the app's standard tablet-aware
+  // count; min 2 keeps phone behavior identical to before.
+  const metricColumnCount = Math.max(2, layout.columns.dense);
 
   useFocusEffect(
     useCallback(() => {
@@ -212,6 +217,7 @@ export default function ImpactReportScreen({ navigation }: Props) {
 
               {metrics.length > 0 ? (
                 <FlatList
+                  key={`metrics-${metricColumnCount}`}
                   initialNumToRender={20}
                   maxToRenderPerBatch={10}
                   windowSize={10}
@@ -220,7 +226,7 @@ export default function ImpactReportScreen({ navigation }: Props) {
                   keyExtractor={item => item.key}
                   renderItem={renderMetricCard}
                   scrollEnabled={false}
-                  numColumns={2}
+                  numColumns={metricColumnCount}
                   columnWrapperStyle={{ gap: 10 }}
                   contentContainerStyle={{ gap: 10, paddingTop: 12 }}
                 />

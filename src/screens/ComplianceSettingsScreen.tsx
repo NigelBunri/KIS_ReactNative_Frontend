@@ -459,6 +459,9 @@ function createStyles(palette: any, responsive: ResponsiveLayout) {
       paddingTop: 20,
       paddingBottom: 48,
       gap: 8,
+      width: '100%',
+      maxWidth: responsive.contentMaxWidth,
+      alignSelf: 'center',
     },
     sectionLabel: {
       fontSize: responsive.labelFontSize,

@@ -17,7 +17,6 @@ import React, {
 import {
   ActivityIndicator,
   Animated,
-  Dimensions,
   Image,
   Platform,
   Pressable,
@@ -26,6 +25,7 @@ import {
   StatusBar,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import Video from 'react-native-video';
@@ -37,6 +37,7 @@ import { KISIcon } from '@/constants/kisIcons';
 import { resolveBackendAssetUrl } from '@/network';
 import type { RootStackParamList } from '@/navigation/types';
 import { useKISTheme } from '@/theme/useTheme';
+import { useResponsiveLayout } from '@/theme/responsive';
 import { useLiveStream } from './hooks/useLiveStream';
 import LiveChatPanel from './components/LiveChatPanel';
 import SuperChatPanel from './components/SuperChatPanel';
@@ -179,14 +180,27 @@ function EndedOverlay({
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
-
 export default function LiveWatchPage() {
   const route = useRoute<RouteProp<RootStackParamList, 'LiveWatch'>>();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList, 'LiveWatch'>>();
   const { palette } = useKISTheme();
   const insets = useSafeAreaInsets();
   const topInset = useSafeTopInset();
+  // Was a module-level Dimensions.get('window') snapshot, frozen at bundle
+  // load and never updated on rotation - the floating-reaction spawn
+  // x-position (sendReaction below) would keep using the portrait width's
+  // left-35% even after rotating to landscape, clustering reactions in a
+  // now-stale, too-narrow band instead of spreading across the actual
+  // current width.
+  const { width: SCREEN_W } = useWindowDimensions();
+  const { isTablet } = useResponsiveLayout();
+  // The chat/polls/Q&A side panel was hardcoded to 230pt regardless of
+  // screen size - not broken on tablet (the video is still full-bleed,
+  // the panel still works), but a fixed 230pt becomes a much smaller
+  // fraction of a 1024pt+ wide tablet screen than it is on a phone.
+  // Scaled up on tablet, capped so it never eats more than ~40% of the
+  // width on a narrower/split-view tablet window.
+  const chatPanelWidth = isTablet ? Math.min(360, Math.round(SCREEN_W * 0.32)) : 230;
   const styles = useMemo(() => makeStyles(palette), [palette]);
 
   const streamId: string = route.params?.streamId ?? route.params?.stream?.id ?? '';
@@ -246,7 +260,7 @@ export default function LiveWatchPage() {
     Animated.timing(anim, { toValue: 1, duration: 1400, useNativeDriver: true }).start(() => {
       setFloaters(prev => prev.filter(r => r.id !== id));
     });
-  }, []);
+  }, [SCREEN_W]);
 
   // ── Share ───────────────────────────────────────────────────────────────────
   const handleShare = useCallback(async () => {
@@ -463,7 +477,7 @@ export default function LiveWatchPage() {
       <View
         style={[
           styles.bottomOverlay,
-          { paddingBottom: insets.bottom + 10 },
+          { paddingBottom: insets.bottom + 10, right: chatPanelWidth },
         ]}
         pointerEvents="box-none"
       >
@@ -529,7 +543,7 @@ export default function LiveWatchPage() {
         <View
           style={[
             styles.pinnedBanner,
-            { bottom: insets.bottom + (chatOpen ? 280 : 110) },
+            { bottom: insets.bottom + (chatOpen ? 280 : 110), right: chatPanelWidth + 10 },
           ]}
           pointerEvents="none"
         >
@@ -543,7 +557,7 @@ export default function LiveWatchPage() {
 
       {/* ── Bottom panel (chat / polls / Q&A tabs) ── */}
       {(isLive || isEnded) && (
-        <View style={styles.bottomPanelWrap}>
+        <View style={[styles.bottomPanelWrap, { width: chatPanelWidth }]}>
           {/* Tab selector */}
           <View style={styles.panelTabRow}>
             {([

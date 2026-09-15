@@ -129,7 +129,18 @@ export function EditProfileModal(props: EditProfileModalProps) {
   const [lightboxIndex, setLightboxIndex] = useState(0);
   const lightboxTranslateY = useRef(new Animated.Value(0)).current;
   const touchStartX = useRef(0);
-  const screenWidth = responsive.width;
+  // This component renders inside BottomSheet.tsx, which caps at
+  // maxWidth: responsive.isTablet ? 760 : undefined and centers it — on a
+  // tablet, responsive.width (the raw device width) is wider than the
+  // sheet's actual content width, so galleryWidth computed itself wider
+  // than the sheet, and each gallery page/image overflowed the sheet's
+  // bounds with pagingEnabled scroll snapping desynced from what was
+  // actually visible. Measuring this section's own rendered width via
+  // onLayout reflects the real available space regardless of what's
+  // hosting it, falling back to the raw width only until the first
+  // layout pass lands.
+  const [sectionWidth, setSectionWidth] = useState(0);
+  const screenWidth = sectionWidth || responsive.width;
   const galleryWidth = Math.max(screenWidth - 72, 260);
   const galleryScrollRef = useRef<ScrollView | null>(null);
 
@@ -250,7 +261,13 @@ export function EditProfileModal(props: EditProfileModalProps) {
   };
 
   return (
-    <View style={{ gap: 12 }}>
+    <View
+      style={{ gap: 12 }}
+      onLayout={(e) => {
+        const w = Math.round(e.nativeEvent.layout.width);
+        if (w > 0 && w !== sectionWidth) setSectionWidth(w);
+      }}
+    >
       <View
         style={{
           borderRadius: 18,

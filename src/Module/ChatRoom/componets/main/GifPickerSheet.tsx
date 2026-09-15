@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { KISIcon } from '@/constants/kisIcons';
+import { useResponsiveLayout } from '@/theme/responsive';
 
 // Tenor GIF API — set TENOR_API_KEY in your .env file.
 // In development, if no key is configured, GIF search will return an empty result.
@@ -65,6 +66,11 @@ export const GifPickerSheet: React.FC<Props> = ({
   palette,
 }) => {
   const insets = useSafeAreaInsets();
+  const { isTablet } = useResponsiveLayout();
+  // Was hardcoded to 2 regardless of device class — gifCell is flex:1, so
+  // on tablet that showed only 2 oversized GIF tiles per row, wasting
+  // horizontal space in a sheet that also spans the full device width.
+  const columnCount = isTablet ? 4 : 2;
   const slideAnim = useRef(new Animated.Value(0)).current;
   const [query, setQuery] = useState('');
   const [gifs, setGifs] = useState<TenorGif[]>([]);
@@ -144,13 +150,14 @@ export const GifPickerSheet: React.FC<Props> = ({
           </View>
         ) : (
           <FlatList
+            key={`gifs-${columnCount}`}
             initialNumToRender={20}
             maxToRenderPerBatch={10}
             windowSize={10}
             removeClippedSubviews
             data={gifs}
             keyExtractor={(g) => g.id}
-            numColumns={2}
+            numColumns={columnCount}
             contentContainerStyle={styles.grid}
             renderItem={({ item }) => {
               const aspectRatio = item.width > 0 && item.height > 0

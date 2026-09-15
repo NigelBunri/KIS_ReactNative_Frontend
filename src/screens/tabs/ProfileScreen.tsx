@@ -3626,7 +3626,14 @@ export default function ProfileScreen() {
               },
             ]}
           >
-            <PartnerCreateSlide onClose={c.closeCreatePartner} />
+            {/* Slide itself stays full-width (its translateX distance is
+             * computed against the full screen width above) - only the
+             * form content column is capped/centered on tablet, same as
+             * the management panel just above. CreatePartnerScreen has no
+             * width containment of its own. */}
+            <View style={{ flex: 1, width: '100%', maxWidth: responsive.contentMaxWidth, alignSelf: 'center' }}>
+              <PartnerCreateSlide onClose={c.closeCreatePartner} />
+            </View>
           </Animated.View>
         )}
 
@@ -3641,37 +3648,45 @@ export default function ProfileScreen() {
               },
             ]}
           >
-            <View
-              style={[
-                styles.managementPanelHeader,
-                { paddingTop: topInset + 32 },
-              ]}
-            >
-              <View style={{ flex: 1 }}>
-                <Text
-                  style={[styles.managementPanelTitle, { color: palette.text }]}
-                >
-                  {managementPanelDefinition?.managementLabel ??
-                    managementPanelDefinition?.label ??
-                    'Profile console'}
-                </Text>
-                <Text
-                  style={[
-                    styles.managementPanelSubtitle,
-                    { color: palette.subtext },
-                  ]}
-                >
-                  {managementPanelDefinition?.helper}
-                </Text>
-              </View>
-              <Pressable
-                onPress={closeManagementPanel}
-                style={styles.managementClose}
+            {/* The panel itself stays full-width (its translateX slide-in
+             * distance is computed against the full screen width above) -
+             * only the actual content column is capped/centered, same
+             * pattern as every other screen's contentMaxWidth usage. Left
+             * uncapped before, every stat chip/asset banner inside
+             * stretched edge-to-edge on tablet. */}
+            <View style={{ flex: 1, width: '100%', maxWidth: responsive.contentMaxWidth, alignSelf: 'center' }}>
+              <View
+                style={[
+                  styles.managementPanelHeader,
+                  { paddingTop: topInset + 32 },
+                ]}
               >
-                <KISIcon name="close" size={28} color={palette.subtext} />
-              </Pressable>
+                <View style={{ flex: 1 }}>
+                  <Text
+                    style={[styles.managementPanelTitle, { color: palette.text }]}
+                  >
+                    {managementPanelDefinition?.managementLabel ??
+                      managementPanelDefinition?.label ??
+                      'Profile console'}
+                  </Text>
+                  <Text
+                    style={[
+                      styles.managementPanelSubtitle,
+                      { color: palette.subtext },
+                    ]}
+                  >
+                    {managementPanelDefinition?.helper}
+                  </Text>
+                </View>
+                <Pressable
+                  onPress={closeManagementPanel}
+                  style={styles.managementClose}
+                >
+                  <KISIcon name="close" size={28} color={palette.subtext} />
+                </Pressable>
+              </View>
+              {renderManagementPanelContent()}
             </View>
-            {renderManagementPanelContent()}
           </Animated.View>
         )}
 

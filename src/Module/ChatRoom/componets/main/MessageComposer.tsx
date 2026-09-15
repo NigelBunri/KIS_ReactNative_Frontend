@@ -247,6 +247,9 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
   const sendingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const responsive = useResponsiveLayout();
   const isTinyDevice = responsive.isWatch || responsive.isCompactPhone;
+  // Was hardcoded to 2 regardless of device class — on tablet this showed
+  // only 2 oversized GIF tiles per row in the composer's GIF search panel.
+  const gifColumnCount = responsive.isTablet ? 4 : 2;
   const composerIconSize = responsive.isWatch ? 32 : responsive.isCompactPhone ? 34 : 36;
   const sendButtonSize = responsive.isWatch ? 40 : responsive.isCompactPhone ? 44 : 50;
   const composerIconGlyph = responsive.isWatch ? 18 : 22;
@@ -635,13 +638,14 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
               <ActivityIndicator color={palette.primary} style={{ marginTop: 20 }} />
             ) : (
               <FlatList
+                key={`gifs-${gifColumnCount}`}
                 initialNumToRender={20}
                 maxToRenderPerBatch={10}
                 windowSize={10}
                 removeClippedSubviews
                 data={gifResults}
                 keyExtractor={(g) => g.id}
-                numColumns={2}
+                numColumns={gifColumnCount}
                 style={{ maxHeight: 220 }}
                 contentContainerStyle={{ gap: 6 }}
                 columnWrapperStyle={{ gap: 6 }}

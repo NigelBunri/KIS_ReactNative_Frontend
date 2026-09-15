@@ -467,13 +467,19 @@ const buildCategories = (recentEmojis?: string[]): EmojiCategory[] => {
   return categories;
 };
 
-// Utility to chunk emojis into rows
-const chunkEmojisToRows = (emojis: string[], catId: string): EmojiRow[] => {
+// Utility to chunk emojis into rows. perRow defaults to EMOJIS_PER_ROW
+// (the original phone-sized fixed count) but the picker itself now passes
+// a measured-width-derived value — see EmojiPicker's `emojisPerRow` below.
+// Previously this was always 8 and each row was rendered flexWrap:'nowrap'
+// (a genuinely fixed-width row, not a reflowing grid), so on a wide
+// tablet panel the emoji rows stayed pinned to a small ~384pt clump in
+// the corner with a large unfilled void filling the rest of the panel.
+const chunkEmojisToRows = (emojis: string[], catId: string, perRow: number = EMOJIS_PER_ROW): EmojiRow[] => {
   const rows: EmojiRow[] = [];
-  for (let i = 0; i < emojis.length; i += EMOJIS_PER_ROW) {
-    const rowEmojis = emojis.slice(i, i + EMOJIS_PER_ROW);
+  for (let i = 0; i < emojis.length; i += perRow) {
+    const rowEmojis = emojis.slice(i, i + perRow);
     rows.push({
-      key: `${catId}-row-${i / EMOJIS_PER_ROW}`,
+      key: `${catId}-row-${i / perRow}`,
       emojis: rowEmojis,
     });
   }
@@ -494,6 +500,11 @@ export const EmojiPicker: React.FC<EmojiPickerProps> = ({
   const [loadingRecents, setLoadingRecents] = useState<boolean>(!recentEmojis);
   // GAP 2: emoji search query
   const [emojiSearchQuery, setEmojiSearchQuery] = useState('');
+  // Measured via onLayout on the panel's own root View below - each emoji
+  // button occupies 48pt (40pt + 4pt margin on each side). Falls back to
+  // the original 8-per-row until the first layout pass lands.
+  const [panelWidth, setPanelWidth] = useState(0);
+  const emojisPerRow = panelWidth > 0 ? Math.max(EMOJIS_PER_ROW, Math.floor(panelWidth / 48)) : EMOJIS_PER_ROW;
 
   // Load recents from AsyncStorage on mount, if we're managing them internally
   useEffect(() => {
@@ -568,9 +579,9 @@ export const EmojiPicker: React.FC<EmojiPickerProps> = ({
       categories.map((cat) => ({
         id: cat.id,
         title: cat.label,
-        data: chunkEmojisToRows(cat.emojis, cat.id),
+        data: chunkEmojisToRows(cat.emojis, cat.id, emojisPerRow),
       })),
-    [categories],
+    [categories, emojisPerRow],
   );
 
   const handleEmojiPress = (emoji: string) => {
@@ -682,6 +693,10 @@ export const EmojiPicker: React.FC<EmojiPickerProps> = ({
         borderTopColor: palette.divider,
         backgroundColor: palette.chatComposerBg ?? palette.card,
         paddingVertical: 4,
+      }}
+      onLayout={(e) => {
+        const w = Math.round(e.nativeEvent.layout.width);
+        if (w > 0 && w !== panelWidth) setPanelWidth(w);
       }}
     >
       {/* GAP 2: Search bar */}
