@@ -157,6 +157,34 @@ extension AppDelegate: PKPushRegistryDelegate {
     let callType   = data["callType"]   as? String ?? "voice"
     let hasVideo   = callType == "video" || callType == "video-group"
 
+    // Persist enough of the payload to reconstruct a working call session
+    // later, BEFORE reporting to CallKit — synchronously, to UserDefaults,
+    // so it survives regardless of whether JS ever runs before the user
+    // answers. This closes a real bug: react-native-callkeep's native
+    // "answer"/"end" events carry ONLY a bare callUUID (confirmed in its
+    // own source, RNCallKeep.m), and SocketProvider.tsx's onAnswerCall
+    // needs conversationId/callType/caller info to actually do anything.
+    // Without this, a backgrounded/killed recipient who never received the
+    // socket's own call.offer (Socket.IO doesn't replay missed room
+    // broadcasts) would see CallKit ring correctly, tap Answer, and have
+    // nothing happen — the call would just time out to missed. See
+    // PendingCallModule.swift and src/services/calls/pendingCallPayload.ts.
+    let conversationId = data["conversationId"] as? String
+    let fromUserId = data["fromUserId"] as? String
+    if let conversationId = conversationId {
+      let pending: [String: Any] = [
+        "callId": callId,
+        "conversationId": conversationId,
+        "callType": callType,
+        "callerName": callerName,
+        "fromUserId": fromUserId as Any,
+      ]
+      if let encoded = try? JSONSerialization.data(withJSONObject: pending) {
+        UserDefaults.standard.set(encoded, forKey: PendingCallModule.userDefaultsKey)
+        PendingCallModule.notifyUpdated(pending)
+      }
+    }
+
     // reportNewIncomingCall is the correct static class method on RNCallKeep.
     RNCallKeep.reportNewIncomingCall(
       callId,

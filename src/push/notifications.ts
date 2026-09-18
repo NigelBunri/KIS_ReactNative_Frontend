@@ -8,6 +8,7 @@ import { InAppNotificationToastRef } from './InAppNotificationToast';
 import { displayIncomingCall, callKeepAvailable } from '@/services/calls/callKitService';
 import { ensureDeviceId } from '@/security/e2ee';
 import { logCallDiagnostic } from '@/services/calls/callDiagnostics';
+import { savePendingCallPayload } from '@/services/calls/pendingCallPayload';
 
 const PENDING_PUSH_TOKEN_KEY = 'KIS_PENDING_PUSH_TOKEN';
 // Nest's registration is tracked SEPARATELY from Django's above. They're two
@@ -161,6 +162,22 @@ export const handleBackgroundPushMessage = async (remoteMessage: any) => {
       const callId = String(data.callId);
       const callType = String((data.callType as any) ?? 'voice');
       void logCallDiagnostic({ stage: 'CALL_PAYLOAD_PARSED', callId, callType });
+      // Persist enough of the payload to reconstruct a working call session
+      // later, in case the socket's own call.offer never reaches this
+      // client (Socket.IO doesn't replay missed room broadcasts to a
+      // reconnecting client) — see pendingCallPayload.ts's own doc comment
+      // for the full failure mode this closes (CallKit/ConnectionService's
+      // native answer/end events carry only a bare callUUID, nothing else).
+      const conversationId = data?.conversationId ?? data?.conversation_id;
+      if (conversationId) {
+        void savePendingCallPayload({
+          callId,
+          conversationId: String(conversationId),
+          callType,
+          callerName: String(data.callerName ?? data.fromDisplayName ?? title ?? ''),
+          fromUserId: data.fromUserId ? String(data.fromUserId) : undefined,
+        });
+      }
       void logCallDiagnostic({ stage: 'CALLKEEP_REQUESTED', callId, callType });
       const displayed = displayIncomingCall({
         callUUID: callId,
