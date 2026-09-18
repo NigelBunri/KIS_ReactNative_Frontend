@@ -1039,15 +1039,15 @@ export default function FeedScreen<T extends FeedPost>({
       ) : null}
 
       {/* Top App Bar (center title, back left, bell right) — this screen is
-          always rendered nested below the tab's own Golden Section gold
-          header (Communities or Partners), which already reserves the
-          safe-area top inset, so this bar only needs its own small vertical
-          rhythm, not another inset on top of that one. */}
+          rendered directly inside a full-height (top:0) overlay pane in
+          both the Communities and Partners tabs, with nothing above it
+          reserving the safe-area top inset, so this bar has to add its
+          own via topInset. */}
       <View
         style={[
           styles.appBar,
           {
-            paddingTop: 10,
+            paddingTop: topInset + 10,
             backgroundColor: palette.card,
           },
         ]}
