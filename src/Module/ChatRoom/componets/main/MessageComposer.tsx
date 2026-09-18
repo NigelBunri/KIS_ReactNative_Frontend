@@ -55,6 +55,7 @@ import { useResponsiveLayout } from '@/theme/responsive';
 import { searchTenor, TenorGif } from './GifPickerSheet';
 import { LocationPickerSheet } from './LocationPickerSheet';
 import { ScheduleMessageSheet } from './ScheduleMessageSheet';
+import { extractFirstUrl, isLinkSuspicious, LINK_BLOCK_MESSAGE } from '@/services/contentSafety/linkSafety';
 
 /* -------------------------------------------------------------------------- */
 /*                          STICKER PICKER (BOTTOM PANEL)                     */
@@ -512,6 +513,17 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
     if (lastSendRef.current && now - lastSendRef.current < 400) {
       return;
     }
+
+    // On-device link-safety pre-send check — see
+    // services/contentSafety/linkSafety.ts. Runs before any dedupe/send
+    // state changes so a blocked send leaves the composer untouched and
+    // the user can edit/remove the link and try again.
+    const candidateUrl = extractFirstUrl(value);
+    if (candidateUrl && isLinkSuspicious(candidateUrl)) {
+      Alert.alert('Link blocked', LINK_BLOCK_MESSAGE);
+      return;
+    }
+
     lastSendRef.current = now;
 
     const mentionIds = [...mentionedUserIdsRef.current];

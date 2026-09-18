@@ -35,6 +35,7 @@
 import RNFS from 'react-native-fs';
 import { postRequest } from '@/network/post';
 import { API_BASE_URL } from '@/network';
+import { ON_DEVICE_BLOCK_MESSAGE, scanVideoUriOnDevice } from '@/services/contentSafety/onDeviceImageScan';
 import ROUTES from '@/network';
 import { buildDjangoMediaConfirmPath, resolveUploadIntent } from '@/network/uploadIntentContract';
 
@@ -159,6 +160,19 @@ export async function uploadChannelContentVideo(opts: {
   const throwIfAborted = () => {
     if (signal?.aborted) throw Object.assign(new Error('Upload cancelled.'), { name: 'AbortError' });
   };
+
+  // On-device content-safety pre-send check, before ANY network call
+  // (including the draft-creation call below) — see uploadFileToBackend.ts
+  // for the identical rationale. This path (channel video) isn't built on
+  // that shared function (see this file's own header comment), so it
+  // needs its own copy of the same check rather than inheriting it for
+  // free.
+  {
+    const verdict = await scanVideoUriOnDevice(file.uri);
+    if (verdict.flagged) {
+      throw new Error(ON_DEVICE_BLOCK_MESSAGE);
+    }
+  }
 
   onProgress?.({ status: 'creating', progress: 0 });
   const createRes = await postRequest(

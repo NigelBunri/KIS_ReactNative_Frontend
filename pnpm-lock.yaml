@@ -75,6 +75,9 @@ importers:
       buffer:
         specifier: ^6.0.3
         version: 6.0.3
+      jpeg-js:
+        specifier: ^0.4.4
+        version: 0.4.4
       mediasoup-client:
         specifier: ^3.21.0
         version: 3.21.0
@@ -99,12 +102,18 @@ importers:
       react-native-country-picker-modal:
         specifier: ^2.0.0
         version: 2.0.0(@types/react@19.2.2)(react-art@16.13.1(react@19.1.1))(react-dom@16.14.0(react@19.1.1))(react-native-web@0.9.13(react-art@16.13.1(react@19.1.1))(react-dom@16.14.0(react@19.1.1))(react@19.1.1))(react-native@0.82.1(@babel/core@7.28.5)(@react-native-community/cli@20.1.3(typescript@5.9.3))(@react-native/metro-config@0.82.1(@babel/core@7.28.5))(@types/react@19.2.2)(react@19.1.1))(react@19.1.1)
+      react-native-create-thumbnail:
+        specifier: ^2.2.0
+        version: 2.2.0
       react-native-document-picker:
         specifier: ^9.3.1
         version: 9.3.1(react-native@0.82.1(@babel/core@7.28.5)(@react-native-community/cli@20.1.3(typescript@5.9.3))(@react-native/metro-config@0.82.1(@babel/core@7.28.5))(@types/react@19.2.2)(react@19.1.1))(react@19.1.1)
       react-native-encrypted-storage:
         specifier: ^4.0.3
         version: 4.0.3(react-native@0.82.1(@babel/core@7.28.5)(@react-native-community/cli@20.1.3(typescript@5.9.3))(@react-native/metro-config@0.82.1(@babel/core@7.28.5))(@types/react@19.2.2)(react@19.1.1))(react@19.1.1)
+      react-native-fast-tflite:
+        specifier: ^3.0.1
+        version: 3.0.1(react-native-nitro-modules@0.35.9(react-native@0.82.1(@babel/core@7.28.5)(@react-native-community/cli@20.1.3(typescript@5.9.3))(@react-native/metro-config@0.82.1(@babel/core@7.28.5))(@types/react@19.2.2)(react@19.1.1))(react@19.1.1))(react-native@0.82.1(@babel/core@7.28.5)(@react-native-community/cli@20.1.3(typescript@5.9.3))(@react-native/metro-config@0.82.1(@babel/core@7.28.5))(@types/react@19.2.2)(react@19.1.1))(react@19.1.1)
       react-native-fs:
         specifier: ^2.20.0
         version: 2.20.0(react-native@0.82.1(@babel/core@7.28.5)(@react-native-community/cli@20.1.3(typescript@5.9.3))(@react-native/metro-config@0.82.1(@babel/core@7.28.5))(@types/react@19.2.2)(react@19.1.1))
@@ -3481,6 +3490,9 @@ packages:
   joi@17.13.3:
     resolution: {integrity: sha512-otDA4ldcIx+ZXsKHWmp0YizCweVRZG96J10b0FevjfuncLO1oX59THoAmHkNubYJ+9gWsYsp5k8v4ib6oDv1fA==}
 
+  jpeg-js@0.4.4:
+    resolution: {integrity: sha512-WZzeDOEtTOBK4Mdsar0IqEU5sMr3vSV2RqkAIzUEV2BHnUfKGyswWFPFwK5EeDo93K3FohSHbLAjj0s1Wzd+dg==}
+
   js-tokens@4.0.0:
     resolution: {integrity: sha512-RdJUflcE3cUzKiMqQgsCu06FPu9UdIJO0beYbPhHN4k6apgJtifcoCtT9bcxOpYBtpD2kCM6Sbzg4CausW/PKQ==}
 
@@ -4174,6 +4186,9 @@ packages:
       react-native: '*'
       react-native-web: '*'
 
+  react-native-create-thumbnail@2.2.0:
+    resolution: {integrity: sha512-zrwVYWMpeMEGIYO1jgwUMBpSpIzMR7Z2gkSANVlf9BFZLRw017k7CfjttvDhCHjsxNNDb7+V8uJaNwIGdTpz/g==}
+
   react-native-document-picker@9.3.1:
     resolution: {integrity: sha512-Vcofv9wfB0j67zawFjfq9WQPMMzXxOZL9kBmvWDpjVuEcVK73ndRmlXHlkeFl5ZHVsv4Zb6oZYhqm9u5omJOPA==}
     deprecated: the package was renamed, follow migration instructions at https://shorturl.at/QYT4t
@@ -4190,6 +4205,14 @@ packages:
     peerDependencies:
       react: '*'
       react-native: '*'
+
+  react-native-fast-tflite@3.0.1:
+    resolution: {integrity: sha512-88wNR/4iR8X0zuQtrpb1jRbF+X+hUqrD8cER4DhNJnbhA+3PuGz8SoP3n8WEhjYWDkGqTme2Ezk+mbeLiiE+6w==}
+    engines: {node: '>= 18'}
+    peerDependencies:
+      react: '*'
+      react-native: '*'
+      react-native-nitro-modules: '*'
 
   react-native-fs@2.20.0:
     resolution: {integrity: sha512-VkTBzs7fIDUiy/XajOSNk0XazFE9l+QlMAce7lGuebZcag5CnjszB+u4BdqzwaQOdcYb5wsJIsqq4kxInIRpJQ==}
@@ -9431,6 +9454,8 @@ snapshots:
       '@sideway/formula': 3.0.1
       '@sideway/pinpoint': 2.0.0
 
+  jpeg-js@0.4.4: {}
+
   js-tokens@4.0.0: {}
 
   js-yaml@3.14.1:
@@ -10247,6 +10272,8 @@ snapshots:
       - '@types/react'
       - react-art
 
+  react-native-create-thumbnail@2.2.0: {}
+
   react-native-document-picker@9.3.1(react-native@0.82.1(@babel/core@7.28.5)(@react-native-community/cli@20.1.3(typescript@5.9.3))(@react-native/metro-config@0.82.1(@babel/core@7.28.5))(@types/react@19.2.2)(react@19.1.1))(react@19.1.1):
     dependencies:
       invariant: 2.2.4
@@ -10257,6 +10284,12 @@ snapshots:
     dependencies:
       react: 19.1.1
       react-native: 0.82.1(@babel/core@7.28.5)(@react-native-community/cli@20.1.3(typescript@5.9.3))(@react-native/metro-config@0.82.1(@babel/core@7.28.5))(@types/react@19.2.2)(react@19.1.1)
+
+  react-native-fast-tflite@3.0.1(react-native-nitro-modules@0.35.9(react-native@0.82.1(@babel/core@7.28.5)(@react-native-community/cli@20.1.3(typescript@5.9.3))(@react-native/metro-config@0.82.1(@babel/core@7.28.5))(@types/react@19.2.2)(react@19.1.1))(react@19.1.1))(react-native@0.82.1(@babel/core@7.28.5)(@react-native-community/cli@20.1.3(typescript@5.9.3))(@react-native/metro-config@0.82.1(@babel/core@7.28.5))(@types/react@19.2.2)(react@19.1.1))(react@19.1.1):
+    dependencies:
+      react: 19.1.1
+      react-native: 0.82.1(@babel/core@7.28.5)(@react-native-community/cli@20.1.3(typescript@5.9.3))(@react-native/metro-config@0.82.1(@babel/core@7.28.5))(@types/react@19.2.2)(react@19.1.1)
+      react-native-nitro-modules: 0.35.9(react-native@0.82.1(@babel/core@7.28.5)(@react-native-community/cli@20.1.3(typescript@5.9.3))(@react-native/metro-config@0.82.1(@babel/core@7.28.5))(@types/react@19.2.2)(react@19.1.1))(react@19.1.1)
 
   react-native-fs@2.20.0(react-native@0.82.1(@babel/core@7.28.5)(@react-native-community/cli@20.1.3(typescript@5.9.3))(@react-native/metro-config@0.82.1(@babel/core@7.28.5))(@types/react@19.2.2)(react@19.1.1)):
     dependencies:

@@ -18,6 +18,11 @@ import { APP_ENV } from '@/env';
 import ImageResizer from 'react-native-image-resizer';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { buildConfirmPath, resolveUploadIntent } from '@/network/uploadIntentContract';
+import {
+  ON_DEVICE_BLOCK_MESSAGE,
+  scanImageUriOnDevice,
+  scanVideoUriOnDevice,
+} from '@/services/contentSafety/onDeviceImageScan';
 
 const UPLOAD_TIMEOUT_MS = 10 * 60 * 1000;
 const DEFAULT_MAX_UPLOAD_BYTES = 2_147_483_647;
@@ -473,6 +478,33 @@ export async function uploadFileToBackend(opts: {
     if (!stillExists) {
       onStatus?.('failed');
       throw new Error('This file is no longer available on your device. Please pick it again and resend.');
+    }
+  }
+
+  // On-device content-safety pre-send check — runs BEFORE any network call
+  // so obviously prohibited content never leaves the device at all,
+  // regardless of which backend/context this upload is headed to. This is
+  // the only safety layer that can ever apply to the Nest signed-URL flow
+  // for direct chat media (the server never sees those bytes to scan), so
+  // it matters most here, but applies uniformly to every caller of this
+  // shared function (chat, thumbnails, feed/channel posts). See
+  // src/services/contentSafety/onDeviceImageScan.ts's module docstring:
+  // fails safe to "clean" if no model is bundled yet — never blocks a send
+  // that would otherwise have worked today.
+  {
+    const uploadMime = inferUploadMime(uploadFile.name, uploadFile.type);
+    if (uploadMime.startsWith('image/')) {
+      const verdict = await scanImageUriOnDevice(uploadFile.uri);
+      if (verdict.flagged) {
+        onStatus?.('verification_failed');
+        throw new VerificationFailedError(ON_DEVICE_BLOCK_MESSAGE);
+      }
+    } else if (uploadMime.startsWith('video/')) {
+      const verdict = await scanVideoUriOnDevice(uploadFile.uri);
+      if (verdict.flagged) {
+        onStatus?.('verification_failed');
+        throw new VerificationFailedError(ON_DEVICE_BLOCK_MESSAGE);
+      }
     }
   }
 

@@ -6,6 +6,13 @@ const { getDefaultConfig, mergeConfig } = require('@react-native/metro-config');
  *
  * @type {import('@react-native/metro-config').MetroConfig}
  */
-const config = {};
+// 'tflite' lets metro treat bundled on-device model files (see
+// src/services/contentSafety/onDeviceImageScan.ts) as binary assets
+// loadable via require(..), per react-native-fast-tflite's setup docs.
+const config = {
+  resolver: {
+    assetExts: [...getDefaultConfig(__dirname).resolver.assetExts, 'tflite'],
+  },
+};
 
 module.exports = mergeConfig(getDefaultConfig(__dirname), config);

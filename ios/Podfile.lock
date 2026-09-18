@@ -2006,6 +2006,8 @@ PODS:
     - ReactCommon/turbomodule/core
     - SocketRocket
     - Yoga
+  - react-native-create-thumbnail (2.2.0):
+    - React-Core
   - react-native-document-picker (9.3.1):
     - boost
     - DoubleConversion
@@ -2036,6 +2038,37 @@ PODS:
     - Yoga
   - react-native-encrypted-storage (4.0.3):
     - React-Core
+  - react-native-fast-tflite (3.0.1):
+    - boost
+    - DoubleConversion
+    - fast_float
+    - fmt
+    - glog
+    - hermes-engine
+    - NitroModules
+    - RCT-Folly
+    - RCT-Folly/Fabric
+    - RCTRequired
+    - RCTTypeSafety
+    - React-callinvoker
+    - React-Core
+    - React-debug
+    - React-Fabric
+    - React-featureflags
+    - React-graphics
+    - React-ImageManager
+    - React-jsi
+    - React-NativeModulesApple
+    - React-RCTFabric
+    - React-renderercss
+    - React-rendererdebug
+    - React-utils
+    - ReactCodegen
+    - ReactCommon/turbomodule/bridging
+    - ReactCommon/turbomodule/core
+    - SocketRocket
+    - TensorFlowLiteC (= 2.17.0)
+    - Yoga
   - react-native-geolocation-service (5.3.1):
     - React
   - react-native-get-random-values (1.11.0):
@@ -3639,6 +3672,9 @@ PODS:
     - SocketRocket
     - Yoga
   - SocketRocket (0.7.1)
+  - TensorFlowLiteC (2.17.0):
+    - TensorFlowLiteC/Core (= 2.17.0)
+  - TensorFlowLiteC/Core (2.17.0)
   - TextToSpeech (4.1.1):
     - React-Core
   - Yoga (0.0.0)
@@ -3699,8 +3735,10 @@ DEPENDENCIES:
   - React-microtasksnativemodule (from `../node_modules/react-native/ReactCommon/react/nativemodule/microtasks`)
   - react-native-blob-util (from `../node_modules/react-native-blob-util`)
   - react-native-contacts (from `../node_modules/react-native-contacts`)
+  - react-native-create-thumbnail (from `../node_modules/react-native-create-thumbnail`)
   - react-native-document-picker (from `../node_modules/react-native-document-picker`)
   - react-native-encrypted-storage (from `../node_modules/react-native-encrypted-storage`)
+  - react-native-fast-tflite (from `../node_modules/react-native-fast-tflite`)
   - react-native-geolocation-service (from `../node_modules/react-native-geolocation-service`)
   - react-native-get-random-values (from `../node_modules/react-native-get-random-values`)
   - "react-native-image-editor (from `../node_modules/@react-native-community/image-editor`)"
@@ -3786,6 +3824,7 @@ SPEC REPOS:
     - nanopb
     - PromisesObjC
     - SocketRocket
+    - TensorFlowLiteC
 
 EXTERNAL SOURCES:
   boost:
@@ -3881,10 +3920,14 @@ EXTERNAL SOURCES:
     :path: "../node_modules/react-native-blob-util"
   react-native-contacts:
     :path: "../node_modules/react-native-contacts"
+  react-native-create-thumbnail:
+    :path: "../node_modules/react-native-create-thumbnail"
   react-native-document-picker:
     :path: "../node_modules/react-native-document-picker"
   react-native-encrypted-storage:
     :path: "../node_modules/react-native-encrypted-storage"
+  react-native-fast-tflite:
+    :path: "../node_modules/react-native-fast-tflite"
   react-native-geolocation-service:
     :path: "../node_modules/react-native-geolocation-service"
   react-native-get-random-values:
@@ -4082,8 +4125,10 @@ SPEC CHECKSUMS:
   React-microtasksnativemodule: d1ee999dc9052e23f6488b730fa2d383a4ea40e5
   react-native-blob-util: 2b17149a64aaac3a62c8d05a0b78e54328163278
   react-native-contacts: aff87a9bbd66e06cefe6e173be4102e95a824cd1
+  react-native-create-thumbnail: c15cedc37f3822777d44e6035be041f7961341ea
   react-native-document-picker: dcf5e57f3bcae61bf8384a1c6f90896f81e17941
   react-native-encrypted-storage: 569d114e329b1c2c2d9f8c84bcdbe4478dda2258
+  react-native-fast-tflite: f22ca212597ff85d000ff6b67632ad72abf7888b
   react-native-geolocation-service: 32b2c2a3b91e70ce2a8d0c684801aaeb0a07e0ec
   react-native-get-random-values: d16467cf726c618e9c7a8c3c39c31faa2244bbba
   react-native-image-editor: 2d7c254cc514d94b6580ff0a603a8e9d19fd1871
@@ -4152,9 +4197,10 @@ SPEC CHECKSUMS:
   RNVectorIcons: 791f13226ec4a3fd13062eda9e892159f0981fae
   RNWorklets: 437811d275dac2d504dd4c266de6321f04859fa1
   SocketRocket: d4aabe649be1e368d1318fdf28a022d714d65748
+  TensorFlowLiteC: eac6d689a8d391d1b202dc59e3d9165ba64aaf73
   TextToSpeech: 89b239221ec378d213af422d14789a729705360b
   Yoga: 689c8e04277f3ad631e60fe2a08e41d411daf8eb
 
 PODFILE CHECKSUM: 5a2130882248f411540f4b664d7f9e9c876e34c9
 
-COCOAPODS: 1.17.0
+COCOAPODS: 1.15.2

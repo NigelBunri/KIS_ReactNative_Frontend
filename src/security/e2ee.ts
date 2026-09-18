@@ -27,7 +27,7 @@ const deviceBundleCache = new Map<
 const deviceBundleRequests = new Map<string, Promise<DeviceBundle[]>>();
 const sessionBuildRequests = new Map<
   string,
-  Promise<{ address: any; device_id: string }>
+  Promise<{ address: any; device_id: string } | null>
 >();
 
 const clearRuntimeE2EECaches = () => {
@@ -448,6 +448,22 @@ export const repairLocalE2EEBundle = async (userId?: string | null) => {
 const getAddress = (userId: string, deviceId: string) =>
   new libsignal.SignalProtocolAddress(userId, deviceIdToNumber(deviceId));
 
+/**
+ * Drops this device's local Signal session for a specific (userId,
+ * deviceId), without touching that device's identity/prekeys/anything
+ * else. For use after a decrypt failure that a simple retry can't recover
+ * from (see useChatMessaging.ts's generic decrypt-failure handling) - a
+ * corrupted/desynced local session record left in place would keep
+ * failing the same way forever, whereas removing it lets the NEXT
+ * incoming PreKeyWhisperMessage (or this device's own next send to that
+ * peer) bootstrap a clean session from scratch instead.
+ */
+export const dropStaleSession = async (userId: string, deviceId: string): Promise<void> => {
+  if (!userId || !deviceId) return;
+  const address = getAddress(userId, deviceId);
+  await signalStore.removeSession(getSessionId(address));
+};
+
 const getSessionId = (address: any) => `${address.getName()}.${address.getDeviceId()}`;
 
 const logE2EE = (...args: any[]) => {
@@ -547,35 +563,94 @@ const fetchDeviceBundles = async (recipientUserId: string): Promise<DeviceBundle
   }
 };
 
+const invalidateDeviceBundleCache = (userId: string) => {
+  deviceBundleCache.delete(userId);
+};
+
+// One per-device session build/reuse. Deliberately NOT all-or-nothing across
+// a user's devices: a single broken/unreachable device (e.g. one stale
+// browser session, one device mid-reinstall) must never prevent building
+// sessions for that same user's OTHER devices, or this device count would
+// regress every multi-device account to single-device reliability. Returns
+// null (never throws) for a device this call couldn't build a session for -
+// callers filter nulls rather than losing the whole batch to one failure.
+const ensureSessionForDevice = async (
+  bundle: DeviceBundle,
+): Promise<{ address: any; device_id: string } | null> => {
+  const address = getAddress(bundle.user_id, bundle.device_id);
+  const sessionId = getSessionId(address);
+  const existingSession = await signalStore.loadSession(sessionId);
+  if (existingSession) {
+    // Verify the cached session still matches the identity this device
+    // CURRENTLY publishes, not just that a session record exists. If a
+    // device was reinstalled/reset, it generates a brand-new identity
+    // keypair under the same device_id/user_id - a stale local session
+    // built against the OLD identity would otherwise be reused forever,
+    // silently producing ciphertext that device can never decrypt (see
+    // isNoSignalSessionError's doc comment in useChatMessaging.ts for the
+    // exact failure mode this was previously undetectable and
+    // unrecoverable from: "the original message stays permanently
+    // unreadable"). Deliberately using sessionId (userId.deviceId) here
+    // rather than the library's own isTrustedIdentity/saveIdentity calls -
+    // those are invoked internally with inconsistent identifiers (bare
+    // userId on read, userId.deviceId on write), making them a permanent
+    // no-op; this is a separate, self-consistent check layered on top,
+    // not a fix to that library-internal mismatch.
+    const bundleIdentityKey = fromB64(bundle.identity_key);
+    const stillTrusted = await signalStore.isTrustedIdentity(sessionId, bundleIdentityKey as ArrayBuffer);
+    if (stillTrusted) {
+      return { address, device_id: bundle.device_id };
+    }
+    logE2EE('ensureSession:identity_changed_rebuilding', {
+      recipientUserId: bundle.user_id,
+      deviceId: bundle.device_id,
+    });
+    await signalStore.removeSession(sessionId);
+  }
+
+  const pending = sessionBuildRequests.get(sessionId);
+  if (pending) return pending;
+
+  const build = (async () => {
+    try {
+      const built = await buildSessionForBundle(bundle);
+      // No manual safety-number-verification UX exists in this app - TOFU
+      // already governs trust - so recording the new identity here is
+      // "accept this device's current keys as authoritative" rather than a
+      // downgrade: it's what makes the mismatch detected above actually
+      // self-heal instead of just being detected forever.
+      await signalStore.saveIdentity(sessionId, fromB64(bundle.identity_key) as ArrayBuffer);
+      return built;
+    } catch (error) {
+      logE2EE('ensureSession:build_failed', {
+        recipientUserId: bundle.user_id,
+        deviceId: bundle.device_id,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return null;
+    }
+  })();
+  sessionBuildRequests.set(sessionId, build);
+  try {
+    return await build;
+  } finally {
+    sessionBuildRequests.delete(sessionId);
+  }
+};
+
 const ensureSessionsForUser = async (recipientUserId: string) => {
   const bundles = await fetchDeviceBundles(recipientUserId);
-  return Promise.all(
-    bundles.map(async (bundle) => {
-      const address = getAddress(bundle.user_id, bundle.device_id);
-      const sessionId = getSessionId(address);
-      const existingSession = await signalStore.loadSession(sessionId);
-      if (existingSession) {
-        return { address, device_id: bundle.device_id };
-      }
-
-      const pending = sessionBuildRequests.get(sessionId);
-      if (pending) return pending;
-
-      const build = buildSessionForBundle(bundle);
-      sessionBuildRequests.set(sessionId, build);
-      try {
-        return await build;
-      } finally {
-        sessionBuildRequests.delete(sessionId);
-      }
-    }),
-  );
+  const sessions = await Promise.all(bundles.map((bundle) => ensureSessionForDevice(bundle)));
+  return sessions.filter((s): s is { address: any; device_id: string } => s !== null);
 };
 
 export const encryptForUser = async (recipientUserId: string, plaintext: string) => {
   const senderDeviceId = await ensureDeviceId();
   logE2EE('encryptForUser:start', { recipientUserId, senderDeviceId });
   let session = (await ensureSessionsForUser(recipientUserId))[0];
+  if (!session) {
+    throw new Error(`Could not establish an E2EE session with any device for ${recipientUserId}`);
+  }
   let cipher = new libsignal.SessionCipher(signalStore, session.address);
   const plaintextBytes = toArrayBuffer(plaintext);
   let encrypted;
@@ -663,10 +738,19 @@ const encryptPayloadForRecipientsSerialized = async (
     throw new Error('Missing valid E2EE recipient user ids');
   }
 
+  // Per-user AND per-device fault isolation. A message must reach every
+  // device it can, not none of them because one device (any recipient's, or
+  // even the sender's OWN other device) was temporarily unreachable/stale -
+  // that all-or-nothing behavior is what made multi-device accounts less
+  // reliable than single-device ones. Each uid gets one retry (forcing a
+  // fresh device-bundle fetch, bypassing the 30s cache, in case the failure
+  // was a just-registered device the cache hadn't seen yet); a uid that
+  // still fails after that is skipped, logged, and never blocks delivery to
+  // every other uid/device that did succeed.
   const encryptOnce = async () => {
     const recipients: Array<{ userId: string; deviceId: string; type: number; ciphertext: string }> = [];
     for (const uid of uniqueIds) {
-      let sessions;
+      let sessions: Array<{ address: any; device_id: string }> = [];
       try {
         sessions = await ensureSessionsForUser(uid);
       } catch (error) {
@@ -674,26 +758,78 @@ const encryptPayloadForRecipientsSerialized = async (
           await repairLocalE2EEBundle(senderUserId);
           sessions = await ensureSessionsForUser(uid);
         } else {
-          throw error;
+          logE2EE('encryptPayloadForRecipients:bundle_fetch_failed_retrying', {
+            uid,
+            error: error instanceof Error ? error.message : String(error),
+          });
+          invalidateDeviceBundleCache(uid);
+          try {
+            sessions = await ensureSessionsForUser(uid);
+          } catch (retryError) {
+            logE2EE('encryptPayloadForRecipients:uid_skipped', {
+              uid,
+              error: retryError instanceof Error ? retryError.message : String(retryError),
+            });
+            continue;
+          }
         }
       }
       for (const session of sessions) {
-        const cipher = new libsignal.SessionCipher(signalStore, session.address);
-        const encrypted = await cipher.encrypt(toArrayBuffer(plaintext));
-        const body = encrypted.body;
-        const bodyBytes = typeof body === 'string' ? binaryStringToBytes(body) : new Uint8Array(body);
-        recipients.push({
-          userId: uid,
-          deviceId: session.device_id,
-          type: encrypted.type,
-          ciphertext: fromByteArray(bodyBytes),
-        });
+        try {
+          const cipher = new libsignal.SessionCipher(signalStore, session.address);
+          const encrypted = await cipher.encrypt(toArrayBuffer(plaintext));
+          const body = encrypted.body;
+          const bodyBytes = typeof body === 'string' ? binaryStringToBytes(body) : new Uint8Array(body);
+          recipients.push({
+            userId: uid,
+            deviceId: session.device_id,
+            type: encrypted.type,
+            ciphertext: fromByteArray(bodyBytes),
+          });
+        } catch (error) {
+          // A session that loaded but failed to actually encrypt with (a
+          // corrupt/desynced record) - drop it and rebuild fresh from the
+          // device's current bundle rather than losing this device for
+          // every future message too.
+          logE2EE('encryptPayloadForRecipients:session_encrypt_failed_rebuilding', {
+            uid,
+            deviceId: session.device_id,
+            error: error instanceof Error ? error.message : String(error),
+          });
+          await signalStore.removeSession(getSessionId(session.address));
+          try {
+            const bundles = await fetchDeviceBundles(uid);
+            const bundle = bundles.find((b) => b.device_id === session.device_id);
+            const rebuilt = bundle ? await ensureSessionForDevice(bundle) : null;
+            if (!rebuilt) continue;
+            const cipher = new libsignal.SessionCipher(signalStore, rebuilt.address);
+            const encrypted = await cipher.encrypt(toArrayBuffer(plaintext));
+            const body = encrypted.body;
+            const bodyBytes = typeof body === 'string' ? binaryStringToBytes(body) : new Uint8Array(body);
+            recipients.push({
+              userId: uid,
+              deviceId: rebuilt.device_id,
+              type: encrypted.type,
+              ciphertext: fromByteArray(bodyBytes),
+            });
+          } catch (rebuildError) {
+            logE2EE('encryptPayloadForRecipients:device_skipped', {
+              uid,
+              deviceId: session.device_id,
+              error: rebuildError instanceof Error ? rebuildError.message : String(rebuildError),
+            });
+          }
+        }
       }
     }
     return recipients;
   };
 
   const recipients = await encryptOnce();
+
+  if (!recipients.length) {
+    throw new Error('Could not establish an E2EE session with any recipient device');
+  }
 
   return {
     encryptionMeta: {

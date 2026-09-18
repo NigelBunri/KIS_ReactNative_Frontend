@@ -15,7 +15,7 @@ import {
   useRef,
 } from 'react';
 import type { MutableRefObject } from 'react';
-import { AppState, DeviceEventEmitter } from 'react-native';
+import { Alert, AppState, DeviceEventEmitter } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { isOnline, onNetworkRecovery } from '@/services/networkMonitor';
 import { getRequest } from '@/network/get';
@@ -53,6 +53,7 @@ import {
 } from '@/security/customE2EE';
 import {
   decryptFromUser,
+  dropStaleSession,
   ensureDeviceId,
   encryptPayloadForRecipients,
   isSignalMessageCounterError,
@@ -147,6 +148,48 @@ const isNoSignalSessionError = (error: any): boolean => {
   return message.includes('no record for');
 };
 
+const EMIT_ACK_TIMEOUT_MS = 8_000;
+
+// socket.emit(event, payload) alone is fire-and-forget - the server's
+// safeAck(ack, ...) response (see Nest's realtime handlers) only reaches
+// the caller if an ack callback was actually passed. Without one, ANY
+// server-side rejection (permission check, rate limit, moderation/legal
+// policy) is indistinguishable from success: the client just never hears
+// back, and the optimistic local UI change is left standing as if it
+// worked. Used for chat.edit/chat.delete, where the previous fire-and-
+// forget pattern made server-side delete rejections completely silent.
+const emitWithAck = (
+  socket: { emit: (event: string, payload: any, cb?: (ack: any) => void) => void },
+  event: string,
+  payload: any,
+): Promise<{ ok: boolean; error?: string }> => {
+  return new Promise((resolve) => {
+    let settled = false;
+    const timer = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      resolve({ ok: false, error: 'The request timed out. Please check your connection and try again.' });
+    }, EMIT_ACK_TIMEOUT_MS);
+    try {
+      socket.emit(event, payload, (ack: any) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        if (ack && ack.ok === false) {
+          resolve({ ok: false, error: typeof ack.error === 'string' ? ack.error : undefined });
+        } else {
+          resolve({ ok: true });
+        }
+      });
+    } catch (error) {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      resolve({ ok: false, error: error instanceof Error ? error.message : String(error) });
+    }
+  });
+};
+
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 const normalizeUuid = (value: unknown): string | null => {
@@ -161,6 +204,30 @@ const normalizeUuid = (value: unknown): string | null => {
   }
   const text = String(value ?? '').trim();
   return UUID_RE.test(text) ? text : null;
+};
+
+// Which intended recipient users (not devices - a user can have several)
+// got literally zero envelopes in encryptionMeta.recipients. Coverage is
+// checked per-USER, not by comparing raw device counts: e2ee.ts's
+// encryptPayloadForRecipients already does its own best-effort per-device
+// delivery (one retry per user, skip only devices that truly can't be
+// reached) and also folds the SENDER's own other devices into the same
+// recipients array, so a plain length comparison against recipientIds.length
+// was never a meaningful signal - a recipient with 2 devices, or the
+// sender's own second device, could inflate the count while a genuinely
+// unreachable recipient still went entirely unnoticed. A user with at least
+// one device covered here got the message; only a user with NONE truly
+// failed to receive anything.
+const recipientUsersWithoutEnvelope = (
+  encryptionMeta: { recipients?: Array<{ userId: string }> } | undefined,
+  recipientIds: string[],
+): string[] => {
+  const covered = new Set(
+    Array.isArray(encryptionMeta?.recipients)
+      ? encryptionMeta!.recipients.map((r) => String(r.userId))
+      : [],
+  );
+  return recipientIds.filter((uid) => !covered.has(String(uid)));
 };
 
 const resolveParticipantUserIdForE2EE = (participant: any): string | null => {
@@ -828,7 +895,31 @@ export function useChatMessaging({
           }
           return;
         } else {
+          // Any OTHER decrypt failure (e.g. an identity mismatch surfaced
+          // during session bootstrap) previously did nothing user-facing
+          // at all - the message stayed behind a bare 🔒 forever, silently
+          // retried every 5s via the failedAt cooldown above with no way
+          // to ever actually recover, since the local session record
+          // causing the failure never got cleared. Same honest placeholder
+          // as isNoSignalSessionError above, plus dropping the stale
+          // session so a later message from this sender/device gets a
+          // clean rebuild instead of repeating the identical failure.
           console.warn('[useChatMessaging] decrypt failed', error);
+          const messageId = String(mapped.serverId ?? mapped.id ?? mapped.clientId ?? '');
+          const senderDeviceId = encMeta?.senderDeviceId ?? encMeta?.deviceId ?? '';
+          const UNDECRYPTABLE_TEXT = '🔒 This message could not be decrypted. Ask them to send it again.';
+          const alreadyPatched = messagesRef.current.find(
+            (m) => (m.serverId === messageId || m.id === messageId) &&
+              typeof m.text === 'string' && m.text === UNDECRYPTABLE_TEXT,
+          );
+          if (mapped.senderId && senderDeviceId) {
+            await dropStaleSession(String(mapped.senderId), String(senderDeviceId)).catch(() => {});
+          }
+          if (!alreadyPatched) {
+            const patch = { text: UNDECRYPTABLE_TEXT };
+            await saveDecryptedMessage(String(currentUserId), mapped, patch);
+            await patchDecryptedMessage(messageId, patch);
+          }
         }
       } finally {
         decryptInFlightRef.current.delete(decryptKey);
@@ -1685,6 +1776,32 @@ export function useChatMessaging({
             }
           : undefined;
 
+      // Storage-locator-only echo of media.attachments that must survive
+      // outside the encrypted envelope, same trust level/reasoning as
+      // voicePlaintextEcho above (id is a server-issued UploadIntent
+      // attachmentId, not content — Nest's messages.service.ts
+      // normalizeAttachments() re-resolves storageKey/mimeType/size/
+      // scanStatus from the matching CONFIRMED UploadIntent server-side,
+      // never trusting the client payload for any of that). Without this,
+      // Nest's message document ends up with attachments/media both
+      // undefined (the real reference lives only inside encryptionMeta,
+      // which the server can never read), so GET /uploads/file and
+      // /uploads/:id/download-url can never resolve a storage key for the
+      // attachment — every image/video/file sent in an E2EE conversation
+      // 404s on download for every recipient, even though the underlying
+      // object is sitting in S3 the whole time.
+      //
+      // Deliberately just `id`, nothing else: kind/dimensions/thumbUrl/
+      // viewOnce are all real presentation metadata the recipient already
+      // gets from the encrypted envelope itself, and this DTO's own
+      // top-level viewOnce field is documented as intentionally staying
+      // inside encryption for E2EE sends — echoing it back out per
+      // attachment here would quietly undo that.
+      const mediaPlaintextEcho =
+        normalizedMediaAttachments?.length
+          ? { attachments: normalizedMediaAttachments.map((a: any) => ({ id: a.id })) }
+          : undefined;
+
       let payloadToSend: any;
       const isPublicRoom = (chat as any)?.kind === 'post' || (chat as any)?.kind === 'thread';
       if (E2EE_ENABLED && chat && !isPublicRoom) {
@@ -1705,11 +1822,9 @@ export function useChatMessaging({
               recipientIds,
               basePayload,
             );
-            const encryptedRecipientCount = Array.isArray(encryptionMeta?.recipients)
-              ? encryptionMeta.recipients.length
-              : 0;
-            if (encryptedRecipientCount < recipientIds.length) {
-              throw new Error(`E2EE recipient envelope missing: ${encryptedRecipientCount}/${recipientIds.length}`);
+            const missingRecipients = recipientUsersWithoutEnvelope(encryptionMeta, recipientIds);
+            if (missingRecipients.length > 0) {
+              throw new Error(`E2EE recipient envelope missing for: ${missingRecipients.join(',')}`);
             }
             payloadToSend = {
               conversationId: String(convId),
@@ -1722,6 +1837,7 @@ export function useChatMessaging({
               encrypted: true,
               encryptionMeta,
               ...(voicePlaintextEcho ? { voice: voicePlaintextEcho } : {}),
+              ...(mediaPlaintextEcho ? { media: mediaPlaintextEcho } : {}),
             };
           } catch (encryptErr) {
             if (String((encryptErr as any)?.message ?? '').includes('Missing E2EE bundle')) {
@@ -1732,10 +1848,8 @@ export function useChatMessaging({
                   recipientIds,
                   basePayload,
                 );
-                const encryptedRecipientCount = Array.isArray(encryptionMeta?.recipients)
-                  ? encryptionMeta.recipients.length
-                  : 0;
-                if (encryptedRecipientCount >= recipientIds.length) {
+                const missingRecipients = recipientUsersWithoutEnvelope(encryptionMeta, recipientIds);
+                if (missingRecipients.length === 0) {
                   payloadToSend = {
                     conversationId: String(convId),
                     clientId,
@@ -1744,9 +1858,10 @@ export function useChatMessaging({
                     encrypted: true,
                     encryptionMeta,
                     ...(voicePlaintextEcho ? { voice: voicePlaintextEcho } : {}),
+              ...(mediaPlaintextEcho ? { media: mediaPlaintextEcho } : {}),
                   };
                 } else {
-                  throw new Error(`E2EE recipient envelope missing after repair: ${encryptedRecipientCount}/${recipientIds.length}`);
+                  throw new Error(`E2EE recipient envelope missing after repair for: ${missingRecipients.join(',')}`);
                 }
               } catch (repairErr) {
                 console.warn('[E2EE] encryption failed; message remains queued locally', {
@@ -2483,7 +2598,10 @@ export function useChatMessaging({
         text: patch.text,
         styledText: patch.styledText,
       };
-      socket.emit('chat.edit', editPayload);
+      const ack = await emitWithAck(socket, 'chat.edit', editPayload);
+      if (!ack.ok) {
+        Alert.alert('Could not edit message', ack.error || 'Please try again.');
+      }
     },
     softDeleteMessage: async (
       messageId: string,
@@ -2497,10 +2615,21 @@ export function useChatMessaging({
 
       const serverId = resolveServerId(messageId);
       if (!serverId) return;
-      socket.emit('chat.delete', {
+      // Previously fire-and-forget with no ack callback at all: if the
+      // server rejected this for ANY reason (permission check, rate
+      // limit, moderation policy), the failure vanished into nothing -
+      // the message stayed exactly as-is server-side, but the client had
+      // zero way to know the delete didn't actually happen. The message
+      // only ever LOOKED deleted (locally blanked text/attachments above)
+      // until the next history sync silently brought the real, still-
+      // intact content back - which is exactly "I can't delete this."
+      const ack = await emitWithAck(socket, 'chat.delete', {
         conversationId: String(convId),
         messageId: serverId,
       });
+      if (!ack.ok) {
+        Alert.alert('Could not delete message', ack.error || 'Please try again.');
+      }
     },
     replyToMessage,
     attemptFlushQueue,

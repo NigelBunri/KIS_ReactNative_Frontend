@@ -88,6 +88,7 @@ node_modules_updated_files/
 # CLAUDE.md, settings.json, and any other .claude files ARE committed
 # (they configure Claude's behaviour for this repo and are useful to share).
 .claude/worktrees/
+.worktrees/
 
 # ─── Git artifacts ───────────────────────────────────────────────────────────
 *.orig
