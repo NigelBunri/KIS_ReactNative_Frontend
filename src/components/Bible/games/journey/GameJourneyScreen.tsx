@@ -65,16 +65,25 @@ export default function GameJourneyScreen({ gameKey, onExit, onOpenStats, onEnte
   const isFullyComplete = completedCount >= STAGES_PER_GAME;
 
   return (
-    <View style={[styles.wrap, { backgroundColor: palette.bg, paddingTop: insets.top }]}>
+    // Rendered nested below BibleScreen's own Golden Section gold header,
+    // which already reserves the safe-area top inset — adding insets.top
+    // here on top of that opened a dead gap between the two.
+    <View style={[styles.wrap, { backgroundColor: palette.bg }]}>
       <View style={[styles.header, { paddingHorizontal: responsive.pageGutter }]}>
-        <Pressable onPress={onExit} hitSlop={10} style={[styles.backBtn, { backgroundColor: palette.selectedBg }]}>
-          <KISIcon name="back" size={18} color={palette.text} />
+        <Pressable
+          onPress={onExit}
+          hitSlop={10}
+          style={[styles.backBtn, { backgroundColor: palette.selectedBg, borderColor: palette.inputBorder }]}
+          accessibilityRole="button"
+          accessibilityLabel="Close"
+        >
+          <KISIcon name="close" size={18} color={palette.text} />
         </Pressable>
         <View style={{ flex: 1 }}>
           <Text style={[styles.title, { color: palette.text }]} numberOfLines={1}>{meta.title}</Text>
           <Text style={[styles.subtitle, { color: theme.accent }]} numberOfLines={1}>{theme.journeyTitle}</Text>
         </View>
-        <Pressable onPress={onOpenStats} hitSlop={10} style={[styles.backBtn, { backgroundColor: palette.selectedBg }]}>
+        <Pressable onPress={onOpenStats} hitSlop={10} style={[styles.backBtn, { backgroundColor: palette.selectedBg, borderColor: palette.inputBorder }]}>
           <KISIcon name="bar-chart" size={16} color={palette.primary} />
         </Pressable>
       </View>
@@ -160,7 +169,7 @@ const styles = StyleSheet.create({
   wrap: { flex: 1 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   header: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10 },
-  backBtn: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
+  backBtn: { width: 36, height: 36, borderRadius: 10, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   title: { fontSize: 16, fontWeight: '900' },
   subtitle: { fontSize: 11, fontWeight: '800', marginTop: 1 },
   scrollContent: { gap: 14, paddingTop: 8 },

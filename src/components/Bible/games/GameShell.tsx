@@ -33,9 +33,9 @@ export default function GameShell({ title, subtitle, onBack, rightStat, children
           hitSlop={10}
           accessibilityRole="button"
           accessibilityLabel="Back to games"
-          style={[styles.backBtn, { backgroundColor: palette.selectedBg }]}
+          style={[styles.backBtn, { backgroundColor: palette.selectedBg, borderColor: palette.inputBorder }]}
         >
-          <KISIcon name="back" size={18} color={palette.text} />
+          <KISIcon name="close" size={18} color={palette.text} />
         </Pressable>
 
         <View style={styles.titleGroup}>
@@ -74,7 +74,8 @@ const styles = StyleSheet.create({
   backBtn: {
     width: 38,
     height: 38,
-    borderRadius: 19,
+    borderRadius: 10,
+    borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },

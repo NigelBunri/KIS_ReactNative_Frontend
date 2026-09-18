@@ -26,7 +26,6 @@ import apiService from '@/services/apiService';
 import { uploadFileToBackend } from '@/Module/ChatRoom/uploadFileToBackend';
 import { getAccessToken } from '@/security/authStorage';
 import { getFeedPlainText } from '@/components/feeds/richTextValue';
-import { useSafeTopInset } from '@/hooks/useSafeTopInset';
 import { useSocket } from '@/SocketProvider';
 
 type MemberUser = {
@@ -84,7 +83,6 @@ export const CommunityInfoPage: React.FC<CommunityInfoPageProps> = ({
   onBack,
 }) => {
   const { palette } = useKISTheme();
-  const topInset = useSafeTopInset();
 
   const [avatarUrl, setAvatarUrl] = useState<string | undefined>(undefined);
   const [description, setDescription] = useState<string>('');
@@ -458,10 +456,16 @@ export const CommunityInfoPage: React.FC<CommunityInfoPageProps> = ({
   }, []);
 
   return (
-    <View style={[styles.root, { backgroundColor: palette.bg, paddingTop: topInset }]}>
+    <View style={[styles.root, { backgroundColor: palette.bg }]}>
       <View style={[styles.header, { borderBottomColor: palette.divider }]}>
-        <Pressable onPress={onBack} style={styles.backBtn}>
-          <KISIcon name="arrow-left" size={22} color={palette.text} />
+        <Pressable
+          onPress={onBack}
+          style={[styles.backBtn, { backgroundColor: palette.selectedBg, borderColor: palette.inputBorder }]}
+          accessibilityRole="button"
+          accessibilityLabel="Close"
+          hitSlop={8}
+        >
+          <KISIcon name="close" size={18} color={palette.text} />
         </Pressable>
         <Text style={[styles.headerTitle, { color: palette.text }]} numberOfLines={1}>
           Community info
@@ -669,7 +673,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     borderBottomWidth: 1,
   },
-  backBtn: { padding: 6, marginRight: 8 },
+  backBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 8,
+  },
   headerTitle: { fontSize: 18, fontWeight: '600' },
   content: { paddingBottom: 40 },
   hero: { alignItems: 'center', paddingVertical: 20, paddingHorizontal: 16 },

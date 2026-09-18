@@ -1038,18 +1038,28 @@ export default function FeedScreen<T extends FeedPost>({
         </>
       ) : null}
 
-      {/* Top App Bar (center title, back left, bell right) */}
+      {/* Top App Bar (center title, back left, bell right) — this screen is
+          always rendered nested below the tab's own Golden Section gold
+          header (Communities or Partners), which already reserves the
+          safe-area top inset, so this bar only needs its own small vertical
+          rhythm, not another inset on top of that one. */}
       <View
         style={[
           styles.appBar,
           {
-            paddingTop: topInset + 6,
+            paddingTop: 10,
             backgroundColor: palette.card,
           },
         ]}
       >
-        <Pressable onPress={onBack} style={styles.appBarIconBtn} hitSlop={10}>
-          <KISIcon name="arrow-left" size={22} color={palette.text} />
+        <Pressable
+          onPress={onBack}
+          style={[styles.appBarCloseBtn, { backgroundColor: palette.selectedBg, borderColor: palette.inputBorder }]}
+          accessibilityRole="button"
+          accessibilityLabel="Close"
+          hitSlop={8}
+        >
+          <KISIcon name="close" size={20} color={palette.text} />
         </Pressable>
 
         <Text style={[styles.appBarTitle, { color: palette.text }]} numberOfLines={1}>
@@ -1620,6 +1630,14 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  appBarCloseBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },

@@ -107,17 +107,26 @@ export default function BibleGamesOverallStatsScreen({ onBack, onReset }: { onBa
   }
 
   return (
-    <View style={[styles.wrap, { backgroundColor: palette.bg, paddingTop: insets.top }]}>
+    // Rendered nested below BibleScreen's own Golden Section gold header,
+    // which already reserves the safe-area top inset — adding insets.top
+    // here on top of that opened a dead gap between the two.
+    <View style={[styles.wrap, { backgroundColor: palette.bg }]}>
       <View style={[styles.header, { paddingHorizontal: responsive.pageGutter }]}>
-        <Pressable onPress={onBack} hitSlop={10} style={[styles.backBtn, { backgroundColor: palette.selectedBg }]}>
-          <KISIcon name="back" size={18} color={palette.text} />
+        <Pressable
+          onPress={onBack}
+          hitSlop={10}
+          style={[styles.backBtn, { backgroundColor: palette.selectedBg, borderColor: palette.inputBorder }]}
+          accessibilityRole="button"
+          accessibilityLabel="Close"
+        >
+          <KISIcon name="close" size={18} color={palette.text} />
         </Pressable>
         <Text style={[styles.title, { color: palette.text }]} numberOfLines={1}>Bible Games — Overall Progress</Text>
         <Pressable
           onPress={() => setShareVisible(true)}
           disabled={sharing}
           hitSlop={10}
-          style={[styles.backBtn, { backgroundColor: palette.selectedBg }]}
+          style={[styles.backBtn, { backgroundColor: palette.selectedBg, borderColor: palette.inputBorder }]}
         >
           {sharing ? <ActivityIndicator size="small" color={palette.primary} /> : <KISIcon name="share" size={18} color={palette.primary} />}
         </Pressable>
@@ -210,7 +219,7 @@ const styles = StyleSheet.create({
   wrap: { flex: 1 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   header: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10 },
-  backBtn: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
+  backBtn: { width: 36, height: 36, borderRadius: 10, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   title: { flex: 1, fontSize: 16, fontWeight: '900' },
   cardLabel: { fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.4 },
   bigNumber: { fontSize: 24, fontWeight: '900' },

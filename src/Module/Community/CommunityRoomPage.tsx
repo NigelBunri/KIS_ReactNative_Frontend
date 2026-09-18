@@ -203,8 +203,14 @@ export default function CommunityRoomPage({
   return (
     <View style={[styles.root, { backgroundColor: palette.bg }]}>
       <View style={[styles.header, { borderBottomColor: palette.divider, backgroundColor: palette.card }]}>
-        <Pressable onPress={onBack} style={styles.headerButton}>
-          <KISIcon name="arrow-left" size={20} color={palette.text} />
+        <Pressable
+          onPress={onBack}
+          style={[styles.headerButton, { backgroundColor: palette.selectedBg, borderColor: palette.inputBorder }]}
+          accessibilityRole="button"
+          accessibilityLabel="Close"
+          hitSlop={8}
+        >
+          <KISIcon name="close" size={18} color={palette.text} />
         </Pressable>
         <Pressable
           onPress={() => onOpenInfo({ id: community.id, name: community.name })}
@@ -395,7 +401,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  headerButton: { padding: 8, marginRight: 8 },
+  headerButton: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 8,
+  },
   headerTitle: { fontSize: 18, fontWeight: '600' },
   headerTitleWrap: { flexDirection: 'row', alignItems: 'center', flex: 1 },
   headerAvatar: { width: 32, height: 32, borderRadius: 16, marginRight: 10 },
