@@ -1047,7 +1047,7 @@ export default function FeedScreen<T extends FeedPost>({
         style={[
           styles.appBar,
           {
-            paddingTop: topInset + 10,
+            paddingTop: topInset + 2,
             backgroundColor: palette.card,
           },
         ]}
@@ -1618,7 +1618,7 @@ const styles = StyleSheet.create({
 
   // AppBar (center title)
   appBar: {
-    paddingBottom: 10,
+    paddingBottom: 6,
     paddingHorizontal: 14,
     flexDirection: 'row',
     alignItems: 'center',
@@ -1627,9 +1627,9 @@ const styles = StyleSheet.create({
     borderBottomColor: 'rgba(0,0,0,0.08)',
   },
   appBarIconBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
   },
