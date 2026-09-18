@@ -12,6 +12,8 @@
 		1F5B2BB5783FF4FC6DAA5FB0 /* SampleHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D479AB9881473D785F039A7 /* SampleHandler.swift */; };
 		304D811954FCDEC0B8323B77 /* RTCScreenSharingExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = F863FCF6C29C862AD78B228B /* RTCScreenSharingExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		4FC4C9F8B9430993A38C5D94 /* VoipTokenModule.m in Sources */ = {isa = PBXBuildFile; fileRef = 7F4F74320FBBADD7614C20F5 /* VoipTokenModule.m */; };
+		3E784A47BD9D47C3AF92FB4F /* PendingCallModule.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC7A104BCFB846C89CDE5524 /* PendingCallModule.swift */; };
+		103689D18187427F92DE09CC /* PendingCallModule.m in Sources */ = {isa = PBXBuildFile; fileRef = B8AB19416B5D448D84B7C699 /* PendingCallModule.m */; };
 		5111D89852F6BEB0CA3009D3 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */; };
 		65379F83ECA9ECEF091B0A9A /* VoipTokenModule.swift in Sources */ = {isa = PBXBuildFile; fileRef = BBD9F51B5CB790C01348379D /* VoipTokenModule.swift */; };
 		A1B2C3D4E5F6071829304A5C /* TranslationModule.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6071829304A5B /* TranslationModule.swift */; };
@@ -61,6 +63,8 @@
 		7F4F74320FBBADD7614C20F5 /* VoipTokenModule.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; name = VoipTokenModule.m; path = KIS/VoipTokenModule.m; sourceTree = "<group>"; };
 		A1B2C3D4E5F6071829304A5B /* TranslationModule.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = TranslationModule.swift; path = KIS/TranslationModule.swift; sourceTree = "<group>"; };
 		A1B2C3D4E5F6071829304A5D /* TranslationModule.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; name = TranslationModule.m; path = KIS/TranslationModule.m; sourceTree = "<group>"; };
+		CC7A104BCFB846C89CDE5524 /* PendingCallModule.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = PendingCallModule.swift; path = KIS/PendingCallModule.swift; sourceTree = "<group>"; };
+		B8AB19416B5D448D84B7C699 /* PendingCallModule.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; name = PendingCallModule.m; path = KIS/PendingCallModule.m; sourceTree = "<group>"; };
 		81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = LaunchScreen.storyboard; path = KIS/LaunchScreen.storyboard; sourceTree = "<group>"; };
 		9A2E6D0F5B7C48A1902FDEB3 /* KISRelease.entitlements */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.entitlements; path = KISRelease.entitlements; sourceTree = "<group>"; };
 		A3F069872D1B686B57B9DBA0 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
@@ -106,6 +110,8 @@
 				7F4F74320FBBADD7614C20F5 /* VoipTokenModule.m */,
 				A1B2C3D4E5F6071829304A5B /* TranslationModule.swift */,
 				A1B2C3D4E5F6071829304A5D /* TranslationModule.m */,
+				CC7A104BCFB846C89CDE5524 /* PendingCallModule.swift */,
+				B8AB19416B5D448D84B7C699 /* PendingCallModule.m */,
 			);
 			name = KIS;
 			sourceTree = "<group>";
@@ -374,6 +380,8 @@
 				4FC4C9F8B9430993A38C5D94 /* VoipTokenModule.m in Sources */,
 				A1B2C3D4E5F6071829304A5C /* TranslationModule.swift in Sources */,
 				A1B2C3D4E5F6071829304A5E /* TranslationModule.m in Sources */,
+				3E784A47BD9D47C3AF92FB4F /* PendingCallModule.swift in Sources */,
+				103689D18187427F92DE09CC /* PendingCallModule.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

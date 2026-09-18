@@ -55,6 +55,7 @@ import { setCallPiPActive } from '@/services/calls/callPiPService';
 import { toggleScreenShare as callServiceToggleScreenShare } from '@/services/calls/callService';
 import { saveConversationCallHistory, loadConversationCallHistory } from '@/services/calls/callHistoryStorage';
 import { logCallDiagnostic } from '@/services/calls/callDiagnostics';
+import { getPendingCallPayload, clearPendingCallPayload } from '@/services/calls/pendingCallPayload';
 
 // Use SFU when a group call grows beyond this threshold.
 // Below it, P2P is used (lower latency, no server media).
@@ -244,6 +245,62 @@ function makeParticipant(overrides: Partial<CallParticipant> & { userId: string 
 
 function makeReactionId() {
   return `rxn_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+}
+
+/**
+ * Builds a full, valid CallSession from the minimal fields a push payload
+ * carries. Extracted out of the call.offer handler's own inline
+ * construction (still used there) so the exact same defaulting logic is
+ * reusable for reconstructing a session from a persisted pending-call
+ * payload — see pendingCallPayload.ts and onAnswerCall/onEndCall below for
+ * why that reconstruction is needed (CallKit/ConnectionService's native
+ * answer/end events carry only a bare callUUID, and a backgrounded/killed
+ * recipient may never have received the socket's own call.offer at all).
+ */
+function buildCallSessionFromOfferLike(input: {
+  callId: string;
+  conversationId: string;
+  callType: CallType;
+  callerName?: string | null;
+  fromUserId?: string | null;
+  myUserId: string;
+  state: CallSession['state'];
+}): CallSession {
+  const callerParticipant = makeParticipant({
+    userId: input.fromUserId ?? 'caller',
+    displayName: safeDisplayName(input.callerName, 'Caller'),
+    role: 'host',
+  });
+  return {
+    callId: input.callId,
+    conversationId: input.conversationId,
+    callType: input.callType,
+    title: safeDisplayName(input.callerName, 'Incoming call'),
+    state: input.state,
+    participants: [callerParticipant],
+    localUserId: input.myUserId,
+    initiatedBy: input.fromUserId ?? null,
+    startedAt: new Date().toISOString(),
+    isMuted: false,
+    isVideoEnabled: hasVideo(input.callType),
+    isSpeakerOn: false,
+    isFrontCamera: true,
+    isScreenSharing: false,
+    layout: isGroupCall(input.callType) ? 'speaker' : 'gallery',
+    pinnedUserId: null,
+    activeSpeakerId: null,
+    isControlsVisible: true,
+    chatMessages: [],
+    raisedHands: [],
+    reactions: [],
+    networkQuality: 4,
+    unreadChatCount: 0,
+    viewerCount: 0,
+    isRecording: false,
+    knockingUsers: [],
+    isAudioOnly: false,
+    isNoiseCancellationOn: true,
+  };
 }
 
 /* ============================================================================
@@ -1565,17 +1622,58 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   /* ─── CallKit setup ─────────────────────────────────────────────────────── */
 
+  // If CallKit/ConnectionService reports an answer/end for a callUUID we
+  // have no matching in-memory session for, this is a cold start: the app
+  // process was launched fresh by the OS to show the native call UI, and
+  // never received (or hasn't yet processed) the socket's own call.offer —
+  // Socket.IO doesn't replay missed room broadcasts to a client that
+  // connects after the fact. Reconstruct a minimal session from the
+  // pending-call payload persisted natively (AppDelegate.swift on iOS,
+  // handleBackgroundPushMessage on Android) at the moment the push arrived,
+  // so answerCall()/leaveCall() — which both read only from
+  // activeCallRef.current — have something real to act on. Returns the
+  // resolved session (existing or reconstructed), or null if neither the
+  // live ref nor the persisted payload matches callUUID.
+  const resolveSessionForCallKitEvent = useCallback(async (callUUID: string): Promise<CallSession | null> => {
+    const existing = activeCallRef.current;
+    if (existing && existing.callId === callUUID) return existing;
+
+    const pending = await getPendingCallPayload();
+    if (!pending || pending.callId !== callUUID) return null;
+
+    const myUserId = currentUserIdRef.current ?? currentUserId ?? '';
+    const rebuilt = buildCallSessionFromOfferLike({
+      callId: pending.callId,
+      conversationId: pending.conversationId,
+      callType: pending.callType as CallType,
+      callerName: pending.callerName,
+      fromUserId: pending.fromUserId,
+      myUserId,
+      state: 'incoming',
+    });
+    activeCallRef.current = rebuilt;
+    setActiveCall(rebuilt);
+    return rebuilt;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   useEffect(() => {
     if (!callKeepAvailable) return;
     setupCallKit({
       onAnswerCall: (callUUID) => {
-        // User answered from lock screen — trigger the in-app answer flow
-        const session = activeCallRef.current;
-        if (session && session.callId === callUUID) void answerCall();
+        void (async () => {
+          // User answered from lock screen — trigger the in-app answer flow
+          const session = await resolveSessionForCallKitEvent(callUUID);
+          if (session) await answerCall();
+          void clearPendingCallPayload(callUUID);
+        })();
       },
       onEndCall: (callUUID) => {
-        const session = activeCallRef.current;
-        if (session && session.callId === callUUID) void leaveCall();
+        void (async () => {
+          const session = await resolveSessionForCallKitEvent(callUUID);
+          if (session) await leaveCall();
+          void clearPendingCallPayload(callUUID);
+        })();
       },
       onToggleMute: (muted) => {
         webRTCService.setMuted(muted);
