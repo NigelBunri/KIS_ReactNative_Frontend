@@ -9,4 +9,10 @@ export const FEATURE_FLAGS = {
   // auto-verifies accounts (see KIS_PHONE_VERIFICATION_ENABLED on the API).
   // Set true here (and on the API) to bring phone verification back live.
   PHONE_VERIFICATION_ENABLED: toBool(env.KIS_PHONE_VERIFICATION_ENABLED ?? null),
+  // KIS Auth (Google-backed identity, kisauth.kingdomimpactventures.org) —
+  // recovery-first rollout per the Phase 2 design. Off by default: flip on
+  // only once a real KIS Auth deployment + Google OAuth client exist.
+  // Ships ALONGSIDE the existing email/phone recovery path, never replacing
+  // it in this phase.
+  KIS_AUTH_RECOVERY_ENABLED: toBool(env.KIS_AUTH_RECOVERY_ENABLED ?? null),
 };

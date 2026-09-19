@@ -1,8 +1,9 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
+  Linking,
   Platform,
   Pressable,
   ScrollView,
@@ -12,22 +13,31 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from '@/components/common/SafeAreaViewWithTopPadding';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import { useKISTheme } from '@/theme/useTheme';
 import { useResponsiveLayout } from '@/theme/responsive';
 import { KISIcon } from '@/constants/kisIcons';
 import { postRequest } from '@/network/post';
 import ROUTES from '@/network';
+import { KISAUTH_BASE_URL } from '@/network/config';
 import { setAuthTokens } from '@/security/authStorage';
 import { setUserData } from '@/network/cache';
 import { ensureDeviceId, initE2EE } from '@/security/e2ee';
+import { FEATURE_FLAGS } from '@/constants/featureFlags';
 import { useAuth } from '../../App';
 
 type Step = 'identify' | 'verify' | 'done';
 
+// Not in RootStackParamList (src/navigation/types.ts) — that file had
+// unrelated uncommitted changes in flight from a concurrent session when
+// this was written, so these params are read locally via useRoute()
+// instead of extending the shared navigator types.
+type KisAuthCallbackParams = { kisAuthCode?: string; kisAuthState?: string };
+
 export default function ParentRecoveryScreen() {
   const { palette } = useKISTheme();
   const navigation = useNavigation();
+  const route = useRoute();
   const { setAuth, setUser } = useAuth();
   const responsive = useResponsiveLayout();
   const formMaxWidth = Math.min(480, responsive.contentMaxWidth - 32);
@@ -37,6 +47,103 @@ export default function ParentRecoveryScreen() {
   const [email, setEmail] = useState('');
   const [recoveryToken, setRecoveryToken] = useState('');
   const [loading, setLoading] = useState(false);
+  const [kisAuthLoading, setKisAuthLoading] = useState(false);
+
+  // Set when the KIS Auth browser round trip is launched; compared against
+  // the state query param on return so a deep link this screen didn't
+  // itself initiate (or a replayed one) is rejected rather than acted on.
+  const kisAuthExpectedState = useRef<string | null>(null);
+  // Guards against double-handling the same deep link (e.g. a duplicate
+  // AppState/Linking event firing for one physical return-to-app).
+  const kisAuthHandledCode = useRef<string | null>(null);
+
+  const handleKisAuthRecovery = useCallback(async () => {
+    setKisAuthLoading(true);
+    try {
+      const deviceId = await ensureDeviceId();
+      const state = `${deviceId}.${Date.now()}.${Math.random().toString(36).slice(2)}`;
+      kisAuthExpectedState.current = state;
+      const redirectUri = 'https://kis.app/auth/kisauth-callback';
+      const url =
+        `${KISAUTH_BASE_URL}/authorize` +
+        `?client_id=kis-mobile` +
+        `&redirect_uri=${encodeURIComponent(redirectUri)}` +
+        `&purpose=recovery` +
+        `&state=${encodeURIComponent(state)}`;
+      const canOpen = await Linking.canOpenURL(url);
+      if (!canOpen) {
+        Alert.alert('Error', 'Unable to open KIS Auth.');
+        return;
+      }
+      await Linking.openURL(url);
+    } catch (e: any) {
+      Alert.alert('Error', e?.message ?? 'Unable to start KIS Auth recovery.');
+    } finally {
+      setKisAuthLoading(false);
+    }
+  }, []);
+
+  const completeKisAuthRecovery = useCallback(
+    async (code: string) => {
+      setLoading(true);
+      try {
+        const deviceId = await ensureDeviceId();
+        const res = await postRequest(
+          ROUTES.auth.kisAuthRecoveryComplete,
+          {
+            authorization_code: code,
+            redirect_uri: 'https://kis.app/auth/kisauth-callback',
+            device_id: deviceId,
+            device_name: `${Platform.OS === 'ios' ? 'iPhone' : 'Android'} (recovered via KIS Auth)`,
+            platform: Platform.OS,
+          },
+          { errorMessage: 'Recovery via KIS Auth failed.' },
+        );
+
+        if (!res?.success) {
+          Alert.alert(
+            'Recovery failed',
+            res?.message || res?.data?.detail || 'We could not complete this authentication request.',
+          );
+          return;
+        }
+
+        const accessToken = res.data?.access;
+        if (!accessToken) {
+          Alert.alert('Recovery failed', 'We could not complete this authentication request.');
+          return;
+        }
+
+        setStep('done');
+        await setAuthTokens({ accessToken, refreshToken: res.data?.refresh ?? null });
+        const resolvedUser = res?.data?.user ?? null;
+        await setUserData(resolvedUser, res.data);
+        setUser?.(resolvedUser);
+        void initE2EE(String(resolvedUser?.id ?? '')).catch(() => {});
+        setAuth(true);
+      } catch (e: any) {
+        Alert.alert('Error', e?.message ?? 'Unable to complete recovery.');
+      } finally {
+        setLoading(false);
+      }
+    },
+    [setAuth, setUser],
+  );
+
+  useEffect(() => {
+    const params = (route.params ?? {}) as KisAuthCallbackParams;
+    if (!params.kisAuthCode || !params.kisAuthState) return;
+    if (kisAuthHandledCode.current === params.kisAuthCode) return;
+    if (!kisAuthExpectedState.current || params.kisAuthState !== kisAuthExpectedState.current) {
+      // Either this screen never launched a KIS Auth attempt (app was
+      // killed and relaunched by the link) or the state doesn't match —
+      // fail closed rather than guess. The user can just retry.
+      Alert.alert('Error', 'We could not complete this authentication request.');
+      return;
+    }
+    kisAuthHandledCode.current = params.kisAuthCode;
+    void completeKisAuthRecovery(params.kisAuthCode);
+  }, [route.params, completeKisAuthRecovery]);
 
   const handleInitiate = useCallback(async () => {
     if (!phone.trim() && !email.trim()) {
@@ -137,6 +244,28 @@ export default function ParentRecoveryScreen() {
               If you lost your primary device, enter your phone number or email. We'll send a recovery code.
               Verifying it makes this device your primary immediately and signs your previous primary device out.
             </Text>
+
+            {FEATURE_FLAGS.KIS_AUTH_RECOVERY_ENABLED && (
+              <>
+                <Pressable
+                  style={[
+                    styles.primaryBtn,
+                    { backgroundColor: palette.primary, opacity: kisAuthLoading ? 0.6 : 1, maxWidth: formMaxWidth },
+                  ]}
+                  onPress={handleKisAuthRecovery}
+                  disabled={kisAuthLoading || loading}
+                >
+                  {kisAuthLoading ? (
+                    <ActivityIndicator color={palette.ivory} />
+                  ) : (
+                    <Text style={[styles.primaryBtnText, { color: palette.ivory }]}>Recover with KIS Auth</Text>
+                  )}
+                </Pressable>
+                <Text style={[{ color: palette.subtext, fontWeight: '600', fontSize: 12 }]}>
+                  — or use a recovery code —
+                </Text>
+              </>
+            )}
 
             <View style={[styles.inputGroup, { maxWidth: formMaxWidth }]}>
               <Text style={[styles.label, { color: palette.subtext }]}>Phone number</Text>

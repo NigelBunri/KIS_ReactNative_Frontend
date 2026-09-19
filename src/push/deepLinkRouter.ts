@@ -14,6 +14,24 @@
 //   kis://posts/<id>                       https://kis.app/posts/<id>
 //   kis://education/courses/<id>           https://kis.app/education/courses/<id>
 //   kis://education/events/<id>            https://kis.app/education/events/<id>
+//   https://kis.app/auth/kisauth-callback?code=&state=   KIS Auth recovery
+//     round trip (see ParentRecoveryScreen.tsx) — reuses this already-
+//     verified Universal Link domain rather than registering a new
+//     associated domain for kisauth.kingdomimpactventures.org, which
+//     would need real DNS + hosting to verify (external action, out of
+//     scope for a code change). Revisit if KIS Auth ever needs its own
+//     domain for a multi-app future.
+
+function queryParams(url: string): Record<string, string> {
+  const query = url.split('?')[1]?.split('#')[0];
+  if (!query) return {};
+  const out: Record<string, string> = {};
+  for (const pair of query.split('&')) {
+    const [key, value] = pair.split('=');
+    if (key) out[decodeURIComponent(key)] = decodeURIComponent(value ?? '');
+  }
+  return out;
+}
 
 function pathSegments(url: string): string[] {
   try {
@@ -36,6 +54,19 @@ export function routeDeepLink(url: string, navigation: any): boolean {
 
   try {
     const [first, second, third] = segments;
+
+    if (first === 'auth' && second === 'kisauth-callback') {
+      const { code, state } = queryParams(url);
+      if (!code || !state) return false;
+      // Route params here aren't in RootStackParamList's ParentRecovery
+      // entry (currently `undefined`) — deliberately not editing
+      // src/navigation/types.ts for this, since it had unrelated
+      // uncommitted changes in flight from a concurrent session when this
+      // was written. ParentRecoveryScreen reads these via useRoute() with
+      // its own local type, not the shared navigator param list.
+      navigation.navigate('ParentRecovery', { kisAuthCode: code, kisAuthState: state } as any);
+      return true;
+    }
 
     if (first === 'market' && second === 'products' && third) {
       navigation.navigate('ProductDetail', { productId: third });

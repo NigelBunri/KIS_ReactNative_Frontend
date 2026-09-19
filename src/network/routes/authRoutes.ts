@@ -25,6 +25,10 @@ const authRoutes = {
     renameDevice: (deviceId: string) => `${API_BASE_URL}/api/v1/auth/devices/${deviceId}/rename/`,
     parentRecoveryInit: `${API_BASE_URL}/api/v1/auth/recovery/initiate/`,
     parentRecoveryConfirm: `${API_BASE_URL}/api/v1/auth/recovery/confirm/`,
+    // KIS Auth (Google-backed) recovery — ships alongside the email/phone
+    // OTP path above, not replacing it. See apps/kis_auth_bridge on the
+    // Django backend.
+    kisAuthRecoveryComplete: `${API_BASE_URL}/api/v1/kis-auth/recovery/complete/`,
     checkContact: `${API_BASE_URL}/api/v1/users/check-contacts/`,
     twoFactorSetup: `${API_BASE_URL}/api/v1/auth/2fa/setup/`,
     twoFactorEnable: `${API_BASE_URL}/api/v1/auth/2fa/enable/`,
