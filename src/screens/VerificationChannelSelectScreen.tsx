@@ -138,16 +138,16 @@ export default function VerificationChannelSelectScreen({ navigation }: any) {
             setChannels({
               sms: Boolean(res.data.sms),
               email: Boolean(res.data.email),
-              whatsapp: Boolean(res.data.whatsapp ?? true),
+              whatsapp: Boolean(res.data.whatsapp),
             });
           } else {
-            // Fall back to WhatsApp only
-            setChannels({ sms: false, email: false, whatsapp: true });
+            // Fall back to email — the single active channel while SMS/WhatsApp are disabled
+            setChannels({ sms: false, email: true, whatsapp: false });
           }
         }
       } catch {
         if (!cancelled) {
-          setChannels({ sms: false, email: false, whatsapp: true });
+          setChannels({ sms: false, email: true, whatsapp: false });
         }
       } finally {
         if (!cancelled) setLoadingChannels(false);

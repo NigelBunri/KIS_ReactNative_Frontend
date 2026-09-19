@@ -406,7 +406,7 @@ export default function LoginScreen({ navigation }: any) {
     try {
       if (!forgotPhoneValid || forgotLoading) return;
       setForgotLoading(true);
-      const payload = { phone: forgotPhoneE164, channel: 'sms' };
+      const payload = { phone: forgotPhoneE164, channel: 'email' };
       const res = await postRequest(ROUTES.auth.forgotPassword, payload, {
         errorMessage: 'Unable to send reset code.',
       });

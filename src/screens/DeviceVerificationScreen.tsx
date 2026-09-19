@@ -78,7 +78,7 @@ export default function DeviceVerificationScreen({ navigation, setLoad }: any) {
 
   const [phone] = useState<string>(String(params.phone || ''));
   const [purpose] = useState<'register' | 'login' | 'reset'>(params.purpose || 'register');
-  const [channel] = useState<string>(params.channel || 'sms');
+  const [channel] = useState<string>(params.channel || 'email');
   const [code, setCode] = useState('');
   const [loadingVerify, setLoadingVerify] = useState(false);
   const [loadingResend, setLoadingResend] = useState(false);
