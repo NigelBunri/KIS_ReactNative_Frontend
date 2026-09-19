@@ -66,10 +66,30 @@ export default function CallHistoryRow({ entry, currentUserId, onCallBack }: Pro
   const time = entry.startedAt ? formatRelativeTime(entry.startedAt) : '';
   const durationStr = entry.duration != null ? formatDuration(entry.duration) : null;
 
+  // A call that never connected because the other side actively rejected
+  // or was unreachable - distinct from a plain "missed" (never answered
+  // at all) and from a normal "completed" call, so it gets its own
+  // amber/warning treatment instead of silently falling into the same
+  // neutral grey as a completed call.
+  const isDeclinedOrBusyOrCancelled =
+    entry.status === 'declined' || entry.status === 'busy' || entry.status === 'cancelled';
+
   // Colours
-  const accentColor = isMissed ? palette.danger : isOngoing ? palette.success : palette.subtext;
-  const iconBg = isMissed ? `${palette.danger}15` : isOngoing ? `${palette.success}15` : palette.surface;
-  const iconColor = isMissed ? palette.danger : isOngoing ? palette.success : palette.subtext;
+  const accentColor = isMissed
+    ? palette.danger
+    : isOngoing
+    ? palette.success
+    : isDeclinedOrBusyOrCancelled
+    ? palette.warning
+    : palette.subtext;
+  const iconBg = isMissed
+    ? `${palette.danger}15`
+    : isOngoing
+    ? `${palette.success}15`
+    : isDeclinedOrBusyOrCancelled
+    ? `${palette.warning}15`
+    : palette.surface;
+  const iconColor = accentColor;
 
   // Direction arrow for missed/outgoing
   const directionIcon = isMissed
@@ -79,74 +99,91 @@ export default function CallHistoryRow({ entry, currentUserId, onCallBack }: Pro
     : 'arrow-down-left';
 
   return (
-    <View style={[styles.row, { borderColor: palette.inputBorder, backgroundColor: palette.card }]}>
-      {/* Icon */}
-      <View style={[styles.iconWrap, { backgroundColor: iconBg }]}>
-        <KISIcon name={icon} size={18} color={iconColor} />
-      </View>
-
-      {/* Content */}
-      <View style={styles.content}>
-        <View style={styles.titleRow}>
-          <KISIcon name={directionIcon} size={12} color={accentColor} />
-          <Text style={[styles.label, { color: isMissed ? palette.danger : palette.text }]}>
-            {entry.title || label}
-          </Text>
+    <View style={[styles.wrap, isInitiated ? styles.wrapMe : styles.wrapThem]}>
+      <View style={[styles.row, { borderColor: palette.inputBorder, backgroundColor: palette.card }]}>
+        {/* Icon */}
+        <View style={[styles.iconWrap, { backgroundColor: iconBg }]}>
+          <KISIcon name={icon} size={18} color={iconColor} />
         </View>
-        <View style={styles.metaRow}>
-          <Text style={[styles.meta, { color: palette.subtext }]}>{time}</Text>
-          {durationStr && (
+
+        {/* Content */}
+        <View style={styles.content}>
+          <View style={styles.titleRow}>
+            <KISIcon name={directionIcon} size={12} color={accentColor} />
+            <Text style={[styles.label, { color: isMissed ? palette.danger : palette.text }]}>
+              {entry.title || label}
+            </Text>
+          </View>
+          <View style={styles.metaRow}>
+            <Text style={[styles.meta, { color: palette.subtext }]}>{time}</Text>
+            {durationStr && (
+              <>
+                <Text style={[styles.meta, { color: palette.subtext }]}>·</Text>
+                <Text style={[styles.meta, { color: palette.subtext }]}>{durationStr}</Text>
+              </>
+            )}
+            {(entry.participantCount ?? 0) > 2 && (
+              <>
+                <Text style={[styles.meta, { color: palette.subtext }]}>·</Text>
+                <Text style={[styles.meta, { color: palette.subtext }]}>
+                  {entry.participantCount} people
+                </Text>
+              </>
+            )}
             <>
               <Text style={[styles.meta, { color: palette.subtext }]}>·</Text>
-              <Text style={[styles.meta, { color: palette.subtext }]}>{durationStr}</Text>
-            </>
-          )}
-          {(entry.participantCount ?? 0) > 2 && (
-            <>
-              <Text style={[styles.meta, { color: palette.subtext }]}>·</Text>
-              <Text style={[styles.meta, { color: palette.subtext }]}>
-                {entry.participantCount} people
+              <Text style={[styles.meta, { color: accentColor, fontWeight: '600' }]}>
+                {statusLabel[entry.status]}
               </Text>
             </>
-          )}
-          <>
-            <Text style={[styles.meta, { color: palette.subtext }]}>·</Text>
-            <Text style={[styles.meta, { color: isMissed ? palette.danger : isOngoing ? palette.success : palette.subtext }]}>
-              {statusLabel[entry.status]}
-            </Text>
-          </>
+          </View>
         </View>
-      </View>
 
-      {/* Call back button */}
-      {onCallBack && !isOngoing && entry.status !== 'pending' && (
-        <Pressable
-          onPress={() => onCallBack(entry)}
-          style={({ pressed }) => [
-            styles.callbackBtn,
-            { borderColor: palette.inputBorder },
-            pressed && { opacity: 0.65 },
-          ]}
-          hitSlop={8}
-          accessibilityLabel="Call back"
-        >
-          <KISIcon
-            name={entry.callType === 'video' || entry.callType === 'video-group' ? 'video' : 'phone'}
-            size={15}
-            color={palette.primary}
-          />
-        </Pressable>
-      )}
+        {/* Call back button */}
+        {onCallBack && !isOngoing && entry.status !== 'pending' && (
+          <Pressable
+            onPress={() => onCallBack(entry)}
+            style={({ pressed }) => [
+              styles.callbackBtn,
+              { borderColor: palette.inputBorder },
+              pressed && { opacity: 0.65 },
+            ]}
+            hitSlop={8}
+            accessibilityLabel="Call back"
+          >
+            <KISIcon
+              name={entry.callType === 'video' || entry.callType === 'video-group' ? 'video' : 'phone'}
+              size={15}
+              color={palette.primary}
+            />
+          </Pressable>
+        )}
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  // Outer row picks which side of the thread the call bubble sits on -
+  // the same left/right convention as a regular chat bubble, driven by
+  // who actually placed the call (entry.createdBy) rather than always
+  // spanning the full width regardless of caller.
+  wrap: {
+    flexDirection: 'row',
+    marginVertical: 2,
+    paddingHorizontal: 8,
+  },
+  wrapMe: {
+    justifyContent: 'flex-end',
+  },
+  wrapThem: {
+    justifyContent: 'flex-start',
+  },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    marginHorizontal: 12,
+    maxWidth: '82%',
     marginVertical: 3,
     borderWidth: 1,
     borderRadius: 14,
@@ -161,7 +198,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     flexShrink: 0,
   },
-  content: { flex: 1, gap: 3 },
+  // flexShrink (not flex: 1) deliberately - `row` now hug-sizes to its own
+  // content instead of being stretched to a parent-provided width (that's
+  // what makes the bubble sit at 82% max instead of spanning the full
+  // line). flex: 1 sets flexBasis to 0 and relies entirely on flex-grow
+  // to receive space; with no parent-provided width to grow into, that
+  // collapsed this column to zero width and hid every line of text.
+  // flexShrink lets it take its natural (text) width and only shrink
+  // once the bubble actually hits its maxWidth ceiling.
+  content: { flexShrink: 1, gap: 3 },
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   label: { fontSize: 14, fontWeight: '700' },
   metaRow: { flexDirection: 'row', alignItems: 'center', gap: 5, flexWrap: 'wrap' },
