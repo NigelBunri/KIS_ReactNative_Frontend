@@ -13,6 +13,7 @@ import { getRequest } from '@/network/get';
 import { postRequest } from '@/network/post';
 import ROUTES from '@/network';
 import type { RootStackParamList } from '@/navigation/types';
+import GiftMembershipSheet from './components/GiftMembershipSheet';
 
 type PaymentProvider = 'flutterwave' | 'stripe';
 
@@ -38,6 +39,7 @@ export default function MembershipScreen() {
   const [joining, setJoining] = useState<string | null>(null);
   const [pendingTier, setPendingTier] = useState<Tier | null>(null);
   const [paymentModal, setPaymentModal] = useState(false);
+  const [giftSheetVisible, setGiftSheetVisible] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -140,6 +142,16 @@ export default function MembershipScreen() {
         <Text style={[styles.title, { color: palette.text }]}>
           {channelName ? `${channelName} · ` : ''}Memberships
         </Text>
+        {tiers.length > 0 && (
+          <Pressable
+            onPress={() => setGiftSheetVisible(true)}
+            hitSlop={8}
+            style={[styles.giftHeaderBtn, { borderColor: palette.primaryStrong }]}
+          >
+            <KISIcon name="gift" size={14} color={palette.primaryStrong} />
+            <Text style={{ color: palette.primaryStrong, fontWeight: '800', fontSize: 12 }}>Gift</Text>
+          </Pressable>
+        )}
       </View>
 
       {loading ? (
@@ -278,6 +290,13 @@ export default function MembershipScreen() {
           </Pressable>
         </Pressable>
       </Modal>
+
+      <GiftMembershipSheet
+        channelId={channelId}
+        tiers={tiers}
+        visible={giftSheetVisible}
+        onClose={() => setGiftSheetVisible(false)}
+      />
     </SafeAreaView>
   );
 }
@@ -290,6 +309,10 @@ const styles = StyleSheet.create({
   },
   backBtn: { padding: 2, minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
   title: { flex: 1, fontSize: 18, fontWeight: '900' },
+  giftHeaderBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    borderWidth: 1.5, borderRadius: 16, paddingHorizontal: 10, paddingVertical: 6,
+  },
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
   emptyText: { fontSize: 14, fontWeight: '700' },
   card: {

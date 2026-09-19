@@ -33,7 +33,7 @@ type Props = {
 
 export default function GiftMembershipRedeem({ token: initialToken, onSuccess }: Props) {
   const { palette } = useKISTheme();
-  const { bodyFontSize, labelFontSize, minTouchTarget } = useResponsiveLayout();
+  const { bodyFontSize, labelFontSize } = useResponsiveLayout();
   const [token, setToken] = useState(initialToken ?? '');
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);

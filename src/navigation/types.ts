@@ -69,6 +69,7 @@ export type RootStackParamList = {
   InviteJoin: { type: 'group' | 'community' | 'contact' | 'referral'; token: string };
   CallJoin: { token: string };
   PartnerRedeemInvite: { code?: string };
+  GiftMembershipRedeem: { token?: string };
   OrganizationAppForm: { partnerId: string; app?: PartnerOrganizationApp };
   HealthInstitutionDetail: {
     institutionId: string;

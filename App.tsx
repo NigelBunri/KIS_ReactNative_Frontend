@@ -99,6 +99,7 @@ import CategoryBrowsePage from '@/screens/broadcast/channels/CategoryBrowsePage'
 import BroadcastSearchScreen from '@/screens/broadcast/channels/BroadcastSearchScreen';
 import ChannelMembersScreen from '@/screens/broadcast/channels/ChannelMembersScreen';
 import MembershipScreen from '@/screens/broadcast/channels/MembershipScreen';
+import GiftMembershipRedeemScreen from '@/screens/broadcast/channels/GiftMembershipRedeemScreen';
 import PartnerInsightsScreen from './src/screens/insights/PartnerInsightsScreen';
 import AdminToolsScreen from './src/screens/insights/AdminToolsScreen';
 import AdminDashboardScreen from './src/screens/insights/AdminDashboardScreen';
@@ -1366,6 +1367,7 @@ function AppContent() {
 
                   InviteJoin: 'join/:type/:token',
                   PartnerRedeemInvite: 'join/partner/:code',
+                  GiftMembershipRedeem: 'gift/:token',
 
                   CallJoin: 'call/join/:token',
 
@@ -1466,6 +1468,11 @@ function AppContent() {
                     <RootStack.Screen
                       name="Membership"
                       getComponent={() => MembershipScreen}
+                      options={{ headerShown: false }}
+                    />
+                    <RootStack.Screen
+                      name="GiftMembershipRedeem"
+                      getComponent={() => GiftMembershipRedeemScreen}
                       options={{ headerShown: false }}
                     />
                     <RootStack.Screen

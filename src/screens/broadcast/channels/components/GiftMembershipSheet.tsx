@@ -6,6 +6,7 @@ import React, { useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Linking,
   Modal,
   Pressable,
   ScrollView,
@@ -16,10 +17,13 @@ import {
 } from 'react-native';
 import { SafeAreaView } from '@/components/common/SafeAreaViewWithTopPadding';
 import { useKISTheme } from '@/theme/useTheme';
+import { KISIcon } from '@/constants/kisIcons';
 import ROUTES from '@/network';
 import { postRequest } from '@/network/post';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
+
+type PaymentProvider = 'flutterwave' | 'stripe';
 
 type Tier = {
   id: string;
@@ -47,6 +51,7 @@ export default function GiftMembershipSheet({ channelId, tiers, visible, onClose
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [paymentModal, setPaymentModal] = useState(false);
 
   const selectedTier = tiers.find(t => t.id === selectedTierId);
 
@@ -55,21 +60,42 @@ export default function GiftMembershipSheet({ channelId, tiers, visible, onClose
     return `${currency} ${(cents / 100).toFixed(2)}/mo`;
   };
 
-  const handleGift = async () => {
-    if (!selectedTierId) {
+  const validate = (): string | null => {
+    if (!selectedTierId) return 'select-tier';
+    const recipientValue = recipient.trim();
+    if (!recipientValue) return 'no-recipient';
+    if (!/\S+@\S+\.\S+/.test(recipientValue)) return 'bad-email';
+    return null;
+  };
+
+  const handleGift = () => {
+    const problem = validate();
+    if (problem === 'select-tier') {
       Alert.alert('Select a tier', 'Please select a membership tier to gift.');
       return;
     }
-    const recipientValue = recipient.trim();
-    if (!recipientValue) {
+    if (problem === 'no-recipient') {
       Alert.alert('Recipient required', 'Please enter the recipient’s email address.');
       return;
     }
-    const isEmail = /\S+@\S+\.\S+/.test(recipientValue);
-    if (!isEmail) {
+    if (problem === 'bad-email') {
       Alert.alert('Invalid email', 'Please enter a valid email address for the recipient.');
       return;
     }
+    // Free tier: nothing to pay, so skip straight to the same request a
+    // paid tier makes with 'flutterwave' as a harmless default - the
+    // backend never reads payment_provider for a free tier.
+    if (!selectedTier || selectedTier.price_cents === 0) {
+      void confirmGift('flutterwave');
+      return;
+    }
+    setPaymentModal(true);
+  };
+
+  const confirmGift = async (provider: PaymentProvider) => {
+    setPaymentModal(false);
+    if (!selectedTierId) return;
+    const recipientValue = recipient.trim();
     setLoading(true);
     try {
       const res = await postRequest(
@@ -79,13 +105,31 @@ export default function GiftMembershipSheet({ channelId, tiers, visible, onClose
           tier_id: selectedTierId,
           recipient_email: recipientValue,
           message: message.trim() || undefined,
+          payment_provider: provider,
         },
         { errorMessage: 'Could not send gift.' },
       );
-      if (res?.data || res?.id || res?.success) {
-        setSuccess(true);
-      } else {
+      if (!res?.success) {
         Alert.alert('Error', res?.message ?? 'Could not send gift. Please try again.');
+      } else if (res.data?.payment_required) {
+        const url = res.data.payment_url || res.data.checkout_url;
+        if (url) {
+          const canOpen = await Linking.canOpenURL(url).catch(() => false);
+          if (canOpen) {
+            await Linking.openURL(url);
+            Alert.alert(
+              'Complete payment',
+              'Finish payment in the browser to send the gift. The recipient is emailed once payment is confirmed.',
+              [{ text: 'OK', onPress: handleClose }],
+            );
+          } else {
+            Alert.alert('Payment required', `Please visit: ${url}`);
+          }
+        } else {
+          Alert.alert('Error', 'Payment link unavailable. Please try again.');
+        }
+      } else {
+        setSuccess(true);
       }
     } catch {
       Alert.alert('Error', 'Could not send gift. Please try again.');
@@ -96,6 +140,7 @@ export default function GiftMembershipSheet({ channelId, tiers, visible, onClose
 
   const handleClose = () => {
     setSuccess(false);
+    setPaymentModal(false);
     setRecipient('');
     setMessage('');
     setSelectedTierId(tiers[0]?.id ?? null);
@@ -103,6 +148,7 @@ export default function GiftMembershipSheet({ channelId, tiers, visible, onClose
   };
 
   return (
+    <>
     <Modal
       visible={visible}
       animationType="slide"
@@ -180,6 +226,14 @@ export default function GiftMembershipSheet({ channelId, tiers, visible, onClose
                   </Pressable>
                 );
               })}
+              {selectedTier && selectedTier.price_cents > 0 && (
+                <View style={styles.paymentNote}>
+                  <KISIcon name="lock" size={11} color={palette.subtext} />
+                  <Text style={[styles.paymentNoteText, { color: palette.subtext }]}>
+                    Pay via Flutterwave (Africa) or Stripe (card)
+                  </Text>
+                </View>
+              )}
 
               {/* Recipient */}
               <Text style={[styles.sectionLabel, { color: palette.subtext }]}>
@@ -232,6 +286,71 @@ export default function GiftMembershipSheet({ channelId, tiers, visible, onClose
         </ScrollView>
       </SafeAreaView>
     </Modal>
+
+    {/* Payment provider picker for paid tiers - same pattern as
+        MembershipScreen's own "Join" flow, so gifting a paid tier feels
+        identical to joining one. A sibling Modal, not nested inside the
+        one above, matching MembershipScreen's own two-sibling-Modals
+        shape rather than one Modal inside another. */}
+    <Modal
+        visible={paymentModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setPaymentModal(false)}
+      >
+        <Pressable style={styles.providerOverlay} onPress={() => setPaymentModal(false)}>
+          <Pressable style={[styles.providerSheet, { backgroundColor: palette.card }]} onPress={() => {}}>
+            <View style={[styles.providerHandle, { backgroundColor: palette.border }]} />
+            <Text style={[styles.providerModalTitle, { color: palette.text }]}>Choose payment method</Text>
+            {selectedTier && (
+              <Text style={[styles.providerModalSub, { color: palette.subtext }]}>
+                {selectedTier.title} — {formatPrice(selectedTier.price_cents, selectedTier.currency)}
+              </Text>
+            )}
+
+            <Pressable
+              style={[styles.providerBtn, { backgroundColor: palette.surface, borderColor: palette.border }]}
+              onPress={() => confirmGift('flutterwave')}
+            >
+              <View style={styles.providerRow}>
+                <View style={[styles.providerIcon, { backgroundColor: palette.gold }]}>
+                  <Text style={[styles.providerIconText, { color: palette.royalInk }]}>FW</Text>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.providerName, { color: palette.text }]}>Flutterwave</Text>
+                  <Text style={[styles.providerDesc, { color: palette.subtext }]}>
+                    Mobile money, bank transfer, cards (Africa & more)
+                  </Text>
+                </View>
+                <KISIcon name="arrow-left" size={16} color={palette.subtext} style={{ transform: [{ rotate: '180deg' }] }} />
+              </View>
+            </Pressable>
+
+            <Pressable
+              style={[styles.providerBtn, { backgroundColor: palette.surface, borderColor: palette.border }]}
+              onPress={() => confirmGift('stripe')}
+            >
+              <View style={styles.providerRow}>
+                <View style={[styles.providerIcon, { backgroundColor: palette.primaryStrong }]}>
+                  <Text style={[styles.providerIconText, { color: palette.onPrimary }]}>S</Text>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.providerName, { color: palette.text }]}>Stripe</Text>
+                  <Text style={[styles.providerDesc, { color: palette.subtext }]}>
+                    International credit / debit card
+                  </Text>
+                </View>
+                <KISIcon name="arrow-left" size={16} color={palette.subtext} style={{ transform: [{ rotate: '180deg' }] }} />
+              </View>
+            </Pressable>
+
+            <Pressable onPress={() => setPaymentModal(false)} style={styles.providerCancelBtn}>
+              <Text style={[styles.providerCancelText, { color: palette.subtext }]}>Cancel</Text>
+            </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
+    </>
   );
 }
 
@@ -288,4 +407,31 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   doneBtnText: { fontWeight: '800', fontSize: 14 },
+  paymentNote: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: -4 },
+  paymentNoteText: { fontSize: 11, fontWeight: '600' },
+  providerOverlay: {
+    flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end',
+  },
+  providerSheet: {
+    borderTopLeftRadius: 24, borderTopRightRadius: 24,
+    padding: 24, paddingBottom: 36, gap: 12,
+  },
+  providerHandle: {
+    width: 40, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: 4,
+  },
+  providerModalTitle: { fontSize: 18, fontWeight: '900', textAlign: 'center' },
+  providerModalSub: { fontSize: 13, fontWeight: '600', textAlign: 'center', marginBottom: 4 },
+  providerBtn: {
+    borderRadius: 14, borderWidth: 1.5, padding: 14,
+  },
+  providerRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  providerIcon: {
+    width: 40, height: 40, borderRadius: 10,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  providerIconText: { fontWeight: '900', fontSize: 13 },
+  providerName: { fontSize: 15, fontWeight: '800' },
+  providerDesc: { fontSize: 12, fontWeight: '600', marginTop: 2 },
+  providerCancelBtn: { alignItems: 'center', paddingVertical: 12 },
+  providerCancelText: { fontSize: 15, fontWeight: '700' },
 });
