@@ -86,7 +86,7 @@ export function routeDeepLink(url: string, navigation: any): boolean {
     }
 
     if (first === 'auth' && second === 'kisauth-registration-callback') {
-      const { code, error } = queryParams(url);
+      const { code, state, error } = queryParams(url);
       if (error === 'already_registered') {
         navigation.navigate('Login');
         return true;
@@ -95,6 +95,7 @@ export function routeDeepLink(url: string, navigation: any): boolean {
       navigation.navigate('KisAuthRegisterPhone', {
         registrationCode: code,
         redirectUri: 'https://kis.app/auth/kisauth-registration-callback',
+        state,
       } as any);
       return true;
     }

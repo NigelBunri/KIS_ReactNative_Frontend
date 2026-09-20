@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Country, CountryCode } from 'react-native-country-picker-modal';
 import SafeCountryPicker from '@/components/common/SafeCountryPicker';
 import {
@@ -23,12 +23,10 @@ import ROUTES from '@/network';
 import { setAuthTokens } from '@/security/authStorage';
 import { setUserData } from '@/network/cache';
 import { ensureDeviceId, initE2EE } from '@/security/e2ee';
+import { consumePendingState } from '@/security/kisAuthBrowser';
 import { useAuth } from '../../App';
 
-// Not in RootStackParamList's generated navigator typings at the point
-// this screen was added (same situation ParentRecoveryScreen documents) —
-// read locally via useRoute() rather than fighting the navigator types.
-type Params = { registrationCode?: string; redirectUri?: string };
+type Params = { registrationCode?: string; redirectUri?: string; state?: string };
 
 // The one screen a Google sign-up needs beyond what kis-auth's OAuth round
 // trip already proved: KIS accounts are phone-centric (USERNAME_FIELD,
@@ -43,6 +41,29 @@ export default function KisAuthRegisterPhoneScreen() {
   const responsive = useResponsiveLayout();
   const formMaxWidth = Math.min(480, responsive.contentMaxWidth - 32);
   const params = (route.params ?? {}) as Params;
+
+  // Verified once, on mount — not in onFinish — so a state mismatch (or a
+  // second navigation into this screen replaying an old param set) is
+  // caught before the user even sees the phone form, the same fail-closed
+  // posture ParentRecoveryScreen's deep-link effect uses. Cross-screen
+  // rather than a local ref: RegisterScreen (where the flow started) may
+  // already be gone from the nav stack by the time this screen mounts,
+  // for either entry path (InAppBrowser success navigates here directly;
+  // the Linking.openURL fallback's deep link lands here from a cold
+  // start). See kisAuthBrowser.ts's rememberPendingState/consumePendingState.
+  const [stateVerified] = useState(() => {
+    const remembered = consumePendingState('registration');
+    return Boolean(remembered) && remembered === params.state;
+  });
+
+  useEffect(() => {
+    if (!stateVerified) {
+      Alert.alert('Error', 'We could not complete this authentication request.', [
+        { text: 'OK', onPress: () => navigation.goBack() },
+      ]);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const [regPhone, setRegPhone] = useState('');
   const [countryCode, setCountryCode] = useState<CountryCode>('CM');
@@ -64,7 +85,7 @@ export default function KisAuthRegisterPhoneScreen() {
   const phoneValid = regPhone.trim().replace(/[^\d]/g, '').length >= 6;
 
   const onFinish = useCallback(async () => {
-    if (!params.registrationCode || !params.redirectUri) {
+    if (!stateVerified || !params.registrationCode || !params.redirectUri) {
       Alert.alert('Error', 'Missing registration details — please start over.');
       navigation.goBack();
       return;
@@ -116,7 +137,7 @@ export default function KisAuthRegisterPhoneScreen() {
     } finally {
       setLoading(false);
     }
-  }, [params.registrationCode, params.redirectUri, regPhone, callingCode, countryCode, phoneValid, navigation, setAuth, setUser]);
+  }, [stateVerified, params.registrationCode, params.redirectUri, regPhone, callingCode, countryCode, phoneValid, navigation, setAuth, setUser]);
 
   return (
     <SafeAreaView style={[styles.root, { backgroundColor: palette.bg }]} edges={['top', 'bottom']}>

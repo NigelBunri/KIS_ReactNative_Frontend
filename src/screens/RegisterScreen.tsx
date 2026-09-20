@@ -34,7 +34,7 @@ import KISDateTimeInput from '@/constants/KISDateTimeInput';
 import { KIS_TOKENS } from '@/theme/constants';
 import { readReferralCodeFromClipboard } from '@/utils/referralAttribution';
 import { KISAUTH_BASE_URL } from '@/network/config';
-import { launchKisAuthFlow } from '@/security/kisAuthBrowser';
+import { launchKisAuthFlow, rememberPendingState } from '@/security/kisAuthBrowser';
 
 // Distinct from the recovery/link redirect_uris for the same reason —
 // kis-auth's client registry keys allowed_redirect_uris per exact
@@ -230,6 +230,11 @@ export default function RegisterScreen({ navigation, route }: any) {
     setGoogleLoading(true);
     try {
       const state = `${Date.now()}.${Math.random().toString(36).slice(2)}`;
+      // Remembered at module scope, not a component ref — this flow's
+      // deep-link fallback return lands on KisAuthRegisterPhoneScreen, a
+      // DIFFERENT screen than this one, so a ref here would already be
+      // gone by the time that screen could check it.
+      rememberPendingState('registration', state);
       const url =
         `${KISAUTH_BASE_URL}/authorize` +
         `?client_id=kis-mobile` +
@@ -263,6 +268,7 @@ export default function RegisterScreen({ navigation, route }: any) {
       navigation.navigate('KisAuthRegisterPhone', {
         registrationCode: outcome.code,
         redirectUri: KIS_AUTH_REGISTRATION_REDIRECT_URI,
+        state: outcome.state,
       });
     } catch (e: any) {
       Alert.alert('Error', e?.message ?? 'Unable to sign up with Google.');

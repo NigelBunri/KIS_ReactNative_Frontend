@@ -85,3 +85,32 @@ export async function launchKisAuthFlow(
   await Linking.openURL(authorizeUrl);
   return { kind: 'pending' };
 }
+
+// Cross-screen expected-state store, for the Linking.openURL fallback
+// path only. A same-screen flow (recovery, link — both land back on the
+// screen that launched them) can use a plain useRef, same as this always
+// has; that ref is gone the moment React unmounts the component, though,
+// which happens by definition for a flow whose deep-link return navigates
+// to a DIFFERENT screen (registration's callback lands on
+// KisAuthRegisterPhoneScreen, not RegisterScreen). This is still only an
+// in-memory JS-module value — it does not survive the app process itself
+// being killed while the user is in the browser, the same residual gap
+// the recovery screen's ref has always had. Closing that fully would need
+// AsyncStorage-backed persistence; not done here since it would add a
+// second, differently-shaped failure mode (a stale persisted value
+// surviving across attempts) for a fallback path that's only reachable
+// when InAppBrowser itself is unavailable.
+const pendingStates = new Map<string, string>();
+
+export function rememberPendingState(key: string, state: string): void {
+  pendingStates.set(key, state);
+}
+
+/** Reads and clears in one step — a second call for the same key (e.g. a
+ * duplicate deep-link event) gets undefined rather than re-validating
+ * against a state that's already been consumed. */
+export function consumePendingState(key: string): string | undefined {
+  const value = pendingStates.get(key);
+  pendingStates.delete(key);
+  return value;
+}

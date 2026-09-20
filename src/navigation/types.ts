@@ -217,7 +217,7 @@ export type RootStackParamList = {
   QRScanLogin: undefined;
   ParentRecovery: undefined;
   KisAuthLink: undefined;
-  KisAuthRegisterPhone: { registrationCode: string; redirectUri: string } | undefined;
+  KisAuthRegisterPhone: { registrationCode: string; redirectUri: string; state?: string } | undefined;
   InvoiceList: undefined;
   Loyalty: undefined;
   Referrals: undefined;

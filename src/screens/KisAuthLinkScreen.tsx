@@ -1,7 +1,7 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from '@/components/common/SafeAreaViewWithTopPadding';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import { useKISTheme } from '@/theme/useTheme';
 import { useResponsiveLayout } from '@/theme/responsive';
 import { KISIcon } from '@/constants/kisIcons';
@@ -17,6 +17,15 @@ import { launchKisAuthFlow } from '@/security/kisAuthBrowser';
 // one path with a purpose flag baked into app state.
 const KIS_AUTH_LINK_REDIRECT_URI = 'https://kis.app/auth/kisauth-link-callback';
 
+// Not in RootStackParamList's KisAuthLink entry (currently `undefined`) —
+// same situation ParentRecoveryScreen documents for its own deep-link
+// params. Read locally via useRoute() rather than widening the shared type.
+type KisAuthLinkDeepLinkParams = {
+  kisAuthCode?: string;
+  kisAuthState?: string;
+  kisAuthError?: string;
+};
+
 // This is the ONLY entry point that can ever create a Google-identity
 // link (Phase 2 §7/§8 decision: linking happens from Settings, while
 // already authenticated — never inferred from a recovery or registration
@@ -25,11 +34,61 @@ const KIS_AUTH_LINK_REDIRECT_URI = 'https://kis.app/auth/kisauth-link-callback';
 export default function KisAuthLinkScreen() {
   const { palette } = useKISTheme();
   const navigation = useNavigation();
+  const route = useRoute();
   const responsive = useResponsiveLayout();
   const formMaxWidth = Math.min(480, responsive.contentMaxWidth - 32);
 
   const [loading, setLoading] = useState(false);
   const [linked, setLinked] = useState(false);
+
+  // Same replay/CSRF guard as ParentRecoveryScreen's expected-state ref —
+  // this flow returns to the SAME screen (deepLinkRouter.ts navigates back
+  // to 'KisAuthLink'), so a plain ref is enough; no need for the
+  // cross-screen pending-state store registration's fallback needs.
+  const kisAuthExpectedState = useRef<string | null>(null);
+  const kisAuthHandledCode = useRef<string | null>(null);
+
+  const completeLink = useCallback(async (code: string) => {
+    setLoading(true);
+    try {
+      const completeRes = await postRequest(
+        ROUTES.auth.kisAuthLinkComplete,
+        { code, redirect_uri: KIS_AUTH_LINK_REDIRECT_URI },
+        { errorMessage: 'Unable to finish linking your Google account.' },
+      );
+      if (!completeRes?.success) {
+        Alert.alert('Error', 'Unable to finish linking your Google account.');
+        return;
+      }
+      setLinked(true);
+    } catch (e: any) {
+      Alert.alert('Error', e?.message ?? 'Unable to link your Google account.');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    const params = (route.params ?? {}) as KisAuthLinkDeepLinkParams;
+    if (!params.kisAuthCode && !params.kisAuthError) return;
+    const dedupeKey = params.kisAuthCode ?? params.kisAuthError ?? '';
+    if (kisAuthHandledCode.current === dedupeKey) return;
+    if (!kisAuthExpectedState.current || params.kisAuthState !== kisAuthExpectedState.current) {
+      Alert.alert('Error', 'We could not complete this authentication request.');
+      return;
+    }
+    kisAuthHandledCode.current = dedupeKey;
+    if (params.kisAuthError) {
+      Alert.alert(
+        'Could not link account',
+        params.kisAuthError === 'already_linked'
+          ? 'This Google account is already linked to a different KIS account.'
+          : 'We could not complete this authentication request.',
+      );
+      return;
+    }
+    void completeLink(params.kisAuthCode!);
+  }, [route.params, completeLink]);
 
   const handleLink = useCallback(async () => {
     setLoading(true);
@@ -46,6 +105,7 @@ export default function KisAuthLinkScreen() {
       }
 
       const state = `${Date.now()}.${Math.random().toString(36).slice(2)}`;
+      kisAuthExpectedState.current = state;
       const url =
         `${KISAUTH_BASE_URL}/authorize` +
         `?client_id=kis-mobile` +
@@ -57,16 +117,8 @@ export default function KisAuthLinkScreen() {
       const outcome = await launchKisAuthFlow(url, KIS_AUTH_LINK_REDIRECT_URI);
       if (outcome.kind === 'cancelled') return;
       if (outcome.kind === 'pending') {
-        // No InAppBrowser on this device — nothing more this screen can
-        // do; the universal link (once kis.app is verified) would need
-        // to route back here, but there's no in-memory state left to
-        // resume into after a full system-browser round trip for a
-        // screen with no deep-link handler of its own. Tell the user
-        // plainly rather than leaving them stuck.
-        Alert.alert(
-          'Continue in your browser',
-          'Finish linking in the browser that just opened, then come back to KIS and try again if it doesn’t update automatically.',
-        );
+        // No InAppBrowser on this device — the deep-link effect above
+        // handles the result once the universal link routes back here.
         return;
       }
       if (outcome.state !== state) {
@@ -82,23 +134,14 @@ export default function KisAuthLinkScreen() {
         );
         return;
       }
-
-      const completeRes = await postRequest(
-        ROUTES.auth.kisAuthLinkComplete,
-        { code: outcome.code, redirect_uri: KIS_AUTH_LINK_REDIRECT_URI },
-        { errorMessage: 'Unable to finish linking your Google account.' },
-      );
-      if (!completeRes?.success) {
-        Alert.alert('Error', 'Unable to finish linking your Google account.');
-        return;
-      }
-      setLinked(true);
+      kisAuthHandledCode.current = outcome.code;
+      await completeLink(outcome.code);
     } catch (e: any) {
       Alert.alert('Error', e?.message ?? 'Unable to link your Google account.');
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [completeLink]);
 
   return (
     <SafeAreaView style={[styles.root, { backgroundColor: palette.bg }]} edges={['top', 'bottom']}>
