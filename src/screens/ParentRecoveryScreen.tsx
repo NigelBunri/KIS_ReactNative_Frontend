@@ -3,7 +3,6 @@ import {
   ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
-  Linking,
   Platform,
   Pressable,
   ScrollView,
@@ -24,7 +23,10 @@ import { setAuthTokens } from '@/security/authStorage';
 import { setUserData } from '@/network/cache';
 import { ensureDeviceId, initE2EE } from '@/security/e2ee';
 import { FEATURE_FLAGS } from '@/constants/featureFlags';
+import { launchKisAuthFlow } from '@/security/kisAuthBrowser';
 import { useAuth } from '../../App';
+
+const KIS_AUTH_RECOVERY_REDIRECT_URI = 'https://kis.app/auth/kisauth-callback';
 
 type Step = 'identify' | 'verify' | 'done';
 
@@ -57,32 +59,6 @@ export default function ParentRecoveryScreen() {
   // AppState/Linking event firing for one physical return-to-app).
   const kisAuthHandledCode = useRef<string | null>(null);
 
-  const handleKisAuthRecovery = useCallback(async () => {
-    setKisAuthLoading(true);
-    try {
-      const deviceId = await ensureDeviceId();
-      const state = `${deviceId}.${Date.now()}.${Math.random().toString(36).slice(2)}`;
-      kisAuthExpectedState.current = state;
-      const redirectUri = 'https://kis.app/auth/kisauth-callback';
-      const url =
-        `${KISAUTH_BASE_URL}/authorize` +
-        `?client_id=kis-mobile` +
-        `&redirect_uri=${encodeURIComponent(redirectUri)}` +
-        `&purpose=recovery` +
-        `&state=${encodeURIComponent(state)}`;
-      const canOpen = await Linking.canOpenURL(url);
-      if (!canOpen) {
-        Alert.alert('Error', 'Unable to open KIS Auth.');
-        return;
-      }
-      await Linking.openURL(url);
-    } catch (e: any) {
-      Alert.alert('Error', e?.message ?? 'Unable to start KIS Auth recovery.');
-    } finally {
-      setKisAuthLoading(false);
-    }
-  }, []);
-
   const completeKisAuthRecovery = useCallback(
     async (code: string) => {
       setLoading(true);
@@ -92,7 +68,7 @@ export default function ParentRecoveryScreen() {
           ROUTES.auth.kisAuthRecoveryComplete,
           {
             authorization_code: code,
-            redirect_uri: 'https://kis.app/auth/kisauth-callback',
+            redirect_uri: KIS_AUTH_RECOVERY_REDIRECT_URI,
             device_id: deviceId,
             device_name: `${Platform.OS === 'ios' ? 'iPhone' : 'Android'} (recovered via KIS Auth)`,
             platform: Platform.OS,
@@ -129,6 +105,50 @@ export default function ParentRecoveryScreen() {
     },
     [setAuth, setUser],
   );
+
+  const handleKisAuthRecovery = useCallback(async () => {
+    setKisAuthLoading(true);
+    try {
+      const deviceId = await ensureDeviceId();
+      const state = `${deviceId}.${Date.now()}.${Math.random().toString(36).slice(2)}`;
+      kisAuthExpectedState.current = state;
+      const url =
+        `${KISAUTH_BASE_URL}/authorize` +
+        `?client_id=kis-mobile` +
+        `&redirect_uri=${encodeURIComponent(KIS_AUTH_RECOVERY_REDIRECT_URI)}` +
+        `&purpose=recovery` +
+        `&state=${encodeURIComponent(state)}`;
+
+      const outcome = await launchKisAuthFlow(url, KIS_AUTH_RECOVERY_REDIRECT_URI);
+      if (outcome.kind === 'pending') {
+        // InAppBrowser wasn't available — the deep-link effect below
+        // handles the result once the universal link routes back here.
+        return;
+      }
+      if (outcome.kind === 'cancelled') {
+        return;
+      }
+      if (outcome.state !== state) {
+        Alert.alert('Error', 'We could not complete this authentication request.');
+        return;
+      }
+      if (outcome.kind === 'error') {
+        Alert.alert(
+          'Recovery failed',
+          outcome.error === 'not_linked'
+            ? "This Google account isn't linked to a KIS account yet. Log in the usual way and link it from Settings first."
+            : 'We could not complete this authentication request.',
+        );
+        return;
+      }
+      kisAuthHandledCode.current = outcome.code;
+      await completeKisAuthRecovery(outcome.code);
+    } catch (e: any) {
+      Alert.alert('Error', e?.message ?? 'Unable to start KIS Auth recovery.');
+    } finally {
+      setKisAuthLoading(false);
+    }
+  }, [completeKisAuthRecovery]);
 
   useEffect(() => {
     const params = (route.params ?? {}) as KisAuthCallbackParams;

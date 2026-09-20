@@ -197,6 +197,8 @@ import AdminUserManagementScreen from '@/screens/AdminUserManagementScreen';
 import DeviceManagementScreen from '@/screens/DeviceManagementScreen';
 import QRScanLoginScreen from '@/screens/QRScanLoginScreen';
 import ParentRecoveryScreen from '@/screens/ParentRecoveryScreen';
+import KisAuthLinkScreen from '@/screens/KisAuthLinkScreen';
+import KisAuthRegisterPhoneScreen from '@/screens/KisAuthRegisterPhoneScreen';
 import InvoiceListScreen from '@/screens/market/InvoiceListScreen';
 import LoyaltyScreen from '@/screens/market/LoyaltyScreen';
 import ReferralScreen from '@/screens/market/ReferralScreen';
@@ -1713,6 +1715,10 @@ function AppContent() {
                       getComponent={() => ParentRecoveryScreen}
                     />
                     <RootStack.Screen
+                      name="KisAuthLink"
+                      getComponent={() => KisAuthLinkScreen}
+                    />
+                    <RootStack.Screen
                       name="AccountDeletion"
                       getComponent={() => AccountDeletionScreen}
                     />
@@ -2013,6 +2019,10 @@ function AppContent() {
                     <RootStack.Screen
                       name="Register"
                       component={RegisterScreen}
+                    />
+                    <RootStack.Screen
+                      name="KisAuthRegisterPhone"
+                      component={KisAuthRegisterPhoneScreen}
                     />
                     <RootStack.Screen name="DeviceVerification">
                       {props => (

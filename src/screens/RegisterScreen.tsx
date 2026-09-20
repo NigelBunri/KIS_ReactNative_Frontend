@@ -33,6 +33,13 @@ import KISText from '@/components/common/KISText';
 import KISDateTimeInput from '@/constants/KISDateTimeInput';
 import { KIS_TOKENS } from '@/theme/constants';
 import { readReferralCodeFromClipboard } from '@/utils/referralAttribution';
+import { KISAUTH_BASE_URL } from '@/network/config';
+import { launchKisAuthFlow } from '@/security/kisAuthBrowser';
+
+// Distinct from the recovery/link redirect_uris for the same reason —
+// kis-auth's client registry keys allowed_redirect_uris per exact
+// string, keeping deepLinkRouter.ts's routing unambiguous per purpose.
+const KIS_AUTH_REGISTRATION_REDIRECT_URI = 'https://kis.app/auth/kisauth-registration-callback';
 
 const createStyles = (tokens: typeof KIS_TOKENS, contentMaxWidth: number) =>
   StyleSheet.create({
@@ -163,6 +170,7 @@ export default function RegisterScreen({ navigation, route }: any) {
   const [regPassword2, setRegPassword2] = useState('');
   const [loading, setLoading] = useState(false);
   const [termsAgreed, setTermsAgreed] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
 
   // Install attribution: InviteJoinScreen's referral branch navigates here
   // with a code straight from a deep link the app was already installed
@@ -217,6 +225,51 @@ export default function RegisterScreen({ navigation, route }: any) {
     passwordsMatch &&
     termsAgreed &&
     !loading;
+
+  const onGoogleSignUp = async () => {
+    setGoogleLoading(true);
+    try {
+      const state = `${Date.now()}.${Math.random().toString(36).slice(2)}`;
+      const url =
+        `${KISAUTH_BASE_URL}/authorize` +
+        `?client_id=kis-mobile` +
+        `&redirect_uri=${encodeURIComponent(KIS_AUTH_REGISTRATION_REDIRECT_URI)}` +
+        `&purpose=registration` +
+        `&state=${encodeURIComponent(state)}`;
+
+      const outcome = await launchKisAuthFlow(url, KIS_AUTH_REGISTRATION_REDIRECT_URI);
+      if (outcome.kind === 'cancelled') return;
+      if (outcome.kind === 'pending') {
+        // No InAppBrowser — deepLinkRouter.ts routes the universal-link
+        // return straight to KisAuthRegisterPhone itself, so there's
+        // nothing more to do from this screen.
+        return;
+      }
+      if (outcome.state !== state) {
+        Alert.alert('Error', 'We could not complete this authentication request.');
+        return;
+      }
+      if (outcome.kind === 'error') {
+        if (outcome.error === 'already_registered') {
+          Alert.alert(
+            'Account already exists',
+            'This Google account is already associated with a KIS account. Try signing in instead.',
+          );
+        } else {
+          Alert.alert('Error', 'We could not complete this authentication request.');
+        }
+        return;
+      }
+      navigation.navigate('KisAuthRegisterPhone', {
+        registrationCode: outcome.code,
+        redirectUri: KIS_AUTH_REGISTRATION_REDIRECT_URI,
+      });
+    } catch (e: any) {
+      Alert.alert('Error', e?.message ?? 'Unable to sign up with Google.');
+    } finally {
+      setGoogleLoading(false);
+    }
+  };
 
   const onRegister = async () => {
     const normalizedPhone = regPhone.replace(/[^\d]/g, '');
@@ -358,6 +411,23 @@ export default function RegisterScreen({ navigation, route }: any) {
               Enter your country code and phone number
             </KISText>
           </View>
+
+          {FEATURE_FLAGS.KIS_AUTH_REGISTRATION_ENABLED && (
+            <>
+              <KISButton
+                title={googleLoading ? undefined : 'Sign up with Google'}
+                onPress={onGoogleSignUp}
+                disabled={googleLoading}
+                variant="secondary"
+                size="md"
+              >
+                {googleLoading ? <ActivityIndicator /> : null}
+              </KISButton>
+              <KISText preset="helper" color={palette.subtext} style={{ textAlign: 'center', fontWeight: '600' }}>
+                — or create an account with a password —
+              </KISText>
+            </>
+          )}
 
           <View style={styles.field}>
             <KISText preset="label" color={palette.subtext}>Display Name (optional)</KISText>

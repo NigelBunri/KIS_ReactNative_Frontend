@@ -29,6 +29,9 @@ const authRoutes = {
     // OTP path above, not replacing it. See apps/kis_auth_bridge on the
     // Django backend.
     kisAuthRecoveryComplete: `${API_BASE_URL}/api/v1/kis-auth/recovery/complete/`,
+    kisAuthLinkInitiate: `${API_BASE_URL}/api/v1/kis-auth/link/initiate/`,
+    kisAuthLinkComplete: `${API_BASE_URL}/api/v1/kis-auth/link/complete/`,
+    kisAuthRegistrationComplete: `${API_BASE_URL}/api/v1/kis-auth/registration/complete/`,
     checkContact: `${API_BASE_URL}/api/v1/users/check-contacts/`,
     twoFactorSetup: `${API_BASE_URL}/api/v1/auth/2fa/setup/`,
     twoFactorEnable: `${API_BASE_URL}/api/v1/auth/2fa/enable/`,

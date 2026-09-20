@@ -21,6 +21,16 @@
 //     would need real DNS + hosting to verify (external action, out of
 //     scope for a code change). Revisit if KIS Auth ever needs its own
 //     domain for a multi-app future.
+//   https://kis.app/auth/kisauth-link-callback?code=&state=          link
+//   https://kis.app/auth/kisauth-registration-callback?code=&state=  sign-up
+//     Same domain, distinct paths per purpose (kis-auth's client registry
+//     keys allowed_redirect_uris per exact string) so each routes
+//     unambiguously without a purpose flag threaded through app state.
+//     Fallback only — react-native-inappbrowser-reborn's openAuth()
+//     resolves the result directly in JS for the primary path; these
+//     branches exist for the rare device/OS where InAppBrowser isn't
+//     available and Linking.openURL's universal-link return is all
+//     there is. See kisAuthBrowser.ts's 'pending' outcome.
 
 function queryParams(url: string): Record<string, string> {
   const query = url.split('?')[1]?.split('#')[0];
@@ -65,6 +75,27 @@ export function routeDeepLink(url: string, navigation: any): boolean {
       // was written. ParentRecoveryScreen reads these via useRoute() with
       // its own local type, not the shared navigator param list.
       navigation.navigate('ParentRecovery', { kisAuthCode: code, kisAuthState: state } as any);
+      return true;
+    }
+
+    if (first === 'auth' && second === 'kisauth-link-callback') {
+      const { code, state, error } = queryParams(url);
+      if (!code && !error) return false;
+      navigation.navigate('KisAuthLink', { kisAuthCode: code, kisAuthState: state, kisAuthError: error } as any);
+      return true;
+    }
+
+    if (first === 'auth' && second === 'kisauth-registration-callback') {
+      const { code, error } = queryParams(url);
+      if (error === 'already_registered') {
+        navigation.navigate('Login');
+        return true;
+      }
+      if (!code) return false;
+      navigation.navigate('KisAuthRegisterPhone', {
+        registrationCode: code,
+        redirectUri: 'https://kis.app/auth/kisauth-registration-callback',
+      } as any);
       return true;
     }
 

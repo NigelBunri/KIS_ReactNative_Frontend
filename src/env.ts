@@ -10,4 +10,9 @@ export const APP_ENV = {
   KIS_CHAT_WS_URL: "wss://chat.kingdomimpactventures.org",
   KIS_CHAT_WS_PATH: "/ws",
   KIS_MEDIA_VERIFICATION_ENABLED: "true",
+  KIS_EDU_V2: "false",
+  KIS_PHONE_VERIFICATION_ENABLED: "false",
+  KIS_AUTH_RECOVERY_ENABLED: "false",
+  KIS_AUTH_LINK_ENABLED: "false",
+  KIS_AUTH_REGISTRATION_ENABLED: "false",
 } as const;

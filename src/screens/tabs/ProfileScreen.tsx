@@ -197,6 +197,7 @@ import ShopEditorDrawer from '@/screens/market/ShopEditorDrawer';
 import { resolveShopImageUri } from '@/utils/shopAssets';
 import { backendOrderTotalToFrontendKisc } from '@/utils/currency';
 import { useLanguage } from '@/languages';
+import { FEATURE_FLAGS } from '@/constants/featureFlags';
 import {
   AppointmentSummaryCard,
   HERO_COLLAPSE_DISTANCE,
@@ -3402,6 +3403,17 @@ export default function ProfileScreen() {
                   danger: false,
                   badge: false,
                 },
+                // Prerequisite for Google-backed recovery (ParentRecoveryScreen's
+                // "Recover with KIS Auth") — that flow can only ever find an
+                // account here already linked one, never the other way around.
+                ...(FEATURE_FLAGS.KIS_AUTH_LINK_ENABLED
+                  ? [{
+                      label: 'Link Google Account',
+                      route: 'KisAuthLink' as const,
+                      danger: false,
+                      badge: false,
+                    }]
+                  : []),
                 {
                   label: 'Family & Parental Controls',
                   route: 'FamilyHub' as const,
