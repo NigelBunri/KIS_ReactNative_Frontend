@@ -61,10 +61,13 @@ type TaskRow = {
   status: TaskStatusValue;
   priority: TaskPriorityValue;
   assigned_to: UserSummary | null;
+  assignees: UserSummary[];
   created_by: UserSummary | null;
+  parent_task: string | null;
   due_at: string | null;
   attachment_count: number;
   comment_count: number;
+  subtask_count: number;
   is_overdue: boolean;
 };
 type TaskAttachment = {
@@ -80,7 +83,7 @@ type TaskActivity = {
 type TaskDetail = TaskRow & {
   description: string; review_note: string;
   started_at: string | null; submitted_at: string | null; reviewed_at: string | null; completed_at: string | null;
-  attachments: TaskAttachment[]; comments: TaskComment[]; activity: TaskActivity[];
+  attachments: TaskAttachment[]; comments: TaskComment[]; activity: TaskActivity[]; subtasks: TaskRow[];
 };
 type MemberOption = { user_id: string; display_name?: string | null; username?: string | null };
 
@@ -155,6 +158,32 @@ function UserChip({ user, palette, fallback = 'Unassigned' }: { user: UserSummar
     </View>
   );
 }
+function AvatarStack({ users, palette, max = 3 }: { users: UserSummary[]; palette: any; max?: number }) {
+  if (!users.length) return null;
+  const shown = users.slice(0, max);
+  const overflow = users.length - shown.length;
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+      {shown.map((u, i) => (
+        <View
+          key={u.id}
+          style={{
+            width: 20, height: 20, borderRadius: 10, backgroundColor: palette.surface,
+            borderWidth: 1, borderColor: palette.borderMuted, alignItems: 'center', justifyContent: 'center',
+            marginLeft: i === 0 ? 0 : -6,
+          }}
+        >
+          <Text style={{ color: palette.text, fontSize: 9, fontWeight: '700' }}>
+            {(u.display_name || '?').trim().charAt(0).toUpperCase()}
+          </Text>
+        </View>
+      ))}
+      {overflow > 0 ? (
+        <Text style={{ color: palette.subtext, fontSize: 10, marginLeft: 4 }}>+{overflow}</Text>
+      ) : null}
+    </View>
+  );
+}
 function GhostButton({ label, onPress, disabled, palette, tone }: { label: string; onPress: () => void; disabled?: boolean; palette: any; tone?: string }) {
   const color = tone ?? palette.text;
   return (
@@ -197,12 +226,16 @@ export default function PartnerTaskBoardsPanel({
   const [newDescription, setNewDescription] = useState('');
   const [newPriority, setNewPriority] = useState<TaskPriorityValue>('medium');
   const [newAssigneeId, setNewAssigneeId] = useState<string | null>(null);
+  const [newCollaboratorIds, setNewCollaboratorIds] = useState<string[]>([]);
   const [newDueAt, setNewDueAt] = useState('');
   const [creating, setCreating] = useState(false);
 
   const [detail, setDetail] = useState<TaskDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [showAssignPicker, setShowAssignPicker] = useState(false);
+  const [showSubtaskForm, setShowSubtaskForm] = useState(false);
+  const [newSubtaskTitle, setNewSubtaskTitle] = useState('');
+  const [creatingSubtask, setCreatingSubtask] = useState(false);
   const [reviewNote, setReviewNote] = useState('');
   const [commentBody, setCommentBody] = useState('');
   const [postingComment, setPostingComment] = useState(false);
@@ -278,6 +311,8 @@ export default function PartnerTaskBoardsPanel({
     setPickedFiles([]);
     setUploadProgress({});
     setShowActivity(false);
+    setShowSubtaskForm(false);
+    setNewSubtaskTitle('');
     loadDetail(taskId);
   };
 
@@ -301,6 +336,7 @@ export default function PartnerTaskBoardsPanel({
       priority: newPriority,
     };
     if (newAssigneeId) body.assigned_to_id = newAssigneeId;
+    if (newCollaboratorIds.length) body.assignee_ids = newCollaboratorIds;
     if (newDueAt.trim()) {
       const parsed = new Date(newDueAt.trim());
       if (!Number.isNaN(parsed.getTime())) body.due_at = parsed.toISOString();
@@ -316,9 +352,50 @@ export default function PartnerTaskBoardsPanel({
     setNewDescription('');
     setNewPriority('medium');
     setNewAssigneeId(null);
+    setNewCollaboratorIds([]);
     setNewDueAt('');
     setShowCreate(false);
     loadBoard();
+  };
+
+  const toggleNewCollaborator = (userId: string) => {
+    setNewCollaboratorIds((prev) => (prev.includes(userId) ? prev.filter((id) => id !== userId) : [...prev, userId]));
+  };
+
+  const createSubtask = async () => {
+    if (!partnerId || !detail || !newSubtaskTitle.trim()) return;
+    setCreatingSubtask(true);
+    const res = await postRequest(
+      ROUTES.partners.channelTasks(partnerId, detail.channel),
+      { title: newSubtaskTitle.trim(), parent_task_id: detail.id },
+      { errorMessage: 'Unable to create subtask.' },
+    );
+    setCreatingSubtask(false);
+    if (!res?.success) {
+      Alert.alert('Failed', res?.message ?? 'Unable to create subtask.');
+      return;
+    }
+    setNewSubtaskTitle('');
+    setShowSubtaskForm(false);
+    loadDetail(detail.id);
+  };
+
+  const toggleCollaborator = async (userId: string) => {
+    if (!detail) return;
+    const current = detail.assignees.map((u) => u.id);
+    const next = current.includes(userId) ? current.filter((id) => id !== userId) : [...current, userId];
+    setBusy(true);
+    const res = await postRequest(
+      ROUTES.tasks.assign(detail.id),
+      { assigned_to_id: detail.assigned_to?.id ?? null, assignee_ids: next },
+      { errorMessage: 'Unable to update collaborators.' },
+    );
+    setBusy(false);
+    if (!res?.success) {
+      Alert.alert('Failed', res?.message ?? 'Unable to update collaborators.');
+      return;
+    }
+    setDetail(res.data ?? res);
   };
 
   const startWork = async () => {
@@ -454,7 +531,10 @@ export default function PartnerTaskBoardsPanel({
     return order.map((s) => ({ status: s, label: STATUS_META[s].label, value: counts[s] ?? 0 }));
   }, [counts]);
 
-  const isAssignee = !!(detail && currentUserId && detail.assigned_to?.id === currentUserId);
+  const isAssignee = !!(
+    detail && currentUserId &&
+    (detail.assigned_to?.id === currentUserId || detail.assignees.some((u) => u.id === currentUserId))
+  );
 
   if (!isOpen) return null;
 
@@ -617,6 +697,18 @@ export default function PartnerTaskBoardsPanel({
                             </Pressable>
                           ))}
                         </View>
+                        <Text style={{ color: palette.subtext, fontSize: 11, marginBottom: 4 }}>Collaborators (optional)</Text>
+                        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>
+                          {members.filter((m) => m.user_id !== newAssigneeId).map((m) => (
+                            <Pressable
+                              key={m.user_id}
+                              onPress={() => toggleNewCollaborator(m.user_id)}
+                              style={{ paddingVertical: 5, paddingHorizontal: 10, borderRadius: 8, borderWidth: 1, borderColor: newCollaboratorIds.includes(m.user_id) ? palette.primary : palette.borderMuted }}
+                            >
+                              <Text style={{ color: newCollaboratorIds.includes(m.user_id) ? palette.primary : palette.text, fontSize: 12 }}>{memberName(m)}</Text>
+                            </Pressable>
+                          ))}
+                        </View>
                         <PrimaryButton label={creating ? 'Creating…' : 'Create task'} onPress={createTask} disabled={creating || !newChannelId} palette={palette} />
                       </View>
                     ) : null}
@@ -641,9 +733,15 @@ export default function PartnerTaskBoardsPanel({
                       </View>
                       <Text style={{ color: palette.subtext, fontSize: 11, marginTop: 2 }}>#{task.channel_name}</Text>
                       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 6 }}>
-                        <UserChip user={task.assigned_to} palette={palette} />
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                          <UserChip user={task.assigned_to} palette={palette} />
+                          <AvatarStack users={task.assignees} palette={palette} />
+                        </View>
                         <PriorityBadge priority={task.priority} palette={palette} />
                       </View>
+                      {task.subtask_count > 0 ? (
+                        <Text style={{ color: palette.subtext, fontSize: 10, marginTop: 4 }}>🧩 {task.subtask_count} subtask{task.subtask_count === 1 ? '' : 's'}</Text>
+                      ) : null}
                       <View style={{ flexDirection: 'row', gap: 10, marginTop: 6 }}>
                         {task.due_at ? (
                           <Text style={{ color: task.is_overdue ? palette.danger : palette.subtext, fontSize: 10, fontWeight: task.is_overdue ? '700' : '400' }}>
@@ -675,7 +773,7 @@ export default function PartnerTaskBoardsPanel({
                 <Text style={[styles.settingsSectionTitle, { color: palette.text }]}>Assigned to</Text>
                 {canManageTasks ? (
                   <Pressable onPress={() => setShowAssignPicker((v) => !v)}>
-                    <Text style={{ color: palette.primary, fontSize: 12, fontWeight: '700' }}>Reassign</Text>
+                    <Text style={{ color: palette.primary, fontSize: 12, fontWeight: '700' }}>{showAssignPicker ? 'Done' : 'Edit'}</Text>
                   </Pressable>
                 ) : null}
               </View>
@@ -686,10 +784,36 @@ export default function PartnerTaskBoardsPanel({
                     <Text style={{ color: palette.subtext, fontSize: 12 }}>Unassign</Text>
                   </Pressable>
                   {members.map((m) => (
-                    <Pressable key={m.user_id} onPress={() => reassign(m.user_id)} style={{ paddingVertical: 5, paddingHorizontal: 10, borderRadius: 8, borderWidth: 1, borderColor: palette.borderMuted }}>
-                      <Text style={{ color: palette.text, fontSize: 12 }}>{memberName(m)}</Text>
+                    <Pressable key={m.user_id} onPress={() => reassign(m.user_id)} style={{ paddingVertical: 5, paddingHorizontal: 10, borderRadius: 8, borderWidth: 1, borderColor: detail.assigned_to?.id === m.user_id ? palette.primary : palette.borderMuted }}>
+                      <Text style={{ color: detail.assigned_to?.id === m.user_id ? palette.primary : palette.text, fontSize: 12 }}>{memberName(m)}</Text>
                     </Pressable>
                   ))}
+                </View>
+              ) : null}
+
+              <Text style={{ color: palette.subtext, fontSize: 11, fontWeight: '700', marginTop: 10, marginBottom: 4 }}>Collaborators</Text>
+              {detail.assignees.length === 0 && !showAssignPicker ? (
+                <Text style={{ color: palette.subtext, fontSize: 12 }}>None</Text>
+              ) : (
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                  {detail.assignees.map((u) => <UserChip key={u.id} user={u} palette={palette} />)}
+                </View>
+              )}
+              {showAssignPicker && canManageTasks ? (
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
+                  {members.filter((m) => m.user_id !== detail.assigned_to?.id).map((m) => {
+                    const active = detail.assignees.some((u) => u.id === m.user_id);
+                    return (
+                      <Pressable
+                        key={m.user_id}
+                        onPress={() => toggleCollaborator(m.user_id)}
+                        disabled={busy}
+                        style={{ paddingVertical: 5, paddingHorizontal: 10, borderRadius: 8, borderWidth: 1, borderColor: active ? palette.primary : palette.borderMuted, opacity: busy ? 0.6 : 1 }}
+                      >
+                        <Text style={{ color: active ? palette.primary : palette.text, fontSize: 12 }}>{active ? '✓ ' : ''}{memberName(m)}</Text>
+                      </Pressable>
+                    );
+                  })}
                 </View>
               ) : null}
 
@@ -732,6 +856,51 @@ export default function PartnerTaskBoardsPanel({
                   ))}
                 </View>
               ) : null}
+
+              <View style={{ marginBottom: 16 }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                  <Text style={[styles.settingsSectionTitle, { color: palette.text }]}>Subtasks</Text>
+                  {canManageTasks ? (
+                    <Pressable onPress={() => setShowSubtaskForm((v) => !v)}>
+                      <Text style={{ color: palette.primary, fontSize: 12, fontWeight: '700' }}>
+                        {showSubtaskForm ? '− Cancel' : '+ Add subtask'}
+                      </Text>
+                    </Pressable>
+                  ) : null}
+                </View>
+                {detail.subtasks.length === 0 ? (
+                  <Text style={{ color: palette.subtext, fontSize: 12 }}>No subtasks yet.</Text>
+                ) : (
+                  detail.subtasks.map((sub) => (
+                    <Pressable
+                      key={sub.id}
+                      onPress={() => openTask(sub.id)}
+                      style={[styles.settingsFeatureRow, { borderColor: palette.borderMuted, backgroundColor: palette.surface, marginBottom: 6, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }]}
+                    >
+                      <Text style={{ color: palette.text, fontSize: 12, flex: 1 }} numberOfLines={1}>{sub.title}</Text>
+                      <StatusBadge status={sub.status} palette={palette} />
+                    </Pressable>
+                  ))
+                )}
+                {showSubtaskForm ? (
+                  <View style={{ flexDirection: 'row', gap: 8, marginTop: 4 }}>
+                    <TextInput
+                      value={newSubtaskTitle}
+                      onChangeText={setNewSubtaskTitle}
+                      placeholder="Subtask title"
+                      placeholderTextColor={palette.subtext}
+                      style={[styles.settingsTextInput, { borderColor: palette.borderMuted, color: palette.text, marginTop: 0, flex: 1 }]}
+                    />
+                    <Pressable
+                      onPress={createSubtask}
+                      disabled={creatingSubtask || !newSubtaskTitle.trim()}
+                      style={({ pressed }) => [{ paddingHorizontal: 14, borderRadius: 10, backgroundColor: palette.royalInk, justifyContent: 'center', opacity: pressed || creatingSubtask || !newSubtaskTitle.trim() ? 0.6 : 1 }]}
+                    >
+                      <Text style={{ color: palette.ivory, fontWeight: '700', fontSize: 12 }}>Add</Text>
+                    </Pressable>
+                  </View>
+                ) : null}
+              </View>
 
               {isAssignee && MEMBER_STARTABLE.includes(detail.status) ? (
                 <View style={{ marginBottom: 16 }}>

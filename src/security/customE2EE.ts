@@ -85,47 +85,17 @@ const toBase64 = (value: Uint8Array | Buffer) =>
 
 const fromBase64 = (value: string) => Buffer.from(toByteArray(value));
 
-const buildAad = (conversationId: string, clientId?: string, kind?: string) => {
-  const parts = [conversationId, clientId ?? '', kind ?? ''];
-  return Buffer.from(parts.join('|'), 'utf8');
-};
-
-export async function encryptConversationPayload(
-  conversationId: string,
-  payload: Record<string, any>,
-) {
-  const entry = await loadConversationKey(conversationId);
-  const key = fromBase64(entry.key);
-  const iv = crypto.randomBytes(12);
-  const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
-  const aad = buildAad(conversationId, payload.clientId, payload.kind);
-  cipher.setAAD(aad as any);
-
-  const plaintext = JSON.stringify(payload);
-  const encrypted = Buffer.concat([
-    cipher.update(plaintext, 'utf8'),
-    cipher.final(),
-  ]);
-  const tag = cipher.getAuthTag();
-
-  if (__DEV__) console.log(
-    '[customE2EE] encrypt',
-    conversationId,
-    'version',
-    entry.version,
-    'aad',
-    toBase64(aad),
-  );
-
-  return {
-    ciphertext: toBase64(encrypted),
-    iv: toBase64(iv),
-    tag: toBase64(tag),
-    encryptionVersion: ENCRYPTION_VERSION,
-    encryptionKeyVersion: entry.version,
-    aad: toBase64(aad),
-  };
-}
+// There is deliberately no encryptConversationPayload here anymore. This
+// server-held-AES-key scheme predates the Signal Protocol pairwise
+// fan-out in security/e2ee.ts (encryptPayloadForRecipients), which is
+// what every outgoing message - DM or group - actually encrypts with
+// today (see useChatMessaging.ts's E2EE_ENABLED send path). Keeping an
+// encrypt function alive for a scheme nothing calls invited exactly the
+// confusion this fixed: code claiming "E2EE" while a server-decryptable
+// path quietly coexisted. decryptConversationPayload below stays,
+// because messages sent under the old scheme before this migration are
+// still sitting in message history and must remain readable - this file
+// is now read-only/legacy-decrypt, not a live encryption path.
 
 export async function decryptConversationPayload(
   conversationId: string,

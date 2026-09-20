@@ -1,6 +1,12 @@
 // src/screens/chat/hooks/useChatMessaging.ts
 
-// E2EE is deferred until key exchange protocol is validated end-to-end. Messages use server-side encryption via TLS. Flip to true when crypto module passes integration tests.
+// Signal Protocol pairwise fan-out (encryptPayloadForRecipients, see
+// security/e2ee.ts) is live for every non-public room - DMs and groups
+// alike. This flag is the one gate on that send path; when false (or for
+// 'post'/'thread' rooms), messages go out plaintext-over-TLS instead. A
+// legacy server-held-AES-key scheme (security/customE2EE.ts) is kept
+// around read-only to decrypt messages sent before this migration - it
+// is never used to encrypt anything new.
 const E2EE_ENABLED = true;
 const STALE_SIGNAL_DECRYPTS_KEY = 'kis.chat.stale_signal_decrypts.v1';
 // Flipped on for the "initial messages arrive garbled in a brand-new

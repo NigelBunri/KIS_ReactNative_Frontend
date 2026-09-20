@@ -280,6 +280,8 @@ const broadcastRoutes = {
       `${API_BASE_URL}/api/v1/partners/${id}/integrations/`,
     integrationUpdate: (id: string, integrationId: string) =>
       `${API_BASE_URL}/api/v1/partners/${id}/integrations/${integrationId}/`,
+    integrationTest: (id: string, integrationId: string) =>
+      `${API_BASE_URL}/api/v1/partners/${id}/integrations/${integrationId}/test/`,
     webhooks: (id: string) => `${API_BASE_URL}/api/v1/partners/${id}/webhooks/`,
     webhookUpdate: (id: string, webhookId: string) =>
       `${API_BASE_URL}/api/v1/partners/${id}/webhooks/${webhookId}/`,
