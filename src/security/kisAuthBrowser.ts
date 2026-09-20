@@ -42,7 +42,7 @@ function parseQueryParams(queryString: string): Record<string, string> {
   return params;
 }
 
-function paramsFromUrl(url: string): Record<string, string> {
+export function paramsFromUrl(url: string): Record<string, string> {
   const queryIndex = url.indexOf('?');
   if (queryIndex < 0) return {};
   // Strip any #fragment before parsing the query string.
