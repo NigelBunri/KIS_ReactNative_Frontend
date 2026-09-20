@@ -17,8 +17,11 @@ module.exports = {
   // react-native-reanimated and its react-native-worklets dependency are
   // the same story again, reached via MessagesScreen.tsx ->
   // AppNavigator.tsx -> App.tsx.
+  // react-native-inappbrowser-reborn ships an unbuilt ESM `import type` in
+  // its entry point too (src/security/kisAuthBrowser.ts pulls it in
+  // directly) — same fix, same reason.
   transformIgnorePatterns: [
-    'node_modules/(?!\\.pnpm/[^/]*/node_modules/((jest-)?react-native|@react-native(-community)?|@react-navigation|react-native-reanimated|react-native-worklets)/|((jest-)?react-native|@react-native(-community)?|@react-navigation|react-native-reanimated|react-native-worklets)/)',
+    'node_modules/(?!\\.pnpm/[^/]*/node_modules/((jest-)?react-native|@react-native(-community)?|@react-navigation|react-native-reanimated|react-native-worklets|react-native-inappbrowser-reborn)/|((jest-)?react-native|@react-native(-community)?|@react-navigation|react-native-reanimated|react-native-worklets|react-native-inappbrowser-reborn)/)',
   ],
   // 20+ files import `useAuth` straight from App.tsx (App.tsx being the
   // app's root component, that pulls the entire navigation stack and every
@@ -50,16 +53,32 @@ module.exports = {
   // don't throw "could not be found" for a module that's never linked
   // under Jest. Standard per the package's own docs, not KIS-specific.
   setupFiles: ['react-native-gesture-handler/jestSetup'],
+  // testPathIgnorePatterns below stops worktree copies from being RUN as
+  // test suites, but Jest's haste-map (module/mock resolver) scans the
+  // whole tree regardless of that option — with several worktrees present
+  // it was finding the same manual mock filename (e.g.
+  // __mocks__/react-native-view-shot.js) in two different worktrees and
+  // warning about "duplicate manual mock", non-deterministically picking
+  // one. That's what was making useResponsibleFeedLimit.test.ts fail only
+  // when run as part of the full suite, never in isolation. This excludes
+  // worktrees from haste-map scanning entirely, the same prefixes as above.
+  modulePathIgnorePatterns: ['<rootDir>/\\.claude/worktrees/', '<rootDir>/\\.worktrees/'],
   testPathIgnorePatterns: [
     '/node_modules/',
-    // Each entry under .claude/worktrees/ is a full git-worktree checkout
-    // of this same repo (used to isolate parallel feature branches before
-    // merge) - without this, running jest from the real repo root also
-    // discovers and re-runs every test file inside every worktree's own
-    // nested copy, multiplying the suite (1529 "tests" instead of the real
-    // 180) and surfacing failures that are just stale/mid-flight state in
-    // someone else's in-progress worktree, not real regressions.
+    // Each entry under .claude/worktrees/ or .worktrees/ is a full
+    // git-worktree checkout of this same repo (used to isolate parallel
+    // feature branches before merge) - without this, running jest from the
+    // real repo root also discovers and re-runs every test file inside
+    // every worktree's own nested copy, multiplying the suite (1529
+    // "tests" instead of the real 180) and surfacing failures that are
+    // just stale/mid-flight state in someone else's in-progress worktree,
+    // not real regressions. Both prefixes are real — .worktrees/ (no
+    // .claude/) currently holds several active ones
+    // (messaging-tabs-redesign, ondevice-translation, notification-audit,
+    // messages-filter-chips, golden-section-collapse as of this writing)
+    // that the original .claude/worktrees/-only pattern never excluded.
     '/\\.claude/worktrees/',
+    '/\\.worktrees/',
     '/__tests__/phase5\\.jest\\.setup\\.ts$',
     '/__tests__/mocks/',
     // App.test.tsx: excluded, not just skipped — see the comment at the
