@@ -52,7 +52,8 @@ export type MessageKind =
   | 'attachment'
   | 'call_event'
   | 'bible_verse'
-  | 'bible_game_stats';
+  | 'bible_game_stats'
+  | 'bible_discipleship_stats';
 
 /* ============================================================================
  * MESSAGE STATUS (STATE MACHINE)
@@ -280,6 +281,28 @@ export type BibleGameStatsMessage =
       timesCompletedBible: number;
     };
 
+/** A point-in-time snapshot of 12 Pillars discipleship-journey progress
+ * shared into chat — see src/components/Bible/discipleshipShare.ts. Mirrors
+ * BibleGameStatsMessage's scope split above: 'doctrine' for one doctrine's
+ * own day-by-day progress, 'overall' for the cross-doctrine summary. */
+export type BibleDiscipleshipStatsMessage =
+  | {
+      scope: 'doctrine';
+      doctrineOrder: number;
+      doctrineTitle: string;
+      daysCompleted: number;
+      totalDays: number; // 6
+      bestDayScorePercent?: number;
+    }
+  | {
+      scope: 'overall';
+      doctrinesCompleted: number;
+      totalDoctrines: number; // 12
+      daysCompleted: number;
+      totalDays: number; // 72
+      hasCertificate: boolean;
+    };
+
 /* ============================================================================
  * READ RECEIPT (per-user, groups)
  * ============================================================================
@@ -418,6 +441,8 @@ export type ChatMessage = {
   bibleVerse?: BibleVerseMessage;
 
   bibleGameStats?: BibleGameStatsMessage;
+
+  bibleDiscipleshipStats?: BibleDiscipleshipStatsMessage;
 
   replyToId?: string;
 

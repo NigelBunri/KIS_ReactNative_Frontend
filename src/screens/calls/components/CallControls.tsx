@@ -1,6 +1,7 @@
 // src/screens/calls/components/CallControls.tsx
 import React, { useMemo } from 'react';
 import {
+  Alert,
   View,
   Text,
   Pressable,
@@ -66,6 +67,13 @@ type ControlBtn = {
   badge?: number;
   hidden?: boolean;
   overrideAccent?: string;
+  /** Backend only flips a flag — no real capture/stream pipeline exists yet. Show as not-yet-available rather than pretending it works. */
+  comingSoon?: boolean;
+};
+
+const COMING_SOON_MESSAGE: Record<string, string> = {
+  record: 'Call recording is coming soon — it isn’t wired up to actually capture the call yet.',
+  rtmp: 'Live streaming to RTMP destinations is coming soon — it isn’t wired up to an actual stream yet.',
 };
 
 export default function CallControls({
@@ -183,7 +191,8 @@ export default function CallControls({
     {
       id: 'virtual-bg',
       icon: 'image',
-      label: 'Background',
+      // Only affects the local self-preview — remote peers still see the raw camera feed.
+      label: session.virtualBgEnabled ? 'BG: you only' : 'Background',
       active: !!session.virtualBgEnabled,
       hidden: !withVideo || isAudienceOnly,
     },
@@ -212,18 +221,16 @@ export default function CallControls({
     {
       id: 'record',
       icon: 'stop-circle',
-      label: session.recordingState === 'recording' ? 'Stop rec' : 'Record',
-      active: session.recordingState === 'recording',
-      danger: session.recordingState === 'recording',
+      label: 'Record (soon)',
       hidden: !(isBroadcast && isHostOrCoHost),
+      comingSoon: true,
     },
     {
       id: 'rtmp',
       icon: 'radio',
-      label: session.rtmpActive ? 'Live' : 'Stream',
-      active: !!session.rtmpActive,
-      danger: !!session.rtmpActive,
+      label: 'Stream (soon)',
       hidden: !(isBroadcast && isHostOrCoHost),
+      comingSoon: true,
     },
     {
       id: 'whiteboard',
@@ -375,9 +382,13 @@ export default function CallControls({
               key={btn.id}
               btn={btn}
               accent={btn.overrideAccent ?? accent}
-              onPress={() =>
-                btn.id === 'reactions' ? onToggleReactionPicker() : onAction(btn.id)
-              }
+              onPress={() => {
+                if (btn.comingSoon) {
+                  Alert.alert('Coming soon', COMING_SOON_MESSAGE[btn.id] ?? 'This feature isn’t available yet.');
+                  return;
+                }
+                btn.id === 'reactions' ? onToggleReactionPicker() : onAction(btn.id);
+              }}
               palette={palette}
               styles={styles}
             />
@@ -437,12 +448,13 @@ function CallButton({
   return (
     <Pressable
       onPress={onPress}
-      accessibilityLabel={btn.label}
+      accessibilityLabel={btn.comingSoon ? `${btn.label} — coming soon` : btn.label}
       accessibilityRole="button"
       hitSlop={10}
       style={({ pressed }) => [
         styles.btn,
         { backgroundColor: bgColor, borderColor },
+        btn.comingSoon && { opacity: 0.45 },
         pressed && styles.btnPressed,
       ]}
     >

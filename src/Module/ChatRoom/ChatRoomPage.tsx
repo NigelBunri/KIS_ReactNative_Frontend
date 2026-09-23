@@ -140,7 +140,7 @@ export type UploadStatus = 'verifying' | 'uploading' | 'done' | 'failed' | 'veri
 
 type UploadBubble = ChatMessage & {
   _uploadProgress: number;
-  _uploadStatus: 'verifying' | 'uploading' | 'verification_failed' | 'failed';
+  _uploadStatus: 'verifying' | 'uploading' | 'verification_failed' | 'failed' | 'done';
   _uploadInput?: AttachmentFilePayload;
 };
 
@@ -1622,13 +1622,18 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
   /*                              HANDLER BINDINGS                             */
   /* ======================================================================== */
 
-  const handleSend = () => {
+  // `overrideText`, when given, is sent instead of the `draft` state value —
+  // needed because setDraft(text) followed by handleSend() in the same tick
+  // (e.g. a quick-reply chip) still reads the PRE-update `draft` from this
+  // closure, since React state updates aren't synchronous. Passing the text
+  // straight through sidesteps that stale-read race entirely.
+  const handleSend = (overrideText?: string) => {
     const lp = composerLinkPreviewRef.current;
     composerLinkPreviewRef.current = null;
     const viewOnce = composerViewOnceRef.current;
     composerViewOnceRef.current = false;
     return Handlers.handleSend({
-      draft,
+      draft: overrideText ?? draft,
       chat,
       editing,
       replyTo,
@@ -1834,10 +1839,13 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
       const anyUploading = uris.some(u => fileStatusMap[u] === 'uploading');
 
       if (allDone) {
+        // Every file finished uploading — the bubble should read "done", not
+        // still say "uploading" while it waits for sendRichMessage() to
+        // resolve and onUploadedReady() to remove it.
         setUploadBubbles(prev => {
           const b = prev[bubbleId];
           if (!b) return prev;
-          return { ...prev, [bubbleId]: { ...b, _uploadProgress: 1, _uploadStatus: 'uploading' } };
+          return { ...prev, [bubbleId]: { ...b, _uploadProgress: 1, _uploadStatus: 'done' } };
         });
       } else if (anyVerifFailed || anyFailed) {
         setUploadBubbles(prev => {
@@ -2463,8 +2471,7 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
           lastMessage={lastReceivedMessage}
           palette={palette}
           onSelect={(text) => {
-            setDraft(text);
-            handleSend();
+            handleSend(text);
           }}
         />
 

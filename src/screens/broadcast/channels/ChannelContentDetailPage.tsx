@@ -143,21 +143,33 @@ function VideoPlayerControls({
     return () => clearTimeout(t);
   }, [showEndScreen, countdown]);
 
+  // Read via a ref, not the `paused` closure captured when this timer was
+  // armed — calling showControls() right after setPaused() (see the
+  // play/pause button below) fires on the SAME tick as the state update,
+  // before the re-render that would give a fresh `paused` closure. Without
+  // the ref, the hide timer armed by that call evaluates the PRE-toggle
+  // paused value, so pausing the video could still auto-hide the controls
+  // 3.5s later — exactly backwards, and the reason controls could vanish
+  // and never come back on their own.
+  const pausedRef = useRef(paused);
+  useEffect(() => { pausedRef.current = paused; }, [paused]);
+
   const showControls = useCallback(() => {
     setControlsVis(true);
     Animated.timing(controlsAnim, { toValue: 1, duration: 150, useNativeDriver: true }).start();
     if (hideTimer.current) clearTimeout(hideTimer.current);
     hideTimer.current = setTimeout(() => {
-      if (!paused) {
+      if (!pausedRef.current) {
         Animated.timing(controlsAnim, { toValue: 0, duration: 300, useNativeDriver: true }).start();
         setControlsVis(false);
       }
     }, 3500);
-  }, [paused, controlsAnim]);
+  }, [controlsAnim]);
 
   useEffect(() => {
     showControls();
     return () => { if (hideTimer.current) clearTimeout(hideTimer.current); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const formatTime = (secs: number) => {

@@ -3112,6 +3112,20 @@ export default function ProfileScreen() {
                   </Text>
                   <KISIcon name="chevron-right" size={16} color={palette.subtext} />
                 </Pressable>
+                <Pressable
+                  style={billingLinksStyles.link}
+                  onPress={() => rootNavigation?.navigate('GiftMembershipRedeem', {})}
+                >
+                  <Text
+                    style={[
+                      billingLinksStyles.linkText,
+                      { color: palette.text },
+                    ]}
+                  >
+                    Redeem a Gift Membership
+                  </Text>
+                  <KISIcon name="chevron-right" size={16} color={palette.subtext} />
+                </Pressable>
               </View>
 
               <LanguageSelectorCard
@@ -3417,6 +3431,18 @@ export default function ProfileScreen() {
                 {
                   label: 'Family & Parental Controls',
                   route: 'FamilyHub' as const,
+                  danger: false,
+                  badge: false,
+                },
+                {
+                  label: 'Church & Giving',
+                  route: 'ChurchHome' as const,
+                  danger: false,
+                  badge: false,
+                },
+                {
+                  label: 'Government & Civic Services',
+                  route: 'GovernmentHub' as const,
                   danger: false,
                   badge: false,
                 },

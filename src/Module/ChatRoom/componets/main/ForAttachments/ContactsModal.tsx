@@ -8,10 +8,10 @@ import {
   FlatList,
   ActivityIndicator,
 } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { KISPalette, KIS_TOKENS, kisRadius } from '@/theme/constants';
 import usePullDownToClose from '@/hooks/usePullDownToClose';
+import { refreshFromDeviceAndBackend } from '@/Module/AddContacts/contactsService';
 
 export type SimpleContact = {
   id: string;
@@ -25,8 +25,6 @@ type ContactsModalProps = {
   onClose: () => void;
   onSendContacts?: (contacts: SimpleContact[]) => void;
 };
-
-const CONTACTS_CACHE_KEY = 'kis.contacts.cache.v1';
 
 export const ContactsModal: React.FC<ContactsModalProps> = ({
   visible,
@@ -43,26 +41,25 @@ export const ContactsModal: React.FC<ContactsModalProps> = ({
   });
 
   useEffect(() => {
-    const loadContactsFromCache = async () => {
+    const loadContacts = async () => {
       if (!visible) return;
       setLoading(true);
       try {
-        const raw = await AsyncStorage.getItem(CONTACTS_CACHE_KEY);
-        if (!raw) {
-          setContacts([]);
-          setSelectedIds([]);
-          return;
-        }
-        const parsed = JSON.parse(raw) as any[];
-        const mapped: SimpleContact[] = (parsed || []).map(c => ({
-          id: c.id ?? c.phone ?? String(Math.random()),
-          name: c.name ?? c.phone ?? 'Unknown',
-          phone: c.phone ?? '',
+        // Pulls straight from the device (requesting permission on first use
+        // if needed) + the backend registered-contacts check, the same
+        // source AddContactsPage uses — not a passive read of a cache key
+        // nothing else in this modal's own flow ever populates. Its own
+        // 10-minute cache keeps repeat opens fast without a redundant fetch.
+        const kisContacts = await refreshFromDeviceAndBackend();
+        const mapped: SimpleContact[] = kisContacts.map(c => ({
+          id: c.id,
+          name: c.name,
+          phone: c.phone,
         }));
         setContacts(mapped);
         setSelectedIds([]);
       } catch (e) {
-        console.warn('[ContactsModal] Failed to read contacts cache:', e);
+        console.warn('[ContactsModal] Failed to load contacts:', e);
         setContacts([]);
         setSelectedIds([]);
       } finally {
@@ -70,7 +67,7 @@ export const ContactsModal: React.FC<ContactsModalProps> = ({
       }
     };
 
-    loadContactsFromCache();
+    loadContacts();
   }, [visible]);
 
   const toggleContact = (id: string) => {
@@ -154,8 +151,8 @@ export const ContactsModal: React.FC<ContactsModalProps> = ({
                   fontSize: KIS_TOKENS.typography.body,
                 }}
               >
-                No contacts available. Open the contacts screen and refresh
-                first.
+                No contacts found on this device, or contacts permission was
+                denied.
               </Text>
             </View>
           ) : (

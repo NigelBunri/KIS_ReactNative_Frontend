@@ -52,6 +52,7 @@
     "buffer": "^6.0.3",
     "jpeg-js": "^0.4.4",
     "mediasoup-client": "^3.21.0",
+    "nanoid": "^3.3.11",
     "react": "19.1.1",
     "react-native": "0.82.1",
     "react-native-audio-recorder-player": "3.6.14",

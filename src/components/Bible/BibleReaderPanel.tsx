@@ -27,6 +27,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import LinearGradient from 'react-native-linear-gradient';
 import { useKISTheme } from '@/theme/useTheme';
 import { useResponsiveLayout } from '@/theme/responsive';
 import BibleSectionCard from './BibleSectionCard';
@@ -397,16 +398,6 @@ const BibleReaderPanel = forwardRef<BibleReaderPanelHandle, Props>(function Bibl
       swipeTranslateX,
     ],
   );
-  const leftArrowOpacity = swipeTranslateX.interpolate({
-    inputRange: [0, 70],
-    outputRange: [0.45, 1],
-    extrapolate: 'clamp',
-  });
-  const rightArrowOpacity = swipeTranslateX.interpolate({
-    inputRange: [-70, 0],
-    outputRange: [1, 0.45],
-    extrapolate: 'clamp',
-  });
   const highlightByVerse = useMemo(() => {
     const map = new Map<string, string>();
     highlights.forEach(item => {
@@ -2540,110 +2531,112 @@ const BibleReaderPanel = forwardRef<BibleReaderPanelHandle, Props>(function Bibl
         <View
           style={[
             styles.readerHeader,
-            { backgroundColor: palette.surface, borderColor: palette.divider },
+            { backgroundColor: palette.surface, borderColor: `${palette.gold}33` },
           ]}
         >
-          <Text
-            style={[styles.translationLabel, { color: palette.subtext }]}
-            numberOfLines={1}
-          >
-            {reader?.translation?.name ??
-              translations[0]?.name ??
-              'Public Bible'}
-          </Text>
-          <View style={styles.readerHeaderTitleRow}>
-            <TouchableOpacity
-              activeOpacity={0.85}
-              onPress={() => setReadAloudSheetOpen(true)}
-              disabled={!verses.length}
-              style={[
-                styles.reloadIconButton,
-                readAloud.isActive
-                  ? { backgroundColor: palette.goldDeep, borderColor: palette.goldLight }
-                  : { backgroundColor: palette.surface, borderColor: palette.divider },
-                { opacity: verses.length ? 1 : 0.55, marginRight: 8 },
-              ]}
-            >
-              <KISIcon name="volume" size={17} color={readAloud.isActive ? palette.ivory : palette.primaryStrong} />
-              {!tinyReader ? (
+          <LinearGradient
+            colors={[palette.goldDeep, palette.gold, palette.goldLight, palette.gold, palette.goldDeep]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.readerHeaderAccentBar}
+          />
+
+          <View style={styles.readerHeaderBody}>
+            <View style={styles.readerHeaderTopRow}>
+              <View style={styles.translationLabelRow}>
+                <View style={[styles.goldDot, { backgroundColor: palette.gold }]} />
                 <Text
+                  style={[styles.translationLabel, { color: palette.text }]}
+                  numberOfLines={1}
+                >
+                  {reader?.translation?.name ??
+                    translations[0]?.name ??
+                    'Public Bible'}
+                </Text>
+                <View style={[styles.kcanBadgeSmall, { backgroundColor: palette.primarySoft }]}>
+                  <Text style={{ color: palette.primaryStrong, fontWeight: '900', fontSize: 10 }}>
+                    KCAN
+                  </Text>
+                </View>
+              </View>
+
+              <View style={styles.headerIconRow}>
+                <TouchableOpacity
+                  activeOpacity={0.8}
+                  onPress={() => setReadAloudSheetOpen(true)}
+                  disabled={!verses.length}
+                  accessibilityRole="button"
+                  accessibilityLabel={readAloud.status === 'playing' ? 'Reading aloud' : readAloud.status === 'paused' ? 'Paused' : 'Listen'}
                   style={[
-                    styles.reloadIconButtonText,
-                    { color: readAloud.isActive ? palette.ivory : palette.primaryStrong },
+                    styles.circleIconBtn,
+                    readAloud.isActive
+                      ? { backgroundColor: palette.goldDeep, borderColor: palette.gold }
+                      : { backgroundColor: palette.royalInk, borderColor: `${palette.gold}55` },
+                    { opacity: verses.length ? 1 : 0.45 },
                   ]}
                 >
-                  {readAloud.status === 'playing' ? 'Reading…' : readAloud.status === 'paused' ? 'Paused' : 'Listen'}
-                </Text>
-              ) : null}
-            </TouchableOpacity>
-            <TouchableOpacity
-              activeOpacity={0.85}
-              onPress={() => verses.length && openShareSheetForVerses(verses)}
-              disabled={!verses.length}
-              style={[
-                styles.reloadIconButton,
-                {
-                  backgroundColor: palette.surface,
-                  borderColor: palette.divider,
-                  opacity: verses.length ? 1 : 0.55,
-                  marginRight: 8,
-                },
-              ]}
-            >
-              <KISIcon name="share" size={17} color={palette.primaryStrong} />
-              {!tinyReader ? (
-                <Text style={[styles.reloadIconButtonText, { color: palette.primaryStrong }]}>
-                  Share chapter
-                </Text>
-              ) : null}
-            </TouchableOpacity>
-          </View>
+                  <KISIcon name="volume" size={15} color={palette.ivory} />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  activeOpacity={0.8}
+                  onPress={() => verses.length && openShareSheetForVerses(verses)}
+                  disabled={!verses.length}
+                  accessibilityRole="button"
+                  accessibilityLabel="Share chapter"
+                  style={[
+                    styles.circleIconBtn,
+                    { backgroundColor: palette.royalInk, borderColor: `${palette.gold}55`, opacity: verses.length ? 1 : 0.45 },
+                  ]}
+                >
+                  <KISIcon name="share" size={15} color={palette.ivory} />
+                </TouchableOpacity>
+              </View>
+            </View>
 
-          {/* Always-visible tap alternative to the pull-gesture chapter
-              navigation (the swipe-hint bar further down still works too —
-              this isn't a replacement, just a second, explicit control for
-              anyone who doesn't want to rely on the gesture). */}
-          <View style={styles.readerNavRow}>
-            <TouchableOpacity
-              activeOpacity={0.85}
-              onPress={() => loadNavigation(reader?.navigation?.previous)}
-              disabled={!reader?.navigation?.previous}
-              accessibilityRole="button"
-              accessibilityLabel="Previous chapter"
-              style={[
-                styles.readerNavArrow,
-                {
-                  backgroundColor: palette.royalInk,
-                  borderColor: palette.goldLight,
-                  opacity: reader?.navigation?.previous ? 1 : 0.4,
-                },
-              ]}
-            >
-              <KISIcon name="chevron-left" size={18} color={palette.ivory} />
-            </TouchableOpacity>
-            <Text
-              style={[styles.readerNavReference, { color: palette.text }]}
-              numberOfLines={1}
-            >
-              {currentReferenceWithListenVerse}
+            {/* Always-visible tap alternative to the pull-gesture chapter
+                navigation — not a replacement for the swipe gesture, just a
+                second, explicit control for anyone who doesn't want to rely
+                on it. */}
+            <View style={[styles.readerNavCapsule, { backgroundColor: `${palette.royalInk}0D`, borderColor: `${palette.gold}26` }]}>
+              <TouchableOpacity
+                activeOpacity={0.8}
+                onPress={() => loadNavigation(reader?.navigation?.previous)}
+                disabled={!reader?.navigation?.previous}
+                hitSlop={6}
+                accessibilityRole="button"
+                accessibilityLabel="Previous chapter"
+                style={[
+                  styles.readerNavArrowDot,
+                  { backgroundColor: palette.royalInk, opacity: reader?.navigation?.previous ? 1 : 0.35 },
+                ]}
+              >
+                <KISIcon name="chevron-left" size={14} color={palette.ivory} />
+              </TouchableOpacity>
+              <Text
+                style={[styles.readerNavReference, { color: palette.text }]}
+                numberOfLines={1}
+              >
+                {currentReferenceWithListenVerse}
+              </Text>
+              <TouchableOpacity
+                activeOpacity={0.8}
+                onPress={() => loadNavigation(reader?.navigation?.next)}
+                disabled={!reader?.navigation?.next}
+                hitSlop={6}
+                accessibilityRole="button"
+                accessibilityLabel="Next chapter"
+                style={[
+                  styles.readerNavArrowDot,
+                  { backgroundColor: palette.royalInk, opacity: reader?.navigation?.next ? 1 : 0.35 },
+                ]}
+              >
+                <KISIcon name="chevron-right" size={14} color={palette.ivory} />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={[styles.chapterNavHint, { color: palette.subtext }]}>
+              {tinyReader ? 'Swipe chapters' : 'Tap or swipe for previous · next chapter'}
             </Text>
-            <TouchableOpacity
-              activeOpacity={0.85}
-              onPress={() => loadNavigation(reader?.navigation?.next)}
-              disabled={!reader?.navigation?.next}
-              accessibilityRole="button"
-              accessibilityLabel="Next chapter"
-              style={[
-                styles.readerNavArrow,
-                {
-                  backgroundColor: palette.royalInk,
-                  borderColor: palette.goldLight,
-                  opacity: reader?.navigation?.next ? 1 : 0.4,
-                },
-              ]}
-            >
-              <KISIcon name="chevron-right" size={18} color={palette.ivory} />
-            </TouchableOpacity>
           </View>
         </View>
       </View>
@@ -2664,88 +2657,6 @@ const BibleReaderPanel = forwardRef<BibleReaderPanelHandle, Props>(function Bibl
           ) : undefined
         }
       >
-        <BibleSectionCard>
-          <View style={[styles.headerRow, compactReader && styles.wrapHeaderRow, {paddingHorizontal : 12}]}>
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.title, { color: palette.text }]}>Read</Text>
-              <Text style={{ color: palette.subtext, marginTop: 4 }}>
-                Public/licensed translations only. Personal tools require login.
-              </Text>
-            </View>
-            <View
-              style={[
-                styles.kcanBadge,
-                { backgroundColor: palette.primarySoft },
-              ]}
-            >
-              <Text style={{ color: palette.primaryStrong, fontWeight: '900' }}>
-                KCAN
-              </Text>
-            </View>
-          </View>
-        </BibleSectionCard>
-
-        <BibleSectionCard>
-          <View
-            style={[
-              styles.swipeHint,
-              {
-                borderColor: palette.divider,
-                backgroundColor: palette.surface,
-              },
-            ]}
-          >
-            <Pressable
-              onPress={() => loadNavigation(reader?.navigation?.previous)}
-              disabled={!reader?.navigation?.previous}
-              hitSlop={10}
-              accessibilityRole="button"
-              accessibilityLabel="Previous chapter"
-            >
-              <Animated.View
-                style={{
-                  opacity: reader?.navigation?.previous ? leftArrowOpacity : 0.18,
-                }}
-              >
-                <KISIcon
-                  name="chevron-left"
-                  size={24}
-                  color={palette.primaryStrong}
-                />
-              </Animated.View>
-            </Pressable>
-            <Text
-              style={{
-                color: palette.subtext,
-                flex: 1,
-                textAlign: 'center',
-                fontWeight: '700',
-              }}
-            >
-              {tinyReader ? 'Swipe chapters' : 'Tap or swipe for previous · next chapter'}
-            </Text>
-            <Pressable
-              onPress={() => loadNavigation(reader?.navigation?.next)}
-              disabled={!reader?.navigation?.next}
-              hitSlop={10}
-              accessibilityRole="button"
-              accessibilityLabel="Next chapter"
-            >
-              <Animated.View
-                style={{
-                  opacity: reader?.navigation?.next ? rightArrowOpacity : 0.18,
-                }}
-              >
-                <KISIcon
-                  name="chevron-right"
-                  size={24}
-                  color={palette.primaryStrong}
-                />
-              </Animated.View>
-            </Pressable>
-          </View>
-        </BibleSectionCard>
-
         <BibleSectionCard>
           <Animated.View
             {...navigationPanResponder.panHandlers}
@@ -2952,7 +2863,7 @@ export default BibleReaderPanel;
 const styles = StyleSheet.create({
   readerRoot: { flex: 1, minHeight: 0 },
   readerScroll: { flex: 1 },
-  readerScrollContent: { gap: 14, paddingVertical: 16, paddingBottom: 40 },
+  readerScrollContent: { gap: 14, paddingTop: 6, paddingBottom: 40 },
   audioBar: {
     borderTopWidth: 1,
     paddingHorizontal: 14,
@@ -2979,8 +2890,8 @@ const styles = StyleSheet.create({
   sectionTitle: { fontSize: 18, fontWeight: '900' },
   headerRow: { flexDirection: 'row', gap: 12, alignItems: 'center' },
   wrapHeaderRow: { flexWrap: 'wrap' },
-  kcanBadge: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999 },
-  stickyReaderHeaderWrap: { zIndex: 10, paddingBottom: 8 },
+  kcanBadgeSmall: { paddingHorizontal: 7, paddingVertical: 2, borderRadius: 999 },
+  stickyReaderHeaderWrap: { zIndex: 10, paddingBottom: 2 },
   selectionBar: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -2989,51 +2900,51 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 10,
   },
-  readerHeader: { borderWidth: 2, borderRadius: 12, padding: 12 },
-  readerHeaderTitleRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 10,
-    rowGap: 8,
-    marginTop: 4,
-  },
-  translationLabel: { fontSize: 12, textTransform: 'uppercase' },
-  readerNavRow: {
+  readerHeader: { borderWidth: 1, borderRadius: 14, overflow: 'hidden' },
+  readerHeaderAccentBar: { height: 2.5, width: '100%' },
+  readerHeaderBody: { paddingHorizontal: 12, paddingTop: 8, paddingBottom: 7, gap: 6 },
+  readerHeaderTopRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    gap: 10,
-    marginTop: 10,
+    gap: 8,
   },
-  readerNavArrow: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+  headerIconRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  circleIconBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    flexShrink: 0,
+  },
+  translationLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 1 },
+  goldDot: { width: 6, height: 6, borderRadius: 3 },
+  translationLabel: { fontSize: 12, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.6 },
+  readerNavCapsule: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+    borderWidth: 1,
+    borderRadius: 999,
+    paddingHorizontal: 6,
+    paddingVertical: 6,
+  },
+  readerNavArrowDot: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   readerNavReference: {
     flex: 1,
     textAlign: 'center',
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '900',
+    letterSpacing: 0.2,
   },
-  reloadIconButton: {
-    minHeight: 36,
-    borderRadius: 999,
-    borderWidth: 1,
-    paddingHorizontal: 11,
-    paddingVertical: 7,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-  },
-  reloadIconButtonText: { fontSize: 12, fontWeight: '900' },
   reloadButton: {
     marginTop: 6,
     minHeight: 38,
@@ -3091,14 +3002,11 @@ const styles = StyleSheet.create({
     gap: 8,
     flexWrap: 'wrap',
   },
-  swipeHint: {
-    borderWidth: 1,
-    borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+  chapterNavHint: {
+    textAlign: 'center',
+    fontSize: 11,
+    fontWeight: '700',
+    marginTop: 4,
   },
   stateBox: {
     borderWidth: 2,

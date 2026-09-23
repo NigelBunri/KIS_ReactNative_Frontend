@@ -24,15 +24,20 @@ import { setAuthTokens } from '@/security/authStorage';
 import { setUserData } from '@/network/cache';
 import { ensureDeviceId, initE2EE } from '@/security/e2ee';
 import { consumePendingState } from '@/security/kisAuthBrowser';
+import KISDateTimeInput from '@/constants/KISDateTimeInput';
 import { useAuth } from '../../App';
 
 type Params = { registrationCode?: string; redirectUri?: string; state?: string };
 
-// The one screen a Google sign-up needs beyond what kis-auth's OAuth round
-// trip already proved: KIS accounts are phone-centric (USERNAME_FIELD,
-// SMS/WhatsApp notifications) and Google never provides a phone number.
-// Everything else — identity, email, password (there isn't one; Google is
-// the credential) — is already settled by the time the user lands here.
+// Fallback-only screen: reached solely when InAppBrowser wasn't available
+// on this device and the OAuth return came back as a fresh cold start via
+// universal link, losing whatever RegisterScreen had collected in memory
+// (see kisAuthBrowser.ts's rememberPendingState doc comment for why that
+// state is deliberately NOT persisted to AsyncStorage — a stale persisted
+// form surviving across attempts would be its own failure mode). So this
+// screen re-collects the full set of fields RegisterScreen normally
+// gathers up front, then completes registration exactly the way
+// RegisterScreen's happy path does.
 export default function KisAuthRegisterPhoneScreen() {
   const { palette } = useKISTheme();
   const navigation = useNavigation();
@@ -65,10 +70,13 @@ export default function KisAuthRegisterPhoneScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const [displayName, setDisplayName] = useState('');
+  const [dateOfBirth, setDateOfBirth] = useState<string | null>(null);
   const [regPhone, setRegPhone] = useState('');
   const [countryCode, setCountryCode] = useState<CountryCode>('CM');
   const [callingCode, setCallingCode] = useState('+237');
   const [countryPickerVisible, setCountryPickerVisible] = useState(false);
+  const [referralCode, setReferralCode] = useState('');
   const [loading, setLoading] = useState(false);
 
   const onChangeRegPhone = useCallback((value: string) => {
@@ -105,6 +113,9 @@ export default function KisAuthRegisterPhoneScreen() {
           phone_country_code: callingCode,
           phone_number: normalizedPhone,
           country: countryCode,
+          ...(displayName.trim() ? { display_name: displayName.trim() } : {}),
+          ...(dateOfBirth ? { date_of_birth: dateOfBirth.slice(0, 10) } : {}),
+          ...(referralCode.trim() ? { referral_code: referralCode.trim() } : {}),
           device_id: deviceId,
           device_name: `${Platform.OS === 'ios' ? 'iPhone' : 'Android'} (KIS Auth sign-up)`,
           platform: Platform.OS,
@@ -137,7 +148,21 @@ export default function KisAuthRegisterPhoneScreen() {
     } finally {
       setLoading(false);
     }
-  }, [stateVerified, params.registrationCode, params.redirectUri, regPhone, callingCode, countryCode, phoneValid, navigation, setAuth, setUser]);
+  }, [
+    stateVerified,
+    params.registrationCode,
+    params.redirectUri,
+    regPhone,
+    callingCode,
+    countryCode,
+    phoneValid,
+    displayName,
+    dateOfBirth,
+    referralCode,
+    navigation,
+    setAuth,
+    setUser,
+  ]);
 
   return (
     <SafeAreaView style={[styles.root, { backgroundColor: palette.bg }]} edges={['top', 'bottom']}>
@@ -160,11 +185,35 @@ export default function KisAuthRegisterPhoneScreen() {
           <View style={[styles.iconWrap, { backgroundColor: palette.primarySoft ?? palette.surface }]}>
             <KISIcon name="check" size={36} color={palette.primary} />
           </View>
-          <Text style={[styles.title, { color: palette.text }]}>Add your phone number</Text>
+          <Text style={[styles.title, { color: palette.text }]}>Finish creating your account</Text>
           <Text style={[styles.subtitle, { color: palette.subtext }]}>
-            Your Google account is verified. KIS uses your phone number for account recovery and notifications —
-            add it to finish creating your account.
+            Your Google account is verified. We lost the details you entered earlier when the
+            browser closed — add them again to finish.
           </Text>
+
+          <View style={[styles.field, { maxWidth: formMaxWidth }]}>
+            <Text style={[styles.fieldLabel, { color: palette.subtext }]}>Display name (optional)</Text>
+            <TextInput
+              value={displayName}
+              onChangeText={setDisplayName}
+              autoCapitalize="words"
+              placeholder="John Doe"
+              placeholderTextColor={palette.subtext}
+              style={[styles.input, { backgroundColor: palette.surface, borderColor: palette.border, color: palette.text }]}
+            />
+          </View>
+
+          <View style={{ width: '100%', maxWidth: formMaxWidth }}>
+            <KISDateTimeInput
+              label="Date of birth (optional)"
+              mode="date"
+              value={dateOfBirth}
+              onChange={setDateOfBirth}
+              placeholder="Select date of birth"
+              maximumDate={new Date()}
+              minimumDate={new Date(new Date().getFullYear() - 130, 0, 1)}
+            />
+          </View>
 
           <View style={[styles.phoneRow, { maxWidth: formMaxWidth }]}>
             <Pressable
@@ -197,6 +246,19 @@ export default function KisAuthRegisterPhoneScreen() {
             />
           </View>
 
+          <View style={[styles.field, { maxWidth: formMaxWidth }]}>
+            <Text style={[styles.fieldLabel, { color: palette.subtext }]}>Referral code (optional)</Text>
+            <TextInput
+              value={referralCode}
+              onChangeText={(v) => setReferralCode(v.toUpperCase())}
+              autoCapitalize="characters"
+              autoCorrect={false}
+              placeholder="e.g. B6UCUG5S"
+              placeholderTextColor={palette.subtext}
+              style={[styles.input, { backgroundColor: palette.surface, borderColor: palette.border, color: palette.text }]}
+            />
+          </View>
+
           <Pressable
             style={[
               styles.primaryBtn,
@@ -225,6 +287,8 @@ const styles = StyleSheet.create({
   backBtn: { width: 40, height: 40, justifyContent: 'center' },
   headerTitle: { flex: 1, textAlign: 'center', fontSize: 17, fontWeight: '700' },
   body: { alignItems: 'center', gap: 16 },
+  field: { width: '100%', gap: 8 },
+  fieldLabel: { fontSize: 13, fontWeight: '600' },
   iconWrap: {
     width: 80,
     height: 80,

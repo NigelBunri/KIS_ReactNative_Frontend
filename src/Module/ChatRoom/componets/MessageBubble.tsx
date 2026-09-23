@@ -3379,6 +3379,80 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   };
 
   /* ─────────────────────────────────────────
+   * Discipleship (12 Pillars) stats share card
+   * ──────────────────────────────────────── */
+  const renderBibleDiscipleshipStatsCard = () => {
+    const stats = (message as any).bibleDiscipleshipStats as
+      | { scope: 'doctrine'; doctrineOrder: number; doctrineTitle: string; daysCompleted: number; totalDays: number; bestDayScorePercent?: number }
+      | { scope: 'overall'; doctrinesCompleted: number; totalDoctrines: number; daysCompleted: number; totalDays: number; hasCertificate: boolean }
+      | undefined;
+    if (!stats) return null;
+
+    const isOverall = stats.scope === 'overall';
+    const percent = Math.round((stats.daysCompleted / Math.max(1, stats.totalDays)) * 100);
+
+    return (
+      <Pressable
+        onPress={() => {
+          DeviceEventEmitter.emit('chat.close_all');
+          (navigation as any).navigate('MainTabs', { screen: 'Bible' });
+        }}
+        style={({ pressed }) => ({
+          marginTop: text ? 8 : 0,
+          borderRadius: 14,
+          borderWidth: 1,
+          borderColor: palette.divider,
+          overflow: 'hidden',
+          backgroundColor: isMe ? 'rgba(255,255,255,0.10)' : palette.surface,
+          minWidth: 220,
+          opacity: pressed ? 0.85 : 1,
+        })}
+      >
+        <View style={{ padding: 14, gap: 8 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <KISIcon name="trophy" size={16} color={isMe ? outgoingTextColor : palette.primary} />
+            <Text style={{ fontSize: 14, fontWeight: '800', color: isMe ? outgoingTextColor : palette.text }}>
+              {isOverall ? '12 Pillars — Discipleship Journey' : stats.doctrineTitle}
+            </Text>
+          </View>
+
+          <View style={{ height: 8, borderRadius: 999, overflow: 'hidden', backgroundColor: isMe ? 'rgba(255,255,255,0.25)' : palette.divider }}>
+            <View style={{ height: 8, borderRadius: 999, width: `${percent}%`, backgroundColor: isMe ? outgoingTextColor : palette.primary }} />
+          </View>
+
+          {isOverall ? (
+            <>
+              <Text style={{ fontSize: 12, fontWeight: '700', color: isMe ? outgoingMetaColor : palette.subtext }}>
+                {stats.doctrinesCompleted} of {stats.totalDoctrines} doctrines · {stats.daysCompleted} of {stats.totalDays} days ({percent}%)
+              </Text>
+              {stats.hasCertificate ? (
+                <Text style={{ fontSize: 12, fontWeight: '700', color: isMe ? outgoingMetaColor : palette.success }}>
+                  🎓 Certificate earned
+                </Text>
+              ) : null}
+            </>
+          ) : (
+            <>
+              <Text style={{ fontSize: 12, fontWeight: '700', color: isMe ? outgoingMetaColor : palette.subtext }}>
+                Day {stats.daysCompleted} of {stats.totalDays}
+              </Text>
+              {typeof stats.bestDayScorePercent === 'number' ? (
+                <Text style={{ fontSize: 12, fontWeight: '700', color: isMe ? outgoingMetaColor : palette.subtext }}>
+                  Best day score: {stats.bestDayScorePercent}%
+                </Text>
+              ) : null}
+            </>
+          )}
+
+          <Text style={{ fontSize: 12, fontWeight: '600', color: isMe ? outgoingMetaColor : palette.primary, alignSelf: 'flex-end' }}>
+            Continue the journey →
+          </Text>
+        </View>
+      </Pressable>
+    );
+  };
+
+  /* ─────────────────────────────────────────
    * GAP 4: Payment card
    * ──────────────────────────────────────── */
   const renderPaymentCard = () => {
@@ -4293,6 +4367,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
             {renderProductCard()}
             {renderBibleVerseCard()}
             {renderBibleGameStatsCard()}
+            {renderBibleDiscipleshipStatsCard()}
             {renderPaymentCard()}
 
             {/* Attachments (images, files, etc.) */}

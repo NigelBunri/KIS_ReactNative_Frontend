@@ -185,24 +185,25 @@ export const CommunityInfoPage: React.FC<CommunityInfoPageProps> = ({
     };
   }, [socket, communityId, loadCommunity]);
 
-  const me = useMemo(() => {
-    if (!currentUserId) return null;
-    return members.find((m) => {
-      const u = m.user;
-      if (typeof u === 'object' && u && u.id) return String(u.id) === String(currentUserId);
-      return false;
-    }) ?? null;
-  }, [members, currentUserId]);
-
-  const role = String(me?.role ?? me?.base_role ?? '').toLowerCase();
-  const isAdmin = role === 'owner' || role === 'admin' || role === 'mod' || role === 'moderator';
-
   const resolveUserId = (member: CommunityMember): string => {
     const u = member.user;
     if (typeof u === 'object' && u && u.id) return String(u.id);
     if (typeof u === 'string' || typeof u === 'number') return String(u);
     return '';
   };
+
+  // Was only matching object-shaped member.user (missing the string/number
+  // ID shape resolveUserId already accounts for elsewhere in this file) -
+  // a mismatch here silently made `me` always null, so isAdmin was always
+  // false regardless of the viewer's real role, hiding invite-link/
+  // member-management controls from actual owners/admins.
+  const me = useMemo(() => {
+    if (!currentUserId) return null;
+    return members.find((m) => resolveUserId(m) === String(currentUserId)) ?? null;
+  }, [members, currentUserId]);
+
+  const role = String(me?.role ?? me?.base_role ?? '').toLowerCase();
+  const isAdmin = role === 'owner' || role === 'admin' || role === 'mod' || role === 'moderator';
 
   const handleMemberAction = (member: CommunityMember) => {
     const userId = resolveUserId(member);

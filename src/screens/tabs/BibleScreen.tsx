@@ -26,6 +26,7 @@ import MeditationPanel from '../../components/Bible/MeditationPanel';
 import BiblePlansPanel from '../../components/Bible/BiblePlansPanel';
 import PrayerPanel from '../../components/Bible/PrayerPanel';
 import BibleLessonsPanel from '../../components/Bible/BibleLessonsPanel';
+import TwelvePillarsPanel from '../../components/Bible/TwelvePillarsPanel';
 import BibleSettingsPanel from '../../components/Bible/BibleSettingsPanel';
 import BibleBooksPanel from '../../components/Bible/BibleBooksPanel';
 import BibleMessagesPanel from '../../components/Bible/BibleMessagesPanel';
@@ -81,11 +82,11 @@ export default function BibleScreen() {
     () => [
       { key: 'read', label: 'Read', icon: 'book' },
       { key: 'games', label: 'Games', icon: 'game-controller' },
+      { key: 'discipleship', label: 'Discipleship', icon: 'layers' },
       { key: 'daily', label: 'Daily', icon: 'calendar' },
       { key: 'meditations', label: 'Meditations', icon: 'sparkles' },
       { key: 'prayer-calendar', label: 'Prayer Calendar', icon: 'heart' },
       { key: 'reading-planner', label: 'Reading Planner', icon: 'list' },
-      { key: 'discipleship', label: 'Discipleship', icon: 'layers' },
       { key: 'books', label: 'Books', icon: 'library' },
       { key: 'messages', label: 'Messages', icon: 'videocam' },
       { key: 'settings', label: 'Settings', icon: 'settings' },
@@ -193,6 +194,7 @@ export default function BibleScreen() {
       case 'reading-planner':
         return <BiblePlansPanel />;
       case 'discipleship':
+        return <TwelvePillarsPanel />;
       case 'lessons':
         return <BibleLessonsPanel />;
       case 'books':

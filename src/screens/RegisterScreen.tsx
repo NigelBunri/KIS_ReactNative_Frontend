@@ -226,14 +226,28 @@ export default function RegisterScreen({ navigation, route }: any) {
     termsAgreed &&
     !loading;
 
+  // Google is the only credential in the combined flow, so readiness here
+  // is everything the form collects EXCEPT password.
+  const googleReady = countryCodeValid && phoneValid && termsAgreed && !googleLoading;
+
   const onGoogleSignUp = async () => {
+    const normalizedPhone = regPhone.replace(/[^\d]/g, '');
+    if (!callingCode) {
+      Alert.alert('Registration failed', 'Country code is required.');
+      return;
+    }
+    if (!normalizedPhone || !termsAgreed) {
+      return;
+    }
     setGoogleLoading(true);
     try {
       const state = `${Date.now()}.${Math.random().toString(36).slice(2)}`;
-      // Remembered at module scope, not a component ref — this flow's
-      // deep-link fallback return lands on KisAuthRegisterPhoneScreen, a
-      // DIFFERENT screen than this one, so a ref here would already be
-      // gone by the time that screen could check it.
+      // Remembered at module scope, not a component ref — needed only for
+      // the deep-link fallback path (InAppBrowser unavailable), which lands
+      // on a DIFFERENT screen (KisAuthRegisterPhoneScreen) after a cold
+      // start; a ref here would already be gone by then. The happy path
+      // below never touches this — it compares outcome.state to the local
+      // `state` closure directly.
       rememberPendingState('registration', state);
       const url =
         `${KISAUTH_BASE_URL}/authorize` +
@@ -246,8 +260,9 @@ export default function RegisterScreen({ navigation, route }: any) {
       if (outcome.kind === 'cancelled') return;
       if (outcome.kind === 'pending') {
         // No InAppBrowser — deepLinkRouter.ts routes the universal-link
-        // return straight to KisAuthRegisterPhone itself, so there's
-        // nothing more to do from this screen.
+        // return to KisAuthRegisterPhone, which re-collects these same
+        // fields since this screen's local state won't survive a cold
+        // start.
         return;
       }
       if (outcome.state !== state) {
@@ -265,11 +280,55 @@ export default function RegisterScreen({ navigation, route }: any) {
         }
         return;
       }
-      navigation.navigate('KisAuthRegisterPhone', {
-        registrationCode: outcome.code,
-        redirectUri: KIS_AUTH_REGISTRATION_REDIRECT_URI,
-        state: outcome.state,
-      });
+
+      // Success — finish registration right here, in the same process,
+      // using the fields already collected on this screen. No separate
+      // phone-entry screen needed: everything kis-auth's ticket doesn't
+      // carry (name/phone/DOB/referral) was already gathered above.
+      const deviceId = await ensureDeviceId();
+      const res = await postRequest(
+        ROUTES.auth.kisAuthRegistrationComplete,
+        {
+          registration_code: outcome.code,
+          redirect_uri: KIS_AUTH_REGISTRATION_REDIRECT_URI,
+          phone: `${callingCode}${normalizedPhone}`,
+          phone_country_code: callingCode,
+          phone_number: normalizedPhone,
+          country: countryCode,
+          ...(displayName.trim() ? { display_name: displayName.trim() } : {}),
+          ...(dateOfBirth ? { date_of_birth: dateOfBirth.slice(0, 10) } : {}),
+          ...(referralCode.trim() ? { referral_code: referralCode.trim() } : {}),
+          device_id: deviceId,
+          device_name: `${Platform.OS === 'ios' ? 'iPhone' : 'Android'} (KIS Auth sign-up)`,
+          platform: Platform.OS,
+        },
+        { errorMessage: 'Unable to complete sign-up.' },
+      );
+
+      if (!res?.success) {
+        Alert.alert(
+          'Sign-up failed',
+          res?.message || res?.data?.detail || 'Please check your details and try again.',
+        );
+        return;
+      }
+
+      const accessToken = res.data?.access;
+      if (!accessToken) {
+        Alert.alert('Sign-up failed', 'We could not complete this authentication request.');
+        return;
+      }
+
+      await AsyncStorage.multiSet([
+        ['user_dial_code', callingCode],
+        ['user_country_code', countryCode],
+      ]);
+      await setAuthTokens({ accessToken, refreshToken: res.data?.refresh ?? null });
+      const resolvedUser = res?.data?.user ?? null;
+      await setUserData(resolvedUser, res.data);
+      setUser?.(resolvedUser);
+      void initE2EE(String(resolvedUser?.id ?? '')).catch(() => {});
+      setAuth(true);
     } catch (e: any) {
       Alert.alert('Error', e?.message ?? 'Unable to sign up with Google.');
     } finally {
@@ -418,23 +477,6 @@ export default function RegisterScreen({ navigation, route }: any) {
             </KISText>
           </View>
 
-          {FEATURE_FLAGS.KIS_AUTH_REGISTRATION_ENABLED && (
-            <>
-              <KISButton
-                title={googleLoading ? undefined : 'Sign up with Google'}
-                onPress={onGoogleSignUp}
-                disabled={googleLoading}
-                variant="secondary"
-                size="md"
-              >
-                {googleLoading ? <ActivityIndicator /> : null}
-              </KISButton>
-              <KISText preset="helper" color={palette.subtext} style={{ textAlign: 'center', fontWeight: '600' }}>
-                — or create an account with a password —
-              </KISText>
-            </>
-          )}
-
           <View style={styles.field}>
             <KISText preset="label" color={palette.subtext}>Display Name (optional)</KISText>
             <TextInput
@@ -501,68 +543,72 @@ export default function RegisterScreen({ navigation, route }: any) {
             </KISText>
           </View>
 
-          <View style={styles.field}>
-            <KISText preset="label" color={palette.text}>Password</KISText>
-            <TextInput
-              value={regPassword}
-              onChangeText={setRegPassword}
-              secureTextEntry
-              placeholder="Choose a strong password"
-              placeholderTextColor={palette.subtext}
-              style={[
-                styles.input,
-                inputStyle,
-                !!regPassword && !passwordValid(regPassword) && { borderColor: palette.danger },
-              ]}
-              textContentType="newPassword"
-            />
-            <View style={styles.passwordReqList}>
-              <KISText preset="helper" color={palette.subtext} style={styles.passwordReqTitle}>
-                Password must include:
-              </KISText>
-              {[
-                { label: '• At least 10 characters', ok: regPassword.length >= 10 },
-                { label: '• One uppercase letter (A-Z)', ok: /[A-Z]/.test(regPassword) },
-                { label: '• One lowercase letter (a-z)', ok: /[a-z]/.test(regPassword) },
-                { label: '• One number (0-9)', ok: /[0-9]/.test(regPassword) },
-              ].map(({ label, ok }) => (
-                <KISText
-                  key={label}
-                  preset="helper"
+          {!FEATURE_FLAGS.KIS_AUTH_REGISTRATION_ENABLED && (
+            <>
+              <View style={styles.field}>
+                <KISText preset="label" color={palette.text}>Password</KISText>
+                <TextInput
+                  value={regPassword}
+                  onChangeText={setRegPassword}
+                  secureTextEntry
+                  placeholder="Choose a strong password"
+                  placeholderTextColor={palette.subtext}
                   style={[
-                    styles.passwordReqItem,
-                    {
-                      color:
-                        regPassword.length === 0
-                          ? palette.subtext
-                          : ok
-                          ? palette.success
-                          : palette.danger,
-                    },
+                    styles.input,
+                    inputStyle,
+                    !!regPassword && !passwordValid(regPassword) && { borderColor: palette.danger },
                   ]}
-                >
-                  {label}
-                </KISText>
-              ))}
-            </View>
-          </View>
+                  textContentType="newPassword"
+                />
+                <View style={styles.passwordReqList}>
+                  <KISText preset="helper" color={palette.subtext} style={styles.passwordReqTitle}>
+                    Password must include:
+                  </KISText>
+                  {[
+                    { label: '• At least 10 characters', ok: regPassword.length >= 10 },
+                    { label: '• One uppercase letter (A-Z)', ok: /[A-Z]/.test(regPassword) },
+                    { label: '• One lowercase letter (a-z)', ok: /[a-z]/.test(regPassword) },
+                    { label: '• One number (0-9)', ok: /[0-9]/.test(regPassword) },
+                  ].map(({ label, ok }) => (
+                    <KISText
+                      key={label}
+                      preset="helper"
+                      style={[
+                        styles.passwordReqItem,
+                        {
+                          color:
+                            regPassword.length === 0
+                              ? palette.subtext
+                              : ok
+                              ? palette.success
+                              : palette.danger,
+                        },
+                      ]}
+                    >
+                      {label}
+                    </KISText>
+                  ))}
+                </View>
+              </View>
 
-          <View style={styles.field}>
-            <KISText preset="label" color={palette.text}>Confirm Password</KISText>
-            <TextInput
-              value={regPassword2}
-              onChangeText={setRegPassword2}
-              secureTextEntry
-              placeholder="Re-enter password"
-              placeholderTextColor={palette.subtext}
-              style={[
-                styles.input,
-                inputStyle,
-                !!regPassword2 && regPassword2 !== regPassword && { borderColor: palette.danger },
-              ]}
-              textContentType="newPassword"
-            />
-          </View>
+              <View style={styles.field}>
+                <KISText preset="label" color={palette.text}>Confirm Password</KISText>
+                <TextInput
+                  value={regPassword2}
+                  onChangeText={setRegPassword2}
+                  secureTextEntry
+                  placeholder="Re-enter password"
+                  placeholderTextColor={palette.subtext}
+                  style={[
+                    styles.input,
+                    inputStyle,
+                    !!regPassword2 && regPassword2 !== regPassword && { borderColor: palette.danger },
+                  ]}
+                  textContentType="newPassword"
+                />
+              </View>
+            </>
+          )}
 
           {referralFieldExpanded ? (
             <View style={styles.field}>
@@ -627,15 +673,27 @@ export default function RegisterScreen({ navigation, route }: any) {
             </KISText>
           </Pressable>
 
-          <KISButton
-            title={loading ? undefined : 'Create Account'}
-            onPress={onRegister}
-            disabled={!registerReady}
-            variant="primary"
-            size="md"
-          >
-            {loading ? <ActivityIndicator /> : null}
-          </KISButton>
+          {FEATURE_FLAGS.KIS_AUTH_REGISTRATION_ENABLED ? (
+            <KISButton
+              title={googleLoading ? undefined : 'Continue with Google'}
+              onPress={onGoogleSignUp}
+              disabled={!googleReady}
+              variant="primary"
+              size="md"
+            >
+              {googleLoading ? <ActivityIndicator /> : null}
+            </KISButton>
+          ) : (
+            <KISButton
+              title={loading ? undefined : 'Create Account'}
+              onPress={onRegister}
+              disabled={!registerReady}
+              variant="primary"
+              size="md"
+            >
+              {loading ? <ActivityIndicator /> : null}
+            </KISButton>
+          )}
 
           <View style={styles.spacer} />
         </ScrollView>

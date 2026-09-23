@@ -18,6 +18,8 @@ import {
   readLocalBiblePreference,
   writeLocalBiblePreference,
 } from '@/services/biblePreferenceStore';
+import { getCoverageSummary, STAGES_PER_GAME, TOTAL_GAMES } from '@/screens/tabs/bible/games/gameStorage';
+import { getOverallStats as getDiscipleshipStats, type OverallStats as DiscipleshipStats } from './discipleship/discipleshipStorage';
 
 type Props = {
   translations: BibleTranslation[];
@@ -77,6 +79,10 @@ export default function BibleSettingsPanel({ translations, spiritualGrowthSummar
   const streak = spiritualGrowthSummary?.journey?.streak ?? 0;
   const growthCounts = spiritualGrowthSummary?.counts ?? {};
   const growthReadiness = spiritualGrowthSummary?.readiness ?? {};
+  const journeyContext = spiritualGrowthSummary?.journey ?? {};
+  const journeyPassageLabel =
+    journeyContext.today_passage?.passage_ref || journeyContext.today_passage?.title || '';
+  const journeyMeditationLabel = journeyContext.latest_meditation?.title || '';
   const [preference, setPreference] = useState<Preference | null>(null);
   const [loadingPreference, setLoadingPreference] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -86,6 +92,34 @@ export default function BibleSettingsPanel({ translations, spiritualGrowthSummar
   const [controlRoomAllowed, setControlRoomAllowed] = useState(false);
   const [loadingControlRoom, setLoadingControlRoom] = useState(true);
   const [scanning, setScanning] = useState(false);
+
+  // Bible Games and Discipleship track engagement entirely on-device (see
+  // gameStorage.ts / discipleshipStorage.ts's "fixed and offline" design) —
+  // spiritualGrowthSummary is backend-only and has no visibility into
+  // either, so this analytics section pulls them in separately to actually
+  // cover every sub-tab of the Bible section, not just the backend-tracked
+  // ones (Read/Daily/Meditations/Prayer/Plans).
+  const [gamesStats, setGamesStats] = useState<{
+    stagesCompleted: number;
+    totalStages: number;
+    versesCovered: number;
+    totalVerses: number;
+    timesCompletedBible: number;
+  } | null>(null);
+  const [discipleshipStats, setDiscipleshipStats] = useState<DiscipleshipStats | null>(null);
+
+  useEffect(() => {
+    getCoverageSummary().then(summary => {
+      setGamesStats({
+        stagesCompleted: summary.games.reduce((sum, g) => sum + g.progress.stagesCompleted, 0),
+        totalStages: TOTAL_GAMES * STAGES_PER_GAME,
+        versesCovered: summary.games.reduce((sum, g) => sum + g.versesCoveredByCompletedStages, 0),
+        totalVerses: summary.totalBibleVerses,
+        timesCompletedBible: summary.timesCompletedBible,
+      });
+    });
+    getDiscipleshipStats().then(setDiscipleshipStats);
+  }, []);
 
   const selectedTranslationCode = useMemo(() => {
     if (preference?.default_translation_code) return preference.default_translation_code;
@@ -243,7 +277,7 @@ export default function BibleSettingsPanel({ translations, spiritualGrowthSummar
           <View style={{ flex: 1 }}>
             <Text style={[styles.sectionTitle, { color: palette.text }]}>Your journey</Text>
             <Text style={{ color: palette.subtext, marginTop: 4 }}>
-              Scripture, prayer, notes, plans, and discipleship in one flow.
+              Every part of the Bible section, in one place: reading, study, prayer, games, and discipleship.
             </Text>
           </View>
           <LinearGradient
@@ -260,12 +294,21 @@ export default function BibleSettingsPanel({ translations, spiritualGrowthSummar
             </Text>
           </LinearGradient>
         </View>
+
+        <Text style={[styles.label, { color: palette.subtext }]}>Read &amp; Study</Text>
         <View style={styles.growthStats}>
           {[
-            { label: 'Notes', value: growthCounts.notes ?? 0, icon: '📝' },
+            { label: 'Sessions', value: growthCounts.reading_sessions ?? 0, icon: '📖' },
+            { label: 'Bookmarks', value: growthCounts.bookmarks ?? 0, icon: '🔖' },
             { label: 'Highlights', value: growthCounts.highlights ?? 0, icon: '✨' },
-            { label: 'Plans', value: growthCounts.active_reading_plans ?? 0, icon: '📅' },
+            { label: 'Notes', value: growthCounts.notes ?? 0, icon: '📝' },
+            { label: 'Memory verses', value: growthCounts.memory_verses ?? 0, icon: '🧠' },
+            { label: 'Active plans', value: growthCounts.active_reading_plans ?? 0, icon: '📅' },
+            { label: 'Scheduled', value: growthCounts.scheduled_reading_events ?? 0, icon: '⏰' },
             { label: 'Missed', value: growthCounts.missed_reading_events ?? 0, icon: '⚠️' },
+            { label: 'Active courses', value: growthCounts.active_courses ?? 0, icon: '🎓' },
+            { label: 'Completed', value: growthCounts.completed_courses ?? 0, icon: '🏁' },
+            { label: 'Live sessions', value: growthCounts.upcoming_live_sessions ?? 0, icon: '🎥' },
           ].map((item) => (
             <View key={item.label} style={[styles.growthStat, { backgroundColor: palette.surface, borderColor: palette.divider }]}>
               <Text style={{ fontSize: 16, marginBottom: 2 }}>{item.icon}</Text>
@@ -276,17 +319,111 @@ export default function BibleSettingsPanel({ translations, spiritualGrowthSummar
             </View>
           ))}
         </View>
+
+        {(journeyContext.today_passage || journeyContext.latest_meditation || journeyContext.prayer_focus || journeyContext.next_reading_event) ? (
+          <View style={styles.journeyContextStack}>
+            {journeyContext.today_passage ? (
+              <Text style={{ color: palette.subtext, fontSize: 12 }}>
+                📖 Today's passage: <Text style={{ fontWeight: '800', color: palette.text }}>{journeyPassageLabel}</Text>
+              </Text>
+            ) : null}
+            {journeyContext.latest_meditation ? (
+              <Text style={{ color: palette.subtext, fontSize: 12 }} numberOfLines={1}>
+                🕊️ Latest meditation: <Text style={{ fontWeight: '800', color: palette.text }}>{journeyMeditationLabel}</Text>
+              </Text>
+            ) : null}
+            {journeyContext.prayer_focus ? (
+              <Text style={{ color: palette.subtext, fontSize: 12 }} numberOfLines={1}>
+                🙏 Prayer focus active this month
+              </Text>
+            ) : null}
+            {journeyContext.next_reading_event ? (
+              <Text style={{ color: palette.subtext, fontSize: 12 }} numberOfLines={1}>
+                📅 A reading-plan event is coming up
+              </Text>
+            ) : null}
+          </View>
+        ) : null}
+
+        <Text style={[styles.label, { color: palette.subtext, marginTop: 10 }]}>Readiness</Text>
         <View style={styles.growthSignals}>
           {[
             growthReadiness.family_safe_journey ? 'Family-safe ✓' : 'Safety pending',
             growthReadiness.low_bandwidth_ready ? 'Offline-ready ✓' : 'Online-first',
             growthReadiness.licensed_translations_ready ? 'Licensed ✓' : 'License review',
             growthReadiness.study_courses_ready ? 'Study-ready ✓' : 'Study setup',
+            growthReadiness.offline_scripture_ready ? 'Offline Scripture ✓' : 'Scripture online-only',
+            growthReadiness.audio_sync_ready ? 'Audio sync ✓' : 'Audio sync pending',
+            growthReadiness.reading_plans_ready ? 'Plans ready ✓' : 'Plans setup',
+            growthReadiness.highlights_notes_ready ? 'Highlights/Notes ✓' : 'Highlights setup',
+            growthReadiness.prayer_calendar_ready ? 'Prayer calendar ✓' : 'Prayer setup',
+            growthReadiness.live_devotionals_ready ? 'Live devotionals ✓' : 'Live setup',
           ].map((label) => (
             <View key={label} style={[styles.growthSignal, { borderColor: palette.divider, backgroundColor: palette.surface }]}>
               <Text style={{ color: palette.subtext, fontSize: 11, fontWeight: '700' }}>{label}</Text>
             </View>
           ))}
+        </View>
+      </BibleSectionCard>
+
+      <BibleSectionCard>
+        <Text style={[styles.sectionTitle, { color: palette.text }]}>Games &amp; Discipleship</Text>
+        <Text style={{ color: palette.subtext, marginTop: 4 }}>
+          Tracked entirely on this device — offline, same as the games and discipleship journey themselves.
+        </Text>
+        <View style={styles.growthStats}>
+          {gamesStats ? (
+            <>
+              <View style={[styles.growthStat, { backgroundColor: palette.surface, borderColor: palette.divider }]}>
+                <Text style={{ fontSize: 16, marginBottom: 2 }}>🎮</Text>
+                <Text style={[styles.growthStatValue, { color: palette.text }]}>
+                  {gamesStats.stagesCompleted}/{gamesStats.totalStages}
+                </Text>
+                <Text style={[styles.growthStatLabel, { color: palette.subtext }]}>Game stages</Text>
+              </View>
+              <View style={[styles.growthStat, { backgroundColor: palette.surface, borderColor: palette.divider }]}>
+                <Text style={{ fontSize: 16, marginBottom: 2 }}>📜</Text>
+                <Text style={[styles.growthStatValue, { color: palette.text }]}>
+                  {gamesStats.versesCovered > 999 ? `${Math.round(gamesStats.versesCovered / 1000)}k` : gamesStats.versesCovered}
+                </Text>
+                <Text style={[styles.growthStatLabel, { color: palette.subtext }]}>Verses covered</Text>
+              </View>
+              <View style={[styles.growthStat, { backgroundColor: palette.surface, borderColor: palette.divider }]}>
+                <Text style={{ fontSize: 16, marginBottom: 2 }}>🔁</Text>
+                <Text style={[styles.growthStatValue, { color: palette.text }]}>{gamesStats.timesCompletedBible}</Text>
+                <Text style={[styles.growthStatLabel, { color: palette.subtext }]}>Bible finished</Text>
+              </View>
+            </>
+          ) : (
+            <View style={styles.stateBox}>
+              <ActivityIndicator color={palette.primaryStrong} size="small" />
+            </View>
+          )}
+          {discipleshipStats ? (
+            <>
+              <View style={[styles.growthStat, { backgroundColor: palette.surface, borderColor: palette.divider }]}>
+                <Text style={{ fontSize: 16, marginBottom: 2 }}>🏛️</Text>
+                <Text style={[styles.growthStatValue, { color: palette.text }]}>
+                  {discipleshipStats.doctrinesCompleted}/{discipleshipStats.totalDoctrines}
+                </Text>
+                <Text style={[styles.growthStatLabel, { color: palette.subtext }]}>Pillars done</Text>
+              </View>
+              <View style={[styles.growthStat, { backgroundColor: palette.surface, borderColor: palette.divider }]}>
+                <Text style={{ fontSize: 16, marginBottom: 2 }}>📆</Text>
+                <Text style={[styles.growthStatValue, { color: palette.text }]}>
+                  {discipleshipStats.daysCompleted}/{discipleshipStats.totalDays}
+                </Text>
+                <Text style={[styles.growthStatLabel, { color: palette.subtext }]}>Study days</Text>
+              </View>
+              <View style={[styles.growthStat, { backgroundColor: palette.surface, borderColor: palette.divider }]}>
+                <Text style={{ fontSize: 16, marginBottom: 2 }}>🎖️</Text>
+                <Text style={[styles.growthStatValue, { color: palette.text }]}>
+                  {discipleshipStats.journeyComplete ? 'Earned' : '—'}
+                </Text>
+                <Text style={[styles.growthStatLabel, { color: palette.subtext }]}>Badge</Text>
+              </View>
+            </>
+          ) : null}
         </View>
       </BibleSectionCard>
 
@@ -499,6 +636,7 @@ const styles = StyleSheet.create({
   },
   growthStatValue: { fontSize: 17, fontWeight: '900', letterSpacing: 0.1 },
   growthStatLabel: { fontSize: 11, fontWeight: '700', marginTop: 2, letterSpacing: 0.1 },
+  journeyContextStack: { gap: 4, marginTop: 10 },
   growthSignals: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 },
   growthSignal: { borderWidth: 1, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 6 },
   label: { fontSize: 12, fontWeight: '900', textTransform: 'uppercase', marginTop: 4 },

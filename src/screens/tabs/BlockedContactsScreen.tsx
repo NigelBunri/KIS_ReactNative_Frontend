@@ -42,6 +42,13 @@ export async function blockContact(contact: BlockedContact): Promise<void> {
       list.unshift(contact);
       await AsyncStorage.setItem(BLOCKED_KEY, JSON.stringify(list));
     }
+    // MessageTabs.tsx reads this same AsyncStorage key to hide/show chats
+    // with blocked users — without this, its in-memory blockedUserIds set
+    // goes stale until the app restarts, so a chat can stay hidden after
+    // unblocking (or visible after blocking) even though the source list
+    // itself updated correctly. Was previously only emitted from the
+    // in-chat block action (ChatRoomHandlers.tsx), never from here.
+    DeviceEventEmitter.emit('blocked.contacts.refresh');
   } catch { /* silent */ }
 }
 
@@ -59,6 +66,7 @@ export async function unblockContact(userId: string): Promise<void> {
     const list: BlockedContact[] = JSON.parse(raw);
     const next = list.filter((c) => c.userId !== userId);
     await AsyncStorage.setItem(BLOCKED_KEY, JSON.stringify(next));
+    DeviceEventEmitter.emit('blocked.contacts.refresh');
   } catch { /* silent */ }
 }
 

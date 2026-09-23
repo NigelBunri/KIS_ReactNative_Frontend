@@ -473,6 +473,20 @@ export default function ActiveCallScreen({ session, actions }: Props) {
       borderRadius: 10,
       padding: 3,
     },
+    selfVbgBadge: {
+      position: 'absolute',
+      top: 6,
+      left: 6,
+      backgroundColor: palette.overlay,
+      borderRadius: 8,
+      paddingHorizontal: 6,
+      paddingVertical: 2,
+    },
+    selfVbgBadgeText: {
+      color: palette.ivory,
+      fontSize: 9,
+      fontWeight: '800',
+    },
 
     // Ended card
     endedBg: {
@@ -1063,6 +1077,11 @@ function VideoOneOnOneLayout({ session, remoteParticipants, isConnecting, localS
           {session.isMuted && (
             <View style={styles.selfMutedBadge}>
               <KISIcon name="mic-off" size={11} color={palette.danger} />
+            </View>
+          )}
+          {virtualBgOption && virtualBgOption.mode !== 'none' && (
+            <View style={styles.selfVbgBadge}>
+              <Text style={styles.selfVbgBadgeText}>You only</Text>
             </View>
           )}
         </Animated.View>
