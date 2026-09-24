@@ -543,72 +543,85 @@ export default function RegisterScreen({ navigation, route }: any) {
             </KISText>
           </View>
 
-          {!FEATURE_FLAGS.KIS_AUTH_REGISTRATION_ENABLED && (
+          {FEATURE_FLAGS.KIS_AUTH_REGISTRATION_ENABLED && (
             <>
-              <View style={styles.field}>
-                <KISText preset="label" color={palette.text}>Password</KISText>
-                <TextInput
-                  value={regPassword}
-                  onChangeText={setRegPassword}
-                  secureTextEntry
-                  placeholder="Choose a strong password"
-                  placeholderTextColor={palette.subtext}
-                  style={[
-                    styles.input,
-                    inputStyle,
-                    !!regPassword && !passwordValid(regPassword) && { borderColor: palette.danger },
-                  ]}
-                  textContentType="newPassword"
-                />
-                <View style={styles.passwordReqList}>
-                  <KISText preset="helper" color={palette.subtext} style={styles.passwordReqTitle}>
-                    Password must include:
-                  </KISText>
-                  {[
-                    { label: '• At least 10 characters', ok: regPassword.length >= 10 },
-                    { label: '• One uppercase letter (A-Z)', ok: /[A-Z]/.test(regPassword) },
-                    { label: '• One lowercase letter (a-z)', ok: /[a-z]/.test(regPassword) },
-                    { label: '• One number (0-9)', ok: /[0-9]/.test(regPassword) },
-                  ].map(({ label, ok }) => (
-                    <KISText
-                      key={label}
-                      preset="helper"
-                      style={[
-                        styles.passwordReqItem,
-                        {
-                          color:
-                            regPassword.length === 0
-                              ? palette.subtext
-                              : ok
-                              ? palette.success
-                              : palette.danger,
-                        },
-                      ]}
-                    >
-                      {label}
-                    </KISText>
-                  ))}
-                </View>
-              </View>
-
-              <View style={styles.field}>
-                <KISText preset="label" color={palette.text}>Confirm Password</KISText>
-                <TextInput
-                  value={regPassword2}
-                  onChangeText={setRegPassword2}
-                  secureTextEntry
-                  placeholder="Re-enter password"
-                  placeholderTextColor={palette.subtext}
-                  style={[
-                    styles.input,
-                    inputStyle,
-                    !!regPassword2 && regPassword2 !== regPassword && { borderColor: palette.danger },
-                  ]}
-                  textContentType="newPassword"
-                />
-              </View>
+              <KISButton
+                title={googleLoading ? undefined : 'Continue with Google'}
+                onPress={onGoogleSignUp}
+                disabled={!googleReady}
+                variant="primary"
+                size="md"
+              >
+                {googleLoading ? <ActivityIndicator /> : null}
+              </KISButton>
+              <KISText preset="helper" color={palette.subtext} style={{ fontWeight: '600', textAlign: 'center' }}>
+                — or create an account with a password —
+              </KISText>
             </>
           )}
+
+          <View style={styles.field}>
+            <KISText preset="label" color={palette.text}>Password</KISText>
+            <TextInput
+              value={regPassword}
+              onChangeText={setRegPassword}
+              secureTextEntry
+              placeholder="Choose a strong password"
+              placeholderTextColor={palette.subtext}
+              style={[
+                styles.input,
+                inputStyle,
+                !!regPassword && !passwordValid(regPassword) && { borderColor: palette.danger },
+              ]}
+              textContentType="newPassword"
+            />
+            <View style={styles.passwordReqList}>
+              <KISText preset="helper" color={palette.subtext} style={styles.passwordReqTitle}>
+                Password must include:
+              </KISText>
+              {[
+                { label: '• At least 10 characters', ok: regPassword.length >= 10 },
+                { label: '• One uppercase letter (A-Z)', ok: /[A-Z]/.test(regPassword) },
+                { label: '• One lowercase letter (a-z)', ok: /[a-z]/.test(regPassword) },
+                { label: '• One number (0-9)', ok: /[0-9]/.test(regPassword) },
+              ].map(({ label, ok }) => (
+                <KISText
+                  key={label}
+                  preset="helper"
+                  style={[
+                    styles.passwordReqItem,
+                    {
+                      color:
+                        regPassword.length === 0
+                          ? palette.subtext
+                          : ok
+                          ? palette.success
+                          : palette.danger,
+                    },
+                  ]}
+                >
+                  {label}
+                </KISText>
+              ))}
+            </View>
+          </View>
+
+          <View style={styles.field}>
+            <KISText preset="label" color={palette.text}>Confirm Password</KISText>
+            <TextInput
+              value={regPassword2}
+              onChangeText={setRegPassword2}
+              secureTextEntry
+              placeholder="Re-enter password"
+              placeholderTextColor={palette.subtext}
+              style={[
+                styles.input,
+                inputStyle,
+                !!regPassword2 && regPassword2 !== regPassword && { borderColor: palette.danger },
+              ]}
+              textContentType="newPassword"
+            />
+          </View>
 
           {referralFieldExpanded ? (
             <View style={styles.field}>
@@ -673,27 +686,15 @@ export default function RegisterScreen({ navigation, route }: any) {
             </KISText>
           </Pressable>
 
-          {FEATURE_FLAGS.KIS_AUTH_REGISTRATION_ENABLED ? (
-            <KISButton
-              title={googleLoading ? undefined : 'Continue with Google'}
-              onPress={onGoogleSignUp}
-              disabled={!googleReady}
-              variant="primary"
-              size="md"
-            >
-              {googleLoading ? <ActivityIndicator /> : null}
-            </KISButton>
-          ) : (
-            <KISButton
-              title={loading ? undefined : 'Create Account'}
-              onPress={onRegister}
-              disabled={!registerReady}
-              variant="primary"
-              size="md"
-            >
-              {loading ? <ActivityIndicator /> : null}
-            </KISButton>
-          )}
+          <KISButton
+            title={loading ? undefined : 'Create Account'}
+            onPress={onRegister}
+            disabled={!registerReady}
+            variant="primary"
+            size="md"
+          >
+            {loading ? <ActivityIndicator /> : null}
+          </KISButton>
 
           <View style={styles.spacer} />
         </ScrollView>
