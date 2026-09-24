@@ -13,11 +13,13 @@ import {
   Platform,
   Pressable,
   ScrollView,
+  Share,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from 'react-native';
+import Clipboard from '@react-native-clipboard/clipboard';
 import { useKISTheme } from '@/theme/useTheme';
 import ROUTES from '@/network';
 import { getRequest } from '@/network/get';
@@ -70,6 +72,7 @@ export default function GuestInviteSheet({
   const [inviteRole, setInviteRole] = useState<GuestRole>('GUEST');
   const [inviting, setInviting]     = useState(false);
   const [actioning, setActioning]   = useState<string | null>(null);
+  const [pendingShareLink, setPendingShareLink] = useState<string | null>(null);
 
   // ── Fetch guests ─────────────────────────────────────────────────────────────
 
@@ -93,6 +96,7 @@ export default function GuestInviteSheet({
 
   useEffect(() => {
     if (visible) fetchGuests();
+    else setPendingShareLink(null);
   }, [visible, fetchGuests]);
 
   // ── Invite ───────────────────────────────────────────────────────────────────
@@ -104,11 +108,17 @@ export default function GuestInviteSheet({
     try {
       const res = await postRequest(
         ROUTES.broadcasts.liveStreamGuests(streamId),
-        { user: query, role: inviteRole },
+        { email: query, role: inviteRole },
         { errorMessage: 'Failed to send invite' },
       );
       if (res?.success || res?.data) {
         setInviteInput('');
+        const link = res.data?.share_link ?? null;
+        if (link) {
+          setPendingShareLink(link);
+        } else {
+          Alert.alert('Invited', `${query} has been notified in-app.`);
+        }
         await fetchGuests();
       } else {
         Alert.alert('Invite failed', res?.message || 'Please try again.');
@@ -266,7 +276,7 @@ export default function GuestInviteSheet({
                 <TextInput
                   value={inviteInput}
                   onChangeText={setInviteInput}
-                  placeholder="Username or email"
+                  placeholder="Email address"
                   placeholderTextColor={palette.subtext}
                   style={[
                     styles.inviteInput,
@@ -323,6 +333,43 @@ export default function GuestInviteSheet({
                     <Text style={[styles.inviteBtnText, { color: palette.onPrimary }]}>Send Invite</Text>
                   )}
                 </Pressable>
+
+                {pendingShareLink && (
+                  <View style={[styles.shareLinkBox, { backgroundColor: palette.surfaceElevated, borderColor: palette.border }]}>
+                    <Text style={[styles.shareLinkNote, { color: palette.subtext }]}>
+                      This guest isn't on KIS yet. Share this link with them to join —
+                      it's expiring and can only be used once.
+                    </Text>
+                    <Text style={[styles.shareLinkText, { color: palette.text }]} numberOfLines={1}>
+                      {pendingShareLink}
+                    </Text>
+                    <View style={styles.shareLinkActionsRow}>
+                      <Pressable
+                        onPress={() => {
+                          Clipboard.setString(pendingShareLink);
+                          Alert.alert('Copied', 'Guest invite link copied to clipboard.');
+                        }}
+                        style={[styles.shareLinkActionBtn, { backgroundColor: palette.surface, borderColor: palette.border }]}
+                      >
+                        <Text style={[styles.shareLinkActionText, { color: palette.text }]}>Copy Link</Text>
+                      </Pressable>
+                      <Pressable
+                        onPress={() => {
+                          Share.share({ message: pendingShareLink }).catch(() => {});
+                        }}
+                        style={[styles.shareLinkActionBtn, { backgroundColor: palette.gold }]}
+                      >
+                        <Text style={[styles.shareLinkActionText, { color: palette.onPrimary }]}>Share</Text>
+                      </Pressable>
+                      <Pressable
+                        onPress={() => setPendingShareLink(null)}
+                        style={styles.shareLinkDismissBtn}
+                      >
+                        <Text style={[styles.shareLinkDismissText, { color: palette.subtext }]}>Dismiss</Text>
+                      </Pressable>
+                    </View>
+                  </View>
+                )}
               </View>
             )}
           </ScrollView>
@@ -424,4 +471,23 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   inviteBtnText: { fontWeight: '800', fontSize: 14 },
+  shareLinkBox: {
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 12,
+    gap: 8,
+  },
+  shareLinkNote: { fontSize: 12, fontWeight: '500', lineHeight: 17 },
+  shareLinkText: { fontSize: 12, fontWeight: '600' },
+  shareLinkActionsRow: { flexDirection: 'row', gap: 8, alignItems: 'center' },
+  shareLinkActionBtn: {
+    flex: 1,
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
+  shareLinkActionText: { fontWeight: '800', fontSize: 12 },
+  shareLinkDismissBtn: { paddingHorizontal: 8, paddingVertical: 10 },
+  shareLinkDismissText: { fontWeight: '600', fontSize: 12 },
 });

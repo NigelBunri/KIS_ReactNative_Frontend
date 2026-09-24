@@ -100,6 +100,7 @@ import BroadcastSearchScreen from '@/screens/broadcast/channels/BroadcastSearchS
 import ChannelMembersScreen from '@/screens/broadcast/channels/ChannelMembersScreen';
 import MembershipScreen from '@/screens/broadcast/channels/MembershipScreen';
 import GiftMembershipRedeemScreen from '@/screens/broadcast/channels/GiftMembershipRedeemScreen';
+import LiveGuestRedeemScreen from '@/screens/broadcast/channels/studio/LiveGuestRedeemScreen';
 import PartnerInsightsScreen from './src/screens/insights/PartnerInsightsScreen';
 import AdminToolsScreen from './src/screens/insights/AdminToolsScreen';
 import AdminDashboardScreen from './src/screens/insights/AdminDashboardScreen';
@@ -200,6 +201,7 @@ import ParentRecoveryScreen from '@/screens/ParentRecoveryScreen';
 import KisAuthLinkScreen from '@/screens/KisAuthLinkScreen';
 import KisAuthRegisterPhoneScreen from '@/screens/KisAuthRegisterPhoneScreen';
 import InvoiceListScreen from '@/screens/market/InvoiceListScreen';
+import TransactionHistoryScreen from '@/screens/market/TransactionHistoryScreen';
 import LoyaltyScreen from '@/screens/market/LoyaltyScreen';
 import ReferralScreen from '@/screens/market/ReferralScreen';
 import ContactShareLinkScreen from '@/screens/chat/ContactShareLinkScreen';
@@ -1380,6 +1382,7 @@ function AppContent() {
                   InviteJoin: 'join/:type/:token',
                   PartnerRedeemInvite: 'join/partner/:code',
                   GiftMembershipRedeem: 'gift/:token',
+                  LiveGuestRedeem: 'live-guest/:token',
 
                   CallJoin: 'call/join/:token',
 
@@ -1485,6 +1488,11 @@ function AppContent() {
                     <RootStack.Screen
                       name="GiftMembershipRedeem"
                       getComponent={() => GiftMembershipRedeemScreen}
+                      options={{ headerShown: false }}
+                    />
+                    <RootStack.Screen
+                      name="LiveGuestRedeem"
+                      getComponent={() => LiveGuestRedeemScreen}
                       options={{ headerShown: false }}
                     />
                     <RootStack.Screen
@@ -1743,6 +1751,11 @@ function AppContent() {
                     <RootStack.Screen
                       name="InvoiceList"
                       getComponent={() => InvoiceListScreen}
+                      options={{ presentation: 'modal' }}
+                    />
+                    <RootStack.Screen
+                      name="TransactionHistory"
+                      getComponent={() => TransactionHistoryScreen}
                       options={{ presentation: 'modal' }}
                     />
                     <RootStack.Screen

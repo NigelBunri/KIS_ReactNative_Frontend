@@ -10,11 +10,13 @@ import {
   Modal,
   Pressable,
   ScrollView,
+  Share,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from 'react-native';
+import Clipboard from '@react-native-clipboard/clipboard';
 import { SafeAreaView } from '@/components/common/SafeAreaViewWithTopPadding';
 import { useKISTheme } from '@/theme/useTheme';
 import { KISIcon } from '@/constants/kisIcons';
@@ -52,6 +54,7 @@ export default function GiftMembershipSheet({ channelId, tiers, visible, onClose
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [paymentModal, setPaymentModal] = useState(false);
+  const [shareLink, setShareLink] = useState<string | null>(null);
 
   const selectedTier = tiers.find(t => t.id === selectedTierId);
 
@@ -119,7 +122,7 @@ export default function GiftMembershipSheet({ channelId, tiers, visible, onClose
             await Linking.openURL(url);
             Alert.alert(
               'Complete payment',
-              'Finish payment in the browser to send the gift. The recipient is emailed once payment is confirmed.',
+              'Finish payment in the browser to send the gift. If the recipient is a KIS member, they\'ll be notified in-app once payment is confirmed. Otherwise, you\'ll get a shareable gift link via notification to pass along.',
               [{ text: 'OK', onPress: handleClose }],
             );
           } else {
@@ -129,6 +132,7 @@ export default function GiftMembershipSheet({ channelId, tiers, visible, onClose
           Alert.alert('Error', 'Payment link unavailable. Please try again.');
         }
       } else {
+        setShareLink(res.data?.share_link ?? null);
         setSuccess(true);
       }
     } catch {
@@ -143,6 +147,7 @@ export default function GiftMembershipSheet({ channelId, tiers, visible, onClose
     setPaymentModal(false);
     setRecipient('');
     setMessage('');
+    setShareLink(null);
     setSelectedTierId(tiers[0]?.id ?? null);
     onClose();
   };
@@ -171,9 +176,42 @@ export default function GiftMembershipSheet({ channelId, tiers, visible, onClose
               <Text style={[styles.successTitle, { color: palette.text }]}>
                 Membership gifted!
               </Text>
-              <Text style={[styles.successSubtext, { color: palette.subtext }]}>
-                Your gift has been sent to {recipient}.
-              </Text>
+              {shareLink ? (
+                <>
+                  <Text style={[styles.successSubtext, { color: palette.subtext }]}>
+                    {recipient} isn't on KIS yet. Share this link with them to redeem the gift —
+                    it's single-use and expires soon.
+                  </Text>
+                  <View style={[styles.linkBox, { backgroundColor: palette.surface, borderColor: palette.border }]}>
+                    <Text style={[styles.linkText, { color: palette.text }]} numberOfLines={1}>
+                      {shareLink}
+                    </Text>
+                  </View>
+                  <View style={styles.linkActionsRow}>
+                    <Pressable
+                      onPress={() => {
+                        Clipboard.setString(shareLink);
+                        Alert.alert('Copied', 'Gift link copied to clipboard.');
+                      }}
+                      style={[styles.linkActionBtn, { backgroundColor: palette.surface, borderColor: palette.border }]}
+                    >
+                      <Text style={[styles.linkActionText, { color: palette.text }]}>Copy Link</Text>
+                    </Pressable>
+                    <Pressable
+                      onPress={() => {
+                        Share.share({ message: shareLink }).catch(() => {});
+                      }}
+                      style={[styles.linkActionBtn, { backgroundColor: palette.primaryStrong }]}
+                    >
+                      <Text style={[styles.linkActionText, { color: palette.onPrimary }]}>Share</Text>
+                    </Pressable>
+                  </View>
+                </>
+              ) : (
+                <Text style={[styles.successSubtext, { color: palette.subtext }]}>
+                  {recipient} has been notified in-app.
+                </Text>
+              )}
               <Pressable
                 onPress={handleClose}
                 style={[styles.doneBtn, { backgroundColor: palette.primaryStrong }]}
@@ -407,6 +445,23 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   doneBtnText: { fontWeight: '800', fontSize: 14 },
+  linkBox: {
+    width: '100%',
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  linkText: { fontSize: 12, fontWeight: '600' },
+  linkActionsRow: { flexDirection: 'row', gap: 10, width: '100%' },
+  linkActionBtn: {
+    flex: 1,
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  linkActionText: { fontWeight: '800', fontSize: 13 },
   paymentNote: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: -4 },
   paymentNoteText: { fontSize: 11, fontWeight: '600' },
   providerOverlay: {

@@ -70,6 +70,7 @@ export type RootStackParamList = {
   CallJoin: { token: string };
   PartnerRedeemInvite: { code?: string };
   GiftMembershipRedeem: { token?: string };
+  LiveGuestRedeem: { token?: string };
   OrganizationAppForm: { partnerId: string; app?: PartnerOrganizationApp };
   HealthInstitutionDetail: {
     institutionId: string;
@@ -219,6 +220,7 @@ export type RootStackParamList = {
   KisAuthLink: undefined;
   KisAuthRegisterPhone: { registrationCode: string; redirectUri: string; state?: string } | undefined;
   InvoiceList: undefined;
+  TransactionHistory: undefined;
   Loyalty: undefined;
   Referrals: undefined;
   ContactShareLink: undefined;

@@ -25,6 +25,7 @@ import KISTextInput from '../constants/KISTextInput';
 import KISText from '@/components/common/KISText';
 import { setUserData } from '@/network/cache';
 import { postRequest } from '@/network/post/index';
+import { getRequest } from '@/network/get';
 import ROUTES from '@/network';
 import { useAuth } from '../../App';
 import { ensureDeviceId, initE2EE } from '@/security/e2ee';
@@ -153,10 +154,32 @@ export default function LoginScreen({ navigation }: any) {
   const [forgotPassword, setForgotPassword] = useState('');
   const [forgotLoading, setForgotLoading] = useState(false);
   const [qrLoading, setQrLoading] = useState(false);
+  // Preferred reset-code delivery channel, resolved from what's actually
+  // configured (SMS/WhatsApp preferred over email) rather than hardcoded —
+  // email is the last-resort fallback, not the default.
+  const [forgotChannel, setForgotChannel] = useState<'sms' | 'whatsapp' | 'email'>('email');
 
   useEffect(() => {
     return navigation.addListener('focus', () => setQrLoading(false));
   }, [navigation]);
+
+  useEffect(() => {
+    if (!forgotVisible) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await getRequest(ROUTES.auth.otpChannels, { forceNetwork: true });
+        if (cancelled || !res?.success || !res?.data) return;
+        if (res.data.sms) setForgotChannel('sms');
+        else if (res.data.whatsapp) setForgotChannel('whatsapp');
+        else setForgotChannel('email');
+      } catch {
+        // Keep the default ('email') — the backend still validates
+        // availability before sending, so this fails safe either way.
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [forgotVisible]);
 
   useEffect(() => {
     AsyncStorage.multiGet(['user_dial_code', 'user_country_code']).then(pairs => {
@@ -406,7 +429,7 @@ export default function LoginScreen({ navigation }: any) {
     try {
       if (!forgotPhoneValid || forgotLoading) return;
       setForgotLoading(true);
-      const payload = { phone: forgotPhoneE164, channel: 'email' };
+      const payload = { phone: forgotPhoneE164, channel: forgotChannel };
       const res = await postRequest(ROUTES.auth.forgotPassword, payload, {
         errorMessage: 'Unable to send reset code.',
       });

@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo } from 'react';
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import { Alert, Pressable, ScrollView, Share, Text, View } from 'react-native';
+import Clipboard from '@react-native-clipboard/clipboard';
 import { SafeAreaView } from '@/components/common/SafeAreaViewWithTopPadding';
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
 import { useKISTheme } from '@/theme/useTheme';
@@ -8,6 +9,19 @@ import { KISIcon } from '@/constants/kisIcons';
 import type { RootStackParamList } from '@/navigation/types';
 import { markInAppNotificationAsRead, type InAppNotification } from '@/services/inAppNotificationService';
 import { routeNotification } from '@/push/notificationRouter';
+
+// Comms migration (Sep 2026): notifications like GIFT_READY_TO_SHARE and
+// GUEST_INVITATION_READY_TO_SHARE embed a share link directly in their body
+// text rather than a structured field (InAppNotification doesn't carry the
+// backend's context_data yet) - this pulls it back out so it's copyable/
+// shareable with one tap instead of the reader having to manually select
+// a URL out of a paragraph. Generic on purpose: works for any notification
+// whose body happens to contain a link, not just these two types.
+function extractLink(body: string | undefined): string | null {
+  if (!body) return null;
+  const match = body.match(/https?:\/\/\S+/);
+  return match ? match[0].replace(/[.,)]+$/, '') : null;
+}
 
 // Maps a backend Notification's target_type/target_id (see
 // apps/notifications/models.py + the mark-source-read target_type alias
@@ -74,6 +88,8 @@ export default function ProfileNotificationDetailScreen() {
     return () => routeNotification(data, navigation);
   }, [notification, navigation]);
 
+  const shareLink = useMemo(() => extractLink(notification?.body), [notification]);
+
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg, }} edges={['top']}>
       <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: responsive.pageGutter, gap: 16, width: '100%', maxWidth: responsive.contentMaxWidth, alignSelf: 'center' }}>
@@ -106,6 +122,51 @@ export default function ProfileNotificationDetailScreen() {
             Status: {notification?.readAt ? 'Read' : 'Unread'}
           </Text>
         </View>
+
+        {shareLink ? (
+          <View
+            style={{
+              borderWidth: 1,
+              borderColor: palette.divider,
+              borderRadius: 16,
+              backgroundColor: palette.surface,
+              padding: 14,
+              gap: 10,
+            }}
+          >
+            <Text style={{ color: palette.subtext, fontSize: 12, fontWeight: '700', textTransform: 'uppercase' }}>
+              Share link
+            </Text>
+            <Text style={{ color: palette.text, fontSize: 13, fontWeight: '600' }} numberOfLines={1}>
+              {shareLink}
+            </Text>
+            <View style={{ flexDirection: 'row', gap: 10 }}>
+              <Pressable
+                onPress={() => {
+                  Clipboard.setString(shareLink);
+                  Alert.alert('Copied', 'Link copied to clipboard.');
+                }}
+                style={{
+                  flex: 1, borderWidth: 1.5, borderColor: palette.border ?? palette.divider,
+                  borderRadius: 10, paddingVertical: 12, alignItems: 'center',
+                }}
+              >
+                <Text style={{ color: palette.text, fontWeight: '700', fontSize: 13 }}>Copy Link</Text>
+              </Pressable>
+              <Pressable
+                onPress={() => {
+                  Share.share({ message: shareLink }).catch(() => {});
+                }}
+                style={{
+                  flex: 1, borderRadius: 10, paddingVertical: 12, alignItems: 'center',
+                  backgroundColor: palette.primaryStrong,
+                }}
+              >
+                <Text style={{ color: palette.onPrimary, fontWeight: '700', fontSize: 13 }}>Share</Text>
+              </Pressable>
+            </View>
+          </View>
+        ) : null}
 
         {goToSource ? (
           <Pressable

@@ -3106,6 +3106,23 @@ export default function ProfileScreen() {
                     billingLinksStyles.link,
                     { borderBottomColor: palette.divider },
                   ]}
+                  onPress={() => rootNavigation?.navigate('TransactionHistory')}
+                >
+                  <Text
+                    style={[
+                      billingLinksStyles.linkText,
+                      { color: palette.text },
+                    ]}
+                  >
+                    Transaction History
+                  </Text>
+                  <KISIcon name="chevron-right" size={16} color={palette.subtext} />
+                </Pressable>
+                <Pressable
+                  style={[
+                    billingLinksStyles.link,
+                    { borderBottomColor: palette.divider },
+                  ]}
                   onPress={() => rootNavigation?.navigate('Loyalty')}
                 >
                   <Text

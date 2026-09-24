@@ -841,6 +841,7 @@ const broadcastRoutes = {
     channelPayoutRequests: (id: string) => `${API_BASE_URL}/api/v1/broadcasts/channels/${id}/payout-requests/`,
     liveStreamGuests: (id: string) => `${API_BASE_URL}/api/v1/broadcasts/live-streams/${id}/guests/`,
     liveStreamGuestAction: (streamId: string, guestId: string) => `${API_BASE_URL}/api/v1/broadcasts/live-streams/${streamId}/guests/${guestId}/`,
+    liveStreamGuestRedeem: (token: string) => `${API_BASE_URL}/api/v1/broadcasts/live-streams/guests/${token}/redeem/`,
     recommendations: `${API_BASE_URL}/api/v1/broadcasts/recommendations/`,
     contentProducts: (id: string) => `${API_BASE_URL}/api/v1/broadcasts/channel-contents/${id}/products/`,
     contentAutoChapters: (id: string) => `${API_BASE_URL}/api/v1/broadcasts/channel-contents/${id}/auto-chapters/`,
