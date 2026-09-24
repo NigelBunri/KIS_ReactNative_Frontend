@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   ScrollView,
   Pressable,
@@ -60,6 +60,19 @@ export const QuickRepliesBar: React.FC<Props> = ({
     return suggestReplies(lastMessage);
   }, [lastMessage]);
 
+  // The bar's visibility/content is keyed on the last RECEIVED message, not
+  // on whether a reply was already sent — so without this, the same chips
+  // stay tappable after a send (nothing about lastMessage changes just
+  // because *this device* replied to it), and a double-tap fires onSelect
+  // twice with two fresh clientIds, creating two genuinely separate sent
+  // messages. Lock the whole row the instant any chip is tapped; a new
+  // incoming message (a new lastMessage identity) unlocks it again.
+  const [sentForMessage, setSentForMessage] = useState<ChatMessage | null>(null);
+  useEffect(() => {
+    setSentForMessage(null);
+  }, [lastMessage]);
+  const locked = sentForMessage === lastMessage;
+
   if (suggestions.length === 0) return null;
 
   return (
@@ -73,14 +86,19 @@ export const QuickRepliesBar: React.FC<Props> = ({
         {suggestions.map((text, idx) => (
           <Pressable
             key={idx}
+            disabled={locked}
             style={[
               styles.chip,
               {
                 backgroundColor: palette.surfaceElevated ?? palette.card,
                 borderColor: palette.divider,
+                opacity: locked ? 0.5 : 1,
               },
             ]}
-            onPress={() => onSelect(text)}
+            onPress={() => {
+              setSentForMessage(lastMessage);
+              onSelect(text);
+            }}
           >
             <Text style={[styles.chipText, { color: palette.text }]}>{text}</Text>
           </Pressable>

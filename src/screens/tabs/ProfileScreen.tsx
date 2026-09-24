@@ -363,6 +363,7 @@ export default function ProfileScreen() {
   const [manageableShopPartnersLoading, setManageableShopPartnersLoading] =
     useState(false);
   const [shopPartnerConnecting, setShopPartnerConnecting] = useState(false);
+  const [shopPayoutConnecting, setShopPayoutConnecting] = useState(false);
   const currentUserId = useMemo(() => {
     const userId = c.profile?.user?.id;
     return userId ? String(userId) : null;
@@ -1754,6 +1755,59 @@ export default function ProfileScreen() {
       setShopPartnerConnecting(false);
     }
   }, [marketForm.id, loadCommerceShops]);
+
+  const handleConnectStripePayout = useCallback(async () => {
+    if (!marketForm.id) return;
+    setShopPayoutConnecting(true);
+    try {
+      const response = await postRequest(
+        ROUTES.commerce.shopStripeAccountConnect(marketForm.id),
+        {},
+        { errorMessage: 'Unable to start Stripe onboarding.' },
+      );
+      if (!response?.success) {
+        throw new Error(response?.message || 'Unable to start Stripe onboarding.');
+      }
+      const onboardingUrl = response.data?.onboarding_url;
+      if (onboardingUrl) {
+        const canOpen = await Linking.canOpenURL(onboardingUrl).catch(() => false);
+        if (canOpen) {
+          await Linking.openURL(onboardingUrl);
+        } else {
+          Alert.alert('Payout account', `Please visit: ${onboardingUrl}`);
+        }
+      }
+    } catch (error: any) {
+      Alert.alert('Payout account', error?.message || 'Unable to start Stripe onboarding.');
+    } finally {
+      setShopPayoutConnecting(false);
+    }
+  }, [marketForm.id]);
+
+  const handleConnectFlutterwavePayout = useCallback(
+    async (data: { account_bank: string; account_number: string; business_name?: string }) => {
+      if (!marketForm.id) return;
+      setShopPayoutConnecting(true);
+      try {
+        const response = await postRequest(
+          ROUTES.commerce.shopPayoutAccountConnect(marketForm.id),
+          data,
+          { errorMessage: 'Unable to connect payout account.' },
+        );
+        if (!response?.success) {
+          throw new Error(response?.message || 'Unable to connect payout account.');
+        }
+        setActiveShop((prev: any) => (prev ? { ...prev, ...response.data } : prev));
+        await loadCommerceShops();
+        Alert.alert('Payout account', 'Your payout account is connected. You can now list paid products.');
+      } catch (error: any) {
+        Alert.alert('Payout account', error?.message || 'Unable to connect payout account.');
+      } finally {
+        setShopPayoutConnecting(false);
+      }
+    },
+    [marketForm.id, loadCommerceShops],
+  );
 
   useEffect(() => {
     if (shopEditorVisible && shopEditorMode === 'edit') {
@@ -3748,6 +3802,9 @@ export default function ProfileScreen() {
           partnerConnecting={shopPartnerConnecting}
           onConnectPartner={handleConnectShopPartner}
           onDisconnectPartner={handleDisconnectShopPartner}
+          payoutConnecting={shopPayoutConnecting}
+          onConnectStripePayout={handleConnectStripePayout}
+          onConnectFlutterwavePayout={handleConnectFlutterwavePayout}
         />
 
         {/* Bottom Sheet host */}

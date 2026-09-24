@@ -26,7 +26,7 @@ import { uploadFileToBackend } from '@/Module/ChatRoom/uploadFileToBackend';
 
 type ProductTag = {
   id: string;
-  title: string;
+  product_title: string;
   product_url: string;
   thumbnail_url?: string;
   price_display?: string;
@@ -154,7 +154,7 @@ export default function ProductTagStudio({ contentId }: Props) {
       const res = await postRequest(
         ROUTES.broadcasts.contentProducts(contentId),
         {
-          title: formTitle.trim(),
+          product_title: formTitle.trim(),
           product_url: formUrl.trim(),
           thumbnail_url: formThumb.trim() || undefined,
           price_display: formPrice.trim() || undefined,
@@ -176,7 +176,7 @@ export default function ProductTagStudio({ contentId }: Props) {
   }, [contentId, fetchTags, formPrice, formThumb, formTimestamp, formTitle, formUrl]);
 
   const handleRemove = useCallback(async (tag: ProductTag) => {
-    Alert.alert('Remove product tag?', `Remove "${tag.title}"?`, [
+    Alert.alert('Remove product tag?', `Remove "${tag.product_title}"?`, [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Remove',
@@ -299,7 +299,7 @@ export default function ProductTagStudio({ contentId }: Props) {
           >
             <View style={styles.tagInfo}>
               <Text numberOfLines={1} style={[styles.tagTitle, { color: palette.text }]}>
-                {tag.title}
+                {tag.product_title}
               </Text>
               {tag.price_display ? (
                 <Text style={[styles.tagPrice, { color: palette.primaryStrong }]}>

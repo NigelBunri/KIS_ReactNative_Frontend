@@ -23,6 +23,7 @@ export type BlockedContact = {
   userId: string;
   displayName: string;
   blockedAt: string; // ISO
+  conversationId?: string;
 };
 
 const BLOCKED_KEY = 'KIS_BLOCKED_CONTACTS';
@@ -52,14 +53,35 @@ export async function blockContact(contact: BlockedContact): Promise<void> {
   } catch { /* silent */ }
 }
 
-export async function unblockContact(userId: string): Promise<void> {
+export async function unblockContact(userId: string, conversationId?: string): Promise<void> {
   try {
-    // Sync to backend first (best-effort — don't block local state on network)
+    // Sync to backend first (best-effort — don't block local state on network).
+    // blockContact (above) sets three separate things when blocking someone
+    // from a chat: this user-level record, a conversation-scoped moderation
+    // block record (ROUTES.moderation.block), and the conversation's own
+    // is_locked flag (block_chat/lock on the Django Conversation). Undoing
+    // only this user-level record left the conversation itself still
+    // locked, so a contact removed from this list still couldn't actually
+    // exchange messages again — this contact left "unblocked" here but the
+    // chat they had with the user stayed blocked.
     await postRequest(
       ROUTES.moderation.userBlocks,
       { blocked: userId, action: 'unblock' },
       { errorMessage: '' },
     ).catch(() => {});
+
+    if (conversationId) {
+      await postRequest(
+        ROUTES.moderation.block,
+        { conversationId, blocked: false },
+        { errorMessage: '' },
+      ).catch(() => {});
+      await postRequest(
+        `${ROUTES.chat.listConversations}${conversationId}/lock/`,
+        { locked: false },
+        { errorMessage: '' },
+      ).catch(() => {});
+    }
 
     const raw = await AsyncStorage.getItem(BLOCKED_KEY);
     if (!raw) return;
@@ -122,7 +144,7 @@ export default function BlockedContactsScreen({ onBack }: Props) {
           text: 'Unblock',
           style: 'destructive',
           onPress: async () => {
-            await unblockContact(contact.userId);
+            await unblockContact(contact.userId, contact.conversationId);
             await loadBlocked();
           },
         },

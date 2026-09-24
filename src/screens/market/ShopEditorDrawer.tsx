@@ -27,6 +27,9 @@ type ShopEditorDrawerProps = {
   partnerConnecting?: boolean;
   onConnectPartner?: (partnerId: string) => void;
   onDisconnectPartner?: () => void;
+  payoutConnecting?: boolean;
+  onConnectStripePayout?: () => void;
+  onConnectFlutterwavePayout?: (data: { account_bank: string; account_number: string; business_name?: string }) => void;
 };
 
 type ShopImageUpload = {
@@ -51,11 +54,17 @@ export default function ShopEditorDrawer({
   partnerConnecting,
   onConnectPartner,
   onDisconnectPartner,
+  payoutConnecting,
+  onConnectStripePayout,
+  onConnectFlutterwavePayout,
 }: ShopEditorDrawerProps) {
   const topInset = useSafeTopInset();
   const { palette } = useKISTheme();
   const responsive = useResponsiveLayout();
   const [selectedPartnerId, setSelectedPartnerId] = React.useState('');
+  const [showFlutterwaveForm, setShowFlutterwaveForm] = React.useState(false);
+  const [flwBank, setFlwBank] = React.useState('');
+  const [flwAccountNumber, setFlwAccountNumber] = React.useState('');
   const compactDrawer = responsive.isWatch || responsive.isCompactPhone || responsive.width < 420;
   const drawerWidth = compactDrawer
     ? responsive.width
@@ -268,6 +277,87 @@ export default function ShopEditorDrawer({
                   <Text style={{ color: palette.subtext, fontSize: 12 }}>
                     You don't manage any partner organizations yet.
                   </Text>
+                )}
+              </View>
+            ) : null}
+            {mode === 'edit' ? (
+              <View style={marketStyles.drawerSection}>
+                <View style={marketStyles.drawerSectionHeader}>
+                  <Text
+                    style={[
+                      marketStyles.drawerSectionTitle,
+                      { color: palette.text },
+                    ]}
+                  >
+                    Payout account
+                  </Text>
+                </View>
+                <Text
+                  style={[
+                    marketStyles.drawerSectionHelper,
+                    { color: palette.subtext },
+                  ]}
+                >
+                  Connect how you get paid before listing paid products —
+                  customers can't check out with a shop that has no
+                  connected payout account.
+                </Text>
+                {activeShop?.stripe_charges_enabled || activeShop?.payout_account_status === 'active' ? (
+                  <Text style={{ color: palette.success ?? palette.text, fontWeight: '700' }}>
+                    {activeShop?.stripe_charges_enabled
+                      ? 'Connected via Stripe'
+                      : `Connected via Flutterwave${activeShop?.payout_bank_last4 ? ` (•••• ${activeShop.payout_bank_last4})` : ''}`}
+                  </Text>
+                ) : (
+                  <>
+                    <Text style={{ color: palette.text, fontWeight: '700' }}>
+                      Not connected yet
+                    </Text>
+                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 4 }}>
+                      <KISButton
+                        title={payoutConnecting ? 'Opening…' : 'Connect with Stripe'}
+                        size="sm"
+                        variant="outline"
+                        onPress={() => onConnectStripePayout?.()}
+                        disabled={payoutConnecting}
+                      />
+                      <KISButton
+                        title={showFlutterwaveForm ? 'Cancel' : 'Connect with Flutterwave'}
+                        size="sm"
+                        variant="outline"
+                        onPress={() => setShowFlutterwaveForm(s => !s)}
+                        disabled={payoutConnecting}
+                      />
+                    </View>
+                    {showFlutterwaveForm ? (
+                      <>
+                        <KISTextInput
+                          label="Bank code"
+                          value={flwBank}
+                          onChangeText={setFlwBank}
+                          placeholder="e.g. 044"
+                        />
+                        <KISTextInput
+                          label="Account number"
+                          value={flwAccountNumber}
+                          onChangeText={setFlwAccountNumber}
+                          keyboardType="numeric"
+                        />
+                        <KISButton
+                          title={payoutConnecting ? 'Connecting…' : 'Save payout account'}
+                          size="sm"
+                          onPress={() =>
+                            onConnectFlutterwavePayout?.({
+                              account_bank: flwBank.trim(),
+                              account_number: flwAccountNumber.trim(),
+                              business_name: marketForm.name.trim(),
+                            })
+                          }
+                          disabled={payoutConnecting || !flwBank.trim() || !flwAccountNumber.trim()}
+                        />
+                      </>
+                    ) : null}
+                  </>
                 )}
               </View>
             ) : null}

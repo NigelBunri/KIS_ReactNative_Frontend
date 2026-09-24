@@ -41,7 +41,7 @@ type SetListSong = Song & { order: number };
 type SetList = {
   id: string;
   title?: string;
-  date: string;
+  service_date: string;
   songs: SetListSong[];
 };
 
@@ -50,7 +50,7 @@ type GroupedSetLists = { dateLabel: string; sets: SetList[] }[];
 function groupByDate(setLists: SetList[]): GroupedSetLists {
   const map = new Map<string, SetList[]>();
   setLists.forEach(sl => {
-    const key = new Date(sl.date).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+    const key = new Date(sl.service_date).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
     if (!map.has(key)) map.set(key, []);
     map.get(key)!.push(sl);
   });
@@ -133,7 +133,7 @@ export default function SetListScreen({ navigation }: Props) {
       }));
       const res = await postRequest(ROUTES.church.setlists, {
         title: createTitle.trim(),
-        date: createDate,
+        service_date: createDate,
         songs,
       });
       if (res?.success && res.data) {
@@ -170,8 +170,8 @@ export default function SetListScreen({ navigation }: Props) {
       >
         <View style={styles.setHeader}>
           <View style={{ flex: 1, marginRight: 8 }}>
-            <Text style={styles.setTitle} numberOfLines={1}>{sl.title ?? `Service — ${formatDate(sl.date)}`}</Text>
-            <Text style={styles.setDate}>{formatDate(sl.date)}</Text>
+            <Text style={styles.setTitle} numberOfLines={1}>{sl.title ?? `Service — ${formatDate(sl.service_date)}`}</Text>
+            <Text style={styles.setDate}>{formatDate(sl.service_date)}</Text>
           </View>
           <View style={styles.setHeaderRight}>
             <View style={styles.songCountBadge}>

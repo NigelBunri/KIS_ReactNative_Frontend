@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   Alert,
   Animated,
+  FlatList,
   Image,
   KeyboardAvoidingView,
   Linking,
@@ -36,6 +37,7 @@ import apiService from '@/services/apiService';
 import { uploadFileToBackend } from './uploadFileToBackend';
 import Skeleton from '@/components/common/Skeleton';
 import { getAccessToken } from '@/security/authStorage';
+import { refreshFromDeviceAndBackend, type KISContact } from '@/Module/AddContacts/contactsService';
 import { useSocket } from '../../../SocketProvider';
 import { useSafeTopInset } from '@/hooks/useSafeTopInset';
 
@@ -139,8 +141,14 @@ export const ChatInfoPage: React.FC<ChatInfoPageProps> = ({
   const [mediaLinks, setMediaLinks]     = useState<LinkItem[]>([]);
   const [mediaLoading, setMediaLoading] = useState(true);
   const [addMemberModalVisible, setAddMemberModalVisible] = useState(false);
-  const [addMemberInput, setAddMemberInput] = useState('');
   const [addMemberSubmitting, setAddMemberSubmitting] = useState(false);
+  // Contact-name picker for Add Member — replaces a raw "type the user ID"
+  // text field the tester correctly flagged as broken UX (AND-065: "user id
+  // was asked instead of contact name"). Only contacts with a real KIS
+  // account (isRegistered + userId) can actually be added to a group.
+  const [addMemberContacts, setAddMemberContacts] = useState<KISContact[]>([]);
+  const [addMemberContactsLoading, setAddMemberContactsLoading] = useState(false);
+  const [addMemberSearch, setAddMemberSearch] = useState('');
   const [showAllImages, setShowAllImages] = useState(false);
   const [showAllFiles, setShowAllFiles]   = useState(false);
   const [showAllLinks, setShowAllLinks]   = useState(false);
@@ -414,15 +422,37 @@ export const ChatInfoPage: React.FC<ChatInfoPageProps> = ({
   };
 
   // ── Add member ────────────────────────────────────────────────────────────
-  const handleAddMemberSubmit = async () => {
-    const userId = addMemberInput.trim();
+  useEffect(() => {
+    if (!addMemberModalVisible) return;
+    let cancelled = false;
+    setAddMemberContactsLoading(true);
+    refreshFromDeviceAndBackend()
+      .then(contacts => {
+        if (cancelled) return;
+        setAddMemberContacts(contacts.filter(c => c.isRegistered && !!c.userId));
+      })
+      .catch(() => { if (!cancelled) setAddMemberContacts([]); })
+      .finally(() => { if (!cancelled) setAddMemberContactsLoading(false); });
+    return () => { cancelled = true; };
+  }, [addMemberModalVisible]);
+
+  const filteredAddMemberContacts = useMemo(() => {
+    const q = addMemberSearch.trim().toLowerCase();
+    if (!q) return addMemberContacts;
+    return addMemberContacts.filter(
+      c => c.name.toLowerCase().includes(q) || c.phone.includes(q),
+    );
+  }, [addMemberContacts, addMemberSearch]);
+
+  const handleAddMemberSubmit = async (contact: KISContact) => {
+    const userId = contact.userId;
     if (!userId || !conversationId) return;
     setAddMemberSubmitting(true);
     try {
       const url = `${ROUTES.chat.listConversations}${conversationId}/members/`;
       const res = await postRequest(url, { user_id: userId, base_role: 'member' }, {});
       if (res?.success !== false) {
-        setAddMemberInput('');
+        setAddMemberSearch('');
         setAddMemberModalVisible(false);
         // Notify useChatMessaging to refresh its participants ref so the very
         // next outgoing message is encrypted for the new member.
@@ -1415,7 +1445,7 @@ export const ChatInfoPage: React.FC<ChatInfoPageProps> = ({
               {isAdmin && (
                 <Pressable
                   onPress={() => {
-                    setAddMemberInput('');
+                    setAddMemberSearch('');
                     setAddMemberModalVisible(true);
                   }}
                   style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 14, backgroundColor: palette.primary + '22' }}
@@ -1855,15 +1885,15 @@ export const ChatInfoPage: React.FC<ChatInfoPageProps> = ({
         >
           <Pressable
             onPress={() => {}}
-            style={{ width: '100%', borderRadius: 20, backgroundColor: palette.surface, padding: 24, gap: 16 }}
+            style={{ width: '100%', maxHeight: '80%', borderRadius: 20, backgroundColor: palette.surface, padding: 24, gap: 16 }}
           >
             <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
               <Text style={{ fontSize: 17, fontWeight: '700', color: palette.text }}>Add member</Text>
-              <Text style={{ fontSize: 13, color: palette.subtext }}>Enter the user ID or phone number of the person to add.</Text>
+              <Text style={{ fontSize: 13, color: palette.subtext }}>Pick a contact with a KIS account to add to this group.</Text>
               <TextInput
-                value={addMemberInput}
-                onChangeText={setAddMemberInput}
-                placeholder="User ID or phone number"
+                value={addMemberSearch}
+                onChangeText={setAddMemberSearch}
+                placeholder="Search contacts by name or phone"
                 placeholderTextColor={palette.subtext}
                 style={{
                   borderRadius: 12,
@@ -1877,26 +1907,52 @@ export const ChatInfoPage: React.FC<ChatInfoPageProps> = ({
                 }}
                 autoCapitalize="none"
                 autoCorrect={false}
-                returnKeyType="done"
-                onSubmitEditing={handleAddMemberSubmit}
+                returnKeyType="search"
               />
-              <View style={{ flexDirection: 'row', gap: 12 }}>
-                <Pressable
-                  onPress={() => setAddMemberModalVisible(false)}
-                  style={({ pressed }) => ({ flex: 1, paddingVertical: 12, borderRadius: 14, borderWidth: 1.5, borderColor: palette.divider, alignItems: 'center', opacity: pressed ? 0.7 : 1 })}
-                >
-                  <Text style={{ color: palette.text, fontSize: 15, fontWeight: '600' }}>Cancel</Text>
-                </Pressable>
-                <Pressable
-                  onPress={handleAddMemberSubmit}
-                  disabled={addMemberSubmitting || !addMemberInput.trim()}
-                  style={({ pressed }) => ({ flex: 1, paddingVertical: 12, borderRadius: 14, backgroundColor: palette.primary, alignItems: 'center', opacity: (pressed || addMemberSubmitting || !addMemberInput.trim()) ? 0.6 : 1 })}
-                >
-                  <Text style={{ color: palette.onPrimary, fontSize: 15, fontWeight: '700' }}>
-                    {addMemberSubmitting ? 'Adding…' : 'Add'}
-                  </Text>
-                </Pressable>
-              </View>
+              {addMemberContactsLoading ? (
+                <View style={{ paddingVertical: 24, alignItems: 'center' }}>
+                  <ActivityIndicator color={palette.primary} />
+                </View>
+              ) : filteredAddMemberContacts.length === 0 ? (
+                <Text style={{ color: palette.subtext, fontSize: 13, paddingVertical: 12 }}>
+                  {addMemberContacts.length === 0
+                    ? 'No contacts on this device have a KIS account yet.'
+                    : 'No contacts match your search.'}
+                </Text>
+              ) : (
+                <FlatList
+                  data={filteredAddMemberContacts}
+                  keyExtractor={c => c.userId ?? c.id}
+                  style={{ maxHeight: 320 }}
+                  renderItem={({ item }) => (
+                    <Pressable
+                      onPress={() => handleAddMemberSubmit(item)}
+                      disabled={addMemberSubmitting}
+                      style={({ pressed }) => ({
+                        flexDirection: 'row',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        paddingVertical: 12,
+                        borderBottomWidth: StyleSheet.hairlineWidth,
+                        borderBottomColor: palette.divider,
+                        opacity: pressed || addMemberSubmitting ? 0.6 : 1,
+                      })}
+                    >
+                      <View>
+                        <Text style={{ color: palette.text, fontSize: 15, fontWeight: '600' }}>{item.name}</Text>
+                        <Text style={{ color: palette.subtext, fontSize: 12 }}>{item.phone}</Text>
+                      </View>
+                      <KISIcon name="add" size={20} color={palette.primary} />
+                    </Pressable>
+                  )}
+                />
+              )}
+              <Pressable
+                onPress={() => setAddMemberModalVisible(false)}
+                style={({ pressed }) => ({ paddingVertical: 12, borderRadius: 14, borderWidth: 1.5, borderColor: palette.divider, alignItems: 'center', opacity: pressed ? 0.7 : 1 })}
+              >
+                <Text style={{ color: palette.text, fontSize: 15, fontWeight: '600' }}>Cancel</Text>
+              </Pressable>
             </KeyboardAvoidingView>
           </Pressable>
         </Pressable>

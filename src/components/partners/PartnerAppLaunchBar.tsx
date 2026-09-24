@@ -22,6 +22,9 @@ type Props = {
 
 const MAX_VISIBLE_WITH_MORE = 2;
 
+const isImageUri = (icon?: string | null) =>
+  !!icon && /^(https?:|file:|data:|content:|asset:)/i.test(icon.trim());
+
 const getAppAbbreviation = (name?: string) => {
   const trimmed = name?.trim() ?? '';
   if (!trimmed) return '';
@@ -115,12 +118,14 @@ export default function PartnerAppLaunchBar({
               end={{ x: 1, y: 1 }}
               style={styles.appLaunchButtonInner}
             >
-              {app.icon ? (
+              {isImageUri(app.icon) ? (
                 <Image
-                  source={{ uri: app.icon }}
+                  source={{ uri: app.icon as string }}
                   style={styles.appLaunchIcon}
                   resizeMode="contain"
                 />
+              ) : app.icon ? (
+                <Text style={{ fontSize: 18 }}>{app.icon}</Text>
               ) : (
                 <Text
                   style={{

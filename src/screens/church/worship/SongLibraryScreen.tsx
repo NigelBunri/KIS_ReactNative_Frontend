@@ -1,7 +1,10 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
+  Modal,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -16,6 +19,7 @@ import { useKISTheme } from '@/theme/useTheme';
 import { useResponsiveLayout } from '@/theme/responsive';
 import { KISIcon } from '@/constants/kisIcons';
 import { getRequest } from '@/network/get';
+import { postRequest } from '@/network/post';
 import ROUTES from '@/network';
 import type { RootStackParamList } from '@/navigation/types';
 
@@ -38,24 +42,68 @@ export default function SongLibraryScreen({ navigation }: Props) {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [addVisible, setAddVisible] = useState(false);
+  const [addTitle, setAddTitle] = useState('');
+  const [addArtist, setAddArtist] = useState('');
+  const [addKey, setAddKey] = useState('');
+  const [addLyrics, setAddLyrics] = useState('');
+  const [saving, setSaving] = useState(false);
 
   const styles = useMemo(() => makeStyles(palette, layout), [palette, layout]);
 
+  const loadSongs = useCallback(() => {
+    setLoading(true);
+    const params = search ? `?search=${encodeURIComponent(search)}` : '';
+    getRequest(`${ROUTES.church.songs}${params}`)
+      .then(res => {
+        if (res?.success) {
+          const raw = res.data;
+          setSongs(Array.isArray(raw) ? raw : raw?.results ?? []);
+        }
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [search]);
+
   useFocusEffect(
     useCallback(() => {
-      setLoading(true);
-      const params = search ? `?search=${encodeURIComponent(search)}` : '';
-      getRequest(`${ROUTES.church.songs}${params}`)
-        .then(res => {
-          if (res?.success) {
-            const raw = res.data;
-            setSongs(Array.isArray(raw) ? raw : raw?.results ?? []);
-          }
-        })
-        .catch(() => {})
-        .finally(() => setLoading(false));
-    }, [search]),
+      loadSongs();
+    }, [loadSongs]),
   );
+
+  const handleAddSong = useCallback(async () => {
+    if (!addTitle.trim()) {
+      Alert.alert('Title required', 'Please enter a song title.');
+      return;
+    }
+    setSaving(true);
+    try {
+      const res = await postRequest(
+        ROUTES.church.songs,
+        {
+          title: addTitle.trim(),
+          artist: addArtist.trim(),
+          key: addKey.trim(),
+          lyrics: addLyrics.trim(),
+        },
+        { errorMessage: 'Unable to add song.' },
+      );
+      if (res?.success) {
+        setAddVisible(false);
+        setAddTitle('');
+        setAddArtist('');
+        setAddKey('');
+        setAddLyrics('');
+        loadSongs();
+      } else {
+        Alert.alert('Error', res?.message || 'Unable to add song.');
+      }
+    } catch {
+      Alert.alert('Error', 'Unable to add song. Please try again.');
+    } finally {
+      setSaving(false);
+    }
+  }, [addTitle, addArtist, addKey, addLyrics, loadSongs]);
 
   const renderSong = ({ item }: { item: Song }) => {
     const expanded = expandedId === item.id;
@@ -148,6 +196,69 @@ export default function SongLibraryScreen({ navigation }: Props) {
           }
         />
       )}
+
+      <TouchableOpacity
+        style={[styles.fab, { backgroundColor: palette.primary }]}
+        onPress={() => setAddVisible(true)}
+        activeOpacity={0.85}
+      >
+        <KISIcon name="add" size={24} color={palette.onPrimary ?? palette.ivory} />
+      </TouchableOpacity>
+
+      <Modal visible={addVisible} animationType="slide" transparent onRequestClose={() => setAddVisible(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, { backgroundColor: palette.card }]}>
+            <Text style={styles.modalTitle}>Add song</Text>
+            <ScrollView keyboardShouldPersistTaps="handled">
+              <TextInput
+                style={styles.modalInput}
+                value={addTitle}
+                onChangeText={setAddTitle}
+                placeholder="Title"
+                placeholderTextColor={palette.subtext}
+              />
+              <TextInput
+                style={styles.modalInput}
+                value={addArtist}
+                onChangeText={setAddArtist}
+                placeholder="Artist (optional)"
+                placeholderTextColor={palette.subtext}
+              />
+              <TextInput
+                style={styles.modalInput}
+                value={addKey}
+                onChangeText={setAddKey}
+                placeholder="Key (optional, e.g. G)"
+                placeholderTextColor={palette.subtext}
+              />
+              <TextInput
+                style={[styles.modalInput, styles.modalTextarea]}
+                value={addLyrics}
+                onChangeText={setAddLyrics}
+                placeholder="Lyrics (optional)"
+                placeholderTextColor={palette.subtext}
+                multiline
+              />
+            </ScrollView>
+            <View style={styles.modalActions}>
+              <Pressable style={styles.modalCancelBtn} onPress={() => setAddVisible(false)} disabled={saving}>
+                <Text style={styles.modalCancelText}>Cancel</Text>
+              </Pressable>
+              <Pressable
+                style={[styles.modalSaveBtn, { backgroundColor: palette.primary }]}
+                onPress={handleAddSong}
+                disabled={saving}
+              >
+                {saving ? (
+                  <ActivityIndicator size="small" color={palette.onPrimary ?? '#fff'} />
+                ) : (
+                  <Text style={styles.modalSaveText}>Save</Text>
+                )}
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -220,5 +331,48 @@ function makeStyles(palette: any, layout: any) {
     ccliText: { fontSize: 12, color: palette.subtext, marginTop: 10 },
     center: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 40 },
     emptyText: { fontSize: 14, color: palette.subtext, textAlign: 'center' },
+    fab: {
+      position: 'absolute',
+      right: 20,
+      bottom: 28,
+      width: 52,
+      height: 52,
+      borderRadius: 26,
+      alignItems: 'center',
+      justifyContent: 'center',
+      elevation: 4,
+      shadowColor: '#000',
+      shadowOpacity: 0.2,
+      shadowRadius: 6,
+      shadowOffset: { width: 0, height: 3 },
+    },
+    modalOverlay: {
+      flex: 1,
+      backgroundColor: 'rgba(0,0,0,0.5)',
+      justifyContent: 'flex-end',
+    },
+    modalCard: {
+      borderTopLeftRadius: 20,
+      borderTopRightRadius: 20,
+      padding: 20,
+      maxHeight: '80%',
+    },
+    modalTitle: { fontSize: 17, fontWeight: '800', color: palette.text, marginBottom: 12 },
+    modalInput: {
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: palette.divider,
+      borderRadius: 10,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      fontSize: 14,
+      color: palette.text,
+      marginBottom: 10,
+    },
+    modalTextarea: { minHeight: 90, textAlignVertical: 'top' },
+    modalActions: { flexDirection: 'row', gap: 10, marginTop: 4 },
+    modalCancelBtn: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 12, borderRadius: 10, borderWidth: StyleSheet.hairlineWidth, borderColor: palette.divider },
+    modalCancelText: { color: palette.text, fontWeight: '700' },
+    modalSaveBtn: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 12, borderRadius: 10 },
+    modalSaveText: { color: '#fff', fontWeight: '700' },
   });
 }

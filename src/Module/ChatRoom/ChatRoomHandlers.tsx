@@ -688,6 +688,7 @@ export const handleBlockRequest = async (
       userId: blockedUser.userId,
       displayName: blockedUser.displayName,
       blockedAt: new Date().toISOString(),
+      conversationId: chatId,
     });
     DeviceEventEmitter.emit('blocked.contacts.refresh');
   }

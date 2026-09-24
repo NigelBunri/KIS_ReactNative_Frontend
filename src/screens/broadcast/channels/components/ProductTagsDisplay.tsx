@@ -58,7 +58,7 @@ export default function ProductTagsDisplay({
           ? res
           : Array.isArray(res?.data)
           ? res.data
-          : res?.results ?? [];
+          : res?.data?.results ?? [];
         setTags(raw);
       })
       .catch(() => {});

@@ -338,6 +338,89 @@ export default function HealthInstitutionMembersScreen({ route, navigation }: Pr
     loadState().catch(() => {});
   }, [loadState]);
 
+  // `membersOverride`, when given, is used instead of the `members` state
+  // captured in this callback's closure — needed because addMemberFromContact
+  // calling this right after setMembers(...) in the same tick would
+  // otherwise persist the PRE-update array (React state updates aren't
+  // synchronous), silently dropping the member the user just added. This is
+  // exactly the class of bug behind AND-377's "unable to add a member" —
+  // the old two-step "add locally, then remember to tap Save" flow relied
+  // on the user noticing an alert telling them to save separately.
+  const saveMembers = useCallback(async (membersOverride?: HealthInstitutionMember[]) => {
+    const effectiveMembers = membersOverride ?? members;
+    const currentInstitution = institutions.find((item: any) => String(item?.id) === String(institutionId));
+    if (!currentInstitution) {
+      Alert.alert('Institution members', 'Institution not found.');
+      return;
+    }
+
+    const ownerMembers = effectiveMembers.filter((member) => normalizeRole(member.role) === 'owner');
+    if (ownerMembers.length === 0) {
+      Alert.alert('Institution members', 'At least one owner is required.');
+      return;
+    }
+    if (ownerMembers.length > 1) {
+      Alert.alert('Institution members', 'Only one owner is allowed. Owner role cannot be transferred.');
+      return;
+    }
+
+    const nextInstitution = {
+      ...currentInstitution,
+      members: effectiveMembers,
+      membership_open: membershipOpen,
+      membershipOpen: membershipOpen,
+      membership_discount_pct: clampMembershipDiscount(membershipDiscountPercent),
+      membershipDiscountPct: clampMembershipDiscount(membershipDiscountPercent),
+      membership_settings: {
+        ...(currentInstitution?.membership_settings || {}),
+        open: membershipOpen,
+        discountPercent: clampMembershipDiscount(membershipDiscountPercent),
+      },
+      membershipSettings: {
+        ...(currentInstitution?.membershipSettings || {}),
+        open: membershipOpen,
+        discountPercent: clampMembershipDiscount(membershipDiscountPercent),
+      },
+      employees: effectiveMembers.map((member) => ({
+        id: member.id,
+        user_id: member.userId,
+        name: member.name,
+        phone: member.phone,
+        email: member.email ?? '',
+        role: normalizeRole(member.role),
+        source: member.source ?? 'owner_added',
+        permissions: member.permissions ?? ROLE_PERMISSIONS.staff,
+      })),
+    };
+    const nextInstitutions = institutions.map((item: any) =>
+      String(item?.id) === String(institutionId) ? nextInstitution : item,
+    );
+
+    setSaving(true);
+    try {
+      const response = hasHealthProfile
+        ? await updateHealthInstitutions(nextInstitutions)
+        : await createHealthProfile(nextInstitutions);
+      if (!response?.success) {
+        throw new Error(response?.message || 'Unable to save members.');
+      }
+      await loadState();
+      Alert.alert('Institution members', 'Members, roles, and access controls saved.');
+    } catch (error: any) {
+      Alert.alert('Institution members', error?.message || 'Unable to save members.');
+    } finally {
+      setSaving(false);
+    }
+  }, [
+    hasHealthProfile,
+    institutionId,
+    institutions,
+    loadState,
+    members,
+    membershipDiscountPercent,
+    membershipOpen,
+  ]);
+
   const addMemberFromContact = useCallback(async (contact: KISContact) => {
     if (!canManageMembers) {
       Alert.alert('Members', 'Your role does not allow member management.');
@@ -383,35 +466,31 @@ export default function HealthInstitutionMembersScreen({ route, navigation }: Pr
           ? finalRole
           : normalizeRole(existingMember.role);
 
-        setMembers((prev) =>
-          prev.map((member) =>
-            member.id === existingMember.id
-              ? {
-                  ...member,
-                  userId: resolvedUserId || member.userId,
-                  phone: member.phone || contact.phone,
-                  source: 'owner_added',
-                  role: nextRole,
-                  permissions: ROLE_PERMISSIONS[nextRole],
-                }
-              : member,
-          ),
+        const updatedMembers = members.map((member) =>
+          member.id === existingMember.id
+            ? {
+                ...member,
+                userId: resolvedUserId || member.userId,
+                phone: member.phone || contact.phone,
+                source: 'owner_added' as const,
+                role: nextRole,
+                permissions: ROLE_PERMISSIONS[nextRole],
+              }
+            : member,
         );
+        setMembers(updatedMembers);
         appendAuditLog({
           action: 'member.promoted',
           memberName: existingMember.name || contact.name,
           fromRole: String(existingMember.role || ''),
           toRole: nextRole,
         });
-        Alert.alert(
-          'Members',
-          `${contact.name} was linked as an owner-added member. Tap "Save Members, Roles & Settings" to persist.`,
-        );
+        await saveMembers(updatedMembers);
         return;
       }
 
-      setMembers((prev) => [
-        ...prev,
+      const updatedMembers = [
+        ...members,
         {
           id: `user-${resolvedUserId}`,
           userId: resolvedUserId,
@@ -419,13 +498,14 @@ export default function HealthInstitutionMembersScreen({ route, navigation }: Pr
           phone: contact.phone,
           email: '',
           role: finalRole,
-          source: 'owner_added',
+          source: 'owner_added' as const,
           permissions: ROLE_PERMISSIONS[finalRole],
         },
-      ]);
+      ];
+      setMembers(updatedMembers);
 
       appendAuditLog({ action: 'member.added', memberName: contact.name, toRole: finalRole });
-      Alert.alert('Members', `${contact.name} added as ${finalRole}. Tap "Save Members, Roles & Settings" to persist.`);
+      await saveMembers(updatedMembers);
     } catch (error: any) {
       Alert.alert('Members', error?.message || 'Unable to add member from selected contact.');
     } finally {
@@ -438,6 +518,7 @@ export default function HealthInstitutionMembersScreen({ route, navigation }: Pr
     isRoleAssignableByActor,
     members,
     resolveUserIdByPhone,
+    saveMembers,
     selectedRole,
   ]);
 
@@ -548,80 +629,6 @@ export default function HealthInstitutionMembersScreen({ route, navigation }: Pr
       return prev.filter((member) => member.id !== memberId);
     });
   }, [appendAuditLog, canManageMembers, isRoleAssignableByActor]);
-
-  const saveMembers = useCallback(async () => {
-    const currentInstitution = institutions.find((item: any) => String(item?.id) === String(institutionId));
-    if (!currentInstitution) {
-      Alert.alert('Institution members', 'Institution not found.');
-      return;
-    }
-
-    const ownerMembers = members.filter((member) => normalizeRole(member.role) === 'owner');
-    if (ownerMembers.length === 0) {
-      Alert.alert('Institution members', 'At least one owner is required.');
-      return;
-    }
-    if (ownerMembers.length > 1) {
-      Alert.alert('Institution members', 'Only one owner is allowed. Owner role cannot be transferred.');
-      return;
-    }
-
-    const nextInstitution = {
-      ...currentInstitution,
-      members,
-      membership_open: membershipOpen,
-      membershipOpen: membershipOpen,
-      membership_discount_pct: clampMembershipDiscount(membershipDiscountPercent),
-      membershipDiscountPct: clampMembershipDiscount(membershipDiscountPercent),
-      membership_settings: {
-        ...(currentInstitution?.membership_settings || {}),
-        open: membershipOpen,
-        discountPercent: clampMembershipDiscount(membershipDiscountPercent),
-      },
-      membershipSettings: {
-        ...(currentInstitution?.membershipSettings || {}),
-        open: membershipOpen,
-        discountPercent: clampMembershipDiscount(membershipDiscountPercent),
-      },
-      employees: members.map((member) => ({
-        id: member.id,
-        user_id: member.userId,
-        name: member.name,
-        phone: member.phone,
-        email: member.email ?? '',
-        role: normalizeRole(member.role),
-        source: member.source ?? 'owner_added',
-        permissions: member.permissions ?? ROLE_PERMISSIONS.staff,
-      })),
-    };
-    const nextInstitutions = institutions.map((item: any) =>
-      String(item?.id) === String(institutionId) ? nextInstitution : item,
-    );
-
-    setSaving(true);
-    try {
-      const response = hasHealthProfile
-        ? await updateHealthInstitutions(nextInstitutions)
-        : await createHealthProfile(nextInstitutions);
-      if (!response?.success) {
-        throw new Error(response?.message || 'Unable to save members.');
-      }
-      await loadState();
-      Alert.alert('Institution members', 'Members, roles, and access controls saved.');
-    } catch (error: any) {
-      Alert.alert('Institution members', error?.message || 'Unable to save members.');
-    } finally {
-      setSaving(false);
-    }
-  }, [
-    hasHealthProfile,
-    institutionId,
-    institutions,
-    loadState,
-    members,
-    membershipDiscountPercent,
-    membershipOpen,
-  ]);
 
   if (loading) {
     return (

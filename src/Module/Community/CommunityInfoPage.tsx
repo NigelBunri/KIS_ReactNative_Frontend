@@ -1,14 +1,18 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActionSheetIOS,
+  ActivityIndicator,
   Alert,
+  FlatList,
   Image,
+  Modal,
   Platform,
   Pressable,
   ScrollView,
   Share,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 import Clipboard from '@react-native-clipboard/clipboard';
@@ -27,6 +31,7 @@ import { uploadFileToBackend } from '@/Module/ChatRoom/uploadFileToBackend';
 import { getAccessToken } from '@/security/authStorage';
 import { getFeedPlainText } from '@/components/feeds/richTextValue';
 import { useSocket } from '@/SocketProvider';
+import { refreshFromDeviceAndBackend, type KISContact } from '@/Module/AddContacts/contactsService';
 
 type MemberUser = {
   id?: string;
@@ -92,6 +97,18 @@ export const CommunityInfoPage: React.FC<CommunityInfoPageProps> = ({
   const [saving, setSaving] = useState(false);
   const [inviteLink, setInviteLink] = useState<string | null>(null);
   const [inviteLinkLoading, setInviteLinkLoading] = useState(false);
+
+  // "Can't generate an invite link nor add members" — the invite link half
+  // was actually a visibility bug (isAdmin always computed false, see the
+  // `me` lookup above), but "add members" had no UI at all: the backend
+  // action (apps/communities/views.py's add_members, POST .../add-members/)
+  // and even the frontend ROUTES.community.addMembers constant already
+  // existed — nothing in the app ever called it.
+  const [addMembersModalVisible, setAddMembersModalVisible] = useState(false);
+  const [addMembersContacts, setAddMembersContacts] = useState<KISContact[]>([]);
+  const [addMembersContactsLoading, setAddMembersContactsLoading] = useState(false);
+  const [addMembersSearch, setAddMembersSearch] = useState('');
+  const [addMembersSubmitting, setAddMembersSubmitting] = useState(false);
 
   const mountedRef = useRef(true);
   useEffect(() => {
@@ -371,6 +388,57 @@ export const CommunityInfoPage: React.FC<CommunityInfoPageProps> = ({
     }
   };
 
+  useEffect(() => {
+    if (!addMembersModalVisible) return;
+    let cancelled = false;
+    setAddMembersContactsLoading(true);
+    refreshFromDeviceAndBackend()
+      .then((contacts) => {
+        if (cancelled) return;
+        const existingUserIds = new Set(
+          members.map((m) => (typeof m.user === 'object' ? m.user?.id : m.user)).filter(Boolean).map(String),
+        );
+        setAddMembersContacts(
+          contacts.filter((c) => c.isRegistered && !!c.userId && !existingUserIds.has(String(c.userId))),
+        );
+      })
+      .catch(() => { if (!cancelled) setAddMembersContacts([]); })
+      .finally(() => { if (!cancelled) setAddMembersContactsLoading(false); });
+    return () => { cancelled = true; };
+  }, [addMembersModalVisible, members]);
+
+  const filteredAddMembersContacts = useMemo(() => {
+    const q = addMembersSearch.trim().toLowerCase();
+    if (!q) return addMembersContacts;
+    return addMembersContacts.filter(
+      (c) => c.name.toLowerCase().includes(q) || c.phone.includes(q),
+    );
+  }, [addMembersContacts, addMembersSearch]);
+
+  const handleAddMember = async (contact: KISContact) => {
+    if (!communityId || !contact.userId || addMembersSubmitting) return;
+    setAddMembersSubmitting(true);
+    try {
+      const res = await postRequest(
+        ROUTES.community.addMembers(communityId),
+        { userIds: [contact.userId] },
+        { errorMessage: 'Unable to add member.' },
+      );
+      if (res?.success !== false && (res?.data?.count ?? 0) > 0) {
+        setAddMembersContacts((prev) => prev.filter((c) => c.userId !== contact.userId));
+        await loadCommunity();
+      } else if ((res?.data?.skipped_banned ?? []).length > 0) {
+        Alert.alert('Add member', `${contact.name} can't be added (banned from this community).`);
+      } else {
+        Alert.alert('Add member', res?.message || 'Unable to add member.');
+      }
+    } catch {
+      Alert.alert('Add member', 'Unable to add member.');
+    } finally {
+      setAddMembersSubmitting(false);
+    }
+  };
+
   const handleChangeAvatar = async () => {
     if (!isAdmin || saving) return;
     const picked = await launchImageLibrary({
@@ -640,6 +708,18 @@ export const CommunityInfoPage: React.FC<CommunityInfoPageProps> = ({
           </View>
         )}
 
+        {isAdmin && (
+          <View style={styles.section}>
+            <Text style={[styles.sectionTitle, { color: palette.text }]}>Add members</Text>
+            <Pressable
+              onPress={() => { setAddMembersSearch(''); setAddMembersModalVisible(true); }}
+              style={({ pressed }) => [styles.inviteLinkBtn, { backgroundColor: palette.primary, opacity: pressed ? 0.7 : 1 }]}
+            >
+              <Text style={[styles.inviteLinkBtnText, { color: palette.onPrimary }]}>Add members</Text>
+            </Pressable>
+          </View>
+        )}
+
         {/* Leave community — shown to non-owner members */}
         {me && role !== 'owner' && (
           <View style={[styles.section, { paddingTop: 24 }]}>
@@ -661,6 +741,89 @@ export const CommunityInfoPage: React.FC<CommunityInfoPageProps> = ({
           </View>
         )}
       </ScrollView>
+
+      <Modal
+        visible={addMembersModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setAddMembersModalVisible(false)}
+      >
+        <Pressable
+          style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center', padding: 24 }}
+          onPress={() => setAddMembersModalVisible(false)}
+        >
+          <Pressable
+            onPress={() => {}}
+            style={{ width: '100%', maxHeight: '80%', borderRadius: 20, backgroundColor: palette.surface ?? palette.card, padding: 24, gap: 16 }}
+          >
+            <Text style={{ fontSize: 17, fontWeight: '700', color: palette.text }}>Add members</Text>
+            <Text style={{ fontSize: 13, color: palette.subtext }}>Pick a contact with a KIS account to add to this community.</Text>
+            <TextInput
+              value={addMembersSearch}
+              onChangeText={setAddMembersSearch}
+              placeholder="Search contacts by name or phone"
+              placeholderTextColor={palette.subtext}
+              style={{
+                borderRadius: 12,
+                borderWidth: 1.5,
+                borderColor: palette.divider ?? palette.border,
+                backgroundColor: palette.inputBg ?? palette.bg,
+                color: palette.text,
+                paddingHorizontal: 14,
+                paddingVertical: 10,
+                fontSize: 15,
+              }}
+              autoCapitalize="none"
+              autoCorrect={false}
+              returnKeyType="search"
+            />
+            {addMembersContactsLoading ? (
+              <View style={{ paddingVertical: 24, alignItems: 'center' }}>
+                <ActivityIndicator color={palette.primary} />
+              </View>
+            ) : filteredAddMembersContacts.length === 0 ? (
+              <Text style={{ color: palette.subtext, fontSize: 13, paddingVertical: 12 }}>
+                {addMembersContacts.length === 0
+                  ? 'No contacts on this device have a KIS account (or they’re already members).'
+                  : 'No contacts match your search.'}
+              </Text>
+            ) : (
+              <FlatList
+                data={filteredAddMembersContacts}
+                keyExtractor={(c) => c.userId ?? c.id}
+                style={{ maxHeight: 320 }}
+                renderItem={({ item }) => (
+                  <Pressable
+                    onPress={() => handleAddMember(item)}
+                    disabled={addMembersSubmitting}
+                    style={({ pressed }) => ({
+                      flexDirection: 'row',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      paddingVertical: 12,
+                      borderBottomWidth: StyleSheet.hairlineWidth,
+                      borderBottomColor: palette.divider ?? palette.border,
+                      opacity: pressed || addMembersSubmitting ? 0.6 : 1,
+                    })}
+                  >
+                    <View>
+                      <Text style={{ color: palette.text, fontSize: 15, fontWeight: '600' }}>{item.name}</Text>
+                      <Text style={{ color: palette.subtext, fontSize: 12 }}>{item.phone}</Text>
+                    </View>
+                    <KISIcon name="add" size={20} color={palette.primary} />
+                  </Pressable>
+                )}
+              />
+            )}
+            <Pressable
+              onPress={() => setAddMembersModalVisible(false)}
+              style={({ pressed }) => ({ paddingVertical: 12, borderRadius: 14, borderWidth: 1.5, borderColor: palette.divider ?? palette.border, alignItems: 'center', opacity: pressed ? 0.7 : 1 })}
+            >
+              <Text style={{ color: palette.text, fontSize: 15, fontWeight: '600' }}>Close</Text>
+            </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 };

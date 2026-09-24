@@ -1884,15 +1884,34 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
       },
     };
 
-    void Handlers.handleSendAttachment({
-      input: wrappedInput,
-      chat,
-      authToken,
-      currentUserId,
-      ensureConversationId,
-      sendRichMessage,
-    }).then((ok) => {
-      if (ok === false) {
+    // Every network step inside handleSendAttachment already has its own
+    // bounded timeout (XHR upload: 10min, socket chat.send ack: 20s) — but
+    // those only protect against a call that actually completes (with
+    // success or a timeout error). A step that hangs without ever settling
+    // at all (e.g. a native file-copy promise that neither resolves nor
+    // rejects) would defeat all of those and leave the bubble reading
+    // "uploading" forever — exactly AND-026's "stuck for 22 hours" report,
+    // which a good/offline-RECIPIENT network can't explain since none of
+    // this depends on the recipient being online. This outer race is the
+    // deterministic backstop: whatever the cause, the bubble always
+    // resolves to failed/retryable within a bounded time.
+    const UPLOAD_OVERALL_TIMEOUT_MS = 11 * 60 * 1000; // just past the 10min XHR ceiling
+    const timeoutPromise = new Promise<'timeout'>((resolve) => {
+      setTimeout(() => resolve('timeout'), UPLOAD_OVERALL_TIMEOUT_MS);
+    });
+
+    void Promise.race([
+      Handlers.handleSendAttachment({
+        input: wrappedInput,
+        chat,
+        authToken,
+        currentUserId,
+        ensureConversationId,
+        sendRichMessage,
+      }),
+      timeoutPromise,
+    ]).then((result) => {
+      if (result === false || result === 'timeout') {
         setUploadBubbles(prev => {
           const b = prev[bubbleId];
           if (!b) return prev;
@@ -2018,10 +2037,28 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
   const handleShowReadReceipts = useCallback(
     (message: ChatMessage) => {
       const rb: ReadByEntry[] = (message as any).readBy ?? [];
-      setReadReceiptsData(rb);
+      // The server's readBy payload is just {userId, readAt} — cheap to
+      // broadcast on every read event — so it never carries a display
+      // name. ReadReceiptsSheet already falls back to raw userId when
+      // displayName is missing, which is exactly what was surfacing here.
+      // Resolve names against chat.participants, same lookup the typing-
+      // indicator name resolution above already does.
+      const participants = chat?.participants ?? [];
+      const enriched = rb.map(entry => {
+        if (entry.displayName) return entry;
+        for (const p of participants as any[]) {
+          if (typeof p === 'string') continue;
+          const pId = String(p?.id ?? p?.user?.id ?? '');
+          if (pId !== entry.userId) continue;
+          const name = p?.display_name ?? p?.user?.display_name ?? p?.user?.username ?? null;
+          if (name) return { ...entry, displayName: name };
+        }
+        return entry;
+      });
+      setReadReceiptsData(enriched);
       setReadReceiptsSheetVisible(true);
     },
-    [],
+    [chat?.participants],
   );
 
   const handleSetDisappearing = useCallback(

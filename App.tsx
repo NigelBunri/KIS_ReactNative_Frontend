@@ -1059,14 +1059,24 @@ function AppContent() {
     return () => subscription.remove();
   }, []);
 
-  // Quick Lock: seed lastActiveAtRef from persisted storage so cold restarts
-  // correctly trigger the lock when the timeout has elapsed.
+  // Quick Lock: seed lastActiveAtRef from persisted storage AND evaluate
+  // the lock on cold start. The AppState 'change' listener below only
+  // fires on a background -> foreground transition within a still-alive
+  // process; a fully cold launch (app was terminated, then reopened) never
+  // emits that transition at all, so without this the PIN prompt never
+  // appeared on relaunch no matter how much time had passed or whether a
+  // PIN was configured - the last-viewed screen's content rendered
+  // immediately with nothing gating it.
   useEffect(() => {
-    if (!isAuth) return;
-    getPersistedLastActiveAt().then((ts) => {
+    if (!isAuth || hasPin === null) return;
+    getPersistedLastActiveAt().then(async (ts) => {
       lastActiveAtRef.current = ts;
+      if (hasPin) {
+        const lock = await shouldLockAsync(ts);
+        if (lock) setShowQuickLock(true);
+      }
     }).catch(() => {});
-  }, [isAuth]);
+  }, [isAuth, hasPin]);
 
   // Quick Lock: track background → foreground transitions
   useEffect(() => {

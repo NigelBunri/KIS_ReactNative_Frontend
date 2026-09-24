@@ -926,6 +926,10 @@ const broadcastRoutes = {
       `${API_BASE_URL}/api/v1/commerce/shops/${id}/request_verification/`,
     shopPartnerConnect: (id: string) =>
       `${API_BASE_URL}/api/v1/commerce/shops/${id}/partner/`,
+    shopPayoutAccountConnect: (id: string) =>
+      `${API_BASE_URL}/api/v1/commerce/shops/${id}/payout-account/connect/`,
+    shopStripeAccountConnect: (id: string) =>
+      `${API_BASE_URL}/api/v1/commerce/shops/${id}/stripe-account/connect/`,
     products: `${API_BASE_URL}/api/v1/commerce/products/`,
     discovery: `${API_BASE_URL}/api/v1/commerce/discovery/`,
     // Direct-to-S3 presigned-upload handshake for marketplace media — see

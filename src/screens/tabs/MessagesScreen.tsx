@@ -41,6 +41,7 @@ import { useSocket } from '../../../SocketProvider';
 import { useAuth } from '../../../App';
 import { loadMessages, upsertMessage } from '@/Module/ChatRoom/Storage/chatStorage';
 import { normalizePhoneKey, participantsToIds } from '@/Module/ChatRoom/messagesUtils';
+import { refreshFromDeviceAndBackend } from '@/Module/AddContacts/contactsService';
 import { decryptFromUser, ensureDeviceId } from '@/security/e2ee';
 import { FilterManager, ToggleChip } from '@/components/messaging/Filters';
 import UpdatesTab from '@/screens/tabs/MesssagingSubTabs/UpdatesTab';
@@ -375,6 +376,30 @@ const queueMetaRefresh = useCallback(
 
 const deviceIdRef = useRef<string>('');
 const joinedRoomsRef = useRef<Set<string>>(new Set());
+// This screen eagerly joins EVERY conversation's socket room (see the
+// chat.join effect below), so for any conversation that also has an open
+// room subscription, a single new message triggers BOTH 'chat.message'
+// (room broadcast) and 'conversation.updated' (per-user-room broadcast,
+// backend messages.ts's _postSendSideEffects) — each handler independently
+// incremented unreadCount by 1, double-counting every unread badge (AND-263:
+// "may indicate 2 unread when there's just 1"). Both payloads carry the
+// same message timestamp, so a short-TTL "conversationId:timestamp already
+// counted" guard lets exactly one of the two increments through per real
+// message, regardless of which event arrives first or whether the other
+// ever arrives at all (e.g. a conversation this screen hasn't joined yet).
+const countedUnreadEventsRef = useRef<Map<string, number>>(new Map());
+const UNREAD_DEDUPE_TTL_MS = 5000;
+const shouldCountUnreadEvent = (convId: string, timestamp: string): boolean => {
+  const key = `${convId}:${timestamp}`;
+  const now = Date.now();
+  const map = countedUnreadEventsRef.current;
+  for (const [k, expiresAt] of map) {
+    if (expiresAt <= now) map.delete(k);
+  }
+  if (map.has(key)) return false;
+  map.set(key, now + UNREAD_DEDUPE_TTL_MS);
+  return true;
+};
 
 const handleStartQuickCall = useCallback(
   async (chat: Chat | undefined | null, media: 'voice' | 'video') => {
@@ -912,21 +937,28 @@ useEffect(() => {
 }, [queueMetaRefresh]);
 
 useEffect(() => {
-  const CONTACTS_CACHE_KEY = 'kis.contacts.cache.v1';
-  const loadContacts = async () => {
-    try {
-      const raw = await AsyncStorage.getItem(CONTACTS_CACHE_KEY);
-      if (!raw) return;
-      const list = JSON.parse(raw) as Array<{ name?: string; phone?: string }>;
+  // 'kis.contacts.cache.v1' was a dead key — nothing in the app has ever
+  // written it, so this passive read always produced an empty map, and
+  // every direct-chat with a phone-only contact fell back to showing a raw
+  // phone number instead of their name (same root cause as AND-029's "No
+  // contacts available" — a screen depending on contact data without ever
+  // actually fetching it). Load from the real source, same as
+  // ContactsModal.tsx/AddContactsPage.tsx: device contacts + the backend
+  // registered-contacts check, cached for 10 minutes internally so this
+  // doesn't refetch on every MessagesScreen mount.
+  let cancelled = false;
+  refreshFromDeviceAndBackend()
+    .then((contacts) => {
+      if (cancelled) return;
       const map: Record<string, string> = {};
-      for (const c of list || []) {
+      for (const c of contacts) {
         const key = normalizePhoneKey(c.phone);
         if (key && c.name) map[key] = c.name;
       }
       setContactNameByPhone(map);
-    } catch {}
-  };
-  loadContacts();
+    })
+    .catch(() => {});
+  return () => { cancelled = true; };
 }, []);
 
 const prevConvIdsRef = useRef<Set<string>>(new Set());
@@ -1011,9 +1043,10 @@ useEffect(() => {
       hasEncrypted ? '' : getMessagePreviewText(payload),
     );
 
+    const countsTowardUnread = !isFromMe && shouldCountUnreadEvent(convId, lastAt);
     setConversationMeta((prev) => {
       const prevUnread = prev[convId]?.unreadCount ?? 0;
-      const increment = isFromMe ? 0 : 1;
+      const increment = countsTowardUnread ? 1 : 0;
       const previewText = resolveConversationPreview(
         {
           ...payload,
@@ -1261,6 +1294,7 @@ useEffect(() => {
     const isFromMe = senderId.length > 0 && senderId === String(effectiveCurrentUserId);
 
     if (rawPreview !== undefined) {
+      const countsTowardUnread = !isFromMe && shouldCountUnreadEvent(convId, lastAt);
       setConversationMeta((prev) => {
         const prevUnread = prev[convId]?.unreadCount ?? 0;
         return {
@@ -1269,7 +1303,7 @@ useEffect(() => {
             ...prev[convId],
             lastMessage: resolveConversationPreview(payload, prev[convId]?.lastMessage),
             lastAt,
-            unreadCount: isFromMe ? prevUnread : prevUnread + 1,
+            unreadCount: countsTowardUnread ? prevUnread + 1 : prevUnread,
             lastMessageFromMe: isFromMe,
           },
         };
@@ -1294,13 +1328,31 @@ useEffect(() => {
     queueMetaRefresh(convId);
     refreshConversations(true, false).catch(() => {});
   };
+  // A delete (for-everyone or for-me) never fires conversation.updated —
+  // the open ChatRoomPage thread updates live off its own chat.delete
+  // listener, but this list screen had no listener at all, so a deleted
+  // last message kept showing its old preview text here until the next
+  // full reload (e.g. actually opening the chat, which fetches fresh
+  // data). No preview/lastMessage payload comes with a delete event, so
+  // don't try to patch the cached text locally — just re-pull the
+  // conversation list, which already computes the correct preview
+  // server-side (confirmed by the fact that opening the chat always
+  // showed the right state).
+  const onMessageDeleted = (payload: any) => {
+    const convId = String(payload?.conversationId ?? payload?.conversation_id ?? '');
+    if (!convId) return;
+    queueMetaRefresh(convId);
+    refreshConversations(true, false).catch(() => {});
+  };
   socket.on('chat.message', onMessage);
   socket.on('conversation.updated', onConversationUpdated);
   socket.on('conversation.created', onConversationUpdated);
+  socket.on('chat.delete', onMessageDeleted);
   return () => {
     socket.off('chat.message', onMessage);
     socket.off('conversation.updated', onConversationUpdated);
     socket.off('conversation.created', onConversationUpdated);
+    socket.off('chat.delete', onMessageDeleted);
   };
 }, [socket, isConnected, effectiveCurrentUserId, queueMetaRefresh, setConversations, setConversationMeta, refreshConversations]);
 

@@ -23,13 +23,18 @@ import KISButton from '@/constants/KISButton';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'WhistleblowerReport'>;
 
-const CATEGORIES = [
-  'Corruption',
-  'Fraud',
-  'Human Rights',
-  'Environmental',
-  'Workplace Abuse',
-  'Other',
+// Values must match apps.government.models.WhistleblowerCategory exactly
+// (lowercase choice codes) - the previous list used display-style labels
+// as the submitted value itself ('Corruption', 'Other', ...), and three
+// of the six ('Human Rights', 'Environmental', 'Workplace Abuse') had no
+// matching backend choice at all, so every submission 400'd regardless of
+// which category was picked.
+const CATEGORIES: { value: string; label: string }[] = [
+  { value: 'corruption', label: 'Corruption' },
+  { value: 'fraud', label: 'Fraud' },
+  { value: 'abuse', label: 'Abuse' },
+  { value: 'safety', label: 'Safety' },
+  { value: 'other', label: 'Other' },
 ];
 
 export default function WhistleblowerScreen(_props: Props) {
@@ -43,7 +48,7 @@ export default function WhistleblowerScreen(_props: Props) {
 
   // Submit form
   const [content, setContent] = useState('');
-  const [category, setCategory] = useState('Other');
+  const [category, setCategory] = useState('other');
   const [submitting, setSubmitting] = useState(false);
   const [caseRef, setCaseRef] = useState<string | null>(null);
 
@@ -279,36 +284,36 @@ export default function WhistleblowerScreen(_props: Props) {
                   <View style={styles.chipRow}>
                     {CATEGORIES.map((cat) => (
                       <TouchableOpacity
-                        key={cat}
+                        key={cat.value}
                         activeOpacity={0.75}
                         hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
                         style={[
                           styles.chip,
                           {
                             backgroundColor:
-                              category === cat
+                              category === cat.value
                                 ? palette.primary
                                 : palette.surface,
                             borderColor:
-                              category === cat
+                              category === cat.value
                                 ? palette.primary
                                 : palette.divider,
                           },
                         ]}
-                        onPress={() => setCategory(cat)}
+                        onPress={() => setCategory(cat.value)}
                       >
                         <Text
                           style={[
                             styles.chipText,
                             {
                               color:
-                                category === cat
+                                category === cat.value
                                   ? palette.ivory
                                   : palette.subtext,
                             },
                           ]}
                         >
-                          {cat}
+                          {cat.label}
                         </Text>
                       </TouchableOpacity>
                     ))}

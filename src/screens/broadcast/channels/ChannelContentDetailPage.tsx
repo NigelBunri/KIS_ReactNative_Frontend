@@ -52,6 +52,7 @@ import {
   fetchChannelContentChapters,
 } from '@/screens/broadcast/channels/hooks/useChannelsData';
 import ChannelCommentsPanel from '@/screens/broadcast/channels/components/ChannelCommentsPanel';
+import ProductTagsDisplay from '@/screens/broadcast/channels/components/ProductTagsDisplay';
 import SubscribeBellButton from '@/screens/broadcast/channels/components/SubscribeBellButton';
 import AgeGateScreen from '@/screens/broadcast/channels/components/AgeGateScreen';
 import GeoBlockedScreen from '@/screens/broadcast/channels/components/GeoBlockedScreen';
@@ -154,6 +155,17 @@ function VideoPlayerControls({
   const pausedRef = useRef(paused);
   useEffect(() => { pausedRef.current = paused; }, [paused]);
 
+  // The other half of "before the video loads, controls appear but they
+  // don't work": react-native-video's imperative seek() silently no-ops
+  // (or throws, swallowed here) when called before the native player has
+  // actually finished initializing — the Slider itself is fully visible
+  // and draggable the instant this component mounts, well before onLoad,
+  // so a user dragging it during that window sees a control that visually
+  // works but produces no effect. Gate the seek call, and grey out the
+  // slider until onLoad has actually fired once.
+  const [playerReady, setPlayerReady] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
   const showControls = useCallback(() => {
     setControlsVis(true);
     Animated.timing(controlsAnim, { toValue: 1, duration: 150, useNativeDriver: true }).start();
@@ -204,7 +216,9 @@ function VideoPlayerControls({
         viewType={ViewType.TEXTURE}
         paused={paused}
         rate={speed}
-        onLoad={({ duration: d }) => { setDuration(d); setBuffering(false); }}
+        onLoad={({ duration: d }) => { setDuration(d); setBuffering(false); setPlayerReady(true); }}
+        onFullscreenPlayerDidPresent={() => setIsFullscreen(true)}
+        onFullscreenPlayerDidDismiss={() => setIsFullscreen(false)}
         onProgress={({ currentTime: t }) => { if (!seeking) setCurrentTime(t); }}
         onBuffer={({ isBuffering }) => setBuffering(isBuffering)}
         onEnd={() => {
@@ -235,6 +249,16 @@ function VideoPlayerControls({
           <ActivityIndicator color={palette.ivory} size="large" />
         </View>
       )}
+
+      <ProductTagsDisplay
+        contentId={content.id}
+        currentTimeSeconds={currentTime}
+        onPressProduct={(productUrl) => {
+          Linking.canOpenURL(productUrl)
+            .then((canOpen) => { if (canOpen) Linking.openURL(productUrl); })
+            .catch(() => {});
+        }}
+      />
 
       <Animated.View style={[vstyles.controlsOverlay, { opacity: controlsAnim }]} pointerEvents={controlsVis ? 'box-none' : 'none'}>
         <LinearGradient colors={['rgba(0,0,0,0.0)', 'rgba(0,0,0,0.75)']} style={vstyles.gradientBottom} />
@@ -276,15 +300,17 @@ function VideoPlayerControls({
             ))}
             <Slider
               style={{ flex: 1 }}
+              disabled={!playerReady}
               minimumValue={0}
               maximumValue={Math.max(1, duration)}
               value={seeking ? seekValue : currentTime}
-              minimumTrackTintColor={palette.primaryStrong}
+              minimumTrackTintColor={playerReady ? palette.primaryStrong : palette.divider}
               maximumTrackTintColor={palette.divider}
-              thumbTintColor={palette.primaryStrong}
-              onSlidingStart={() => { setSeeking(true); setSeekValue(currentTime); }}
-              onValueChange={v => setSeekValue(v)}
+              thumbTintColor={playerReady ? palette.primaryStrong : palette.divider}
+              onSlidingStart={() => { if (!playerReady) return; setSeeking(true); setSeekValue(currentTime); }}
+              onValueChange={v => { if (!playerReady) return; setSeekValue(v); }}
               onSlidingComplete={v => {
+                if (!playerReady) return;
                 setSeeking(false);
                 videoRef.current?.seek(v);
                 setCurrentTime(v);
@@ -310,6 +336,24 @@ function VideoPlayerControls({
           {/* Quality */}
           <Pressable onPress={() => setQualityModal(true)} style={vstyles.speedBtn} hitSlop={8}>
             <KISIcon name="video" size={16} color={palette.ivory} />
+          </Pressable>
+
+          {/* Fullscreen/theater — no control for this existed at all before;
+              react-native-video's own native presentFullscreenPlayer/
+              dismissFullscreenPlayer (AVPlayerViewController on iOS,
+              ExoPlayer's fullscreen activity on Android) is the standard,
+              already-available way to do this rather than hand-rolling
+              screen rotation/orientation-lock. */}
+          <Pressable
+            onPress={() => {
+              if (isFullscreen) videoRef.current?.dismissFullscreenPlayer?.();
+              else videoRef.current?.presentFullscreenPlayer?.();
+            }}
+            style={vstyles.speedBtn}
+            hitSlop={8}
+            accessibilityLabel={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
+          >
+            <KISIcon name="fullscreen" size={16} color={palette.ivory} />
           </Pressable>
         </View>
       </Animated.View>

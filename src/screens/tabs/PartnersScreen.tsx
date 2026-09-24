@@ -1,6 +1,6 @@
 // src/screens/tabs/PartnersScreen.tsx
-import React, { useCallback, useEffect } from 'react';
-import { Alert, Animated, DeviceEventEmitter, Pressable, Text, useWindowDimensions, View } from 'react-native';
+import React, { useCallback, useEffect, useState } from 'react';
+import { Alert, Animated, DeviceEventEmitter, Modal, Pressable, Text, useWindowDimensions, View } from 'react-native';
 import { useNavigation, useFocusEffect, useIsFocused } from '@react-navigation/native';
 import { useResponsiveLayout } from '@/theme/responsive';
 import { useKISTheme } from '@/theme/useTheme';
@@ -8,6 +8,7 @@ import { useContextPanelContent, TabletCard } from '@/components/shell';
 import { KISIcon } from '@/constants/kisIcons';
 import { useAuth } from '../../../App';
 import PartnerLayout from './partners/PartnerLayout';
+import PartnerCreateSlide from '@/components/partners/CreatePartnerScreen';
 import { normalizePartnerRole } from '@/components/partners/settings/partnerSettingsData';
 import { usePartnerSettingsCatalog } from '@/components/partners/settings/usePartnerSettingsCatalog';
 import { useMessagesPane } from './partners/useMessagesPane';
@@ -921,9 +922,18 @@ export default function PartnersScreen({ setHidNav, onOpenInfo }: any) {
       },
     ]);
   }, [openOrgProfilePanel, rootNavigation, selectedPartner?.id, selectedPartner?.name]);
+  // "Create a new organization" (CreatePartnerScreen/PartnerCreateSlide) is
+  // a fully-built, working flow — its only mount point in the whole app was
+  // an AccountCreditsCard on the Profile tab that nothing ever renders
+  // (dead/orphaned import), so there was genuinely no way to reach it from
+  // Partners at all (AND-195: "no create option found"). The left rail's
+  // "+" button already exists here and only opens the Discover-existing-
+  // orgs panel; give it a second real destination instead of building a
+  // new entry point from scratch.
+  const [showCreateOrg, setShowCreateOrg] = useState(false);
   const {
     rootPanHandlers,
-    onAddPartnerPress,
+    onAddPartnerPress: onAddPartnerPressBase,
     handleCloseMessages,
     onPartnerHeaderPress,
     onOpenCreate,
@@ -951,6 +961,14 @@ export default function PartnersScreen({ setHidNav, onOpenInfo }: any) {
     isOrganizationAppsPanelOpen: isOrgAppsPanelOpen,
     isComplaintsPanelOpen: complaintsPanel.isOpen,
   });
+
+  const onAddPartnerPress = useCallback(() => {
+    Alert.alert('Add an organization', 'Join one that already exists, or create your own.', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Join existing', onPress: onAddPartnerPressBase },
+      { text: 'Create new', onPress: () => setShowCreateOrg(true) },
+    ]);
+  }, [onAddPartnerPressBase]);
 
   return (
     <PartnerOrganizationAppsProvider partnerId={selectedPartner?.id}>
@@ -1482,6 +1500,17 @@ export default function PartnersScreen({ setHidNav, onOpenInfo }: any) {
           onClose={geolocationPanel.close}
         />
       )}
+
+      {/* ── Create a new organization (AND-195 fix — see onAddPartnerPress
+           above for why this needed its own entry point here) ─────────── */}
+      <Modal visible={showCreateOrg} animationType="slide" onRequestClose={() => setShowCreateOrg(false)}>
+        <PartnerCreateSlide
+          onClose={() => {
+            setShowCreateOrg(false);
+            reloadPartners();
+          }}
+        />
+      </Modal>
     </PartnerOrganizationAppsProvider>
   );
 }
