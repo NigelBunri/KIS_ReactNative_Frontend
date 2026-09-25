@@ -97,6 +97,9 @@ export default function FeedsDiscoverPage({
   // instead of leaving the tap looking unresponsive while the POST below
   // resolves - see handleOpenComments.
   const [commentsLoadingId, setCommentsLoadingId] = useState<string | null>(null);
+  // Same idea as commentsLoadingId, for the share and save buttons.
+  const [shareLoadingId, setShareLoadingId] = useState<string | null>(null);
+  const [saveLoadingId, setSaveLoadingId] = useState<string | null>(null);
   const [showTrendingOnly, setShowTrendingOnly] = useState(false);
   // Use controlled props when provided, else fall back to local state
   const [activeCategoryLocal, setActiveCategoryLocal] = useState<FeedCategory>('for_you');
@@ -291,23 +294,28 @@ export default function FeedsDiscoverPage({
 
   const handleShare = useCallback(
     async (item: BroadcastFeedItem) => {
-      const permalink = buildBroadcastPermalink(item);
-      const message = [
-        item.title?.trim(),
-        item.text_plain?.trim() || item.text?.trim(),
-        permalink,
-      ]
-        .filter(Boolean)
-        .join('\n\n');
-      const shareResult = await Share.share({
-        message,
-        url: permalink,
-        title: item.title ?? 'Broadcast',
-      });
-      if (!wasNativeShareCompleted(shareResult)) return;
-      const result = await recordShare(item.id);
-      if (!result?.ok) {
-        Alert.alert('Share', 'Unable to log this share right now.');
+      setShareLoadingId(item.id);
+      try {
+        const permalink = buildBroadcastPermalink(item);
+        const message = [
+          item.title?.trim(),
+          item.text_plain?.trim() || item.text?.trim(),
+          permalink,
+        ]
+          .filter(Boolean)
+          .join('\n\n');
+        const shareResult = await Share.share({
+          message,
+          url: permalink,
+          title: item.title ?? 'Broadcast',
+        });
+        if (!wasNativeShareCompleted(shareResult)) return;
+        const result = await recordShare(item.id);
+        if (!result?.ok) {
+          Alert.alert('Share', 'Unable to log this share right now.');
+        }
+      } finally {
+        setShareLoadingId(null);
       }
     },
     [buildBroadcastPermalink, recordShare],
@@ -719,6 +727,8 @@ export default function FeedsDiscoverPage({
           onRefresh={refreshAll}
           onOpenItem={handleOpenItem}
           commentsLoadingItemId={commentsLoadingId}
+          shareLoadingItemId={shareLoadingId}
+          saveLoadingItemId={saveLoadingId}
           onShare={item => {
             void handleShare(item);
           }}
@@ -726,7 +736,10 @@ export default function FeedsDiscoverPage({
             void handleLike(item);
           }}
           onSave={item => {
-            void toggleSaved(item.id, Boolean(item.viewer_saved));
+            setSaveLoadingId(item.id);
+            void toggleSaved(item.id, Boolean(item.viewer_saved)).finally(() => {
+              setSaveLoadingId(null);
+            });
           }}
           onComment={item => {
             void handleOpenComments(item);

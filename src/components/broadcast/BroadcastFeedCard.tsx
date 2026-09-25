@@ -125,6 +125,9 @@ type Props = {
   // FeedsDiscoverPage's handleOpenComments) - shows a spinner in place of
   // the comment icon instead of leaving the tap looking unresponsive.
   commentsLoading?: boolean;
+  // Same idea for the share and save buttons.
+  shareLoading?: boolean;
+  savesLoading?: boolean;
   onSubscribe?: () => void | Promise<void | boolean>;
   watchProgress?: number;
 };
@@ -172,6 +175,8 @@ export default function BroadcastFeedCard({
   onOpenAuthorProfile,
   onToggleComments,
   commentsLoading,
+  shareLoading,
+  savesLoading,
   onSubscribe,
   watchProgress,
   showComments,
@@ -461,19 +466,23 @@ export default function BroadcastFeedCard({
   const engagementBlock = (
     <View style={[styles.engagementRow, { borderTopColor: withAlpha(palette.divider, 0.5) }, compact && { flexWrap: 'wrap', rowGap: 8 }]}>
       {onSave ? (
-        <Pressable onPress={onSave} style={styles.engItem} hitSlop={10}>
-          <KISIcon
-            name="bookmark"
-            size={18}
-            color={item.viewer_saved ? palette.primaryStrong : palette.subtext}
-          />
+        <Pressable onPress={onSave} disabled={savesLoading} style={styles.engItem} hitSlop={10}>
+          {savesLoading ? (
+            <ActivityIndicator size="small" color={palette.subtext} />
+          ) : (
+            <KISIcon
+              name="bookmark"
+              size={18}
+              color={item.viewer_saved ? palette.primaryStrong : palette.subtext}
+            />
+          )}
           <Text
             style={[
               styles.engText,
               { color: item.viewer_saved ? palette.primaryStrong : palette.subtext },
             ]}
           >
-            Save
+            {item.save_count ?? 0}
           </Text>
         </Pressable>
       ) : null}
@@ -516,8 +525,12 @@ export default function BroadcastFeedCard({
         </Pressable>
       ) : null}
 
-      <Pressable onPress={onShare} style={styles.engItem} hitSlop={10}>
-        <KISIcon name="share" size={18} color={palette.subtext} />
+      <Pressable onPress={onShare} disabled={shareLoading} style={styles.engItem} hitSlop={10}>
+        {shareLoading ? (
+          <ActivityIndicator size="small" color={palette.subtext} />
+        ) : (
+          <KISIcon name="share" size={18} color={palette.subtext} />
+        )}
         <Text style={[styles.engText, { color: palette.subtext }]}>
           {item.share_count ?? 0}
         </Text>
@@ -1012,14 +1025,18 @@ export default function BroadcastFeedCard({
       {/* ───── Engagement row (icons + counts like mockup bottom bar) ───── */}
       <View style={[styles.engagementRow, { borderTopColor: withAlpha(palette.divider, 0.5) }, compact && { flexWrap: 'wrap', rowGap: 8 }]}>
         {onSave ? (
-          <Pressable onPress={onSave} style={styles.engItem} hitSlop={10}>
-            <KISIcon
-              name="bookmark"
-              size={18}
-              color={
-                item.viewer_saved ? palette.primaryStrong : palette.subtext
-              }
-            />
+          <Pressable onPress={onSave} disabled={savesLoading} style={styles.engItem} hitSlop={10}>
+            {savesLoading ? (
+              <ActivityIndicator size="small" color={palette.subtext} />
+            ) : (
+              <KISIcon
+                name="bookmark"
+                size={18}
+                color={
+                  item.viewer_saved ? palette.primaryStrong : palette.subtext
+                }
+              />
+            )}
             <Text
               style={[
                 styles.engText,
@@ -1030,7 +1047,7 @@ export default function BroadcastFeedCard({
                 },
               ]}
             >
-              Save
+              {item.save_count ?? 0}
             </Text>
           </Pressable>
         ) : null}
@@ -1079,8 +1096,12 @@ export default function BroadcastFeedCard({
           </Pressable>
         ) : null}
 
-        <Pressable onPress={onShare} style={styles.engItem} hitSlop={10}>
-          <KISIcon name="share" size={18} color={palette.subtext} />
+        <Pressable onPress={onShare} disabled={shareLoading} style={styles.engItem} hitSlop={10}>
+          {shareLoading ? (
+            <ActivityIndicator size="small" color={palette.subtext} />
+          ) : (
+            <KISIcon name="share" size={18} color={palette.subtext} />
+          )}
           <Text style={[styles.engText, { color: palette.subtext }]}>
             {item.share_count ?? 0}
           </Text>

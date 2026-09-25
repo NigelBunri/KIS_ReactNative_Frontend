@@ -506,10 +506,20 @@ export default function useFeedsData({ q = '', code = null }: Params) {
   const toggleSaved = useCallback(
     async (itemId: string, currentlySaved: boolean) => {
       const endpoint = ROUTES.broadcasts.save(itemId);
-      // Optimistic update
+      // Optimistic update - save_count moves with viewer_saved so the
+      // number doesn't lag a beat behind the icon's own state change.
       setItems(prev =>
         prev.map(item =>
-          item.id === itemId ? { ...item, viewer_saved: !currentlySaved } : item,
+          item.id === itemId
+            ? {
+                ...item,
+                viewer_saved: !currentlySaved,
+                save_count: Math.max(
+                  0,
+                  Number(item.save_count ?? 0) + (currentlySaved ? -1 : 1),
+                ),
+              }
+            : item,
         ),
       );
       try {
@@ -526,6 +536,17 @@ export default function useFeedsData({ q = '', code = null }: Params) {
             );
         if (res?.success === false) {
           throw new Error(res?.message || 'Failed');
+        }
+        // Reconcile with the server's authoritative count (BroadcastSaveView
+        // only bumps it when the action actually changed this user's saved
+        // state, so this is the real number, not just this client's guess).
+        const serverSaveCount = res?.data?.save_count;
+        if (typeof serverSaveCount === 'number') {
+          setItems(prev =>
+            prev.map(item =>
+              item.id === itemId ? { ...item, save_count: serverSaveCount } : item,
+            ),
+          );
         }
         return { ok: true, saved: !currentlySaved };
       } catch {

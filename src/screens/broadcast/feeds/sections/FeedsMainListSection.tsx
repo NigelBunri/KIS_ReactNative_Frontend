@@ -105,6 +105,9 @@ type Props = {
   // (see FeedsDiscoverPage's handleOpenComments) - lets just that item's
   // card show a loading spinner on its comment button.
   commentsLoadingItemId?: string | null;
+  // Same idea for the share and save buttons.
+  shareLoadingItemId?: string | null;
+  saveLoadingItemId?: string | null;
 };
 
 export default function FeedsMainListSection({
@@ -120,6 +123,8 @@ export default function FeedsMainListSection({
   onMenu,
   onSubscribe,
   commentsLoadingItemId,
+  shareLoadingItemId,
+  saveLoadingItemId,
 }: Props) {
   const { palette } = useKISTheme();
   const {
@@ -204,6 +209,8 @@ export default function FeedsMainListSection({
                   onSave={() => onSave(item)}
                   onToggleComments={() => onComment(item)}
                   commentsLoading={commentsLoadingItemId === item.id}
+                  shareLoading={shareLoadingItemId === item.id}
+                  savesLoading={saveLoadingItemId === item.id}
                   onMenuPress={() => onMenu(item)}
                   onOpenAuthorProfile={
                     isUserBroadcastSource(item)
