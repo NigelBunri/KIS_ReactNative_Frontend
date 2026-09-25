@@ -73,6 +73,7 @@ import {
   DetachedPartnersOverlayProvider,
   useDetachedPartnersOverlayProps,
 } from '@/contexts/DetachedPartnersOverlayContext';
+import { SearchOverlayProvider, useSearchOverlay } from '@/contexts/SearchOverlayContext';
 import { TabletDialogOverlay } from '@/components/shell';
 import ChatRoomPage from '@/Module/ChatRoom/ChatRoomPage';
 import CommunityRoomPage from '@/Module/Community/CommunityRoomPage';
@@ -504,6 +505,24 @@ function DetachedPartnersOverlayOutlet() {
       <PartnersMessagesPane {...p.messagesPaneProps} />
       <PartnerSheet {...p.partnerSheetProps} />
     </>
+  );
+}
+
+// Global search as a true top-level sibling instead of a RootStack push —
+// see SearchOverlayContext.tsx for why: navigating there used to blur
+// whatever main-tab screen was focused, clearing its Golden Section
+// registration for the duration, which is exactly the "modal shifts the
+// Golden Section" behavior this fixes. zIndex 1500 sits above the chat/
+// community overlays (1000-1003) and the Golden Section's own unset
+// stacking, but below QuickLockScreen's 9999 — search should never be
+// reachable over the lock screen, but should win over any other overlay.
+function SearchOverlayOutlet() {
+  const { visible, close } = useSearchOverlay();
+  if (!visible) return null;
+  return (
+    <View style={[StyleSheet.absoluteFillObject, { zIndex: 1500, elevation: 1500 }]}>
+      <GlobalSearchScreen onClose={close} />
+    </View>
   );
 }
 
@@ -1328,6 +1347,11 @@ function AppContent() {
         {/* Same bridge shape again, for Partners' own chat/feed pane and
             settings sheet - see DetachedPartnersOverlayContext.tsx. */}
         <DetachedPartnersOverlayProvider>
+        {/* Global search's open/close state - see SearchOverlayContext.tsx.
+            Scoped here so both the trigger screens (BroadcastScreen etc.,
+            descendants of NavigationContainer below) and SearchOverlayOutlet
+            (a top-level sibling further down) share it. */}
+        <SearchOverlayProvider>
         {/* Wraps BOTH the normal NavigationContainer subtree below AND
             DetachedChatOverlayOutlet further down — not just the former.
             ChatRoomPage/MessageBubble (and therefore every
@@ -2113,6 +2137,10 @@ function AppContent() {
                 same as the chat overlay does. See
                 DetachedPartnersOverlayContext.tsx. */}
             <DetachedPartnersOverlayOutlet />
+            {/* Same NavigationContainerRefContext need — GlobalSearchScreen's
+                result-selection handler calls useNavigation() internally.
+                See SearchOverlayContext.tsx. */}
+            <SearchOverlayOutlet />
           </NavigationContainerRefContext.Provider>
           <LanguageSwitcher />
           <InAppNotificationToast ref={InAppNotificationToastRef} />
@@ -2132,6 +2160,7 @@ function AppContent() {
           <VoiceMessageMiniBadge />
         </View>
         </VoiceMessagePlayerProvider>
+        </SearchOverlayProvider>
         </DetachedPartnersOverlayProvider>
         </DetachedChatOverlayProvider>
         </DetachedTabBarProvider>

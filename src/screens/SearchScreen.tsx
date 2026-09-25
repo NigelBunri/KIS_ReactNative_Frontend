@@ -127,6 +127,7 @@ export default function SearchScreen({ onClose, onSelectResult }: Props) {
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
   const [activeFilter, setActiveFilter] = useState<FilterTab>('all');
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const inputRef = useRef<TextInput>(null);
 
   useEffect(() => {
     AsyncStorage.getItem(RECENT_SEARCHES_KEY).then(raw => {
@@ -231,16 +232,31 @@ export default function SearchScreen({ onClose, onSelectResult }: Props) {
 
   const showShortQueryHint = query.trim().length > 0 && query.trim().length < 2;
   const showRecentPanel = focused && query.trim().length === 0 && recentSearches.length > 0;
+  const showLanding = !focused && query.trim().length === 0 && recentSearches.length === 0;
   const hasResults = results.length > 0;
+  const styles = useMemo(() => makeStyles(responsive), [responsive]);
 
   return (
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
-    <View style={[styles.root, { backgroundColor: palette.bg, paddingTop: topInset }]}>
-      {/* Search header */}
-      <View style={[styles.header, { borderBottomColor: palette.divider }]}>
-        <View style={[styles.inputRow, { backgroundColor: palette.surface, borderColor: palette.inputBorder }]}>
-          <KISIcon name="search" size={18} color={palette.subtext} />
+    <View style={[styles.root, { backgroundColor: palette.bg, paddingTop: topInset + 10 }]}>
+      {/* ── Header: pill search field + close ─────────────────────────────── */}
+      <View style={styles.header}>
+        <Pressable
+          style={[
+            styles.inputRow,
+            {
+              backgroundColor: palette.card,
+              borderColor: focused ? palette.primary : palette.inputBorder,
+              shadowColor: palette.shadow ?? '#000',
+            },
+          ]}
+          onPress={() => inputRef.current?.focus()}
+        >
+          <View style={[styles.searchIconWrap, { backgroundColor: palette.primarySoft ?? palette.surfaceElevated }]}>
+            <KISIcon name="search" size={16} color={palette.primaryStrong} />
+          </View>
           <TextInput
+            ref={inputRef}
             style={[styles.input, { color: palette.text }]}
             placeholder="Search chats, channels, courses, shops, health, Bible…"
             placeholderTextColor={palette.subtext}
@@ -253,19 +269,23 @@ export default function SearchScreen({ onClose, onSelectResult }: Props) {
             onSubmitEditing={() => { void search(query); void saveRecentSearch(query); }}
           />
           {query.length > 0 ? (
-            <Pressable onPress={() => { setQuery(''); setResults([]); }}>
-              <KISIcon name="close" size={16} color={palette.subtext} />
+            <Pressable
+              onPress={() => { setQuery(''); setResults([]); inputRef.current?.focus(); }}
+              hitSlop={8}
+              style={[styles.clearBtn, { backgroundColor: palette.surfaceElevated }]}
+            >
+              <KISIcon name="close" size={12} color={palette.subtext} />
             </Pressable>
           ) : null}
-        </View>
+        </Pressable>
         {onClose && (
-          <Pressable onPress={onClose} style={styles.cancelBtn}>
-            <Text style={{ color: palette.primary, fontSize: 14 }}>Cancel</Text>
+          <Pressable onPress={onClose} hitSlop={8} style={[styles.closeBtn, { backgroundColor: palette.surfaceElevated }]}>
+            <Text style={{ color: palette.primaryStrong, fontSize: 14, fontWeight: '800' }}>Cancel</Text>
           </Pressable>
         )}
       </View>
 
-      {/* Filter tabs — only shown when there are results */}
+      {/* ── Filter pills — only shown once there are results ─────────────── */}
       {hasResults && (
         <ScrollView
           horizontal
@@ -282,12 +302,14 @@ export default function SearchScreen({ onClose, onSelectResult }: Props) {
                 style={[
                   styles.filterPill,
                   {
-                    backgroundColor: active ? palette.primaryStrong : palette.surface,
+                    backgroundColor: active ? palette.primaryStrong : palette.card,
                     borderColor: active ? palette.primaryStrong : palette.inputBorder,
+                    shadowOpacity: active ? 0.16 : 0,
+                    shadowColor: palette.primaryStrong,
                   },
                 ]}
               >
-                <Text style={[styles.filterPillText, { color: active ? palette.onPrimary : palette.subtext }]}>
+                <Text style={[styles.filterPillText, { color: active ? palette.onPrimary : palette.text }]}>
                   {tab.label}
                 </Text>
               </Pressable>
@@ -296,54 +318,74 @@ export default function SearchScreen({ onClose, onSelectResult }: Props) {
         </ScrollView>
       )}
 
-      {/* Recent searches panel */}
+      {/* ── Landing state: nothing typed yet, no recent searches ─────────── */}
+      {showLanding && (
+        <View style={styles.centered}>
+          <View style={[styles.landingIconWrap, { backgroundColor: palette.primarySoft ?? palette.surfaceElevated }]}>
+            <KISIcon name="search" size={26} color={palette.primaryStrong} />
+          </View>
+          <Text style={[styles.emptyTitle, { color: palette.text }]}>Search KIS</Text>
+          <Text style={[styles.emptyCopy, { color: palette.subtext }]}>
+            Find chats, channels, courses, shops, health providers and Bible verses in one place.
+          </Text>
+        </View>
+      )}
+
+      {/* ── Recent searches ───────────────────────────────────────────────── */}
       {showRecentPanel && (
-        <View style={{ paddingHorizontal: 12, paddingTop: 8 }}>
+        <View style={styles.recentSection}>
           <View style={styles.recentHeader}>
-            <Text style={[styles.sectionHeader, { color: palette.subtext, paddingHorizontal: 0, paddingVertical: 0 }]}>RECENT SEARCHES</Text>
+            <Text style={[styles.sectionHeader, { color: palette.subtext }]}>RECENT SEARCHES</Text>
             <Pressable onPress={clearAllRecent} hitSlop={8}>
-              <Text style={{ color: palette.primary, fontSize: 12, fontWeight: '700' }}>Clear all</Text>
+              <Text style={{ color: palette.primaryStrong, fontSize: 12, fontWeight: '800' }}>Clear all</Text>
             </Pressable>
           </View>
-          {recentSearches.map(term => (
-            <Pressable
-              key={term}
-              style={[styles.recentRow, { borderBottomColor: palette.divider }]}
-              onPress={() => handleRecentTap(term)}
-            >
-              <KISIcon name="call-history" size={16} color={palette.subtext} />
-              <Text style={[styles.recentText, { color: palette.text }]} numberOfLines={1}>{term}</Text>
-              <Pressable onPress={() => removeRecentSearch(term)} hitSlop={8}>
-                <KISIcon name="close" size={14} color={palette.subtext} />
+          <View style={[styles.recentCard, { backgroundColor: palette.card, borderColor: palette.divider }]}>
+            {recentSearches.map((term, idx) => (
+              <Pressable
+                key={term}
+                style={[
+                  styles.recentRow,
+                  idx < recentSearches.length - 1 && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: palette.divider },
+                ]}
+                onPress={() => handleRecentTap(term)}
+              >
+                <View style={[styles.recentIconWrap, { backgroundColor: palette.surfaceElevated }]}>
+                  <KISIcon name="call-history" size={14} color={palette.subtext} />
+                </View>
+                <Text style={[styles.recentText, { color: palette.text }]} numberOfLines={1}>{term}</Text>
+                <Pressable onPress={() => removeRecentSearch(term)} hitSlop={8} style={styles.recentRemoveBtn}>
+                  <KISIcon name="close" size={13} color={palette.subtext} />
+                </Pressable>
               </Pressable>
-            </Pressable>
-          ))}
+            ))}
+          </View>
         </View>
       )}
 
       {loading && (
         <View style={styles.centered}>
-          <ActivityIndicator color={palette.primary} />
+          <ActivityIndicator color={palette.primaryStrong} />
         </View>
       )}
 
       {!loading && error ? (
         <View style={styles.centered}>
-          <Text style={{ color: palette.danger }}>{error}</Text>
+          <Text style={{ color: palette.danger, fontWeight: '700' }}>{error}</Text>
         </View>
       ) : null}
 
       {!loading && !error && showShortQueryHint && (
         <View style={styles.centered}>
           <Text style={[styles.emptyTitle, { color: palette.text }]}>Keep typing</Text>
-          <Text style={[styles.emptyCopy, { color: palette.subtext }]}>Enter at least 2 characters to search KIS quickly.</Text>
+          <Text style={[styles.emptyCopy, { color: palette.subtext }]}>Enter at least 2 characters to search KIS.</Text>
         </View>
       )}
 
       {!loading && !error && query.trim().length >= 2 && results.length === 0 && (
         <View style={styles.centered}>
           <Text style={[styles.emptyTitle, { color: palette.text }]}>No results</Text>
-          <Text style={[styles.emptyCopy, { color: palette.subtext }]}>Nothing matched "{query.trim()}" in your safe discovery results.</Text>
+          <Text style={[styles.emptyCopy, { color: palette.subtext }]}>Nothing matched "{query.trim()}".</Text>
         </View>
       )}
 
@@ -362,38 +404,39 @@ export default function SearchScreen({ onClose, onSelectResult }: Props) {
           removeClippedSubviews
           data={sections}
           keyExtractor={([kind]) => kind}
-          ListEmptyComponent={
-            <View style={{ alignItems: 'center', justifyContent: 'center', paddingVertical: 48 }}>
-              <Text style={{ color: palette.subtext, fontSize: 14, textAlign: 'center' }}>
-                No results found
-              </Text>
-            </View>
-          }
           renderItem={({ item: [kind, items] }) => (
-            <View style={{ marginBottom: 8 }}>
+            <View style={{ marginBottom: 10 }}>
               <Text style={[styles.sectionHeader, { color: palette.subtext }]}>
                 {SECTION_LABELS[kind] ?? kind.replace(/_/g, ' ').toUpperCase()}
               </Text>
-              {items.map((result) => (
-                <Pressable
-                  key={`${result.kind}-${result.target_id}`}
-                  onPress={() => onSelectResult?.(result)}
-                  style={[styles.row, { backgroundColor: palette.card, borderColor: palette.inputBorder }]}
-                >
-                  <ImagePlaceholder size={38} radius={19} style={styles.avatar} />
-                  <View style={{ flex: 1 }}>
-                    <Text style={[styles.title, { color: palette.text }]} numberOfLines={1}>
-                      {result.title}
-                    </Text>
-                    {!!result.subtitle && (
-                      <Text style={{ color: palette.subtext, fontSize: 12 }} numberOfLines={1}>
-                        {result.subtitle}
+              <View style={[styles.resultCard, { backgroundColor: palette.card, borderColor: palette.divider, shadowColor: palette.shadow ?? '#000' }]}>
+                {items.map((result, idx) => (
+                  <Pressable
+                    key={`${result.kind}-${result.target_id}`}
+                    onPress={() => onSelectResult?.(result)}
+                    style={({ pressed }) => [
+                      styles.row,
+                      idx < items.length - 1 && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: palette.divider },
+                      pressed && { backgroundColor: palette.surfaceElevated },
+                    ]}
+                  >
+                    <ImagePlaceholder size={40} radius={13} style={styles.avatar} />
+                    <View style={{ flex: 1, minWidth: 0 }}>
+                      <Text style={[styles.title, { color: palette.text }]} numberOfLines={1}>
+                        {result.title}
                       </Text>
-                    )}
-                  </View>
-                  <KISIcon name={KIND_ICON[kind] ?? 'chevron-right'} size={16} color={palette.subtext} />
-                </Pressable>
-              ))}
+                      {!!result.subtitle && (
+                        <Text style={{ color: palette.subtext, fontSize: 12, marginTop: 1 }} numberOfLines={1}>
+                          {result.subtitle}
+                        </Text>
+                      )}
+                    </View>
+                    <View style={[styles.kindBadge, { backgroundColor: palette.surfaceElevated }]}>
+                      <KISIcon name={(KIND_ICON[kind] as any) ?? 'chevron-right'} size={13} color={palette.subtext} />
+                    </View>
+                  </Pressable>
+                ))}
+              </View>
             </View>
           )}
           contentContainerStyle={{ padding: responsive.pageGutter, paddingBottom: insets.bottom + responsive.pageGutter, width: '100%', maxWidth: responsive.contentMaxWidth, alignSelf: 'center' }}
@@ -405,51 +448,117 @@ export default function SearchScreen({ onClose, onSelectResult }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
-  root: { flex: 1 },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    gap: 8,
-  },
-  inputRow: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderRadius: 10,
-    borderWidth: 1,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    gap: 6,
-  },
-  input: { flex: 1, fontSize: 14, padding: 0 },
-  cancelBtn: { paddingHorizontal: 4 },
-  filterRow: { paddingHorizontal: 12, paddingVertical: 8, gap: 8 },
-  filterPill: {
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-    borderRadius: 20,
-    borderWidth: 1,
-  },
-  filterPillText: { fontSize: 13, fontWeight: '700' },
-  recentHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 },
-  recentRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 11, borderBottomWidth: StyleSheet.hairlineWidth, gap: 10 },
-  recentText: { flex: 1, fontSize: 14, fontWeight: '600' },
-  centered: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 },
-  emptyTitle: { fontSize: 16, fontWeight: '900', textAlign: 'center' },
-  emptyCopy: { marginTop: 6, fontSize: 13, lineHeight: 18, textAlign: 'center' },
-  sectionHeader: { fontSize: 11, fontWeight: '700', paddingHorizontal: 12, paddingVertical: 6, letterSpacing: 0.8 },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 10,
-    borderRadius: 10,
-    borderWidth: 1,
-    marginBottom: 6,
-    gap: 10,
-  },
-  avatar: { borderRadius: 19 },
-  title: { fontSize: 14, fontWeight: '600' },
-});
+const makeStyles = (responsive: ReturnType<typeof useResponsiveLayout>) =>
+  StyleSheet.create({
+    root: { flex: 1 },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: responsive.pageGutter,
+      paddingBottom: 12,
+      gap: 10,
+    },
+    inputRow: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      height: 48,
+      borderRadius: 24,
+      borderWidth: 1.5,
+      paddingLeft: 6,
+      paddingRight: 10,
+      gap: 8,
+      shadowOpacity: 0.08,
+      shadowRadius: 12,
+      shadowOffset: { width: 0, height: 4 },
+      elevation: 2,
+    },
+    searchIconWrap: {
+      width: 34,
+      height: 34,
+      borderRadius: 17,
+      alignItems: 'center',
+      justifyContent: 'center',
+      flexShrink: 0,
+    },
+    input: { flex: 1, fontSize: 15, fontWeight: '600', padding: 0, height: 48 },
+    clearBtn: {
+      width: 22,
+      height: 22,
+      borderRadius: 11,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    closeBtn: {
+      height: 40,
+      paddingHorizontal: 16,
+      borderRadius: 20,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    filterRow: { paddingHorizontal: responsive.pageGutter, paddingBottom: 14, gap: 8 },
+    filterPill: {
+      paddingHorizontal: 16,
+      paddingVertical: 9,
+      borderRadius: 20,
+      borderWidth: 1.5,
+      shadowRadius: 8,
+      shadowOffset: { width: 0, height: 3 },
+    },
+    filterPillText: { fontSize: 13, fontWeight: '800' },
+    landingIconWrap: {
+      width: 64,
+      height: 64,
+      borderRadius: 32,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: 16,
+    },
+    recentSection: { paddingHorizontal: responsive.pageGutter, paddingTop: 4 },
+    recentHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
+    recentCard: {
+      borderRadius: 18,
+      borderWidth: 1,
+      overflow: 'hidden',
+    },
+    recentRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 14, gap: 10 },
+    recentIconWrap: {
+      width: 28,
+      height: 28,
+      borderRadius: 14,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    recentText: { flex: 1, fontSize: 14, fontWeight: '700' },
+    recentRemoveBtn: { padding: 4 },
+    centered: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 },
+    emptyTitle: { fontSize: 17, fontWeight: '900', textAlign: 'center' },
+    emptyCopy: { marginTop: 6, fontSize: 13, lineHeight: 19, textAlign: 'center', maxWidth: 280 },
+    sectionHeader: { fontSize: 11, fontWeight: '800', paddingHorizontal: 4, paddingBottom: 8, letterSpacing: 0.8, textTransform: 'uppercase' },
+    resultCard: {
+      borderRadius: 18,
+      borderWidth: 1,
+      overflow: 'hidden',
+      shadowOpacity: 0.05,
+      shadowRadius: 10,
+      shadowOffset: { width: 0, height: 4 },
+      elevation: 1,
+    },
+    row: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: 12,
+      paddingHorizontal: 12,
+      gap: 12,
+    },
+    avatar: { borderRadius: 13 },
+    title: { fontSize: 14, fontWeight: '700' },
+    kindBadge: {
+      width: 26,
+      height: 26,
+      borderRadius: 13,
+      alignItems: 'center',
+      justifyContent: 'center',
+      flexShrink: 0,
+    },
+  });

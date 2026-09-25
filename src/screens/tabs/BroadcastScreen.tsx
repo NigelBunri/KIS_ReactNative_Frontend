@@ -4,21 +4,18 @@ import {
   PanResponder,
   Pressable,
   RefreshControl,
+  ScrollView,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
-import Animated, {
-  useAnimatedStyle,
-  interpolate,
-  Extrapolation,
-} from 'react-native-reanimated';
+import Animated from 'react-native-reanimated';
 import { useRawTopInset } from '@/hooks/useSafeTopInset';
 
 import { useKISTheme } from '@/theme/useTheme';
 import { useGoldenSectionContent } from '@/contexts/GoldenSectionContext';
+import { useSearchOverlay } from '@/contexts/SearchOverlayContext';
 import { useContextPanelContent, TabletCard } from '@/components/shell';
-import { useCollapsingGoldHeader } from '@/hooks/useCollapsingGoldHeader';
 import { useStatusBarStyle } from '@/theme/useStatusBarStyle';
 import { useFocusEffect, useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
 import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
@@ -132,6 +129,18 @@ const TAB_SWIPE_DISTANCE = 104;
 const TAB_SWIPE_MAX_VERTICAL_DRIFT = 30;
 const TAB_SWIPE_DIRECTION_RATIO = 2.5;
 
+// Fixed footprint for the filter panel, regardless of which tab's filters
+// are showing or how many rows they need — the feeds tab alone stacks five
+// sections (quick access, category, sort, date, duration) that previously
+// had no outer height cap, so opening filters there could grow the panel
+// tall enough to push the tab content well down the screen. A real `height`
+// (not `maxHeight`, which still shrinks for short content) keeps the
+// panel's size 100% predictable, so the tab-content ScrollView beneath it
+// always starts in the same place and never overlaps any part of it; all
+// filter content scrolls inside this fixed box instead.
+const FILTER_PANEL_HEIGHT = 300;
+const FILTER_PANEL_HEIGHT_COMPACT = 240;
+
 export default function BroadcastScreen() {
   const { palette, tone, gradients } = useKISTheme();
   const responsive = useResponsiveLayout();
@@ -196,76 +205,6 @@ export default function BroadcastScreen() {
   const [filterVisible, setFilterVisible] = useState(false);
   const [visionVisible, setVisionVisible] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-
-  // ── Scroll-driven animation ───────────────────────────────────────────────
-  // scrollY drives collapsing the Vision + Testimony banners as the user
-  // scrolls. Same shared mechanism as every other Golden Section now
-  // (useCollapsingGoldHeader) — the grow-only natural-height measurement
-  // here is exactly the fix that avoided the old "shaky"/snap-collapse
-  // animation (an arbitrary placeholder height meant maxHeight didn't start
-  // constraining anything until scrollY was almost at ANIM_END).
-  //
-  // ANIM_END = scroll distance at which the animation completes. This
-  // matches the approximate natural height of the vision + testimony content
-  // so animations finish just as those elements scroll off screen.
-  const ANIM_END = 160;
-  const { scrollY, onScroll: scrollHandler, onHeaderLayout, collapseStyle: innerCollapseStyle, onScrollSettle } = useCollapsingGoldHeader(ANIM_END);
-
-  // Our Vision button (and the header title bar it's grouped with) fades +
-  // scales down as it scrolls toward the top. This content sits inside
-  // innerCollapseStyle's maxHeight-shrinking wrapper below, so the fade must
-  // finish well before maxHeight has shrunk enough to start clipping it —
-  // otherwise it gets cropped mid-fade instead of cleanly disappearing
-  // (the "not clear" look). Finishing by 0.35 of ANIM_END, versus maxHeight's
-  // full 0→ANIM_END collapse, leaves a comfortable margin.
-  const visionAnimStyle = useAnimatedStyle(() => ({
-    opacity: interpolate(scrollY.value, [0, ANIM_END * 0.35], [1, 0], Extrapolation.CLAMP),
-    transform: [
-      { scale: interpolate(scrollY.value, [0, ANIM_END * 0.35], [1, 0.88], Extrapolation.CLAMP) },
-      { translateY: interpolate(scrollY.value, [0, ANIM_END * 0.35], [0, -10], Extrapolation.CLAMP) },
-    ],
-  }));
-
-  // Testimony banner — staggered slightly after vision so they don't move in
-  // unison, but still finishes quickly rather than dragging out a slow
-  // half-faded look while it's also physically scrolling away.
-  const testimonyAnimStyle = useAnimatedStyle(() => ({
-    opacity: interpolate(scrollY.value, [10, ANIM_END * 0.45], [1, 0], Extrapolation.CLAMP),
-    transform: [
-      { scale: interpolate(scrollY.value, [10, ANIM_END * 0.45], [1, 0.88], Extrapolation.CLAMP) },
-      { translateY: interpolate(scrollY.value, [10, ANIM_END * 0.45], [0, -8], Extrapolation.CLAMP) },
-    ],
-  }));
-
-  // Mini testimony pill — appears in the search row as the banner scrolls off.
-  // Mini pills — WRAPPER animates from width:0 → 40 so the search bar is
-  // truly full-width when pills are hidden and shrinks in exact sync as they appear.
-  // marginLeft starts at 0 (no gap when pill invisible) and grows to 6 with the width.
-  const miniTestimonyWrapStyle = useAnimatedStyle(() => ({
-    width: interpolate(scrollY.value, [ANIM_END * 0.45, ANIM_END], [0, 40], Extrapolation.CLAMP),
-    marginLeft: interpolate(scrollY.value, [ANIM_END * 0.45, ANIM_END], [0, 6], Extrapolation.CLAMP),
-    overflow: 'hidden' as const,
-  }));
-  const miniVisionWrapStyle = useAnimatedStyle(() => ({
-    width: interpolate(scrollY.value, [ANIM_END * 0.55, ANIM_END], [0, 40], Extrapolation.CLAMP),
-    marginLeft: interpolate(scrollY.value, [ANIM_END * 0.55, ANIM_END], [0, 6], Extrapolation.CLAMP),
-    overflow: 'hidden' as const,
-  }));
-
-  // PILL CONTENT — opacity + scale for the pill itself (separate from the wrapper).
-  const miniTestimonyStyle = useAnimatedStyle(() => ({
-    opacity: interpolate(scrollY.value, [ANIM_END * 0.5, ANIM_END], [0, 1], Extrapolation.CLAMP),
-    transform: [
-      { scale: interpolate(scrollY.value, [ANIM_END * 0.5, ANIM_END], [0.5, 1], Extrapolation.CLAMP) },
-    ],
-  }));
-  // Mini vision pill — staggered slightly after testimony.
-  const miniVisionStyle = useAnimatedStyle(() => ({
-    opacity: interpolate(scrollY.value, [ANIM_END * 0.6, ANIM_END], [0, 1], Extrapolation.CLAMP),
-    transform: [
-      { scale: interpolate(scrollY.value, [ANIM_END * 0.6, ANIM_END], [0.5, 1], Extrapolation.CLAMP) },
-    ],
-  }));
 
   const [cartState, setCartState] = useState<ShopCartState>(getShopCartState());
   const [selectedFilters, setSelectedFilters] = useState<
@@ -377,9 +316,10 @@ export default function BroadcastScreen() {
     navigation.navigate('Profile', { broadcastProfileKey: profileKey });
   }, [activeMainTab, navigation]);
 
+  const { open: openSearchOverlay } = useSearchOverlay();
   const handleOpenSearch = useCallback(() => {
-    (navigation as any).navigate('GlobalSearch');
-  }, [navigation]);
+    openSearchOverlay();
+  }, [openSearchOverlay]);
 
   const handlePullToRefresh = useCallback(async () => {
     if (refreshing) return;
@@ -490,90 +430,30 @@ export default function BroadcastScreen() {
 
   // Registered with the shared Golden Section host in App.tsx instead of
   // rendering GoldHeaderShell locally — stays mounted across tab switches.
-  // scrollHandler-driven reanimated styles below (innerCollapseStyle etc.)
-  // keep working identically since shared values aren't tied to tree position.
+  // Fixed-height content only (no scroll-driven collapse) — see the "Fixed
+  // content only" note just below for why.
   useGoldenSectionContent({
     content: (
       <>
           <View style={styles.headerHalo} />
 
-          {/* Constant, non-animated safe-area clearance wrapping BOTH the
-              collapsing section and the always-visible tabs row below, so
-              the tabs row keeps exactly this much clearance once the header
-              above fully collapses — with only ONE thing animating (the
-              collapse itself), not two independently-timed animations
-              fighting each other (that mismatch was the previous "too much
-              gap" / "not smooth" bug). */}
+          {/* Fixed content only — nothing here collapses or animates on
+              scroll, so this section's height never changes and the Golden
+              Section can never be pushed out of place or shrink away as the
+              user scrolls the tab content below it. */}
           <View style={{ paddingTop: topInset }}>
-            {/* ── STICKY: header bar — never collapses, matches the sticky-row ── */}
-            {/* pattern shared by every Golden Section now. ────────────────── */}
-            <View
-              style={{
-                paddingHorizontal: responsive.pageGutter,
-              }}
-            >
-              <View>
-                <BroadcastHeaderBar
-                  title="Broadcast"
-                  tierLabel="Business Pro"
-                  onCreate={handleCreate}
-                  onSearch={handleOpenSearch}
-                  onNotifications={() => (navigation as any).navigate('ProfileNotifications')}
-                  hasUnreadNotifications={hasUnreadBroadcastNotifications}
-                />
-              </View>
+            <View style={{ paddingHorizontal: responsive.pageGutter }}>
+              <BroadcastHeaderBar
+                title="Broadcast"
+                tierLabel="Business Pro"
+                onCreate={handleCreate}
+                onSearch={handleOpenSearch}
+                onNotifications={() => (navigation as any).navigate('ProfileNotifications')}
+                hasUnreadNotifications={hasUnreadBroadcastNotifications}
+              />
             </View>
 
-            {/* ── COLLAPSING: Vision button + Testimony banner ─────────────── */}
-            <Animated.View style={[innerCollapseStyle, { overflow: 'hidden' }]}>
-              <View
-                onLayout={onHeaderLayout}
-                style={{ paddingHorizontal: responsive.pageGutter }}
-              >
-                <Animated.View style={visionAnimStyle}>
-                  <View style={styles.headerSection}>
-                    <Pressable
-                      accessibilityRole="button"
-                      onPress={() => setVisionVisible(true)}
-                      hitSlop={10}
-                      style={[styles.visionButton, {
-                        borderRadius: compactBroadcast ? 16 : 20,
-                      }]}
-                    >
-                      <View style={styles.visionIcon}>
-                        <KISIcon name="sparkles" size={15} color={palette.onGold} />
-                      </View>
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.visionButtonTitle}>Our Vision</Text>
-                        <Text style={styles.visionButtonText} numberOfLines={2}>
-                          {compactBroadcast
-                            ? 'KCAN purpose and direction.'
-                            : 'Discover why KCAN exists and where Kingdom Impact Social is going.'}
-                        </Text>
-                      </View>
-                      <KISIcon name="chevron-right" size={18} color={palette.onGold} />
-                    </Pressable>
-                  </View>
-                </Animated.View>
-
-                <Animated.View style={[testimonyAnimStyle]}>
-                  <Pressable
-                    onPress={() => (navigation as any).navigate('TestimonyHub')}
-                    style={[styles.testimonyBanner, { backgroundColor: palette.primaryStrong }]}
-                  >
-                    <Text style={{ fontSize: 20 }}>🤝</Text>
-                    <View style={{ flex: 1 }}>
-                      <Text style={{ color: palette.onPrimary, fontWeight: '900', fontSize: 15 }}>Testimony Network</Text>
-                      <Text style={{ color: palette.onPrimary, fontSize: 12, opacity: 0.85 }}>Real people. Real stories. Real help.</Text>
-                    </View>
-                    <KISIcon name="arrow-left" size={16} color={palette.onPrimary} style={{ transform: [{ rotate: '180deg' }] }} />
-                  </Pressable>
-                </Animated.View>
-              </View>
-            </Animated.View>
-
-            {/* ── BOTTOM: always visible — tabs + search + mini pills ───────── */}
-            <View style={{ paddingHorizontal: responsive.pageGutter, paddingTop: 5, paddingBottom: 6 }}>
+            <View style={{ paddingHorizontal: responsive.pageGutter, paddingTop: 10, paddingBottom: 6 }}>
               <BroadcastMainTabs
                 value={activeMainTab}
                 onChange={tab => { setActiveMainTab(tab); setFilterVisible(false); }}
@@ -581,12 +461,14 @@ export default function BroadcastScreen() {
             </View>
           </View>
 
-          {/* Search row — no gap here; each pill wrapper carries its own animated marginLeft
-              so the search bar is full-width when pills are hidden and shrinks in sync
-              as they slide in.                                                          */}
+          {/* Search row — Vision and Testimonials live here as compact,
+              always-visible buttons next to Filter/Search, instead of the
+              full-size banners that used to sit above and collapse away on
+              scroll. */}
           <View style={{
             flexDirection: 'row',
             alignItems: 'center',
+            gap: 6,
             paddingHorizontal: responsive.pageGutter,
             paddingBottom: showFilterPanel ? 6 : 16,
           }}>
@@ -603,49 +485,51 @@ export default function BroadcastScreen() {
               />
             </View>
 
-            {/* Mini Testimony pill — wrapper expands from 0 → 40px pushing search bar left */}
-            <Animated.View style={miniTestimonyWrapStyle}>
-              <Animated.View style={miniTestimonyStyle}>
-                <Pressable
-                  onPress={() => (navigation as any).navigate('TestimonyHub')}
-                  style={[styles.miniPill, { backgroundColor: palette.primaryStrong }]}
-                  accessibilityLabel="Testimony Network"
-                  hitSlop={8}
-                >
-                  <Text style={{ fontSize: compactBroadcast ? 14 : 16 }}>🤝</Text>
-                </Pressable>
-              </Animated.View>
-            </Animated.View>
+            <Pressable
+              onPress={() => (navigation as any).navigate('TestimonyHub')}
+              style={[styles.miniPill, {
+                width: compactBroadcast ? 34 : 40,
+                height: compactBroadcast ? 34 : 40,
+                borderRadius: compactBroadcast ? 17 : 20,
+                backgroundColor: palette.primaryStrong,
+              }]}
+              accessibilityLabel="Testimony Network"
+              hitSlop={8}
+            >
+              <Text style={{ fontSize: compactBroadcast ? 14 : 16 }}>🤝</Text>
+            </Pressable>
 
-            {/* Mini Vision pill — staggered, same expanding wrapper */}
-            <Animated.View style={miniVisionWrapStyle}>
-              <Animated.View style={miniVisionStyle}>
-                <Pressable
-                  onPress={() => setVisionVisible(true)}
-                  style={[styles.miniPill, {
-                    backgroundColor: `${palette.royalInk}70`,
-                    borderColor: palette.goldBorder,
-                    borderWidth: 1,
-                  }]}
-                  accessibilityLabel="Our Vision"
-                  hitSlop={8}
-                >
-                  <KISIcon name="sparkles" size={compactBroadcast ? 14 : 16} color={palette.onGold} />
-                </Pressable>
-              </Animated.View>
-            </Animated.View>
+            <Pressable
+              onPress={() => setVisionVisible(true)}
+              style={[styles.miniPill, {
+                width: compactBroadcast ? 34 : 40,
+                height: compactBroadcast ? 34 : 40,
+                borderRadius: compactBroadcast ? 17 : 20,
+                backgroundColor: `${palette.royalInk}70`,
+                borderColor: palette.goldBorder,
+                borderWidth: 1,
+              }]}
+              accessibilityLabel="Our Vision"
+              hitSlop={8}
+            >
+              <KISIcon name="sparkles" size={compactBroadcast ? 14 : 16} color={palette.onGold} />
+            </Pressable>
           </View>
 
-          {/* Filter panel */}
+          {/* Filter panel — fixed height regardless of tab/content, so it
+              never grows tall enough to push (or destabilize the space
+              reserved for) the tab content below; everything inside
+              scrolls within this fixed box instead. */}
           {showFilterPanel && (
             <View style={[styles.filterPanel, {
+              height: compactBroadcast ? FILTER_PANEL_HEIGHT_COMPACT : FILTER_PANEL_HEIGHT,
               marginHorizontal: responsive.pageGutter,
               marginBottom: 12,
               padding: compactBroadcast ? 8 : 10,
             }]}>
               {activeMainTab === 'feeds' ? (
                 <Animated.ScrollView showsVerticalScrollIndicator={false}
-                  keyboardShouldPersistTaps="handled" style={{ maxHeight: 300 }}>
+                  keyboardShouldPersistTaps="handled" style={{ flex: 1 }}>
                   <Text style={styles.filterSectionLabel}>Quick access</Text>
                   <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap', paddingBottom: 12 }}>
                     {([{ label: 'Playlists', icon: 'list' as const, route: 'PlaylistList' }, { label: 'History', icon: 'play' as const, route: 'WatchHistory' }, { label: 'Shorts', icon: 'play' as const, route: 'ShortsScreen' }]).map(item => (
@@ -700,16 +584,18 @@ export default function BroadcastScreen() {
                   )}
                 </Animated.ScrollView>
               ) : (
-                <Animated.ScrollView horizontal showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={{ gap: 8, paddingRight: 4 }} keyboardShouldPersistTaps="handled">
-                  {FILTER_OPTIONS[activeMainTab].map(option => (
-                    <Pressable key={option.key} onPress={() => handleFilterSelect(option.key)}
-                      style={[styles.filterOption, { minWidth: compactBroadcast ? 96 : 120, paddingHorizontal: compactBroadcast ? 10 : 14, paddingVertical: compactBroadcast ? 8 : 10, marginRight: 0, marginBottom: 0, borderColor: option.key === currentFilter ? palette.primary : palette.divider, backgroundColor: option.key === currentFilter ? palette.primaryStrong : palette.surface }]}>
-                      <Text style={[styles.filterOptionLabel, { color: option.key === currentFilter ? palette.onPrimary : palette.text }]}>{option.label}</Text>
-                      <Text style={[styles.filterOptionDescription, { color: option.key === currentFilter ? palette.onPrimary : palette.subtext }]}>{compactBroadcast ? '' : option.description}</Text>
-                    </Pressable>
-                  ))}
-                </Animated.ScrollView>
+                <View style={{ flex: 1, justifyContent: 'center' }}>
+                  <Animated.ScrollView horizontal showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={{ gap: 8, paddingRight: 4 }} keyboardShouldPersistTaps="handled">
+                    {FILTER_OPTIONS[activeMainTab].map(option => (
+                      <Pressable key={option.key} onPress={() => handleFilterSelect(option.key)}
+                        style={[styles.filterOption, { minWidth: compactBroadcast ? 96 : 120, paddingHorizontal: compactBroadcast ? 10 : 14, paddingVertical: compactBroadcast ? 8 : 10, marginRight: 0, marginBottom: 0, borderColor: option.key === currentFilter ? palette.primary : palette.divider, backgroundColor: option.key === currentFilter ? palette.primaryStrong : palette.surface }]}>
+                        <Text style={[styles.filterOptionLabel, { color: option.key === currentFilter ? palette.onPrimary : palette.text }]}>{option.label}</Text>
+                        <Text style={[styles.filterOptionDescription, { color: option.key === currentFilter ? palette.onPrimary : palette.subtext }]}>{compactBroadcast ? '' : option.description}</Text>
+                      </Pressable>
+                    ))}
+                  </Animated.ScrollView>
+                </View>
               )}
             </View>
           )}
@@ -723,19 +609,15 @@ export default function BroadcastScreen() {
     <View style={{ flex: 1, backgroundColor: palette.bg, }}>
 
       {/*
-       * The gold header (header bar, vision, testimony, tabs, search) is
-       * registered via useGoldenSectionContent above and rendered by the
-       * shared Golden Section host in App.tsx — fixed above this ScrollView,
-       * not a scroll child. Its collapse (Vision + Testimony shrinking via
-       * maxHeight animation as the user scrolls) is still driven by
-       * `scrollHandler` below; the reanimated shared values aren't tied to
-       * where the JSX is mounted. This ScrollView now only holds tab content.
+       * The gold header (header bar, tabs, search + Vision/Testimony
+       * buttons) is registered via useGoldenSectionContent above and
+       * rendered by the shared Golden Section host in App.tsx — fixed above
+       * this ScrollView, not a scroll child, and no longer collapses or
+       * resizes on scroll, so it stays visible and fixed in place
+       * regardless of what this ScrollView does. Plain ScrollView now that
+       * nothing here drives a Reanimated collapse.
        */}
-      <Animated.ScrollView
-        onScroll={scrollHandler}
-        onScrollEndDrag={onScrollSettle}
-        onMomentumScrollEnd={onScrollSettle}
-        scrollEventThrottle={1}
+      <ScrollView
         keyboardShouldPersistTaps="handled"
         style={{ flex: 1, backgroundColor: palette.bg, }}
         contentContainerStyle={{ paddingBottom: compactBroadcast ? 92 : 120 }}
@@ -749,8 +631,6 @@ export default function BroadcastScreen() {
         }
       >
 
-        {/* Testimony banner now lives inside the Golden Section's collapsing
-            card above, alongside the Vision button — not a scroll child here. */}
         {/* ═══ TAB CONTENT ════════════════════════════════════════════════════ */}
         <View
           style={{ paddingHorizontal: responsive.pageGutter }}
@@ -775,7 +655,7 @@ export default function BroadcastScreen() {
           {activeMainTab === 'jobs' && <BroadcastJobsPage searchTerm={currentSearchTerm} searchContext={currentFilter} />}
         </View>
 
-      </Animated.ScrollView>
+      </ScrollView>
 
       {/* Cart FAB (market tab only) */}
       {activeMainTab === 'market' && (
@@ -818,26 +698,11 @@ const makeStyles = (palette: ReturnType<typeof useKISTheme>['palette']) =>
       shadowOffset: { width: 0, height: 3 },
       elevation: 8,
     },
-    // ── Testimony banner (full-size, scrollable) ───────────────────────────
-    testimonyBanner: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 12,
-      borderRadius: 16,
-      padding: 12,
-      marginHorizontal: 16,
-    },
-    // ── Mini pills (appear in search row when collapsed) ────────────────────
-    miniPillWrap: {
-      // Overflow hidden so during scale-in the pill doesn't bleed outside bounds
-      overflow: 'hidden',
-    },
+    // ── Compact Vision/Testimony buttons in the search row ─────────────────
     miniPill: {
-      width: 40,
-      height: 40,
-      borderRadius: 20,
       alignItems: 'center',
       justifyContent: 'center',
+      flexShrink: 0,
     },
     // ── Header container ───────────────────────────────────────────────────
     headerContainer: {
@@ -865,51 +730,6 @@ const makeStyles = (palette: ReturnType<typeof useKISTheme>['palette']) =>
       borderRadius: 75,
       backgroundColor: palette.gold,
       opacity: 0.16,
-    },
-    headerInner: {
-      paddingHorizontal: 12,
-      paddingTop: 12,
-      paddingBottom: 22,
-    },
-    headerSection: {
-      marginBottom: 8,
-    },
-    visionButton: {
-      marginTop: 12,
-      borderRadius: 22,
-      padding: 10,
-      // Semi-transparent royalInk overlay on the gold gradient header
-      backgroundColor: `${palette.royalInk}4D`,
-      opacity: 0.92,
-      borderWidth: 1,
-      borderColor: palette.goldBorder,
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 12,
-    },
-    visionIcon: {
-      width: 40,
-      height: 40,
-      borderRadius: 16,
-      alignItems: 'center',
-      justifyContent: 'center',
-      // Semi-transparent gold overlay on the gold gradient header
-      backgroundColor: `${palette.ivory}2E`,
-      borderWidth: 1,
-      borderColor: palette.goldBorder,
-    },
-    visionButtonTitle: {
-      color: palette.onGold,
-      fontSize: 15,
-      fontWeight: '900',
-      letterSpacing: 0.2,
-    },
-    visionButtonText: {
-      color: palette.onGold,
-      fontSize: 12,
-      lineHeight: 18,
-      fontWeight: '700',
-      marginTop: 3,
     },
     filterPanel: {
       borderWidth: 1,

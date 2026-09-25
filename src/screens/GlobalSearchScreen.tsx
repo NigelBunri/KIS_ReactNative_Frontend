@@ -9,14 +9,29 @@ import { openBibleVerse } from '@/utils/bibleVerseOpenBridge';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
-export default function GlobalSearchScreen() {
+type Props = {
+  // Overridden by SearchOverlayOutlet (App.tsx) when this renders as the
+  // detached overlay rather than a RootStack push - see
+  // SearchOverlayContext.tsx for why the two need different close behavior.
+  // Falls back to navigation.goBack() so the legacy RootStack route (still
+  // registered for compatibility) keeps working unchanged.
+  onClose?: () => void;
+};
+
+export default function GlobalSearchScreen({ onClose: onCloseProp }: Props = {}) {
   const navigation = useNavigation<Nav>();
 
-  const handleClose = useCallback(() => {
+  const dismiss = useCallback(() => {
+    if (onCloseProp) {
+      onCloseProp();
+      return;
+    }
     if (navigation.canGoBack()) {
       navigation.goBack();
     }
-  }, [navigation]);
+  }, [navigation, onCloseProp]);
+
+  const handleClose = dismiss;
 
   const handleSelectResult = useCallback(
     (result: { kind: string; title?: string; target_id: string; target_type: string; route?: string; metadata?: Record<string, any> }) => {
@@ -25,7 +40,7 @@ export default function GlobalSearchScreen() {
       const meta = result.metadata ?? {};
 
       // Dismiss the search modal first
-      if (navigation.canGoBack()) navigation.goBack();
+      dismiss();
 
       switch (kind) {
         case 'channel':
@@ -147,7 +162,7 @@ export default function GlobalSearchScreen() {
           break;
       }
     },
-    [navigation],
+    [navigation, dismiss],
   );
 
   return (
