@@ -21,8 +21,11 @@ import { useKISTheme } from '@/theme/useTheme';
 import { useResponsiveLayout } from '@/theme/responsive';
 import BibleSectionCard from './BibleSectionCard';
 import DayRoadmap, { type DayNode } from './discipleship/DayRoadmap';
+import DiscipleshipReadAloudSheet from './discipleship/DiscipleshipReadAloudSheet';
 import KISButton from '@/constants/KISButton';
 import { KISIcon } from '@/constants/kisIcons';
+import useBibleReadAloud from '@/screens/tabs/bible/useBibleReadAloud';
+import type { BibleReaderPayload, BibleVerse } from '@/screens/tabs/bible/useBibleData';
 import { useSocket } from '../../../SocketProvider';
 import ShareToChatModal from '../broadcast/ShareToChatModal';
 import { shareDiscipleshipStats } from './discipleshipShare';
@@ -157,6 +160,39 @@ export default function TwelvePillarsPanel() {
     activeDoctrineContent && activeDayIndex != null ? activeDoctrineContent.days[activeDayIndex] : null;
   const activeDayDescriptor =
     activeDoctrineDescriptor && activeDayIndex != null ? activeDoctrineDescriptor.days[activeDayIndex] : null;
+
+  // "Listen" — reuses useBibleReadAloud's own on-device TTS engine
+  // wiring (play/pause/stop platform quirks, speed persistence) instead
+  // of a parallel implementation. It's built around verse-by-verse
+  // BibleReaderPayload/BibleVerse shapes, so each parsed content block
+  // (heading or paragraph) stands in for one "verse" - the hook doesn't
+  // care that the text isn't Scripture, only that verses[].text exists.
+  // navigation.next is always empty here, so a finished reading just
+  // stops (no cross-day auto-continue, unlike the Bible's cross-chapter
+  // one - there's no "next" that would make sense to keep reading into).
+  const readAloudBlocks = useMemo(
+    () => parseContent(activeDayContent?.content || ''),
+    [activeDayContent],
+  );
+  const readAloudVerses = useMemo<BibleVerse[]>(
+    () => readAloudBlocks.map((b, i) => ({ id: `block-${i}`, number: i + 1, text: b.text })),
+    [readAloudBlocks],
+  );
+  const readAloudReader = useMemo<BibleReaderPayload | null>(() => {
+    if (!activeDayContent || activeDoctrineOrder == null || activeDayIndex == null) return null;
+    return {
+      book: { code: `discipleship-${activeDoctrineOrder}` } as any,
+      chapter: { number: activeDayIndex + 1 } as any,
+      navigation: { next: null },
+      verses: readAloudVerses,
+    };
+  }, [activeDayContent, activeDoctrineOrder, activeDayIndex, readAloudVerses]);
+  const readAloud = useBibleReadAloud({
+    reader: readAloudReader,
+    verses: readAloudVerses,
+    onLoadChapter: () => {},
+  });
+  const [readAloudSheetOpen, setReadAloudSheetOpen] = useState(false);
 
   const openDoctrine = (order: number, locked: boolean) => {
     if (locked) return;
@@ -454,7 +490,6 @@ export default function TwelvePillarsPanel() {
 
   // ── Day content view ─────────────────────────────────────────────────
   if (mode === 'lesson' && activeDayContent && activeDoctrineContent && activeDayDescriptor && activeDayIndex != null) {
-    const blocks = parseContent(activeDayContent.content || '');
     return (
       <View style={styles.stack}>
         <BibleSectionCard>
@@ -466,13 +501,29 @@ export default function TwelvePillarsPanel() {
               </Text>
               <Text style={[styles.title, { color: palette.text, fontSize: compact ? 18 : 21 }]}>{activeDayContent.title}</Text>
             </View>
+            <TouchableOpacity
+              activeOpacity={0.8}
+              onPress={() => setReadAloudSheetOpen(true)}
+              disabled={!readAloudVerses.length}
+              accessibilityRole="button"
+              accessibilityLabel={readAloud.status === 'playing' ? 'Reading aloud' : readAloud.status === 'paused' ? 'Paused' : 'Listen'}
+              style={[
+                styles.circleIconBtn,
+                readAloud.isActive
+                  ? { backgroundColor: palette.goldDeep, borderColor: palette.gold }
+                  : { backgroundColor: palette.royalInk ?? palette.surface, borderColor: `${palette.gold}55` },
+                { opacity: readAloudVerses.length ? 1 : 0.45 },
+              ]}
+            >
+              <KISIcon name="volume" size={15} color={palette.ivory} />
+            </TouchableOpacity>
             {activeDayDescriptor.status === 'completed' ? <KISIcon name="checkmark-circle" size={22} color={palette.success} /> : null}
           </View>
         </BibleSectionCard>
 
         <BibleSectionCard>
           <View style={{ gap: 12 }}>
-            {blocks.map((b, i) =>
+            {readAloudBlocks.map((b, i) =>
               b.kind === 'h2' ? (
                 <Text key={i} style={[styles.h2, { color: palette.primaryStrong }]}>{b.text}</Text>
               ) : b.kind === 'h3' ? (
@@ -492,6 +543,22 @@ export default function TwelvePillarsPanel() {
             </Text>
           ) : null}
         </BibleSectionCard>
+
+        <DiscipleshipReadAloudSheet
+          visible={readAloudSheetOpen}
+          onClose={() => setReadAloudSheetOpen(false)}
+          status={readAloud.status}
+          finishReason={readAloud.finishReason}
+          dayTitle={activeDayContent.title}
+          elapsedMs={readAloud.elapsedMs}
+          ttsReady={readAloud.ttsReady}
+          errorMessage={readAloud.errorMessage}
+          speed={readAloud.speed}
+          onPlay={readAloud.play}
+          onPause={readAloud.pause}
+          onStop={readAloud.stop}
+          onSetSpeed={readAloud.setSpeed}
+        />
       </View>
     );
   }
@@ -619,6 +686,7 @@ const sheet = (palette: any, compact: boolean) =>
   StyleSheet.create({
     stack: { gap: 14, paddingBottom: 24 },
     headerRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+    circleIconBtn: { width: 28, height: 28, borderRadius: 14, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
     title: { fontWeight: '900' },
     badge: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999 },
     iconBadge: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
