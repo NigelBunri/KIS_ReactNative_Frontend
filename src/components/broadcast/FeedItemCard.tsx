@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import BroadcastFeedVideoPreview from '@/components/broadcast/BroadcastFeedVideoPreview';
 import { useKISTheme } from '@/theme/useTheme';
 import { KISIcon } from '@/constants/kisIcons';
@@ -63,6 +63,24 @@ export default function FeedItemCard({ item, onPress, onReact, isSubscribed, onS
   useEffect(() => {
     setActiveAttachmentIndex(0);
   }, [attachments.length]);
+
+  // Same whole-set prefetch + visible-spinner pattern as
+  // BroadcastFeedCard's slideshow - warms every OTHER image in this item
+  // as soon as it renders, and shows a spinner over the active slide
+  // while its own load is still in flight (Image's own onLoadStart/onLoad
+  // fire again whenever source.uri changes even though this is the same
+  // mounted element).
+  useEffect(() => {
+    if (attachments.length < 2) return;
+    attachments.forEach((att, idx) => {
+      if (idx === activeAttachmentIndex || att.isVideo) return;
+      const uri = att.previewUri ?? att.url;
+      if (uri) Image.prefetch(uri).catch(() => {});
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [attachments]);
+
+  const [slideImageLoading, setSlideImageLoading] = useState(false);
 
   const handlePrevAttachment = () => {
     setActiveAttachmentIndex(prev =>
@@ -162,11 +180,21 @@ export default function FeedItemCard({ item, onPress, onReact, isSubscribed, onS
                 posterOverride={attachments[activeAttachmentIndex].previewUri ?? undefined}
               />
             ) : (
-              <Image
-                source={{ uri: attachments[activeAttachmentIndex].previewUri ?? attachments[activeAttachmentIndex].url! }}
-                style={styles.slideshowImage}
-                resizeMode="cover"
-              />
+              <>
+                <Image
+                  source={{ uri: attachments[activeAttachmentIndex].previewUri ?? attachments[activeAttachmentIndex].url! }}
+                  style={styles.slideshowImage}
+                  resizeMode="cover"
+                  onLoadStart={() => setSlideImageLoading(true)}
+                  onLoad={() => setSlideImageLoading(false)}
+                  onError={() => setSlideImageLoading(false)}
+                />
+                {slideImageLoading ? (
+                  <View style={styles.slideLoadingOverlay} pointerEvents="none">
+                    <ActivityIndicator color="#fff" />
+                  </View>
+                ) : null}
+              </>
             )}
             <Pressable
               style={[styles.navButton, styles.navLeft]}
@@ -306,6 +334,16 @@ const styles = StyleSheet.create({
   slideshowImage: {
     width: '100%',
     height: '100%',
+  },
+  slideLoadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.15)',
   },
   navButton: {
     position: 'absolute',
