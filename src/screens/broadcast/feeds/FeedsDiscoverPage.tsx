@@ -98,6 +98,10 @@ export default function FeedsDiscoverPage({
   // instead of leaving the tap looking unresponsive while the POST below
   // resolves - see handleOpenComments.
   const [commentsLoadingId, setCommentsLoadingId] = useState<string | null>(null);
+  // Selected in BroadcastersRow to filter the feed down to just that
+  // poster's content - tapping the same chip again clears it.
+  const [selectedBroadcasterId, setSelectedBroadcasterId] = useState<string | null>(null);
+  const [selectedBroadcasterName, setSelectedBroadcasterName] = useState<string | null>(null);
   // Same idea as commentsLoadingId, for the share and save buttons.
   const [shareLoadingId, setShareLoadingId] = useState<string | null>(null);
   const [saveLoadingId, setSaveLoadingId] = useState<string | null>(null);
@@ -273,7 +277,11 @@ export default function FeedsDiscoverPage({
     setActiveCategory('for_you');
   };
 
-  const activeFeedItems = showTrendingOnly ? trendingFeeds : displayItems;
+  const activeFeedItems = useMemo(() => {
+    const base = showTrendingOnly ? trendingFeeds : displayItems;
+    if (!selectedBroadcasterId) return base;
+    return base.filter(item => item.author?.id === selectedBroadcasterId);
+  }, [showTrendingOnly, trendingFeeds, displayItems, selectedBroadcasterId]);
   const buildBroadcastPermalink = useCallback((item: BroadcastFeedItem) => {
     return (
       (item as any).permalink ??
@@ -624,7 +632,34 @@ export default function FeedsDiscoverPage({
         {/* Everyone who's broadcasted content, most-recently-active first
             (replaces the old "Manage blocked users" shortcut - that still
             lives in Settings). */}
-        <BroadcastersRow />
+        <BroadcastersRow
+          selectedId={selectedBroadcasterId}
+          onSelect={(id, name) => {
+            setSelectedBroadcasterId(id);
+            setSelectedBroadcasterName(name ?? null);
+          }}
+        />
+
+        {selectedBroadcasterId ? (
+          <Pressable
+            onPress={() => {
+              setSelectedBroadcasterId(null);
+              setSelectedBroadcasterName(null);
+            }}
+            style={({ pressed }) => [
+              styles.broadcasterFilterPill,
+              {
+                backgroundColor: pressed ? palette.primarySoft : palette.surface,
+                borderColor: palette.goldBorder,
+              },
+            ]}
+          >
+            <Text style={{ color: palette.text, fontWeight: '700', fontSize: 13 }}>
+              {selectedBroadcasterName ? `Showing posts from ${selectedBroadcasterName}` : 'Filtering by poster'}
+            </Text>
+            <KISIcon name="close" size={14} color={palette.subtext} />
+          </Pressable>
+        ) : null}
 
         <FadeInView key="feed-content">
         {/* Live items banner */}
@@ -804,6 +839,16 @@ const styles = StyleSheet.create({
   activeChipText: {
     fontSize: 11,
     fontWeight: '700',
+  },
+  broadcasterFilterPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+    borderWidth: 1.5,
   },
   filterOverlay: {
     flex: 1,
