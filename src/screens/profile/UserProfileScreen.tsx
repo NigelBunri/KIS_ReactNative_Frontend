@@ -76,7 +76,27 @@ export default function UserProfileScreen() {
       setLoading(false);
     }
     try {
-      const res = await getRequest(ROUTES.profiles.view(userId), {
+      // ROUTES.profiles.view expects a Profile id, not a User id (its
+      // backend action is a plain DRF get_object() keyed on Profile's own
+      // pk - see apps.accounts.views.ProfileViewSet.view) - but every
+      // caller of this screen (post.author.id, channel member ids,
+      // @mention ids, etc.) passes a User id in `userId`, which almost
+      // never matches a Profile's own id and was showing "Profile not
+      // available" for basically every "view profile" tap in the app.
+      // Resolve the real profile id first, same as
+      // useAuthorProfilePreview.ts already does correctly for the feed's
+      // own author-preview sheet.
+      const userRes = await getRequest(ROUTES.user.detail(userId), {
+        errorMessage: 'Unable to load profile.',
+      });
+      const resolvedProfileId = String(
+        userRes?.data?.profile?.id ??
+          userRes?.data?.profile_id ??
+          userRes?.data?.profileId ??
+          '',
+      ).trim() || userId;
+
+      const res = await getRequest(ROUTES.profiles.view(resolvedProfileId), {
         errorMessage: 'Unable to load profile.',
         forceNetwork: true,
       });
