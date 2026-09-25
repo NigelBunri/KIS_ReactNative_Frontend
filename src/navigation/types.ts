@@ -32,6 +32,23 @@ export type RootStackParamList = {
     items?: any[];
     index?: number;
   };
+  // TikTok-style immersive viewer for the Broadcast Feeds tab specifically
+  // (see BroadcastFeedFullScreenScreen.tsx) - deliberately separate from
+  // BroadcastDetail, which stays exactly as-is for every other entry point
+  // (search results, push notifications). Action callbacks are passed
+  // directly (not re-derived from useFeedsData in the new screen) so likes/
+  // saves/etc. stay backed by the exact same feed-list state already loaded
+  // in FeedsDiscoverPage, instead of a second, independently-fetched copy.
+  BroadcastFeedFullScreen: {
+    items: any[];
+    index: number;
+    initialAttachmentIndex?: number;
+    onLike?: (item: any) => void;
+    onShare?: (item: any) => void;
+    onComment?: (item: any) => void;
+    onSave?: (item: any) => void;
+    onSubscribe?: (item: any) => void;
+  };
   ChannelHome: {
     channelId?: string;
     handle?: string;

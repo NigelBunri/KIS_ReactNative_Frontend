@@ -43,6 +43,11 @@ type Props = {
   // instead of the full VideoControls panel.
   progressBarOnly?: boolean;
   progressBarStyle?: StyleProp<ViewStyle>;
+  // See VideoPlayer.tsx's onDoubleTapMiddle doc (same prop ShortsScreen.tsx
+  // wires directly on KISVideo) - passthrough for full-bleed viewers
+  // (BroadcastFeedFullScreenScreen) that want double-tap-to-like without
+  // reaching past this wrapper to the raw player.
+  onDoubleTapMiddle?: () => void;
 };
 
 const basePlaybackMessage = 'Unable to play this video preview.';
@@ -58,6 +63,7 @@ export default function BroadcastFeedVideoPreview({
   externalPause = false,
   progressBarOnly = false,
   progressBarStyle,
+  onDoubleTapMiddle,
 }: Props) {
   // See VideoPlayer.tsx's containerAspectFallback/hasOwnSizing comments -
   // same conflict, same fix: styles.outerWrap's own aspectRatio:16/9
@@ -267,6 +273,7 @@ export default function BroadcastFeedVideoPreview({
         externalPause={externalPause}
         progressBarOnly={progressBarOnly}
         progressBarStyle={progressBarStyle}
+        onDoubleTapMiddle={onDoubleTapMiddle}
       />
       {playbackError && sourceIndex > 0 ? (
         <View

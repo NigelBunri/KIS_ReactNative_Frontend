@@ -59,7 +59,8 @@ type Props = {
   loading?: boolean;
   loadingMore?: boolean;
   onRefresh?: () => void;
-  onOpenItem: (item: BroadcastFeedItem) => void;
+  // Optional attachment index — see BroadcastFeedCard's onVideoPress doc.
+  onOpenItem: (item: BroadcastFeedItem, attachmentIndex?: number) => void;
   onShare: (item: BroadcastFeedItem) => void;
   onLike: (item: BroadcastFeedItem) => void;
   onSave: (item: BroadcastFeedItem) => void;
@@ -147,7 +148,7 @@ export default function FeedsMainListSection({
                 onLike={() => onLike(item)}
                 onShare={() => onShare(item)}
                 onOpenSource={() => onOpenItem(item)}
-                onVideoPress={() => onOpenItem(item)}
+                onVideoPress={attachmentIndex => onOpenItem(item, attachmentIndex)}
                 onSave={() => onSave(item)}
                 onToggleComments={() => onComment(item)}
                 onMenuPress={() => onMenu(item)}

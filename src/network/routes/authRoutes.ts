@@ -50,14 +50,6 @@ const authRoutes = {
     restoreCredentialAuthenticationOptions: `${API_BASE_URL}/api/v1/auth/restore-credentials/authentication-options/`,
     restoreCredentialAuthenticate: `${API_BASE_URL}/api/v1/auth/restore-credentials/authenticate/`,
   },
-  engagement: {
-    // Server-authoritative daily feed time limit — see
-    // apps/accounts/responsible_feed.py on the backend. The heartbeat
-    // endpoint deliberately ignores any client-reported elapsed time; only
-    // the fact a request arrived matters, so there is nothing to spoof.
-    feedHeartbeat: `${API_BASE_URL}/api/v1/engagement/feed-heartbeat/`,
-    feedStatus: `${API_BASE_URL}/api/v1/engagement/feed-status/`,
-  },
   user: {
     profile: `${API_BASE_URL}/api/v1/users/me/`,
     updateProfile: `${API_BASE_URL}/api/v1/users/me/`,

@@ -83,6 +83,7 @@ import PartnersMessagesPane from '@/components/partners/PartnersMessagesPane';
 import PartnerSheet from '@/components/partners/PartnerSheet';
 import type { RootStackParamList } from '@/navigation/types';
 import BroadcastDetailScreen from '@/screens/tabs/feeds/BroadcastDetailScreen';
+import BroadcastFeedFullScreenScreen from '@/screens/broadcast/feeds/BroadcastFeedFullScreenScreen';
 import PlaylistsScreen from '@/screens/broadcast/playlists/PlaylistsScreen';
 import PlaylistDetailScreen from '@/screens/broadcast/playlists/PlaylistDetailScreen';
 import ChannelHomePage from '@/screens/broadcast/channels/ChannelHomePage';
@@ -1442,6 +1443,10 @@ function AppContent() {
                     <RootStack.Screen
                       name="BroadcastDetail"
                       getComponent={() => BroadcastDetailScreen}
+                    />
+                    <RootStack.Screen
+                      name="BroadcastFeedFullScreen"
+                      getComponent={() => BroadcastFeedFullScreenScreen}
                     />
                     <RootStack.Screen
                       name="ChannelHome"

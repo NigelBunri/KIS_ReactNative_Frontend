@@ -13,7 +13,7 @@ import {
   View,
 } from 'react-native';
 import Clipboard from '@react-native-clipboard/clipboard';
-import { useIsFocused, useNavigation } from '@react-navigation/native';
+import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useKISTheme } from '@/theme/useTheme';
 import { useResponsiveLayout } from '@/theme/responsive';
@@ -31,8 +31,6 @@ import { resolveBroadcastPosterUserId } from '@/components/broadcast/resolveBroa
 import { KISIcon } from '@/constants/kisIcons';
 import AddToPlaylistSheet from '@/screens/broadcast/playlists/AddToPlaylistSheet';
 import { getPlaylistsState, subscribeToPlaylists } from '@/screens/broadcast/playlists/playlistManager';
-import { useResponsibleFeedLimit } from '@/hooks/useResponsibleFeedLimit';
-import { FeedTimeLimitBanner, FeedTimeLimitBlock } from '@/components/broadcast/FeedTimeLimitBanner';
 
 type FeedCategory = 'for_you' | 'following' | 'trending' | 'live' | 'channels' | 'community' | 'market' | 'education';
 
@@ -93,20 +91,7 @@ export default function FeedsDiscoverPage({
   const responsive = useResponsiveLayout();
   const navigation =
     useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const isFocused = useIsFocused();
-  const { status: feedLimitStatus } = useResponsibleFeedLimit(isFocused);
-  // The moment limitReached flips true, the ternary below swaps this whole
-  // feed's content (potentially hundreds of loaded item cards, scrolled
-  // arbitrarily deep) for one small block. Without scrolling back to the top
-  // first, a plain ScrollView just clamps the now-invalid contentOffset to
-  // whatever's left, which reads as a hard, uncontrolled snap on top of the
-  // content swap itself.
   const feedScrollRef = useRef<ScrollView>(null);
-  useEffect(() => {
-    if (feedLimitStatus?.limitReached) {
-      feedScrollRef.current?.scrollTo({ y: 0, animated: true });
-    }
-  }, [feedLimitStatus?.limitReached]);
   const [showTrendingOnly, setShowTrendingOnly] = useState(false);
   // Use controlled props when provided, else fall back to local state
   const [activeCategoryLocal, setActiveCategoryLocal] = useState<FeedCategory>('for_you');
@@ -288,18 +273,6 @@ export default function FeedsDiscoverPage({
     );
   }, []);
 
-  const handleOpenItem = useCallback(
-    (item: BroadcastFeedItem) => {
-      navigation.navigate('BroadcastDetail', {
-        id: item.id,
-        item,
-        items: activeFeedItems,
-        index: activeFeedItems.findIndex(feed => feed.id === item.id),
-      });
-    },
-    [activeFeedItems, navigation],
-  );
-
   const handleLike = useCallback(
     async (item: BroadcastFeedItem) => {
       const result = await reactToItem(item.id);
@@ -359,6 +332,63 @@ export default function FeedsDiscoverPage({
     });
   }, []);
 
+  // Shared by FeedsMainListSection's own onSubscribe prop and the
+  // full-screen viewer below, so both surfaces confirm unsubscribe the
+  // same way rather than duplicating the Alert logic.
+  const handleToggleSubscribe = useCallback(
+    async (source: BroadcastFeedItem['source'], isSubscribed: boolean) => {
+      const runToggle = async () => {
+        const result = await toggleSubscribe(source as any, isSubscribed);
+        if (!result?.ok) {
+          Alert.alert(
+            isSubscribed ? 'Unsubscribe' : 'Subscribe',
+            isSubscribed
+              ? 'Unable to update this subscription right now.'
+              : 'Unable to subscribe to this source right now.',
+          );
+        }
+      };
+      if (isSubscribed) {
+        Alert.alert(
+          'Unsubscribe',
+          `Stop following ${source?.name ?? 'this source'}?`,
+          [
+            { text: 'Cancel', style: 'cancel' },
+            { text: 'Unsubscribe', style: 'destructive', onPress: () => { void runToggle(); } },
+          ],
+        );
+        return;
+      }
+      await runToggle();
+    },
+    [toggleSubscribe],
+  );
+
+  // Opens the TikTok-style full-screen viewer for the Feeds tab
+  // specifically (see BroadcastFeedFullScreenScreen.tsx) - a dedicated
+  // route, not BroadcastDetail, which stays exactly as-is for every other
+  // entry point into a broadcast (search results, push notifications).
+  // Action callbacks are passed straight through so likes/saves/etc. stay
+  // backed by this same feed list's live state instead of a second,
+  // independently-fetched copy inside the viewer.
+  const handleOpenItem = useCallback(
+    (item: BroadcastFeedItem, attachmentIndex?: number) => {
+      navigation.navigate('BroadcastFeedFullScreen', {
+        items: activeFeedItems,
+        index: Math.max(0, activeFeedItems.findIndex(feed => feed.id === item.id)),
+        initialAttachmentIndex: attachmentIndex,
+        onLike: (it: BroadcastFeedItem) => { void handleLike(it); },
+        onShare: (it: BroadcastFeedItem) => { void handleShare(it); },
+        onComment: (it: BroadcastFeedItem) => { void handleOpenComments(it); },
+        onSave: (it: BroadcastFeedItem) => { void toggleSaved(it.id, Boolean(it.viewer_saved)); },
+        onSubscribe: (it: BroadcastFeedItem) => {
+          void handleToggleSubscribe(it.source, Boolean(it.source?.is_subscribed));
+        },
+      } as any);
+    },
+    [activeFeedItems, navigation, handleLike, handleShare, handleOpenComments, toggleSaved, handleToggleSubscribe],
+  );
+
   const handleMenu = useCallback(
     (item: BroadcastFeedItem) => {
       const authorId = resolveBroadcastPosterUserId(item);
@@ -366,7 +396,7 @@ export default function FeedsDiscoverPage({
       const saveLabel = item.viewer_saved ? 'Remove saved post' : 'Save post';
       Alert.alert(item.title ?? 'Broadcast actions', undefined, [
         {
-          text: 'Open',
+          text: 'Full Screen',
           onPress: () => handleOpenItem(item),
         },
         {
@@ -584,19 +614,7 @@ export default function FeedsDiscoverPage({
           <KISIcon name="chevron-right" size={14} color={palette.subtext} />
         </Pressable>
 
-        <FeedTimeLimitBanner status={feedLimitStatus} />
-
-        {/* FadeInView softens this swap instead of the hard, instant cut it
-            was before - the "false" branch here is the entire rest of this
-            feed (every loaded item card), so unmounting it with no
-            transition at all was the single worst moment in this screen's
-            whole scroll experience. */}
-        {feedLimitStatus?.limitReached ? (
-          <FadeInView key="feed-limit-block">
-            <FeedTimeLimitBlock status={feedLimitStatus} onGoBack={() => navigation.goBack()} />
-          </FadeInView>
-        ) : (
-          <FadeInView key="feed-content">
+        <FadeInView key="feed-content">
         {/* Live items banner */}
         {liveItems.length > 0 && activeCategory !== 'live' && !showTrendingOnly && (
           <Pressable
@@ -724,8 +742,7 @@ export default function FeedsDiscoverPage({
             await runToggle();
           }}
         />
-          </FadeInView>
-        )}
+        </FadeInView>
       </View>
 
       <AddToPlaylistSheet

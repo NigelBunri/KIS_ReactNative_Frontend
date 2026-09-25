@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useKISTheme } from '@/theme/useTheme';
 import CommentThreadPanel from '@/components/feeds/CommentThreadPanel';
 import { useResponsiveLayout } from '@/theme/responsive';
@@ -102,7 +102,11 @@ type Props = {
   onOpenSource?: () => void;
   onOpenMarket?: () => void;
   onMenuPress?: () => void;
-  onVideoPress?: () => void;
+  // Optional attachment index — when this item has multiple uploaded
+  // attachments (see the multi-attachment strip below), tapping a specific
+  // one opens the full-screen viewer seeded to that attachment instead of
+  // always the first.
+  onVideoPress?: (attachmentIndex?: number) => void;
   onSave?: () => void;
   onJoinLesson?: () => void;
   onOpenAuthorProfile?: () => void;
@@ -216,6 +220,12 @@ export default function BroadcastFeedCard({
     return deduped.filter(info => Boolean(info.previewUri || info.url));
   }, [item.attachments]);
   const [activeAttachmentIndex, setActiveAttachmentIndex] = useState(0);
+  // Local, card-only - starts playing a single-video item's thumbnail in
+  // place when the play button is tapped. Never sent to a parent callback;
+  // tapping anywhere else on a video-forward card still opens the
+  // full-screen viewer via onVideoPress (see the YouTube-style branch of
+  // this component's return below).
+  const [inlinePlaying, setInlinePlaying] = useState(false);
 
   const handlePrevAttachment = useCallback(() => {
     if (attachmentPreviews.length === 0) return;
@@ -235,6 +245,7 @@ export default function BroadcastFeedCard({
 
   useEffect(() => {
     setAuthorBioExpanded(false);
+    setInlinePlaying(false);
   }, [item.id]);
 
   const activeAttachment = attachmentPreviews[activeAttachmentIndex];
@@ -243,10 +254,21 @@ export default function BroadcastFeedCard({
       ? formatDuration(item.video_duration_seconds)
       : null;
 
+  // YouTube-style presentation (thumbnail-first card, inline play, tap-to-
+  // full-screen) applies to any item carrying video content - everything
+  // else (text posts, testimonies, image-only posts, market/lesson cards)
+  // keeps the existing social-card layout below, unchanged.
+  const hasVideo =
+    attachmentPreviews.some(preview => preview.isVideo) ||
+    typeof item.video_duration_seconds === 'number';
+  const isMultiAttachment = attachmentPreviews.length > 1;
+
   const canSubscribe = Boolean(item.source?.allow_subscribe);
   const isSubscribed = Boolean(item.source?.is_subscribed);
 
-  const onPressPrimary = onVideoPress ?? onOpenMarket ?? onOpenSource;
+  const onPressPrimary = onVideoPress
+    ? () => onVideoPress()
+    : onOpenMarket ?? onOpenSource;
   const authorAvatarUri = resolveBackendAssetUrl(
     item.author?.avatar_url ??
       (item as any)?.author?.avatarUrl ??
@@ -257,14 +279,9 @@ export default function BroadcastFeedCard({
       null,
   );
 
-  return (
-    <View
-      style={[
-        styles.card,
-        { backgroundColor: palette.card, borderColor: palette.primaryStrong, padding: compact ? 11 : 16, borderRadius: compact ? 18 : 26 },
-      ]}
-    >
-      {/* ───── Header (avatar + source + time + menu) ───── */}
+  // ───── Header (avatar + source + time + menu) — shared by both the
+  // YouTube-style video card and the original social-card layout below. ─────
+  const headerBlock = (
       <View style={styles.headerRow}>
         <Image
           source={authorAvatarUri ? { uri: authorAvatarUri } : fallbackAvatar}
@@ -352,6 +369,271 @@ export default function BroadcastFeedCard({
           <KISIcon name="menu" size={18} color={palette.subtext} />
         </Pressable>
       </View>
+  );
+
+  const titleBlock = showTitle ? (
+    <KISText
+      style={[styles.title, { color: palette.text, fontSize: compact ? 15 : 18 }]}
+      numberOfLines={2}
+    >
+      {item.title}
+    </KISText>
+  ) : null;
+
+  // ───── Engagement row (icons + counts) — shared by both layouts. ─────
+  const engagementBlock = (
+    <View style={[styles.engagementRow, { borderTopColor: palette.divider }, compact && { flexWrap: 'wrap', rowGap: 8 }]}>
+      {onSave ? (
+        <Pressable onPress={onSave} style={styles.engItem} hitSlop={10}>
+          <KISIcon
+            name="bookmark"
+            size={18}
+            color={item.viewer_saved ? palette.primaryStrong : palette.subtext}
+          />
+          <Text
+            style={[
+              styles.engText,
+              { color: item.viewer_saved ? palette.primaryStrong : palette.subtext },
+            ]}
+          >
+            Save
+          </Text>
+        </Pressable>
+      ) : null}
+
+      <Pressable onPress={onLike} style={styles.engItem} hitSlop={10}>
+        <KISIcon
+          name="heart"
+          size={18}
+          color={item.viewer_reaction ? palette.primaryStrong : palette.subtext}
+        />
+        <Text
+          style={[
+            styles.engText,
+            { color: item.viewer_reaction ? palette.primaryStrong : palette.subtext },
+          ]}
+        >
+          {item.reaction_count ?? 0}
+        </Text>
+      </Pressable>
+
+      {onToggleComments ? (
+        <Pressable onPress={onToggleComments} style={styles.engItem} hitSlop={10}>
+          <KISIcon
+            name="comment"
+            size={18}
+            color={showComments ? palette.primaryStrong : palette.subtext}
+          />
+          <Text style={[styles.engText, { color: showComments ? palette.primaryStrong : palette.subtext }]}>
+            {item.comment_count ?? 0}
+          </Text>
+        </Pressable>
+      ) : null}
+
+      <Pressable onPress={onShare} style={styles.engItem} hitSlop={10}>
+        <KISIcon name="share" size={18} color={palette.subtext} />
+        <Text style={[styles.engText, { color: palette.subtext }]}>
+          {item.share_count ?? 0}
+        </Text>
+      </Pressable>
+    </View>
+  );
+
+  const ctaRowBlock = (
+    <View style={[styles.ctaRow, compact && { flexWrap: 'wrap' }]}>
+      {canSubscribe ? (
+        <Pressable
+          onPress={onSubscribe ?? onOpenSource}
+          style={[
+            styles.subscribeBtn,
+            {
+              backgroundColor: isSubscribed ? palette.surface : palette.primarySoft,
+              borderColor: isSubscribed ? palette.danger : palette.primary,
+            },
+          ]}
+        >
+          <Text
+            style={{
+              color: isSubscribed ? palette.danger : palette.primaryStrong,
+              fontWeight: '900',
+            }}
+          >
+            {isSubscribed ? 'Unsubscribe' : 'Subscribe'}
+          </Text>
+        </Pressable>
+      ) : null}
+
+      {item.is_lesson && onJoinLesson ? (
+        <Pressable
+          onPress={onJoinLesson}
+          style={[styles.primaryPill, { backgroundColor: palette.primaryStrong }]}
+        >
+          <Text style={{ color: palette.onPrimary, fontWeight: '900' }}>Enroll</Text>
+        </Pressable>
+      ) : null}
+
+      {item.product && onOpenMarket ? (
+        <Pressable
+          onPress={onOpenMarket}
+          style={[styles.primaryPill, { backgroundColor: palette.primaryStrong }]}
+        >
+          <Text style={{ color: palette.onPrimary, fontWeight: '900' }}>Shop</Text>
+        </Pressable>
+      ) : null}
+    </View>
+  );
+
+  const commentBlock = showComments ? (
+    <CommentThreadPanel
+      postId={item.id}
+      initialConversationId={commentConversationId}
+      fetchConversationId={fetchConversationId}
+      onConversationResolved={onConversationResolved}
+      onMessageCountChange={onMessageCountChange}
+      contextLabel={contextLabel}
+      useScrollView
+    />
+  ) : null;
+
+  // ───── YouTube-style layout: video-forward items only (see hasVideo). ─────
+  if (hasVideo) {
+    return (
+      <View
+        style={[
+          styles.card,
+          { backgroundColor: palette.card, borderColor: palette.primaryStrong, padding: compact ? 11 : 16, borderRadius: compact ? 18 : 26 },
+        ]}
+      >
+        {headerBlock}
+        {titleBlock}
+
+        {!isMultiAttachment && activeAttachment ? (
+          <View
+            style={[
+              styles.slideshowWrap,
+              { borderColor: palette.divider, backgroundColor: palette.surface, aspectRatio: compact ? 4 / 3 : 16 / 9 },
+            ]}
+          >
+            {inlinePlaying && activeAttachment.isVideo && activeAttachment.raw ? (
+              <BroadcastFeedVideoPreview
+                attachment={activeAttachment.raw}
+                palette={palette}
+                containerStyle={styles.slideshowImage}
+                posterOverride={activeAttachment.previewUri ?? undefined}
+                autoPlay
+              />
+            ) : (
+              <Pressable
+                onPress={() => onVideoPress?.(activeAttachmentIndex)}
+                style={styles.slideshowPressable}
+              >
+                {activeAttachment.previewUri || activeAttachment.url ? (
+                  <Image
+                    source={{ uri: activeAttachment.previewUri ?? activeAttachment.url! }}
+                    style={styles.slideshowImage}
+                  />
+                ) : (
+                  <View style={[styles.slideshowImage, { backgroundColor: palette.bar }]} />
+                )}
+              </Pressable>
+            )}
+
+            {Boolean(item.is_live) ? (
+              <View style={[styles.liveBadge, { backgroundColor: palette.danger }]}>
+                <Text style={styles.liveText}>LIVE</Text>
+              </View>
+            ) : null}
+
+            {durationLabel && !inlinePlaying ? (
+              <View style={[styles.durationPill, { backgroundColor: 'rgba(0,0,0,0.6)' }]}>
+                <Text style={{ color: '#fff', fontWeight: '900', fontSize: 12 }}>
+                  {durationLabel}
+                </Text>
+              </View>
+            ) : null}
+
+            {/* Play button — the ONLY thing on a video-forward card that
+                plays inline instead of opening the full-screen viewer. */}
+            {!inlinePlaying && activeAttachment.isVideo ? (
+              <Pressable
+                onPress={() => setInlinePlaying(true)}
+                style={styles.ytPlayOverlay}
+                hitSlop={8}
+                accessibilityRole="button"
+                accessibilityLabel="Play"
+              >
+                <View style={styles.ytPlayCircle}>
+                  <KISIcon name="play" size={26} color="#fff" />
+                </View>
+              </Pressable>
+            ) : null}
+
+            {typeof watchProgress === 'number' && watchProgress > 0 ? (
+              <View style={styles.watchProgressTrack} pointerEvents="none">
+                <View
+                  style={[
+                    styles.watchProgressBar,
+                    { width: `${Math.min(100, watchProgress * 100)}%`, backgroundColor: palette.primaryStrong },
+                  ]}
+                />
+              </View>
+            ) : null}
+          </View>
+        ) : null}
+
+        {/* Multi-item post: the other uploaded attachments shown as a
+            horizontal strip within this card, mirroring a YouTube "shelf"
+            row - tapping one opens the full-screen viewer seeded to that
+            attachment, same as tapping the single big thumbnail above. */}
+        {isMultiAttachment ? (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.ytStripContent}
+          >
+            {attachmentPreviews.map((preview, idx) => (
+              <Pressable
+                key={`${item.id}-att-${idx}`}
+                onPress={() => {
+                  setActiveAttachmentIndex(idx);
+                  onVideoPress?.(idx);
+                }}
+                style={[styles.ytChip, { borderColor: palette.divider }]}
+              >
+                {preview.previewUri || preview.url ? (
+                  <Image
+                    source={{ uri: preview.previewUri ?? preview.url! }}
+                    style={styles.ytChipImage}
+                  />
+                ) : (
+                  <View style={[styles.ytChipImage, { backgroundColor: palette.bar }]} />
+                )}
+                {preview.isVideo ? (
+                  <View style={styles.ytChipPlayDot}>
+                    <KISIcon name="play" size={10} color="#fff" />
+                  </View>
+                ) : null}
+              </Pressable>
+            ))}
+          </ScrollView>
+        ) : null}
+
+        {ctaRowBlock}
+        {engagementBlock}
+        {commentBlock}
+      </View>
+    );
+  }
+
+  // ───── Original social-card layout — every non-video item. ─────
+  return (
+    <View
+      style={[
+        styles.card,
+        { backgroundColor: palette.card, borderColor: palette.primaryStrong, padding: compact ? 11 : 16, borderRadius: compact ? 18 : 26 },
+      ]}
+    >
+      {headerBlock}
 
       {/* ───── Title + body (mockup-style) ───── */}
       {showTitle ? (
@@ -900,6 +1182,56 @@ const makeStyles = (_tokens: any) =>
       color: '#fff',
       fontSize: 13,
       fontWeight: '900',
+    },
+
+    // ───── YouTube-style video-forward card additions ─────
+    ytPlayOverlay: {
+      ...StyleSheet.absoluteFillObject,
+      alignItems: 'center',
+      justifyContent: 'center',
+      zIndex: 2,
+    },
+
+    ytPlayCircle: {
+      width: 56,
+      height: 56,
+      borderRadius: 28,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: 'rgba(0,0,0,0.5)',
+      borderWidth: 1.5,
+      borderColor: 'rgba(255,255,255,0.6)',
+    },
+
+    ytStripContent: {
+      gap: 8,
+      paddingVertical: 2,
+    },
+
+    ytChip: {
+      width: 128,
+      aspectRatio: 16 / 9,
+      borderRadius: 12,
+      borderWidth: 1,
+      overflow: 'hidden',
+      position: 'relative',
+    },
+
+    ytChipImage: {
+      width: '100%',
+      height: '100%',
+    },
+
+    ytChipPlayDot: {
+      position: 'absolute',
+      bottom: 6,
+      right: 6,
+      width: 20,
+      height: 20,
+      borderRadius: 10,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: 'rgba(0,0,0,0.6)',
     },
 
     ctaRow: {
