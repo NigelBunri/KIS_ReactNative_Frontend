@@ -92,6 +92,11 @@ export default function FeedsDiscoverPage({
   const navigation =
     useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const feedScrollRef = useRef<ScrollView>(null);
+  // Tracks which single item's comment room is currently being opened, so
+  // the tapped comment button (and only that one) can show a spinner
+  // instead of leaving the tap looking unresponsive while the POST below
+  // resolves - see handleOpenComments.
+  const [commentsLoadingId, setCommentsLoadingId] = useState<string | null>(null);
   const [showTrendingOnly, setShowTrendingOnly] = useState(false);
   // Use controlled props when provided, else fall back to local state
   const [activeCategoryLocal, setActiveCategoryLocal] = useState<FeedCategory>('for_you');
@@ -308,28 +313,33 @@ export default function FeedsDiscoverPage({
   );
 
   const handleOpenComments = useCallback(async (item: BroadcastFeedItem) => {
-    const res = await postRequest(
-      ROUTES.broadcasts.commentRoom(item.id),
-      {},
-      { errorMessage: 'Unable to load comments.' },
-    );
-    const conversationId =
-      res?.data?.conversation_id ??
-      res?.data?.conversationId ??
-      res?.data?.id ??
-      null;
-    if (!conversationId) {
-      Alert.alert(
-        'Comments',
-        'Unable to open the comment room for this broadcast.',
+    setCommentsLoadingId(item.id);
+    try {
+      const res = await postRequest(
+        ROUTES.broadcasts.commentRoom(item.id),
+        {},
+        { errorMessage: 'Unable to load comments.' },
       );
-      return;
+      const conversationId =
+        res?.data?.conversation_id ??
+        res?.data?.conversationId ??
+        res?.data?.id ??
+        null;
+      if (!conversationId) {
+        Alert.alert(
+          'Comments',
+          'Unable to open the comment room for this broadcast.',
+        );
+        return;
+      }
+      DeviceEventEmitter.emit('chat.open', {
+        conversationId,
+        name: item.title ?? item.source?.name ?? 'Broadcast comments',
+        kind: 'broadcast_comments',
+      });
+    } finally {
+      setCommentsLoadingId(null);
     }
-    DeviceEventEmitter.emit('chat.open', {
-      conversationId,
-      name: item.title ?? item.source?.name ?? 'Broadcast comments',
-      kind: 'broadcast_comments',
-    });
   }, []);
 
   // Shared by FeedsMainListSection's own onSubscribe prop and the
@@ -379,7 +389,7 @@ export default function FeedsDiscoverPage({
         initialAttachmentIndex: attachmentIndex,
         onLike: (it: BroadcastFeedItem) => { void handleLike(it); },
         onShare: (it: BroadcastFeedItem) => { void handleShare(it); },
-        onComment: (it: BroadcastFeedItem) => { void handleOpenComments(it); },
+        onComment: (it: BroadcastFeedItem) => handleOpenComments(it),
         onSave: (it: BroadcastFeedItem) => { void toggleSaved(it.id, Boolean(it.viewer_saved)); },
         onSubscribe: (it: BroadcastFeedItem) => {
           void handleToggleSubscribe(it.source, Boolean(it.source?.is_subscribed));
@@ -695,6 +705,7 @@ export default function FeedsDiscoverPage({
           loadingMore={loadingMore}
           onRefresh={refreshAll}
           onOpenItem={handleOpenItem}
+          commentsLoadingItemId={commentsLoadingId}
           onShare={item => {
             void handleShare(item);
           }}

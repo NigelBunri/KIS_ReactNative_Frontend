@@ -10,6 +10,7 @@
 // feed-list state already loaded in the scrolling view.
 import React, { useCallback, useMemo, useRef, useState } from 'react';
 import {
+  ActivityIndicator,
   FlatList,
   Image,
   Pressable,
@@ -59,7 +60,7 @@ type CardProps = {
   onToggleRotate: () => void;
   onLike?: (item: Item) => void;
   onShare?: (item: Item) => void;
-  onComment?: (item: Item) => void;
+  onComment?: (item: Item) => void | Promise<void>;
   onSave?: (item: Item) => void;
   onSubscribe?: (item: Item) => void;
 };
@@ -99,6 +100,17 @@ function FeedFullScreenCard({
   );
   const activeAttachment = attachmentPreviews[activeIndex] ?? null;
   const isMultiAttachment = attachmentPreviews.length > 1;
+
+  const [commentsLoading, setCommentsLoading] = useState(false);
+  const handlePressComment = useCallback(async () => {
+    if (commentsLoading) return;
+    setCommentsLoading(true);
+    try {
+      await onComment?.(item);
+    } finally {
+      setCommentsLoading(false);
+    }
+  }, [commentsLoading, onComment, item]);
 
   const [showHeart, setShowHeart] = useState(false);
   const handleDoubleTapLike = useCallback(() => {
@@ -238,8 +250,12 @@ function FeedFullScreenCard({
                 <Text style={[styles.actionCount, { color: palette.ivory }]}>{item.reaction_count ?? 0}</Text>
               </Pressable>
 
-              <Pressable style={styles.actionBtn} onPress={() => onComment?.(item)}>
-                <KISIcon name="comment" size={24} color={palette.ivory} />
+              <Pressable style={styles.actionBtn} onPress={handlePressComment} disabled={commentsLoading}>
+                {commentsLoading ? (
+                  <ActivityIndicator size="small" color={palette.ivory} />
+                ) : (
+                  <KISIcon name="comment" size={24} color={palette.ivory} />
+                )}
                 <Text style={[styles.actionCount, { color: palette.ivory }]}>{item.comment_count ?? 0}</Text>
               </Pressable>
 
@@ -318,7 +334,7 @@ export default function BroadcastFeedFullScreenScreen() {
 
   const handleLike = useCallback((item: Item) => { Vibration.vibrate(20); route.params?.onLike?.(item); }, [route.params]);
   const handleShare = useCallback((item: Item) => { route.params?.onShare?.(item); }, [route.params]);
-  const handleComment = useCallback((item: Item) => { route.params?.onComment?.(item); }, [route.params]);
+  const handleComment = useCallback((item: Item) => route.params?.onComment?.(item), [route.params]);
   const handleSave = useCallback((item: Item) => { route.params?.onSave?.(item); }, [route.params]);
   const handleSubscribe = useCallback((item: Item) => { route.params?.onSubscribe?.(item); }, [route.params]);
 

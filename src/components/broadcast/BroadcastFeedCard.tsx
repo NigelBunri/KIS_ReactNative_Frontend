@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import { useKISTheme } from '@/theme/useTheme';
 import { withAlpha } from '@/theme/constants';
@@ -119,6 +119,10 @@ type Props = {
   contextLabel?: string;
   showComments?: boolean;
   onToggleComments?: () => void;
+  // True while this item's comment room is being opened (see
+  // FeedsDiscoverPage's handleOpenComments) - shows a spinner in place of
+  // the comment icon instead of leaving the tap looking unresponsive.
+  commentsLoading?: boolean;
   onSubscribe?: () => void | Promise<void | boolean>;
   watchProgress?: number;
 };
@@ -165,6 +169,7 @@ export default function BroadcastFeedCard({
   onJoinLesson,
   onOpenAuthorProfile,
   onToggleComments,
+  commentsLoading,
   onSubscribe,
   watchProgress,
   showComments,
@@ -429,12 +434,21 @@ export default function BroadcastFeedCard({
       </Pressable>
 
       {onToggleComments ? (
-        <Pressable onPress={onToggleComments} style={styles.engItem} hitSlop={10}>
-          <KISIcon
-            name="comment"
-            size={18}
-            color={showComments ? palette.primaryStrong : palette.subtext}
-          />
+        <Pressable
+          onPress={onToggleComments}
+          disabled={commentsLoading}
+          style={styles.engItem}
+          hitSlop={10}
+        >
+          {commentsLoading ? (
+            <ActivityIndicator size="small" color={palette.subtext} />
+          ) : (
+            <KISIcon
+              name="comment"
+              size={18}
+              color={showComments ? palette.primaryStrong : palette.subtext}
+            />
+          )}
           <Text style={[styles.engText, { color: showComments ? palette.primaryStrong : palette.subtext }]}>
             {item.comment_count ?? 0}
           </Text>
@@ -975,14 +989,19 @@ export default function BroadcastFeedCard({
         {onToggleComments ? (
           <Pressable
             onPress={onToggleComments}
+            disabled={commentsLoading}
             style={styles.engItem}
             hitSlop={10}
           >
-            <KISIcon
-              name="comment"
-              size={18}
-              color={showComments ? palette.primaryStrong : palette.subtext}
-            />
+            {commentsLoading ? (
+              <ActivityIndicator size="small" color={palette.subtext} />
+            ) : (
+              <KISIcon
+                name="comment"
+                size={18}
+                color={showComments ? palette.primaryStrong : palette.subtext}
+              />
+            )}
             <Text style={[styles.engText, { color: showComments ? palette.primaryStrong : palette.subtext }]}>
               {item.comment_count ?? 0}
             </Text>

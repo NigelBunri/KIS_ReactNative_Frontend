@@ -70,6 +70,10 @@ type Props = {
     source: BroadcastSourceMeta,
     isSubscribed: boolean,
   ) => Promise<void> | void;
+  // Id of the single item whose comment room is currently being opened
+  // (see FeedsDiscoverPage's handleOpenComments) - lets just that item's
+  // card show a loading spinner on its comment button.
+  commentsLoadingItemId?: string | null;
 };
 
 export default function FeedsMainListSection({
@@ -84,6 +88,7 @@ export default function FeedsMainListSection({
   onComment,
   onMenu,
   onSubscribe,
+  commentsLoadingItemId,
 }: Props) {
   const { palette } = useKISTheme();
   const {
@@ -156,6 +161,7 @@ export default function FeedsMainListSection({
                   onVideoPress={attachmentIndex => onOpenItem(item, attachmentIndex)}
                   onSave={() => onSave(item)}
                   onToggleComments={() => onComment(item)}
+                  commentsLoading={commentsLoadingItemId === item.id}
                   onMenuPress={() => onMenu(item)}
                   onOpenAuthorProfile={
                     isUserBroadcastSource(item)
