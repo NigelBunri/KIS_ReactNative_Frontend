@@ -24,6 +24,7 @@ import { wasNativeShareCompleted } from '@/utils/shareCompletion';
 
 import FeedsMainListSection from '@/screens/broadcast/feeds/sections/FeedsMainListSection';
 import TrendingClipsSection from '@/screens/broadcast/feeds/sections/TrendingClipsSection';
+import BroadcastersRow from '@/screens/broadcast/feeds/sections/BroadcastersRow';
 
 import useFeedsData from '@/screens/broadcast/feeds/hooks/useFeedsData';
 import type { BroadcastFeedItem } from '@/screens/broadcast/feeds/api/feeds.types';
@@ -620,30 +621,10 @@ export default function FeedsDiscoverPage({
       )}
 
       <View style={{ paddingHorizontal: 12, gap: 12, width: '100%', maxWidth: responsive.contentMaxWidth, alignSelf: 'center' }}>
-        {/* Feed settings row — quick access to blocked users management */}
-        <Pressable
-          onPress={() => navigation.navigate('BlockedContacts')}
-          style={({ pressed }) => [
-            styles.blockedRow,
-            {
-              backgroundColor: pressed ? palette.primarySoft : palette.surface,
-              borderColor: palette.divider,
-            },
-          ]}
-        >
-          <View
-            style={[
-              styles.blockedRowIcon,
-              { borderColor: palette.divider, backgroundColor: palette.card },
-            ]}
-          >
-            <KISIcon name="shield" size={16} color={palette.primaryStrong} />
-          </View>
-          <Text style={[styles.blockedRowText, { color: palette.text }]}>
-            Manage blocked users
-          </Text>
-          <KISIcon name="chevron-right" size={14} color={palette.subtext} />
-        </Pressable>
+        {/* Everyone who's broadcasted content, most-recently-active first
+            (replaces the old "Manage blocked users" shortcut - that still
+            lives in Settings). */}
+        <BroadcastersRow />
 
         <FadeInView key="feed-content">
         {/* Live items banner */}
@@ -819,29 +800,6 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingHorizontal: 10,
     paddingVertical: 4,
-  },
-  blockedRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderRadius: 12,
-    borderWidth: 1,
-    minHeight: 44,
-  },
-  blockedRowIcon: {
-    width: 28,
-    height: 28,
-    borderRadius: 8,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  blockedRowText: {
-    flex: 1,
-    fontSize: 13,
-    fontWeight: '700',
   },
   activeChipText: {
     fontSize: 11,

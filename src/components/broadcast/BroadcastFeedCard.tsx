@@ -186,7 +186,11 @@ export default function BroadcastFeedCard({
   onMessageCountChange,
   contextLabel,
 }: Props) {
-  const { palette, tokens, gradients } = useKISTheme();
+  const { palette, tokens, gradients, tone } = useKISTheme();
+  // Explicit white in light mode (palette.card there is a warm cream, not
+  // pure white) - but dark mode needs its own dark card color, not white,
+  // or it looks jarringly out of place against the dark page background.
+  const cardBackgroundColor = tone === 'dark' ? palette.card : '#FFFFFF';
   const responsive = useResponsiveLayout();
   const compact = responsive.isWatch || responsive.isCompactPhone;
   const styles = useMemo(() => makeStyles(tokens), [tokens]);
@@ -603,10 +607,10 @@ export default function BroadcastFeedCard({
 
   // ───── YouTube-style layout: video-forward items only (see hasVideo). ─────
   if (hasVideo) {
-    const ytPadStyle = { paddingHorizontal: compact ? 11 : 16 };
+    const ytPadStyle = { paddingHorizontal: 0 };
     return (
-      <View style={[styles.fullBleedCard, { backgroundColor: palette.card }]}>
-        <View style={[styles.ytPad, ytPadStyle, { paddingTop: compact ? 11 : 16 }]}>
+      <View style={[styles.fullBleedCard, { backgroundColor: cardBackgroundColor }]}>
+        <View style={[styles.ytPad, ytPadStyle, { paddingTop: 0 }]}>
           {headerBlock}
           {titleBlock}
         </View>
@@ -741,7 +745,7 @@ export default function BroadcastFeedCard({
           </ScrollView>
         ) : null}
 
-        <View style={[styles.ytPad, ytPadStyle, { paddingBottom: compact ? 11 : 16 }]}>
+        <View style={[styles.ytPad, ytPadStyle, { paddingBottom: 0 }]}>
           {ctaRowBlock}
           {engagementBlock}
           {commentBlock}
@@ -755,7 +759,7 @@ export default function BroadcastFeedCard({
     <View
       style={[
         styles.fullBleedCard,
-        { backgroundColor: palette.card, padding: compact ? 11 : 16 },
+        { backgroundColor: cardBackgroundColor, padding: 0 },
       ]}
     >
       {headerBlock}
@@ -1131,14 +1135,14 @@ const makeStyles = (_tokens: any) =>
     // Feeds view is edge-to-edge, matching the YouTube-style reference,
     // not a boxed/bordered card.
     fullBleedCard: {
-      gap: 10,
+      gap: 4,
     },
 
     // Horizontal-only padding wrapper used to keep header/title/footer
     // text readable while the thumbnail itself (slideshowWrapBleed) stays
     // truly flush with the screen edges.
     ytPad: {
-      gap: 10,
+      gap: 4,
     },
 
     headerRow: {
@@ -1478,9 +1482,9 @@ const makeStyles = (_tokens: any) =>
     },
 
     engagementRow: {
-      marginTop: 4,
-      paddingTop: 10,
-      borderTopWidth: 1,
+      marginTop: 0,
+      paddingTop: 0,
+      borderTopWidth: 0,
       flexDirection: 'row',
       alignItems: 'center',
       gap: 16,

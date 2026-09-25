@@ -39,7 +39,10 @@ type Props = {
 };
 
 export default function FeedItemCard({ item, onPress, onReact, isSubscribed, onSubscribe }: Props) {
-  const { palette } = useKISTheme();
+  const { palette, tone } = useKISTheme();
+  // Explicit white in light mode (palette.card there is a warm cream, not
+  // pure white) - dark mode keeps its own dark card color instead.
+  const cardBackgroundColor = tone === 'dark' ? palette.card : '#FFFFFF';
   const richTextValue = getFeedRichTextValue(item);
   const plainText = getFeedPlainText(item);
 
@@ -76,7 +79,7 @@ export default function FeedItemCard({ item, onPress, onReact, isSubscribed, onS
       onPress={onPress}
       style={[
         styles.card,
-        { backgroundColor: palette.card, borderColor: palette.divider },
+        { backgroundColor: cardBackgroundColor, borderColor: palette.divider },
       ]}
       accessibilityRole="button"
       accessibilityLabel="Open broadcast detail"
@@ -229,16 +232,12 @@ export default function FeedItemCard({ item, onPress, onReact, isSubscribed, onS
 
 const styles = StyleSheet.create({
   card: {
-    borderWidth: 2,
+    borderWidth: 0,
     borderRadius: 20,
-    padding: 16,
+    padding: 0,
     marginVertical: 8,
     marginHorizontal: 12,
     gap: 10,
-    shadowColor: '#000',
-    shadowOpacity: 0.06,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 6 },
   },
   meta: {
     gap: 6,

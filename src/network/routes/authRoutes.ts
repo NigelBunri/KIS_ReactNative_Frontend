@@ -59,6 +59,7 @@ const authRoutes = {
   },
   profiles: {
     me: `${API_BASE_URL}/api/v1/profiles/me/`,
+    broadcasters: `${API_BASE_URL}/api/v1/profiles/broadcasters/`,
     view: (id: string) => `${API_BASE_URL}/api/v1/profiles/${id}/view/`,
     update: (id: string) => `${API_BASE_URL}/api/v1/profiles/${id}/`,
     discover: `${API_BASE_URL}/api/v1/profiles/discover/`,
