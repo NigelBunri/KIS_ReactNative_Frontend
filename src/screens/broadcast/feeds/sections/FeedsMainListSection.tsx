@@ -7,6 +7,35 @@ import BroadcastAuthorProfileSheet from '@/components/broadcast/BroadcastAuthorP
 import { isUserBroadcastSource } from '@/components/broadcast/authorProfileUtils';
 import useAuthorProfilePreview from '@/components/broadcast/useAuthorProfilePreview';
 import SectionHeader from '@/screens/broadcast/feeds/components/SectionHeader';
+import Skeleton from '@/components/common/Skeleton';
+
+// Mirrors BroadcastFeedCard's edge-to-edge YouTube-style shape (padded
+// header/title, full-bleed thumbnail, padded footer) so the loading state
+// doesn't jump/resize once real cards swap in - shown only while there's
+// nothing to show yet (see the loading && list.length === 0 gate below),
+// never over already-visible content during a background refresh.
+function FeedCardSkeleton() {
+  return (
+    <View style={{ gap: 10 }}>
+      <View style={{ paddingHorizontal: 16, paddingTop: 16, gap: 10 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+          <Skeleton width={44} height={44} radius={16} />
+          <View style={{ flex: 1, gap: 6 }}>
+            <Skeleton width="45%" height={14} radius={6} />
+            <Skeleton width="28%" height={10} radius={6} />
+          </View>
+        </View>
+        <Skeleton width="85%" height={16} radius={6} />
+      </View>
+      <Skeleton width="100%" height={200} radius={0} />
+      <View style={{ paddingHorizontal: 16, paddingBottom: 16, flexDirection: 'row', gap: 16 }}>
+        <Skeleton width={40} height={18} radius={6} />
+        <Skeleton width={40} height={18} radius={6} />
+        <Skeleton width={40} height={18} radius={6} />
+      </View>
+    </View>
+  );
+}
 
 export type BroadcastSourceMeta = {
   type: string;
@@ -130,6 +159,17 @@ export default function FeedsMainListSection({
               paddingHorizontal: 12 (FeedsDiscoverPage.tsx) so the default-view
               feed cards render full width, matching the YouTube-style
               reference, instead of sitting inset like the rest of the page. */}
+          {loading && list.length === 0 ? (
+            // Nothing loaded yet - shimmer placeholders instead of a blank
+            // screen. Gated on list.length so a background refresh (which
+            // also flips `loading`) never blanks out already-visible posts;
+            // that case is covered by the pull-to-refresh spinner instead.
+            <View style={{ gap: 12, marginHorizontal: -12 }}>
+              <FeedCardSkeleton />
+              <FeedCardSkeleton />
+              <FeedCardSkeleton />
+            </View>
+          ) : (
           <View style={{ gap: 12, marginHorizontal: -12 }}>
             {list.map(item => {
               const sourceId = item.source?.id ? String(item.source.id) : null;
@@ -181,6 +221,7 @@ export default function FeedsMainListSection({
               );
             })}
           </View>
+          )}
 
           {loadingMore ? (
             <View
