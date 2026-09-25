@@ -190,10 +190,15 @@ export default function useFeedsData({ q = '', code = null }: Params) {
 
   const loadFirstPage = useCallback(async () => {
     setLoading(true);
+    // 50/page (not the previous 20) so the first screen - and every
+    // full-screen/next-attachment jump within it - has a bigger loaded
+    // window to draw from before ever needing another round trip. See
+    // FeedsDiscoverPage's onScroll for the matching prefetch-ahead trigger
+    // that loads the next 50 before the user reaches the end of this one.
     const url = `${FEEDS_ENDPOINT}${buildQuery({
       q,
       code,
-      limit: 20,
+      limit: 50,
       offset: 0,
     })}`;
     try {

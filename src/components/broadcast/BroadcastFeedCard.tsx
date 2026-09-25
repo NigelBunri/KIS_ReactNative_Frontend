@@ -250,6 +250,24 @@ export default function BroadcastFeedCard({
     setActiveAttachmentIndex(0);
   }, [attachmentPreviews.length]);
 
+  // Warms the OS image cache for whichever slide the user is most likely
+  // to land on next - the prev/next arrows below only ever move one step,
+  // so by the time that tap happens the neighbor's image has usually
+  // already finished loading in the background instead of popping in.
+  // Same pattern as UpdatesTab.tsx's status-viewer prefetch. Videos aren't
+  // prefetchable this way (their startup latency is real buffering, not a
+  // cache-miss), so only image attachments are warmed.
+  useEffect(() => {
+    if (attachmentPreviews.length < 2) return;
+    const neighborIndexes = [activeAttachmentIndex + 1, activeAttachmentIndex - 1];
+    neighborIndexes.forEach(idx => {
+      const preview = attachmentPreviews[idx];
+      if (!preview || preview.isVideo) return;
+      const uri = preview.previewUri ?? preview.url;
+      if (uri) Image.prefetch(uri).catch(() => {});
+    });
+  }, [activeAttachmentIndex, attachmentPreviews]);
+
   useEffect(() => {
     setAuthorBioExpanded(false);
     setInlinePlaying(false);

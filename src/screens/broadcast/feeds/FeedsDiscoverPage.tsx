@@ -548,7 +548,12 @@ export default function FeedsDiscoverPage({
       }
       onScroll={({ nativeEvent }) => {
         const { layoutMeasurement, contentOffset, contentSize } = nativeEvent;
-        const pad = 220;
+        // Roughly 2 screens' worth of runway - with full-bleed video cards
+        // now much taller than the old boxed layout, a small pad risks
+        // firing after the user has already scrolled past it on a fast
+        // fling. Triggers the next 50-item page well before the visible
+        // end, so it's loaded before the user gets there.
+        const pad = layoutMeasurement.height * 2;
         if (
           layoutMeasurement.height + contentOffset.y >=
           contentSize.height - pad

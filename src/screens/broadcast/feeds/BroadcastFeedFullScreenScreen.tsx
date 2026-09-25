@@ -8,7 +8,7 @@
 // straight through via navigation params from FeedsDiscoverPage rather
 // than re-fetched here, so likes/saves/etc. stay backed by the exact same
 // feed-list state already loaded in the scrolling view.
-import React, { useCallback, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -100,6 +100,20 @@ function FeedFullScreenCard({
   );
   const activeAttachment = attachmentPreviews[activeIndex] ?? null;
   const isMultiAttachment = attachmentPreviews.length > 1;
+
+  // Same neighbor-prefetch as BroadcastFeedCard's slideshow - warms the
+  // image the user is most likely to tap next in the floating attachment
+  // strip so it's not a visible cache-miss when they get there.
+  useEffect(() => {
+    if (attachmentPreviews.length < 2) return;
+    const neighborIndexes = [activeIndex + 1, activeIndex - 1];
+    neighborIndexes.forEach(idx => {
+      const preview = attachmentPreviews[idx];
+      if (!preview || preview.isVideo) return;
+      const uri = preview.previewUri ?? preview.url;
+      if (uri) Image.prefetch(uri).catch(() => {});
+    });
+  }, [activeIndex, attachmentPreviews]);
 
   const [commentsLoading, setCommentsLoading] = useState(false);
   const handlePressComment = useCallback(async () => {
