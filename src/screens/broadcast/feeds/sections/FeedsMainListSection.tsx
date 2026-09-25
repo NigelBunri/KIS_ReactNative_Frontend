@@ -121,54 +121,60 @@ export default function FeedsMainListSection({
             </View>
           ) : null}
 
-          {list.map(item => {
-            const sourceId = item.source?.id ? String(item.source.id) : null;
-            const canSubscribe = Boolean(
-              item.source?.allow_subscribe && sourceId,
-            );
-            const subscribed = Boolean(item.source?.is_subscribed);
-            const enrichedSource: BroadcastSourceMeta = {
-              ...(item.source ?? {}),
-              type: item.source?.type ?? 'unknown',
-              allow_subscribe: canSubscribe,
-              is_subscribed: subscribed,
-            };
-            return (
-              <BroadcastFeedCard
-                key={item.id}
-                item={{
-                  ...item,
-                  source: {
-                    ...(item.source ?? {}),
-                    type: item.source?.type ?? 'unknown',
-                    allow_subscribe: canSubscribe,
-                    is_subscribed: subscribed,
-                  },
-                }}
-                onLike={() => onLike(item)}
-                onShare={() => onShare(item)}
-                onOpenSource={() => onOpenItem(item)}
-                onVideoPress={attachmentIndex => onOpenItem(item, attachmentIndex)}
-                onSave={() => onSave(item)}
-                onToggleComments={() => onComment(item)}
-                onMenuPress={() => onMenu(item)}
-                onOpenAuthorProfile={
-                  isUserBroadcastSource(item)
-                    ? () => {
-                        void openAuthorProfile(item);
-                      }
-                    : undefined
-                }
-                onSubscribe={
-                  canSubscribe || subscribed
-                    ? async () => {
-                        await onSubscribe(enrichedSource, subscribed);
-                      }
-                    : undefined
-                }
-              />
-            );
-          })}
+          {/* Cards bleed to the screen edges - offsets the parent's
+              paddingHorizontal: 12 (FeedsDiscoverPage.tsx) so the default-view
+              feed cards render full width, matching the YouTube-style
+              reference, instead of sitting inset like the rest of the page. */}
+          <View style={{ gap: 12, marginHorizontal: -12 }}>
+            {list.map(item => {
+              const sourceId = item.source?.id ? String(item.source.id) : null;
+              const canSubscribe = Boolean(
+                item.source?.allow_subscribe && sourceId,
+              );
+              const subscribed = Boolean(item.source?.is_subscribed);
+              const enrichedSource: BroadcastSourceMeta = {
+                ...(item.source ?? {}),
+                type: item.source?.type ?? 'unknown',
+                allow_subscribe: canSubscribe,
+                is_subscribed: subscribed,
+              };
+              return (
+                <BroadcastFeedCard
+                  key={item.id}
+                  item={{
+                    ...item,
+                    source: {
+                      ...(item.source ?? {}),
+                      type: item.source?.type ?? 'unknown',
+                      allow_subscribe: canSubscribe,
+                      is_subscribed: subscribed,
+                    },
+                  }}
+                  onLike={() => onLike(item)}
+                  onShare={() => onShare(item)}
+                  onOpenSource={() => onOpenItem(item)}
+                  onVideoPress={attachmentIndex => onOpenItem(item, attachmentIndex)}
+                  onSave={() => onSave(item)}
+                  onToggleComments={() => onComment(item)}
+                  onMenuPress={() => onMenu(item)}
+                  onOpenAuthorProfile={
+                    isUserBroadcastSource(item)
+                      ? () => {
+                          void openAuthorProfile(item);
+                        }
+                      : undefined
+                  }
+                  onSubscribe={
+                    canSubscribe || subscribed
+                      ? async () => {
+                          await onSubscribe(enrichedSource, subscribed);
+                        }
+                      : undefined
+                  }
+                />
+              );
+            })}
+          </View>
 
           {loadingMore ? (
             <View

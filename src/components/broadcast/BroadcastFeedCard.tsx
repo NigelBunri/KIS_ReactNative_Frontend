@@ -1,6 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import LinearGradient from 'react-native-linear-gradient';
 import { useKISTheme } from '@/theme/useTheme';
+import { withAlpha } from '@/theme/constants';
 import CommentThreadPanel from '@/components/feeds/CommentThreadPanel';
 import { useResponsiveLayout } from '@/theme/responsive';
 import { KISIcon } from '@/constants/kisIcons';
@@ -172,7 +174,7 @@ export default function BroadcastFeedCard({
   onMessageCountChange,
   contextLabel,
 }: Props) {
-  const { palette, tokens } = useKISTheme();
+  const { palette, tokens, gradients } = useKISTheme();
   const responsive = useResponsiveLayout();
   const compact = responsive.isWatch || responsive.isCompactPhone;
   const styles = useMemo(() => makeStyles(tokens), [tokens]);
@@ -285,7 +287,16 @@ export default function BroadcastFeedCard({
       <View style={styles.headerRow}>
         <Image
           source={authorAvatarUri ? { uri: authorAvatarUri } : fallbackAvatar}
-          style={[styles.avatar, { backgroundColor: palette.bar, width: compact ? 36 : 44, height: compact ? 36 : 44, borderRadius: compact ? 14 : 16 }]}
+          style={[
+            styles.avatar,
+            {
+              backgroundColor: palette.bar,
+              width: compact ? 36 : 44,
+              height: compact ? 36 : 44,
+              borderRadius: compact ? 14 : 16,
+              shadowColor: palette.goldDeep ?? '#000',
+            },
+          ]}
         />
 
         <View style={{ flex: 1 }}>
@@ -382,7 +393,7 @@ export default function BroadcastFeedCard({
 
   // ───── Engagement row (icons + counts) — shared by both layouts. ─────
   const engagementBlock = (
-    <View style={[styles.engagementRow, { borderTopColor: palette.divider }, compact && { flexWrap: 'wrap', rowGap: 8 }]}>
+    <View style={[styles.engagementRow, { borderTopColor: withAlpha(palette.divider, 0.5) }, compact && { flexWrap: 'wrap', rowGap: 8 }]}>
       {onSave ? (
         <Pressable onPress={onSave} style={styles.engItem} hitSlop={10}>
           <KISIcon
@@ -446,15 +457,22 @@ export default function BroadcastFeedCard({
           onPress={onSubscribe ?? onOpenSource}
           style={[
             styles.subscribeBtn,
-            {
-              backgroundColor: isSubscribed ? palette.surface : palette.primarySoft,
-              borderColor: isSubscribed ? palette.danger : palette.primary,
-            },
+            isSubscribed
+              ? { backgroundColor: palette.surface, borderColor: palette.danger }
+              : styles.subscribeBtnGoldShadow,
           ]}
         >
+          {!isSubscribed ? (
+            <LinearGradient
+              colors={gradients.tabSelected as unknown as string[]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={[StyleSheet.absoluteFillObject, styles.subscribeBtnFill]}
+            />
+          ) : null}
           <Text
             style={{
-              color: isSubscribed ? palette.danger : palette.primaryStrong,
+              color: isSubscribed ? palette.danger : '#1a1400',
               fontWeight: '900',
             }}
           >
@@ -497,21 +515,20 @@ export default function BroadcastFeedCard({
 
   // ───── YouTube-style layout: video-forward items only (see hasVideo). ─────
   if (hasVideo) {
+    const ytPadStyle = { paddingHorizontal: compact ? 11 : 16 };
     return (
-      <View
-        style={[
-          styles.card,
-          { backgroundColor: palette.card, borderColor: palette.primaryStrong, padding: compact ? 11 : 16, borderRadius: compact ? 18 : 26 },
-        ]}
-      >
-        {headerBlock}
-        {titleBlock}
+      <View style={[styles.fullBleedCard, { backgroundColor: palette.card }]}>
+        <View style={[styles.ytPad, ytPadStyle, { paddingTop: compact ? 11 : 16 }]}>
+          {headerBlock}
+          {titleBlock}
+        </View>
 
         {!isMultiAttachment && activeAttachment ? (
           <View
             style={[
               styles.slideshowWrap,
-              { borderColor: palette.divider, backgroundColor: palette.surface, aspectRatio: compact ? 4 / 3 : 16 / 9 },
+              styles.slideshowWrapBleed,
+              { backgroundColor: palette.surface, aspectRatio: compact ? 4 / 3 : 16 / 9 },
             ]}
           >
             {inlinePlaying && activeAttachment.isVideo && activeAttachment.raw ? (
@@ -538,6 +555,18 @@ export default function BroadcastFeedCard({
               </Pressable>
             )}
 
+            {/* Bottom scrim - lifts the LIVE/duration badges and play
+                button off the raw thumbnail with a produced, cinematic
+                feel instead of flat overlays on bare pixels. Only over the
+                still poster, never over an actively playing video. */}
+            {!inlinePlaying ? (
+              <LinearGradient
+                colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.5)']}
+                style={styles.thumbScrim}
+                pointerEvents="none"
+              />
+            ) : null}
+
             {Boolean(item.is_live) ? (
               <View style={[styles.liveBadge, { backgroundColor: palette.danger }]}>
                 <Text style={styles.liveText}>LIVE</Text>
@@ -563,7 +592,13 @@ export default function BroadcastFeedCard({
                 accessibilityLabel="Play"
               >
                 <View style={styles.ytPlayCircle}>
-                  <KISIcon name="play" size={26} color="#fff" />
+                  <LinearGradient
+                    colors={gradients.tabSelected as unknown as string[]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={StyleSheet.absoluteFillObject}
+                  />
+                  <KISIcon name="play" size={24} color="#1a1400" />
                 </View>
               </Pressable>
             ) : null}
@@ -589,7 +624,7 @@ export default function BroadcastFeedCard({
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.ytStripContent}
+            contentContainerStyle={[styles.ytStripContent, ytPadStyle]}
           >
             {attachmentPreviews.map((preview, idx) => (
               <Pressable
@@ -618,9 +653,11 @@ export default function BroadcastFeedCard({
           </ScrollView>
         ) : null}
 
-        {ctaRowBlock}
-        {engagementBlock}
-        {commentBlock}
+        <View style={[styles.ytPad, ytPadStyle, { paddingBottom: compact ? 11 : 16 }]}>
+          {ctaRowBlock}
+          {engagementBlock}
+          {commentBlock}
+        </View>
       </View>
     );
   }
@@ -629,8 +666,8 @@ export default function BroadcastFeedCard({
   return (
     <View
       style={[
-        styles.card,
-        { backgroundColor: palette.card, borderColor: palette.primaryStrong, padding: compact ? 11 : 16, borderRadius: compact ? 18 : 26 },
+        styles.fullBleedCard,
+        { backgroundColor: palette.card, padding: compact ? 11 : 16 },
       ]}
     >
       {headerBlock}
@@ -838,17 +875,22 @@ export default function BroadcastFeedCard({
             onPress={onSubscribe ?? onOpenSource}
             style={[
               styles.subscribeBtn,
-              {
-                backgroundColor: isSubscribed
-                  ? palette.surface
-                  : palette.primarySoft,
-                borderColor: isSubscribed ? palette.danger : palette.primary,
-              },
+              isSubscribed
+                ? { backgroundColor: palette.surface, borderColor: palette.danger }
+                : styles.subscribeBtnGoldShadow,
             ]}
           >
+            {!isSubscribed ? (
+              <LinearGradient
+                colors={gradients.tabSelected as unknown as string[]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={[StyleSheet.absoluteFillObject, styles.subscribeBtnFill]}
+              />
+            ) : null}
             <Text
               style={{
-                color: isSubscribed ? palette.danger : palette.primaryStrong,
+                color: isSubscribed ? palette.danger : '#1a1400',
                 fontWeight: '900',
               }}
             >
@@ -883,7 +925,7 @@ export default function BroadcastFeedCard({
       </View>
 
       {/* ───── Engagement row (icons + counts like mockup bottom bar) ───── */}
-      <View style={[styles.engagementRow, { borderTopColor: palette.divider }, compact && { flexWrap: 'wrap', rowGap: 8 }]}>
+      <View style={[styles.engagementRow, { borderTopColor: withAlpha(palette.divider, 0.5) }, compact && { flexWrap: 'wrap', rowGap: 8 }]}>
         {onSave ? (
           <Pressable onPress={onSave} style={styles.engItem} hitSlop={10}>
             <KISIcon
@@ -973,16 +1015,19 @@ export default function BroadcastFeedCard({
 
 const makeStyles = (_tokens: any) =>
   StyleSheet.create({
-    card: {
-      borderWidth: 1,
-      borderRadius: 26,
-      padding: 16,
+    // No border/radius/shadow and no horizontal margin from the parent
+    // list (see FeedsMainListSection's card-list wrapper) - the default
+    // Feeds view is edge-to-edge, matching the YouTube-style reference,
+    // not a boxed/bordered card.
+    fullBleedCard: {
       gap: 10,
-      shadowColor: '#000',
-      shadowOpacity: 0.06,
-      shadowRadius: 14,
-      shadowOffset: { width: 0, height: 6 },
-      elevation: 2,
+    },
+
+    // Horizontal-only padding wrapper used to keep header/title/footer
+    // text readable while the thumbnail itself (slideshowWrapBleed) stays
+    // truly flush with the screen edges.
+    ytPad: {
+      gap: 10,
     },
 
     headerRow: {
@@ -995,6 +1040,10 @@ const makeStyles = (_tokens: any) =>
       width: 44,
       height: 44,
       borderRadius: 16,
+      shadowOpacity: 0.28,
+      shadowRadius: 6,
+      shadowOffset: { width: 0, height: 3 },
+      elevation: 3,
     },
 
     headerTopLine: {
@@ -1057,8 +1106,9 @@ const makeStyles = (_tokens: any) =>
     title: {
       fontSize: 18,
       fontWeight: '900',
-      letterSpacing: -0.2,
-      marginTop: 2,
+      letterSpacing: -0.3,
+      lineHeight: 23,
+      marginTop: 4,
     },
 
     bodyText: {
@@ -1074,6 +1124,13 @@ const makeStyles = (_tokens: any) =>
       width: '100%',
       aspectRatio: 16 / 9,
       borderWidth: 2,
+    },
+
+    // Overrides slideshowWrap's border/radius for the YouTube-style card's
+    // main thumbnail, which sits flush with the screen edges.
+    slideshowWrapBleed: {
+      borderRadius: 0,
+      borderWidth: 0,
     },
 
     slideshowPressable: {
@@ -1143,6 +1200,11 @@ const makeStyles = (_tokens: any) =>
       borderRadius: 10,
       paddingHorizontal: 10,
       paddingVertical: 6,
+      shadowColor: '#000',
+      shadowOpacity: 0.3,
+      shadowRadius: 5,
+      shadowOffset: { width: 0, height: 2 },
+      elevation: 3,
     },
 
     liveText: {
@@ -1159,6 +1221,11 @@ const makeStyles = (_tokens: any) =>
       borderRadius: 10,
       paddingHorizontal: 10,
       paddingVertical: 6,
+      shadowColor: '#000',
+      shadowOpacity: 0.3,
+      shadowRadius: 5,
+      shadowOffset: { width: 0, height: 2 },
+      elevation: 3,
     },
 
     playOverlay: {
@@ -1193,14 +1260,25 @@ const makeStyles = (_tokens: any) =>
     },
 
     ytPlayCircle: {
-      width: 56,
-      height: 56,
-      borderRadius: 28,
+      width: 58,
+      height: 58,
+      borderRadius: 29,
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: 'rgba(0,0,0,0.5)',
-      borderWidth: 1.5,
-      borderColor: 'rgba(255,255,255,0.6)',
+      overflow: 'hidden',
+      shadowColor: '#000',
+      shadowOpacity: 0.35,
+      shadowRadius: 10,
+      shadowOffset: { width: 0, height: 4 },
+      elevation: 6,
+    },
+
+    thumbScrim: {
+      position: 'absolute',
+      left: 0,
+      right: 0,
+      bottom: 0,
+      height: '55%',
     },
 
     ytStripContent: {
@@ -1249,6 +1327,24 @@ const makeStyles = (_tokens: any) =>
       paddingVertical: 10,
       alignItems: 'center',
       justifyContent: 'center',
+    },
+
+    // Not-yet-subscribed state: filled gold gradient instead of a flat
+    // tinted outline, with a matching soft shadow since the gradient
+    // itself is rendered as an absolute-fill child (overflow: hidden
+    // clips it to the pill).
+    subscribeBtnGoldShadow: {
+      borderWidth: 0,
+      overflow: 'hidden',
+      shadowColor: '#9A6A14',
+      shadowOpacity: 0.3,
+      shadowRadius: 8,
+      shadowOffset: { width: 0, height: 3 },
+      elevation: 4,
+    },
+
+    subscribeBtnFill: {
+      borderRadius: 999,
     },
 
     primaryPill: {
