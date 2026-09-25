@@ -166,19 +166,66 @@ const normalizeFeedItem = (item: BroadcastFeedItem): BroadcastFeedItem => ({
   viewer_saved: Boolean(item.viewer_saved),
 });
 
+// Caps how many items this hook keeps in memory per params combo (see
+// MAX_CACHED_FEED_ITEMS below) - past that, older items get trimmed off
+// the top as new pages load in at the bottom, so a long scrolling session
+// doesn't grow the in-memory list (and every full-bleed video card's
+// mounted weight) without bound.
+const MAX_CACHED_FEED_ITEMS = 150;
+
+type FeedSessionCacheEntry = {
+  items: BroadcastFeedItem[];
+  trending: TrendingClipItem[];
+  trendingFeeds: BroadcastFeedItem[];
+  nextUrl: string | null;
+  trimmedFromTop: boolean;
+};
+
+// Module-level (not component state) so it survives this hook unmounting
+// and remounting across navigation within the same app session - leaving
+// the Feeds tab and coming back re-renders from whatever's already here
+// instead of blanking the list and refetching from scratch. Cleared only
+// by the app process restarting, same lifetime as any other in-memory
+// singleton in this codebase (no AsyncStorage/disk persistence - this is
+// session-scoped, not meant to survive an app kill).
+const feedSessionCache = new Map<string, FeedSessionCacheEntry>();
+
 export default function useFeedsData({ q = '', code = null }: Params) {
-  const [items, setItems] = useState<BroadcastFeedItem[]>([]);
-  const [trending, setTrending] = useState<TrendingClipItem[]>([]);
-  const [trendingFeeds, setTrendingFeeds] = useState<BroadcastFeedItem[]>([]);
+  // Computed inline (not via the paramsKey useMemo below, which doesn't
+  // exist yet at this point in the function) purely to seed the lazy
+  // initializers below from any cached session for this exact q/code combo.
+  const initialCacheKey = `${q}::${code ?? ''}`;
+  const initialCached = feedSessionCache.get(initialCacheKey);
+
+  const [items, setItems] = useState<BroadcastFeedItem[]>(initialCached?.items ?? []);
+  const [trending, setTrending] = useState<TrendingClipItem[]>(initialCached?.trending ?? []);
+  const [trendingFeeds, setTrendingFeeds] = useState<BroadcastFeedItem[]>(initialCached?.trendingFeeds ?? []);
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
-  const nextUrlRef = useRef<string | null>(null);
+  const nextUrlRef = useRef<string | null>(initialCached?.nextUrl ?? null);
+  const trimmedFromTopRef = useRef<boolean>(initialCached?.trimmedFromTop ?? false);
   const mountedRef = useRef(true);
-  const itemsRef = useRef<BroadcastFeedItem[]>([]);
+  const itemsRef = useRef<BroadcastFeedItem[]>(initialCached?.items ?? []);
 
   const paramsKey = useMemo(() => `${q}::${code ?? ''}`, [q, code]);
+
+  // Mirrors current state into the module-level session cache so the next
+  // mount for this exact params combo (e.g. navigating back to the Feeds
+  // tab) picks up right where this one left off.
+  const persistCache = useCallback(
+    (nextItems: BroadcastFeedItem[], nextTrendingFeeds: BroadcastFeedItem[], nextTrending: TrendingClipItem[]) => {
+      feedSessionCache.set(paramsKey, {
+        items: nextItems,
+        trending: nextTrending,
+        trendingFeeds: nextTrendingFeeds,
+        nextUrl: nextUrlRef.current,
+        trimmedFromTop: trimmedFromTopRef.current,
+      });
+    },
+    [paramsKey],
+  );
 
   const applyItems = useCallback((nextItems: BroadcastFeedItem[]) => {
     itemsRef.current = nextItems;
@@ -186,7 +233,11 @@ export default function useFeedsData({ q = '', code = null }: Params) {
     const topTrending = getTopTrendingFeeds(nextItems);
     setTrendingFeeds(topTrending);
     setTrending(topTrending.map(toTrendingClipItem));
-  }, []);
+    // A fresh top page fully replaces the window, so whatever was
+    // previously trimmed off the top no longer applies.
+    trimmedFromTopRef.current = false;
+    persistCache(nextItems, topTrending, topTrending.map(toTrendingClipItem));
+  }, [persistCache]);
 
   const loadFirstPage = useCallback(async () => {
     setLoading(true);
@@ -308,16 +359,40 @@ export default function useFeedsData({ q = '', code = null }: Params) {
         }
       }
       if (!mountedRef.current) return prev;
-      itemsRef.current = merged;
-      const topTrending = getTopTrendingFeeds(merged);
+
+      // Keep the in-memory window bounded - trim the oldest (topmost)
+      // items once a new page pushes past the cap, same idea as a video
+      // player only keeping a rolling buffer instead of the whole file.
+      // The trimmed content isn't gone forever: scrolling back up near the
+      // top re-triggers loadFirstPage (see FeedsDiscoverPage's onScroll
+      // and refillFromTopIfTrimmed below), which refetches a fresh page 1.
+      let windowed = merged;
+      if (merged.length > MAX_CACHED_FEED_ITEMS) {
+        windowed = merged.slice(merged.length - MAX_CACHED_FEED_ITEMS);
+        trimmedFromTopRef.current = true;
+      }
+
+      itemsRef.current = windowed;
+      const topTrending = getTopTrendingFeeds(windowed);
       setTrendingFeeds(topTrending);
       setTrending(topTrending.map(toTrendingClipItem));
-      return merged;
+      nextUrlRef.current = page.next ?? null;
+      persistCache(windowed, topTrending, topTrending.map(toTrendingClipItem));
+      return windowed;
     });
 
-    nextUrlRef.current = page.next ?? null;
     setLoadingMore(false);
-  }, [loadingMore]);
+  }, [loadingMore, persistCache]);
+
+  // Re-fetches page 1 when the user scrolls back up near the top of a
+  // window that's had its original top trimmed off (see loadMore above) -
+  // that content isn't cached indefinitely, so "scrolling back up" means a
+  // real (usually fast, since it's a single page) refetch rather than a
+  // local restore. A no-op when nothing's been trimmed.
+  const refillFromTopIfTrimmed = useCallback(() => {
+    if (!trimmedFromTopRef.current || loading) return;
+    void loadFirstPage();
+  }, [loading, loadFirstPage]);
 
   const reactToItem = useCallback(
     async (itemId: string, emoji: string = '❤️') => {
@@ -554,6 +629,7 @@ export default function useFeedsData({ q = '', code = null }: Params) {
     refreshing,
     refreshAll,
     loadMore,
+    refillFromTopIfTrimmed,
     toggleSubscribe,
     reactToItem,
     recordShare,

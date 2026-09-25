@@ -127,6 +127,7 @@ export default function FeedsDiscoverPage({
     refreshing,
     refreshAll,
     loadMore,
+    refillFromTopIfTrimmed,
     toggleSubscribe,
     reactToItem,
     recordShare,
@@ -559,6 +560,13 @@ export default function FeedsDiscoverPage({
           contentSize.height - pad
         ) {
           loadMore();
+        }
+        // Scrolled back near the very top - if loadMore ever trimmed the
+        // original top off the in-memory window (useFeedsData's 150-item
+        // cap), this is a no-op unless that actually happened, in which
+        // case it refetches a fresh page 1 instead of showing a gap.
+        if (contentOffset.y < 100) {
+          refillFromTopIfTrimmed();
         }
       }}
       scrollEventThrottle={16}
