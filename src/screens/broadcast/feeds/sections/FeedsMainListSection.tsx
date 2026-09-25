@@ -41,6 +41,7 @@ export type BroadcastSourceMeta = {
   type: string;
   id?: string | null;
   name?: string;
+  avatar_url?: string | null;
   verified?: boolean;
   allow_subscribe?: boolean;
   is_subscribed?: boolean;
@@ -70,6 +71,7 @@ export type BroadcastFeedItem = {
     id?: string;
     bio?: string;
     headline?: string;
+    is_go?: boolean;
   };
   created_at?: string;
   broadcasted_at?: string;

@@ -2,6 +2,7 @@ export type BroadcastSourceMeta = {
   type: string;
   id?: string | null;
   name?: string;
+  avatar_url?: string | null;
   conversation_id?: string;
   join_policy?: string;
   is_member?: boolean;
@@ -34,6 +35,7 @@ export type BroadcastFeedItem = {
     bio?: string;
     headline?: string;
     summary?: string;
+    is_go?: boolean;
   };
   created_at?: string;
   broadcasted_at?: string;

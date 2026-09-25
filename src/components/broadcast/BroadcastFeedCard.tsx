@@ -36,6 +36,7 @@ type BroadcastSourceMeta = {
     | string;
   id?: string | null;
   name?: string;
+  avatar_url?: string | null;
   conversation_id?: string;
   join_policy?: string;
   is_member?: boolean;
@@ -67,6 +68,7 @@ export type BroadcastFeedItem = {
     bio?: string;
     headline?: string;
     summary?: string;
+    is_go?: boolean;
   };
   created_at?: string;
   broadcasted_at?: string;
@@ -304,6 +306,16 @@ export default function BroadcastFeedCard({
   const onPressPrimary = onVideoPress
     ? () => onVideoPress()
     : onOpenMarket ?? onOpenSource;
+
+  // Header image priority: the official KIS mark only for the platform's
+  // own GO account (never as a generic "no avatar" fallback - see
+  // author.is_go's doc on the backend), then whoever actually owns this
+  // post's identity - the poster's own profile photo for a personal post,
+  // or the channel/community/partner/shop's logo for everything else -
+  // and only once none of those resolve to a real image does this fall
+  // back to a placeholder emoji instead of silently reusing the KIS logo
+  // for content KIS didn't post.
+  const isGoAuthor = Boolean((item.author as any)?.is_go);
   const authorAvatarUri = resolveBackendAssetUrl(
     item.author?.avatar_url ??
       (item as any)?.author?.avatarUrl ??
@@ -313,24 +325,45 @@ export default function BroadcastFeedCard({
       (item as any)?.profile?.avatar ??
       null,
   );
+  const sourceAvatarUri = resolveBackendAssetUrl(
+    item.source?.avatar_url ?? null,
+  );
+  const resolvedAvatarUri = isUserSource ? authorAvatarUri : sourceAvatarUri ?? authorAvatarUri;
+  const placeholderEmoji = useMemo(() => {
+    const sourceType = String(item.source?.type ?? '').toLowerCase();
+    if (sourceType.includes('channel')) return '📺';
+    if (sourceType.includes('community')) return '👥';
+    if (sourceType.includes('partner')) return '🤝';
+    if (sourceType.includes('market') || sourceType.includes('shop')) return '🛍️';
+    if (sourceType.includes('education') || sourceType.includes('lesson')) return '🎓';
+    if (sourceType.includes('health')) return '🏥';
+    if (sourceType.includes('live')) return '🔴';
+    return '👤';
+  }, [item.source?.type]);
 
   // ───── Header (avatar + source + time + menu) — shared by both the
   // YouTube-style video card and the original social-card layout below. ─────
+  const avatarSizeStyle = [
+    styles.avatar,
+    {
+      backgroundColor: palette.bar,
+      width: compact ? 36 : 44,
+      height: compact ? 36 : 44,
+      borderRadius: compact ? 14 : 16,
+      shadowColor: palette.goldDeep ?? '#000',
+    },
+  ];
   const headerBlock = (
       <View style={styles.headerRow}>
-        <Image
-          source={authorAvatarUri ? { uri: authorAvatarUri } : fallbackAvatar}
-          style={[
-            styles.avatar,
-            {
-              backgroundColor: palette.bar,
-              width: compact ? 36 : 44,
-              height: compact ? 36 : 44,
-              borderRadius: compact ? 14 : 16,
-              shadowColor: palette.goldDeep ?? '#000',
-            },
-          ]}
-        />
+        {isGoAuthor ? (
+          <Image source={fallbackAvatar} style={avatarSizeStyle} />
+        ) : resolvedAvatarUri ? (
+          <Image source={{ uri: resolvedAvatarUri }} style={avatarSizeStyle} />
+        ) : (
+          <View style={[avatarSizeStyle, styles.avatarEmojiWrap]}>
+            <Text style={{ fontSize: compact ? 16 : 20 }}>{placeholderEmoji}</Text>
+          </View>
+        )}
 
         <View style={{ flex: 1 }}>
           <View style={styles.headerTopLine}>
@@ -1101,6 +1134,11 @@ const makeStyles = (_tokens: any) =>
       shadowRadius: 6,
       shadowOffset: { width: 0, height: 3 },
       elevation: 3,
+    },
+
+    avatarEmojiWrap: {
+      alignItems: 'center',
+      justifyContent: 'center',
     },
 
     headerTopLine: {
