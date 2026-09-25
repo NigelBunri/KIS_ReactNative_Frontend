@@ -23,8 +23,9 @@ const SECTIONS: Section[] = [
     id: '1',
     title: '1. Our Commitment to Your Privacy',
     body: [
-      `KIS ("the App," "the Platform," "we," "us," or "our") is a faith-centered community platform connecting believers through messaging, calls, church life, health resources, marketplace, civic tools, and more. This Privacy Policy explains what information we collect, how we use it, who we share it with, and the choices and rights you have.`,
-      `This Privacy Policy is incorporated by reference into our Terms & Conditions. If you do not agree with this Policy, please do not use the Platform.`,
+      `KIS ("the App," "the Platform," "we," "us," or "our") is a Christian, faith-based community platform connecting believers through messaging, calls, church life, health resources, marketplace, civic tools, and more. This Privacy Policy explains what information we collect, how we use it, who we share it with, and the choices and rights you have.`,
+      `KIS is built specifically to serve the global Christian community. Messaging, community channels, broadcasts, the Testimony Network, worship and teaching content, marketplace listings, educational resources, and other features across the Platform are created, moderated, and experienced within a Christian, biblical worldview, and may include prayer, Scripture, worship, testimonies of faith, and other Christian religious content and expression. By creating an account and using KIS, you acknowledge this Christian orientation and agree to engage with the Platform, including its Christian religious content, on that basis.`,
+      `This Privacy Policy is incorporated by reference into our Terms & Conditions. If you do not agree with this Policy — including the Christian nature of the Platform and its content described above — please do not use the Platform.`,
       `Because KIS brings together sensitive areas of life — faith, family, health, and finances — we hold ourselves to a higher standard of care with your data than a typical social app. We collect only what is needed to provide each feature, and we do not sell your personal data to third parties for advertising.`,
     ],
   },
