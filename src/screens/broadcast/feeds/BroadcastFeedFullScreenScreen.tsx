@@ -84,7 +84,7 @@ function FeedFullScreenCard({
 }: CardProps) {
   const { palette } = useKISTheme();
   const { width: screenWidth } = useWindowDimensions();
-  const { bottom: bottomInset } = useSafeAreaInsets();
+  const { top: topInset, bottom: bottomInset } = useSafeAreaInsets();
   const navigation = useNavigation<Nav>();
 
   const attachmentPreviews = useMemo(() => {
@@ -234,7 +234,7 @@ function FeedFullScreenCard({
       {trueFullView ? (
         <Pressable
           onPress={onToggleRotate}
-          style={[styles.rotateBtn, { top: 16, backgroundColor: 'rgba(0,0,0,0.5)' }]}
+          style={[styles.rotateBtn, { top: topInset + 12, backgroundColor: 'rgba(0,0,0,0.5)' }]}
           hitSlop={10}
           accessibilityRole="button"
           accessibilityLabel="Rotate"
