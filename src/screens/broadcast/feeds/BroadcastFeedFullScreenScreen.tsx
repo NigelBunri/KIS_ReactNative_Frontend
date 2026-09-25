@@ -101,19 +101,24 @@ function FeedFullScreenCard({
   const activeAttachment = attachmentPreviews[activeIndex] ?? null;
   const isMultiAttachment = attachmentPreviews.length > 1;
 
-  // Same neighbor-prefetch as BroadcastFeedCard's slideshow - warms the
-  // image the user is most likely to tap next in the floating attachment
-  // strip so it's not a visible cache-miss when they get there.
+  // Same whole-set prefetch as BroadcastFeedCard's slideshow - warms every
+  // OTHER image in this item as soon as it renders, not just the one next
+  // to whichever slide is active, since a one-ahead prefetch only wins if
+  // the user waits at least as long as that fetch takes before tapping
+  // the strip again.
   useEffect(() => {
     if (attachmentPreviews.length < 2) return;
-    const neighborIndexes = [activeIndex + 1, activeIndex - 1];
-    neighborIndexes.forEach(idx => {
-      const preview = attachmentPreviews[idx];
-      if (!preview || preview.isVideo) return;
+    attachmentPreviews.forEach((preview, idx) => {
+      if (idx === activeIndex || preview.isVideo) return;
       const uri = preview.previewUri ?? preview.url;
       if (uri) Image.prefetch(uri).catch(() => {});
     });
-  }, [activeIndex, attachmentPreviews]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [attachmentPreviews]);
+
+  // Drives a visible spinner over the current image instead of a blank
+  // tile while it loads - see BroadcastFeedCard's slideImageLoading doc.
+  const [slideImageLoading, setSlideImageLoading] = useState(false);
 
   const [commentsLoading, setCommentsLoading] = useState(false);
   const handlePressComment = useCallback(async () => {
@@ -167,11 +172,21 @@ function FeedFullScreenCard({
           onDoubleTapMiddle={handleDoubleTapLike}
         />
       ) : activeAttachment?.previewUri || activeAttachment?.url ? (
-        <Image
-          source={{ uri: activeAttachment.previewUri ?? activeAttachment.url! }}
-          style={StyleSheet.absoluteFillObject}
-          resizeMode="cover"
-        />
+        <>
+          <Image
+            source={{ uri: activeAttachment.previewUri ?? activeAttachment.url! }}
+            style={StyleSheet.absoluteFillObject}
+            resizeMode="cover"
+            onLoadStart={() => setSlideImageLoading(true)}
+            onLoad={() => setSlideImageLoading(false)}
+            onError={() => setSlideImageLoading(false)}
+          />
+          {slideImageLoading ? (
+            <View style={[StyleSheet.absoluteFillObject, styles.slideLoadingOverlay]} pointerEvents="none">
+              <ActivityIndicator color="#fff" />
+            </View>
+          ) : null}
+        </>
       ) : (
         <View style={[StyleSheet.absoluteFillObject, { backgroundColor: palette.surfaceElevated, alignItems: 'center', justifyContent: 'center' }]}>
           <KISIcon name="play" size={48} color={palette.border} />
@@ -421,6 +436,7 @@ const styles = StyleSheet.create({
   card: { overflow: 'hidden', backgroundColor: '#000' },
   rotateOuter: { alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
   overlayScrim: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.06)' },
+  slideLoadingOverlay: { alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.15)' },
   doubleTapHeart: { position: 'absolute', top: '35%', left: '50%', marginLeft: -40, zIndex: 30 },
   backBtn: {
     position: 'absolute',

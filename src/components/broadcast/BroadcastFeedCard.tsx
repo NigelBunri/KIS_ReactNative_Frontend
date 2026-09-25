@@ -250,28 +250,38 @@ export default function BroadcastFeedCard({
     setActiveAttachmentIndex(0);
   }, [attachmentPreviews.length]);
 
-  // Warms the OS image cache for whichever slide the user is most likely
-  // to land on next - the prev/next arrows below only ever move one step,
-  // so by the time that tap happens the neighbor's image has usually
-  // already finished loading in the background instead of popping in.
-  // Same pattern as UpdatesTab.tsx's status-viewer prefetch. Videos aren't
-  // prefetchable this way (their startup latency is real buffering, not a
-  // cache-miss), so only image attachments are warmed.
+  // Warms the OS image cache for every OTHER slide in this item as soon as
+  // it renders, not just the one next to whichever slide is active - a
+  // one-ahead prefetch only wins if the user waits at least as long as
+  // that fetch takes before tapping again, and multi-image posts are
+  // usually flipped through faster than that. Attachment counts here are
+  // small (a handful of images per post), so warming the whole set is
+  // cheap. Same pattern as UpdatesTab.tsx's status-viewer prefetch. Videos
+  // aren't prefetchable this way (their startup latency is real
+  // buffering, not a cache-miss), so only image attachments are warmed.
   useEffect(() => {
     if (attachmentPreviews.length < 2) return;
-    const neighborIndexes = [activeAttachmentIndex + 1, activeAttachmentIndex - 1];
-    neighborIndexes.forEach(idx => {
-      const preview = attachmentPreviews[idx];
-      if (!preview || preview.isVideo) return;
+    attachmentPreviews.forEach((preview, idx) => {
+      if (idx === activeAttachmentIndex || preview.isVideo) return;
       const uri = preview.previewUri ?? preview.url;
       if (uri) Image.prefetch(uri).catch(() => {});
     });
-  }, [activeAttachmentIndex, attachmentPreviews]);
+    // Only re-run when the attachment SET changes, not on every index
+    // change - the whole set is already warmed after the first pass.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [attachmentPreviews]);
 
   useEffect(() => {
     setAuthorBioExpanded(false);
     setInlinePlaying(false);
   }, [item.id]);
+
+  // Drives a visible spinner over the slideshow's current image instead of
+  // a blank tile while it loads - Image's own onLoadStart/onLoad fire
+  // again whenever `source.uri` changes even though this is the same
+  // mounted element, so this doesn't need to track the active index
+  // itself.
+  const [slideImageLoading, setSlideImageLoading] = useState(false);
 
   const activeAttachment = attachmentPreviews[activeAttachmentIndex];
   const durationLabel =
@@ -785,12 +795,22 @@ export default function BroadcastFeedCard({
           ) : (
             <Pressable onPress={onPressPrimary} style={styles.slideshowPressable}>
               {activeAttachment.previewUri || activeAttachment.url ? (
-                <Image
-                  source={{
-                    uri: activeAttachment.previewUri ?? activeAttachment.url!,
-                  }}
-                  style={styles.slideshowImage}
-                />
+                <>
+                  <Image
+                    source={{
+                      uri: activeAttachment.previewUri ?? activeAttachment.url!,
+                    }}
+                    style={styles.slideshowImage}
+                    onLoadStart={() => setSlideImageLoading(true)}
+                    onLoad={() => setSlideImageLoading(false)}
+                    onError={() => setSlideImageLoading(false)}
+                  />
+                  {slideImageLoading ? (
+                    <View style={styles.slideLoadingOverlay} pointerEvents="none">
+                      <ActivityIndicator color="#fff" />
+                    </View>
+                  ) : null}
+                </>
               ) : (
                 <View
                   style={[
@@ -1269,6 +1289,14 @@ const makeStyles = (_tokens: any) =>
       ...StyleSheet.absoluteFillObject,
       alignItems: 'center',
       justifyContent: 'center',
+      zIndex: 2,
+    },
+
+    slideLoadingOverlay: {
+      ...StyleSheet.absoluteFillObject,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: 'rgba(0,0,0,0.15)',
       zIndex: 2,
     },
 
