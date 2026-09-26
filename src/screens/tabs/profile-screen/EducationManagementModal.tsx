@@ -2414,7 +2414,7 @@ export function EducationManagementModal(props: EducationManagementModalProps) {
   const fetchManageablePartners = useCallback(async () => {
     setManageablePartnersLoading(true);
     try {
-      const response = await getRequest(ROUTES.broadcasts.partners.list, {
+      const response = await getRequest(ROUTES.partners.list, {
         errorMessage: 'Unable to load your partner organizations.',
       });
       if (!response?.success) return;

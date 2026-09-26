@@ -269,7 +269,7 @@ export default function ChannelStudioScreen({ legacyFeeds, liveCount, expiresAt,
             .map((institution: any) => ({ id: String(institution.id), name: String(institution.name || 'Institution') })),
         );
       } else if (ownerType === 'partner') {
-        const response = await getRequest(ROUTES.broadcasts.partners.list, { errorMessage: '' });
+        const response = await getRequest(ROUTES.partners.list, { errorMessage: '' });
         const rows = (response as any)?.data?.results ?? (response as any)?.data ?? [];
         const list = Array.isArray(rows) ? rows : [];
         setOwnerOptions(

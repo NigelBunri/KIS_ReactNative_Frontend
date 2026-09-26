@@ -1695,7 +1695,7 @@ export default function ProfileScreen() {
   const fetchManageableShopPartners = useCallback(async () => {
     setManageableShopPartnersLoading(true);
     try {
-      const response = await getRequest(ROUTES.broadcasts.partners.list, {
+      const response = await getRequest(ROUTES.partners.list, {
         errorMessage: 'Unable to load your partner organizations.',
       });
       if (!response?.success) return;
