@@ -1437,6 +1437,13 @@ function AppContent() {
                   UserProfile: 'profiles/:id',
                   ProfileByHandle: 'u/:handle',
 
+                  EducationHome: 'education',
+                  EducationMyLearning: 'education/my-learning',
+                  EducationCertificates: 'education/certificates',
+                  EducationInstitutionPicker: 'education/institutions',
+                  EducationCourseDetail: 'education/courses/:contentId',
+                  EducationInstitutionDashboard: 'education/institutions/:institutionId',
+
                   MainTabs: {
                     screens: {
                       Messages: 'messages',

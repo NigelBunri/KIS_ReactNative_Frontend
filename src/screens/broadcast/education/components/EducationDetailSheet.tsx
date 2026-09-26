@@ -35,6 +35,15 @@ import {
   EducationLearnerInsights,
   EducationProgress,
 } from '@/screens/broadcast/education/api/education.models';
+// Extracted to utils/materialPreview.ts (Education UX v2, Phase 2) so
+// LearningPlayerScreen renders material kind/mime the same way this sheet
+// always has, instead of a second copy.
+import {
+  buildProtectedSource,
+  toText,
+  inferMaterialMime,
+  inferMaterialKind,
+} from '@/screens/broadcast/education/utils/materialPreview';
 
 type LearnerContent = EducationContentItem & {
   detailLoading?: boolean;
@@ -97,47 +106,7 @@ const formatSeatLimit = (value?: number | null) => {
   return `${value} seats`;
 };
 
-const buildProtectedSource = (
-  uri?: string | null,
-  headers?: Record<string, string>,
-) => {
-  if (!uri) return undefined;
-  if (headers && Object.keys(headers).length > 0) {
-    return { uri, headers };
-  }
-  return { uri };
-};
-
-const toText = (value: any) => String(value ?? '').trim();
 const ACTIVE_ENROLLMENT_STATUSES = new Set(['enrolled', 'completed']);
-
-const inferMaterialMime = (payload: any) => {
-  const rawMime = toText(
-    payload?.resource_mime_type || payload?.resource_type || payload?.mime_type,
-  ).toLowerCase();
-  if (rawMime) return rawMime;
-  const source = toText(
-    payload?.resource_name ||
-      payload?.name ||
-      payload?.title ||
-      payload?.resource_url,
-  ).toLowerCase();
-  if (source.endsWith('.pdf')) return 'application/pdf';
-  if (/\.(png|jpg|jpeg|gif|webp|bmp|heic|heif|svg)$/.test(source))
-    return 'image/*';
-  if (/\.(mp4|mov|m4v|webm|avi|mkv|m3u8)$/.test(source)) return 'video/*';
-  if (/\.(mp3|wav|aac|m4a|ogg|oga|flac)$/.test(source)) return 'audio/*';
-  return toText(payload?.kind).toLowerCase();
-};
-
-const inferMaterialKind = (payload: any) => {
-  const mime = inferMaterialMime(payload);
-  if (mime.includes('image')) return 'image';
-  if (mime.includes('video')) return 'video';
-  if (mime.includes('audio')) return 'audio';
-  if (mime.includes('pdf')) return 'pdf';
-  return toText(payload?.kind).toLowerCase() || 'document';
-};
 
 const renderOutcomes = (outcomes?: EducationCourse['outcomes'], palette?: any) => {
   if (!outcomes?.length) return null;

@@ -2,18 +2,19 @@
 //
 // Education UX v2 — real "Course Builder" destination replacing the
 // module-list -> detail -> curriculum-workspace path inside
-// EducationManagementModal.tsx for the course entity specifically (other
-// entities' deepest per-record forms — e.g. a Program's own detail page —
-// are not yet migrated; see the v2 architecture note). Internal tabs
-// (Details/Curriculum/Content/Assessments/Live/Settings) rather than six
-// separate stack screens, since they all operate on the same course and a
-// tabbed single destination is the right shape here, not six navigations
-// for one editing session.
+// EducationManagementModal.tsx for the course entity (see the v2
+// architecture note for the full capability migration matrix). Internal
+// tabs (Details/Curriculum/Content/Assessments/Live/Settings) rather than
+// six separate stack screens, since they all operate on the same course
+// and a tabbed single destination is the right shape here, not six
+// navigations for one editing session. Content/Assessments/Live are real
+// editors (course-builder/ContentEditor.tsx, AssessmentsEditor.tsx,
+// LiveEditor.tsx), not pointers back to Curriculum.
 //
-// Curriculum tab is the highest-value piece per the v2 brief: modules with
-// a real "+ Add content" flow that creates a lesson/material/class
-// session/assessment/event AND links it into the module in one step,
-// instead of separate CRUD screens per entity.
+// Curriculum tab creates content AND links it into a module in one step
+// ("+ Add content"); the Content/Assessments/Live tabs are for editing an
+// item's own fields (lesson body text, quiz questions, session schedule)
+// after it exists.
 import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, Text, View } from 'react-native';
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
@@ -28,6 +29,9 @@ import ROUTES from '@/network';
 import { getRequest } from '@/network/get';
 import { postRequest } from '@/network/post';
 import { patchRequest } from '@/network/patch';
+import ContentEditor from '@/screens/education/provider/course-builder/ContentEditor';
+import AssessmentsEditor from '@/screens/education/provider/course-builder/AssessmentsEditor';
+import LiveEditor from '@/screens/education/provider/course-builder/LiveEditor';
 import type { RootStackParamList } from '@/navigation/types';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
@@ -76,6 +80,10 @@ export default function CourseBuilderScreen() {
   const [priceAmount, setPriceAmount] = useState('0');
   const [durationMinutes, setDurationMinutes] = useState('0');
   const [status, setStatus] = useState<'draft' | 'published' | 'archived'>('draft');
+  const [programId, setProgramId] = useState<string | null>(null);
+  const [programs, setPrograms] = useState<any[]>([]);
+  const [newProgramTitle, setNewProgramTitle] = useState('');
+  const [creatingProgram, setCreatingProgram] = useState(false);
 
   // Curriculum state
   const [modules, setModules] = useState<any[]>([]);
@@ -97,10 +105,37 @@ export default function CourseBuilderScreen() {
           setPriceAmount(String(course.price_amount ?? 0));
           setDurationMinutes(String(course.duration_minutes ?? 0));
           setStatus(course.status ?? 'draft');
+          setProgramId(course.program?.id ?? course.program_id ?? null);
         }
       })
       .finally(() => setLoading(false));
   }, [institutionId, courseId]);
+
+  useEffect(() => {
+    getRequest(ROUTES.broadcasts.educationInstitutionPrograms(institutionId), { forceNetwork: true }).then(response => {
+      setPrograms(response?.data?.programs ?? []);
+    });
+  }, [institutionId]);
+
+  const createProgram = useCallback(async () => {
+    if (!newProgramTitle.trim()) return;
+    setCreatingProgram(true);
+    try {
+      const response = await postRequest(
+        ROUTES.broadcasts.educationInstitutionPrograms(institutionId),
+        { title: newProgramTitle.trim(), status: 'published' },
+        { errorMessage: 'Unable to create program.' },
+      );
+      const created = response?.data?.program;
+      if (created?.id) {
+        setPrograms(prev => [...prev, created]);
+        setProgramId(created.id);
+        setNewProgramTitle('');
+      }
+    } finally {
+      setCreatingProgram(false);
+    }
+  }, [newProgramTitle, institutionId]);
 
   const loadCurriculum = useCallback(async () => {
     if (!courseId) return;
@@ -131,6 +166,7 @@ export default function CourseBuilderScreen() {
         price_amount: Number(priceAmount) || 0,
         duration_minutes: Number(durationMinutes) || 0,
         status,
+        program_id: programId || null,
       };
       const response = courseId
         ? await patchRequest(ROUTES.broadcasts.educationInstitutionCourse(institutionId, courseId), body, { errorMessage: 'Unable to save course.' })
@@ -148,7 +184,7 @@ export default function CourseBuilderScreen() {
     } finally {
       setSaving(false);
     }
-  }, [title, summary, description, priceAmount, durationMinutes, status, courseId, institutionId]);
+  }, [title, summary, description, priceAmount, durationMinutes, status, programId, courseId, institutionId]);
 
   const createModule = useCallback(async () => {
     if (!courseId) return;
@@ -292,6 +328,32 @@ export default function CourseBuilderScreen() {
                 </View>
               </View>
               <View>
+                <FieldLabel>Program (optional)</FieldLabel>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
+                  <Pressable
+                    onPress={() => setProgramId(null)}
+                    style={{ paddingHorizontal: 12, paddingVertical: 7, borderRadius: 999, borderWidth: 1, borderColor: !programId ? palette.primary : palette.border, backgroundColor: !programId ? palette.primarySoft : 'transparent' }}
+                  >
+                    <Text style={{ fontSize: 12, fontWeight: '700', color: !programId ? palette.primaryStrong : palette.subtext }}>None</Text>
+                  </Pressable>
+                  {programs.map(program => (
+                    <Pressable
+                      key={program.id}
+                      onPress={() => setProgramId(program.id)}
+                      style={{ paddingHorizontal: 12, paddingVertical: 7, borderRadius: 999, borderWidth: 1, borderColor: programId === program.id ? palette.primary : palette.border, backgroundColor: programId === program.id ? palette.primarySoft : 'transparent' }}
+                    >
+                      <Text style={{ fontSize: 12, fontWeight: '700', color: programId === program.id ? palette.primaryStrong : palette.subtext }} numberOfLines={1}>{program.title}</Text>
+                    </Pressable>
+                  ))}
+                </ScrollView>
+                <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
+                  <View style={{ flex: 1 }}>
+                    <KISTextInput placeholder="New program name" value={newProgramTitle} onChangeText={setNewProgramTitle} />
+                  </View>
+                  <KISButton title={creatingProgram ? '…' : 'Add'} size="sm" disabled={creatingProgram} onPress={() => void createProgram()} />
+                </View>
+              </View>
+              <View>
                 <FieldLabel>Status</FieldLabel>
                 <View style={{ flexDirection: 'row', gap: 8 }}>
                   {(['draft', 'published'] as const).map(s => (
@@ -390,14 +452,9 @@ export default function CourseBuilderScreen() {
             </View>
           ) : null}
 
-          {tab === 'content' || tab === 'assessments' || tab === 'live' ? (
-            <View style={{ padding: 18, borderRadius: 14, borderWidth: 1, borderColor: palette.border, backgroundColor: palette.surface }}>
-              <Text style={{ color: palette.subtext, textAlign: 'center' }}>
-                Use the Curriculum tab's "+ Add content" to add {tab === 'assessments' ? 'quizzes' : tab === 'live' ? 'live classes' : 'lessons and materials'} —
-                everything you add there shows up here and in the course automatically.
-              </Text>
-            </View>
-          ) : null}
+          {tab === 'content' && courseId ? <ContentEditor institutionId={institutionId} courseId={courseId} /> : null}
+          {tab === 'assessments' && courseId ? <AssessmentsEditor institutionId={institutionId} courseId={courseId} /> : null}
+          {tab === 'live' && courseId ? <LiveEditor institutionId={institutionId} courseId={courseId} /> : null}
 
           {tab === 'settings' ? (
             <View style={{ gap: 12 }}>

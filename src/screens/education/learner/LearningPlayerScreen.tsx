@@ -2,11 +2,11 @@
 //
 // Education UX v2 — real "Learning Player" destination for consuming one
 // curriculum item (lesson, material, class session, assessment, event, or
-// broadcast). Deliberately narrower than EducationDetailSheet's inline
-// item viewer (untouched — see that file): rich in-line PDF/video preview
-// is not reimplemented here, materials open via the device's own
-// viewer/browser instead. See the v2 architecture note's "Known
-// limitations" for exactly what that trades off.
+// broadcast). Phase 2: renders lesson-attached materials and standalone
+// material items with the same rich inline video/PDF/image preview
+// EducationDetailSheet uses (see shared/MaterialViewer.tsx) rather than
+// handing everything off to the device browser — only genuinely
+// unsupported file types fall back to an explicit "Open" action.
 //
 // Backend note: EducationContentItemActionView only supports
 // `mark_attended` (class sessions) and the three assessment actions
@@ -23,10 +23,12 @@ import { useKISTheme } from '@/theme/useTheme';
 import { useResponsiveLayout } from '@/theme/responsive';
 import { KISIcon } from '@/constants/kisIcons';
 import KISButton from '@/constants/KISButton';
-import ROUTES from '@/network';
+import ROUTES, { useMediaHeaders } from '@/network';
 import { queueableJsonRequest } from '@/services/offlineActionQueue';
 import useEducationCourseDetail from '@/screens/broadcast/education/hooks/useEducationCourseDetail';
 import { hasLearningAccessForItem } from '@/screens/broadcast/education/utils/educationAccess';
+import { inferMaterialKind } from '@/screens/broadcast/education/utils/materialPreview';
+import MaterialViewer from '@/screens/education/shared/MaterialViewer';
 import type { RootStackParamList } from '@/navigation/types';
 import type { EducationCourseOutlineItem } from '@/screens/broadcast/education/api/education.models';
 
@@ -44,6 +46,8 @@ export default function LearningPlayerScreen() {
   const { palette } = useKISTheme();
   const responsive = useResponsiveLayout();
   const { item, loading, hydrate } = useEducationCourseDetail();
+  const mediaHeaders = useMediaHeaders();
+  const [expandedMaterialId, setExpandedMaterialId] = useState<string | null>(null);
   const [assessmentDraft, setAssessmentDraft] = useState<Record<string, string[]>>({});
   const [submissionId, setSubmissionId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -133,35 +137,54 @@ export default function LearningPlayerScreen() {
           <View style={{ gap: 14 }}>
             <Text style={{ color: palette.text, lineHeight: 22 }}>{content.content || current.summary || 'No content available.'}</Text>
             {(content.materials ?? []).length > 0 ? (
-              <View style={{ gap: 8 }}>
+              <View style={{ gap: 10 }}>
                 <Text style={{ fontWeight: '800', color: palette.text }}>Attached materials</Text>
-                {content.materials.map((material: any) => (
-                  <Pressable
-                    key={material.id}
-                    onPress={() => Linking.openURL(material.safe_resource_url || material.resource_url)}
-                    style={{ flexDirection: 'row', alignItems: 'center', gap: 8, padding: 12, borderRadius: 12, borderWidth: 1, borderColor: palette.border }}
-                  >
-                    <KISIcon name="file" size={16} color={palette.primary} />
-                    <Text style={{ color: palette.text, fontWeight: '700', flex: 1 }} numberOfLines={1}>
-                      {material.title}
-                    </Text>
-                    <KISIcon name="download" size={16} color={palette.subtext} />
-                  </Pressable>
-                ))}
+                {content.materials.map((material: any) => {
+                  const expanded = expandedMaterialId === material.id;
+                  const resourceUrl = material.safe_resource_url || material.resource_url;
+                  return (
+                    <View key={material.id} style={{ gap: 8 }}>
+                      <Pressable
+                        onPress={() => setExpandedMaterialId(expanded ? null : material.id)}
+                        style={{ flexDirection: 'row', alignItems: 'center', gap: 8, padding: 12, borderRadius: 12, borderWidth: 1, borderColor: expanded ? palette.primary : palette.border }}
+                      >
+                        <KISIcon name="file" size={16} color={palette.primary} />
+                        <Text style={{ color: palette.text, fontWeight: '700', flex: 1 }} numberOfLines={1}>
+                          {material.title}
+                        </Text>
+                        <KISIcon name={expanded ? 'chevron-down' : 'chevron-right'} size={16} color={palette.subtext} />
+                      </Pressable>
+                      {expanded ? (
+                        <View style={{ gap: 8 }}>
+                          <MaterialViewer material={material} mediaHeaders={mediaHeaders} hasAccess={hasAccess} />
+                          {resourceUrl && inferMaterialKind(material) !== 'video' && inferMaterialKind(material) !== 'audio' ? (
+                            <KISButton title="Open externally" size="sm" variant="ghost" onPress={() => Linking.openURL(resourceUrl)} />
+                          ) : null}
+                        </View>
+                      ) : null}
+                    </View>
+                  );
+                })}
               </View>
             ) : null}
           </View>
         );
-      case 'material':
+      case 'material': {
+        const resourceUrl = content.safe_resource_url || content.resource_url;
         return (
           <View style={{ gap: 12 }}>
             <Text style={{ color: palette.subtext }}>{current.summary}</Text>
-            <KISButton
-              title={content.is_downloadable === false ? 'Open' : 'Open / Download'}
-              onPress={() => Linking.openURL(content.safe_resource_url || content.resource_url)}
-            />
+            <MaterialViewer material={content} mediaHeaders={mediaHeaders} hasAccess={hasAccess} />
+            {resourceUrl ? (
+              <KISButton
+                title={content.is_downloadable === false ? 'Open' : 'Open / Download'}
+                variant="outline"
+                onPress={() => Linking.openURL(resourceUrl)}
+              />
+            ) : null}
           </View>
         );
+      }
       case 'class_session':
         return (
           <View style={{ gap: 12 }}>

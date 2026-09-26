@@ -766,6 +766,34 @@ const broadcastRoutes = {
       assessmentId: string,
     ) =>
       `${API_BASE_URL}/api/v1/broadcasts/education/institutions/${institutionId}/assessments/${assessmentId}/`,
+    // Added for Education UX v2's Course Builder Assessments editor — the
+    // backend endpoints already existed (apps/broadcasts/urls.py), the
+    // frontend just never had route helpers for the question/option
+    // sub-resources before now.
+    educationInstitutionAssessmentQuestions: (
+      institutionId: string,
+      assessmentId: string,
+    ) =>
+      `${API_BASE_URL}/api/v1/broadcasts/education/institutions/${institutionId}/assessments/${assessmentId}/questions/`,
+    educationInstitutionAssessmentQuestion: (
+      institutionId: string,
+      assessmentId: string,
+      questionId: string,
+    ) =>
+      `${API_BASE_URL}/api/v1/broadcasts/education/institutions/${institutionId}/assessments/${assessmentId}/questions/${questionId}/`,
+    educationInstitutionAssessmentOptions: (
+      institutionId: string,
+      assessmentId: string,
+      questionId: string,
+    ) =>
+      `${API_BASE_URL}/api/v1/broadcasts/education/institutions/${institutionId}/assessments/${assessmentId}/questions/${questionId}/options/`,
+    educationInstitutionAssessmentOption: (
+      institutionId: string,
+      assessmentId: string,
+      questionId: string,
+      optionId: string,
+    ) =>
+      `${API_BASE_URL}/api/v1/broadcasts/education/institutions/${institutionId}/assessments/${assessmentId}/questions/${questionId}/options/${optionId}/`,
     educationProfiles: `${API_BASE_URL}/api/v1/broadcasts/education/profiles/`,
     educationProfile: (id: string) =>
       `${API_BASE_URL}/api/v1/broadcasts/education/profiles/${id}/`,
