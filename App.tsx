@@ -124,6 +124,19 @@ import CallJoinScreen from './src/screens/calls/CallJoinScreen';
 import PartnerRedeemInviteScreen from './src/screens/partners/PartnerRedeemInviteScreen';
 import HealthInstitutionDetailScreen from './src/screens/health/HealthInstitutionDetailScreen';
 import HealthInstitutionManagementScreen from './src/screens/health/HealthInstitutionManagementScreen';
+// Education UX v2 — real navigator destinations (see docs/education artifact)
+import EducationHomeScreen from './src/screens/education/learner/EducationHomeScreen';
+import MyLearningScreen from './src/screens/education/learner/MyLearningScreen';
+import CourseDetailScreen from './src/screens/education/learner/CourseDetailScreen';
+import LearningPlayerScreen from './src/screens/education/learner/LearningPlayerScreen';
+import CertificatesScreen from './src/screens/education/learner/CertificatesScreen';
+import InstitutionPickerScreen from './src/screens/education/provider/InstitutionPickerScreen';
+import InstitutionDashboardScreen from './src/screens/education/provider/InstitutionDashboardScreen';
+import CoursesListScreen from './src/screens/education/provider/CoursesListScreen';
+import CourseBuilderScreen from './src/screens/education/provider/CourseBuilderScreen';
+import LearnersScreen from './src/screens/education/provider/LearnersScreen';
+import EventsLiveScreen from './src/screens/education/provider/EventsLiveScreen';
+import InstitutionSettingsScreen from './src/screens/education/provider/InstitutionSettingsScreen';
 import ClinicalCommandCenterScreen from './src/screens/health/ClinicalCommandCenterScreen';
 import WebsiteBuilderScreen from './src/screens/website-builder/WebsiteBuilderScreen';
 import WebsitePreviewScreen from './src/screens/website-builder/WebsitePreviewScreen';
@@ -1842,6 +1855,19 @@ function AppContent() {
                       name="ClinicalCommandCenter"
                       getComponent={() => ClinicalCommandCenterScreen}
                     />
+                    {/* Education UX v2 */}
+                    <RootStack.Screen name="EducationHome" getComponent={() => EducationHomeScreen} />
+                    <RootStack.Screen name="EducationMyLearning" getComponent={() => MyLearningScreen} />
+                    <RootStack.Screen name="EducationCourseDetail" getComponent={() => CourseDetailScreen} />
+                    <RootStack.Screen name="EducationLearningPlayer" getComponent={() => LearningPlayerScreen} />
+                    <RootStack.Screen name="EducationCertificates" getComponent={() => CertificatesScreen} />
+                    <RootStack.Screen name="EducationInstitutionPicker" getComponent={() => InstitutionPickerScreen} />
+                    <RootStack.Screen name="EducationInstitutionDashboard" getComponent={() => InstitutionDashboardScreen} />
+                    <RootStack.Screen name="EducationCourses" getComponent={() => CoursesListScreen} />
+                    <RootStack.Screen name="EducationCourseBuilder" getComponent={() => CourseBuilderScreen} />
+                    <RootStack.Screen name="EducationLearners" getComponent={() => LearnersScreen} />
+                    <RootStack.Screen name="EducationEventsLive" getComponent={() => EventsLiveScreen} />
+                    <RootStack.Screen name="EducationInstitutionSettings" getComponent={() => InstitutionSettingsScreen} />
                     <RootStack.Screen
                       name="WebsiteBuilder"
                       getComponent={() => WebsiteBuilderScreen}

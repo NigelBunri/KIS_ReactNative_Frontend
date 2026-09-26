@@ -2025,7 +2025,12 @@ export default function ProfileScreen() {
         subtitle: 'Open the education workspace',
         icon: 'school' as const,
         tone: 'success' as const,
-        onPress: () => openManagementPanel('education'),
+        // Education UX v2: opens the real EducationInstitutionPicker screen
+        // instead of the EducationManagementModal panel — that modal is
+        // still reachable via the 'education' broadcastProfileKey deep-link
+        // path (openManagementPanel) for anything not yet migrated to a
+        // dedicated screen.
+        onPress: () => rootNavigation?.navigate('EducationInstitutionPicker'),
       },
       {
         key: 'create-shop',

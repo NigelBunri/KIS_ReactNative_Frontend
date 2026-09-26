@@ -194,6 +194,54 @@ export type RootStackParamList = {
     ownerId: string;
     ownerLabel?: string;
   };
+  // --- Education UX v2 -------------------------------------------------
+  // Learner-facing: real destinations replacing the old "everything lives
+  // inside one bottom sheet" pattern (see EducationDetailSheet.tsx, still
+  // used as a lightweight contextual preview from feed cards etc.).
+  EducationHome: undefined;
+  EducationMyLearning: undefined;
+  EducationCourseDetail: {
+    contentId: string;
+    contentType?: string;
+    seed?: Record<string, any>;
+  };
+  EducationLearningPlayer: {
+    contentId: string;
+    itemId: string;
+  };
+  EducationCertificates: undefined;
+  // Provider-facing: real destinations replacing the internal
+  // hub/form/dashboard/module/detail state machine in
+  // EducationManagementModal.tsx (kept in place as the underlying data/
+  // logic source for institution create/edit and the deep per-record CRUD
+  // forms not yet migrated to a dedicated screen - see the v2 architecture
+  // note for exactly which forms that covers).
+  EducationInstitutionPicker: undefined;
+  EducationInstitutionDashboard: {
+    institutionId: string;
+    institutionName?: string;
+  };
+  EducationCourses: {
+    institutionId: string;
+    institutionName?: string;
+  };
+  EducationCourseBuilder: {
+    institutionId: string;
+    institutionName?: string;
+    courseId?: string;
+  };
+  EducationLearners: {
+    institutionId: string;
+    institutionName?: string;
+  };
+  EducationEventsLive: {
+    institutionId: string;
+    institutionName?: string;
+  };
+  EducationInstitutionSettings: {
+    institutionId: string;
+    institutionName?: string;
+  };
   WebsitePreview: {
     websiteId: string;
     previewUrl?: string;

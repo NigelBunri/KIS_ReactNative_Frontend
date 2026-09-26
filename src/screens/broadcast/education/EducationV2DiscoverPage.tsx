@@ -36,6 +36,15 @@ import type {
   EducationProgress,
   EducationInstitutionSpotlight,
 } from '@/screens/broadcast/education/api/education.models';
+// Extracted to utils/educationAccess.ts (Education UX v2) so the new
+// CourseDetailScreen/LearningPlayerScreen destinations derive the same
+// enrollment/booking/access state from one place instead of a second copy.
+import {
+  ACTIVE_ENROLLMENT_STATUSES,
+  hasLearningAccessForItem,
+  getPrimaryActionLabel,
+  getStatusLabel,
+} from '@/screens/broadcast/education/utils/educationAccess';
 
 type Props = {
   searchTerm?: string;
@@ -55,70 +64,6 @@ const HERO_BADGES: Record<EducationContentType, string> = {
   program: 'Program bundle',
   credential: 'Certification',
   mentorship: 'Mentorship circle',
-};
-
-const ACTIVE_ENROLLMENT_STATUSES = new Set(['enrolled', 'completed']);
-
-const hasLearningAccessForItem = (
-  item: EducationContentItem | null | undefined,
-  _progress?: EducationProgress | null,
-) => {
-  if (!item) return false;
-  const viewerState = (item as any)?.viewerState || {};
-  const enrollmentStatus = String(
-    viewerState?.enrollment?.status || viewerState?.enrollment_status || '',
-  ).toLowerCase();
-  return (
-    Boolean(viewerState?.has_learning_access) ||
-    ACTIVE_ENROLLMENT_STATUSES.has(enrollmentStatus)
-  );
-};
-
-const getBookingStatus = (item: EducationContentItem | null | undefined) =>
-  String(
-    (item as any)?.viewerState?.booking?.status ||
-      (item as any)?.viewerState?.booking_status ||
-      '',
-  ).toLowerCase();
-
-const getEnrollmentStatus = (item: EducationContentItem | null | undefined) =>
-  String(
-    (item as any)?.viewerState?.enrollment?.status ||
-      (item as any)?.viewerState?.enrollment_status ||
-      '',
-  ).toLowerCase();
-
-const getPrimaryActionLabel = (
-  item: EducationContentItem,
-  progress?: EducationProgress | null,
-) => {
-  if (hasLearningAccessForItem(item, progress)) {
-    return progress ? 'Continue' : 'Start';
-  }
-  const enrollmentStatus = getEnrollmentStatus(item);
-  if (enrollmentStatus === 'waitlisted') return 'On the list';
-  if (enrollmentStatus === 'pending') return 'Waiting...';
-  const bookingStatus = getBookingStatus(item);
-  if (bookingStatus === 'awaiting_satisfaction') return 'Confirming';
-  if (bookingStatus === 'confirmed') return 'Reserved';
-  if (bookingStatus === 'payment_pending' || bookingStatus === 'pending')
-    return 'Complete booking';
-  const pricing = 'price' in item ? item.price : undefined;
-  return pricing?.isFree ? 'Join free' : 'Book a spot';
-};
-
-const getStatusLabel = (
-  item: EducationContentItem,
-  progress?: EducationProgress | null,
-) => {
-  if (hasLearningAccessForItem(item, progress)) {
-    return progress ? `${progress.progressPercent}%` : 'Enrolled';
-  }
-  const enrollmentStatus = getEnrollmentStatus(item);
-  if (enrollmentStatus) return enrollmentStatus.replace(/_/g, ' ');
-  const bookingStatus = getBookingStatus(item);
-  if (bookingStatus) return bookingStatus.replace(/_/g, ' ');
-  return '';
 };
 
 const resolveContentImage = (item?: Partial<EducationContentItem> | null) =>
@@ -1565,14 +1510,14 @@ export default function EducationV2DiscoverPage({
           <>
             {renderLearningOverview()}
 
-            {/* Institution Management Entry — navigates to the Profile
-                tab's education management panel (EducationManagementModal),
-                the single authoritative institution-admin implementation,
-                via the same broadcastProfileKey mechanism the Broadcast
-                header's "Create" button already uses for every other
-                profile type (see BroadcastScreen.tsx's handleCreate). */}
+            {/* Institution Management Entry — Education UX v2: now opens the
+                real EducationInstitutionPicker screen (navigate() bubbles up
+                to the root stack from this tab-nested screen) instead of the
+                old EducationManagementModal panel on the Profile tab. The
+                modal itself is untouched and still reachable from Profile's
+                own "Create Course" tile for anything not yet migrated. */}
             <Pressable
-              onPress={() => navigation.navigate('Profile', { broadcastProfileKey: 'education' })}
+              onPress={() => navigation.navigate('EducationInstitutionPicker')}
               style={{
                 borderWidth: 1.5,
                 borderColor: palette.primary,

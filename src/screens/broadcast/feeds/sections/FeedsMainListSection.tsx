@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import { Text, View } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import { useKISTheme } from '@/theme/useTheme';
 
 import BroadcastFeedCard from '@/components/broadcast/BroadcastFeedCard';
@@ -8,6 +9,7 @@ import { isUserBroadcastSource } from '@/components/broadcast/authorProfileUtils
 import useAuthorProfilePreview from '@/components/broadcast/useAuthorProfilePreview';
 import SectionHeader from '@/screens/broadcast/feeds/components/SectionHeader';
 import Skeleton from '@/components/common/Skeleton';
+import PromoEducationCard from '@/screens/broadcast/feeds/components/PromoEducationCard';
 
 // Mirrors BroadcastFeedCard's edge-to-edge YouTube-style shape (padded
 // header/title, full-bleed thumbnail, padded footer) so the loading state
@@ -127,6 +129,11 @@ export default function FeedsMainListSection({
   saveLoadingItemId,
 }: Props) {
   const { palette } = useKISTheme();
+  // Education UX v2: PromoEducationCard existed but was never mounted
+  // anywhere, so Education had no presence in the main Feed at all - see
+  // the interleave below, inserted once per screen (not repeated every N
+  // items) to stay a single contextual promo, not spam.
+  const navigation = useNavigation<any>();
   const {
     visible: authorProfileVisible,
     loading: authorProfileLoading,
@@ -178,7 +185,7 @@ export default function FeedsMainListSection({
             </View>
           ) : (
           <View style={{ gap: 12, marginHorizontal: -12 }}>
-            {list.map(item => {
+            {list.map((item, index) => {
               const sourceId = item.source?.id ? String(item.source.id) : null;
               const canSubscribe = Boolean(
                 item.source?.allow_subscribe && sourceId,
@@ -191,8 +198,8 @@ export default function FeedsMainListSection({
                 is_subscribed: subscribed,
               };
               return (
+                <React.Fragment key={item.id}>
                 <BroadcastFeedCard
-                  key={item.id}
                   item={{
                     ...item,
                     source: {
@@ -227,6 +234,16 @@ export default function FeedsMainListSection({
                       : undefined
                   }
                 />
+                {index === 3 && list.length > 4 ? (
+                  <PromoEducationCard
+                    title="Education on KIS"
+                    subtitle="Learn something new this week"
+                    footerLeft="Courses, live classes, and certificates from Kingdom institutions"
+                    ctaLabel="Explore"
+                    onPress={() => navigation.navigate('EducationHome')}
+                  />
+                ) : null}
+                </React.Fragment>
               );
             })}
           </View>
