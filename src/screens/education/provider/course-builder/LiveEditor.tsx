@@ -42,10 +42,13 @@ export default function LiveEditor({ institutionId, courseId }: Props) {
   const [adding, setAdding] = useState(false);
   const [title, setTitle] = useState('');
   const [dayOffset, setDayOffset] = useState(7);
+  const [hourOfDay, setHourOfDay] = useState('9');
+  const [minuteOfDay, setMinuteOfDay] = useState('0');
   const [durationMinutes, setDurationMinutes] = useState(60);
   const [deliveryMode, setDeliveryMode] = useState<'online' | 'onsite' | 'hybrid'>('online');
   const [meetingUrl, setMeetingUrl] = useState('');
   const [locationText, setLocationText] = useState('');
+  const [seatLimit, setSeatLimit] = useState('');
   const [saving, setSaving] = useState(false);
 
   const load = useCallback(async () => {
@@ -66,6 +69,9 @@ export default function LiveEditor({ institutionId, courseId }: Props) {
     setSaving(true);
     try {
       const start = new Date(Date.now() + dayOffset * 24 * 60 * 60 * 1000);
+      const hour = Math.min(23, Math.max(0, Number(hourOfDay) || 0));
+      const minute = Math.min(59, Math.max(0, Number(minuteOfDay) || 0));
+      start.setHours(hour, minute, 0, 0);
       const end = new Date(start.getTime() + durationMinutes * 60 * 1000);
       const response = await postRequest(
         ROUTES.broadcasts.educationInstitutionClassSessions(institutionId),
@@ -77,6 +83,7 @@ export default function LiveEditor({ institutionId, courseId }: Props) {
           delivery_mode: deliveryMode,
           meeting_url: deliveryMode !== 'onsite' ? meetingUrl.trim() : '',
           location_text: deliveryMode !== 'online' ? locationText.trim() : '',
+          seat_limit: seatLimit.trim() ? Number(seatLimit) : null,
           status: 'scheduled',
         },
         { errorMessage: 'Unable to schedule class.' },
@@ -86,12 +93,13 @@ export default function LiveEditor({ institutionId, courseId }: Props) {
         setTitle('');
         setMeetingUrl('');
         setLocationText('');
+        setSeatLimit('');
         await load();
       }
     } finally {
       setSaving(false);
     }
-  }, [title, dayOffset, durationMinutes, deliveryMode, meetingUrl, locationText, institutionId, courseId, sessions.length, load]);
+  }, [title, dayOffset, hourOfDay, minuteOfDay, durationMinutes, deliveryMode, meetingUrl, locationText, seatLimit, institutionId, courseId, sessions.length, load]);
 
   const cancelSession = useCallback(async (sessionId: string) => {
     const response = await patchRequest(
@@ -145,6 +153,16 @@ export default function LiveEditor({ institutionId, courseId }: Props) {
               ))}
             </View>
           </View>
+          <View style={{ flexDirection: 'row', gap: 12 }}>
+            <View style={{ flex: 1 }}>
+              <FieldLabel>Hour (0–23, local)</FieldLabel>
+              <KISTextInput value={hourOfDay} onChangeText={setHourOfDay} keyboardType="numeric" placeholder="9" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <FieldLabel>Minute</FieldLabel>
+              <KISTextInput value={minuteOfDay} onChangeText={setMinuteOfDay} keyboardType="numeric" placeholder="0" />
+            </View>
+          </View>
           <View>
             <FieldLabel>Duration</FieldLabel>
             <View style={{ flexDirection: 'row', gap: 6 }}>
@@ -158,6 +176,10 @@ export default function LiveEditor({ institutionId, courseId }: Props) {
                 </Pressable>
               ))}
             </View>
+          </View>
+          <View>
+            <FieldLabel>Seat limit (blank = unlimited)</FieldLabel>
+            <KISTextInput value={seatLimit} onChangeText={setSeatLimit} keyboardType="numeric" placeholder="Unlimited" />
           </View>
           <View>
             <FieldLabel>Delivery</FieldLabel>

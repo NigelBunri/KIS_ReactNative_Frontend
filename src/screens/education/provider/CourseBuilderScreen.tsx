@@ -16,7 +16,8 @@
 // item's own fields (lesson body text, quiz questions, session schedule)
 // after it exists.
 import React, { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Image, Pressable, ScrollView, Text, View } from 'react-native';
+import { launchImageLibrary } from 'react-native-image-picker';
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { SafeAreaView } from '@/components/common/SafeAreaViewWithTopPadding';
@@ -29,6 +30,7 @@ import ROUTES from '@/network';
 import { getRequest } from '@/network/get';
 import { postRequest } from '@/network/post';
 import { patchRequest } from '@/network/patch';
+import { uploadEducationMedia } from '@/services/uploadEducationMedia';
 import ContentEditor from '@/screens/education/provider/course-builder/ContentEditor';
 import AssessmentsEditor from '@/screens/education/provider/course-builder/AssessmentsEditor';
 import LiveEditor from '@/screens/education/provider/course-builder/LiveEditor';
@@ -84,6 +86,11 @@ export default function CourseBuilderScreen() {
   const [programs, setPrograms] = useState<any[]>([]);
   const [newProgramTitle, setNewProgramTitle] = useState('');
   const [creatingProgram, setCreatingProgram] = useState(false);
+  const [seatLimit, setSeatLimit] = useState('');
+  const [visibility, setVisibility] = useState<'public' | 'private'>('public');
+  const [coverImageUrl, setCoverImageUrl] = useState('');
+  const [coverImageAsset, setCoverImageAsset] = useState<{ uri: string; name: string; type: string; size?: number } | null>(null);
+  const [uploadingCover, setUploadingCover] = useState(false);
 
   // Curriculum state
   const [modules, setModules] = useState<any[]>([]);
@@ -91,6 +98,19 @@ export default function CourseBuilderScreen() {
   const [addContentModuleId, setAddContentModuleId] = useState<string | null>(null);
   const [addContentType, setAddContentType] = useState<string | null>(null);
   const [newItemTitle, setNewItemTitle] = useState('');
+  // A course's own `status: published` field controls what the *provider*
+  // sees as published in this UI, but it is NOT what makes a course
+  // discoverable/enrollable by learners - that's a separate
+  // EducationInstitutionBroadcast record pointing at the course (see
+  // apps.broadcasts.views._sync_course_pricing_to_broadcasts's docstring:
+  // "the entity that actually makes it discoverable/enrollable"). The old
+  // modal exposed this as its own "Broadcasts" tab and left creating one
+  // as a manual, separate step - easy to forget, and a course could sit
+  // at status=published while still being completely invisible to
+  // learners. saveDetails below creates/syncs the broadcast automatically
+  // so "Published" in this UI means what a non-technical provider expects
+  // it to mean.
+  const [courseBroadcastId, setCourseBroadcastId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!courseId) return;
@@ -106,7 +126,12 @@ export default function CourseBuilderScreen() {
           setDurationMinutes(String(course.duration_minutes ?? 0));
           setStatus(course.status ?? 'draft');
           setProgramId(course.program?.id ?? course.program_id ?? null);
+          setSeatLimit(course.seat_limit != null ? String(course.seat_limit) : '');
+          setVisibility(course.visibility === 'private' ? 'private' : 'public');
+          setCoverImageUrl(course.cover_image_url ?? course.coverUrl ?? '');
         }
+        const existingBroadcast = (response?.data?.broadcasts ?? []).find((b: any) => b.broadcast_kind === 'course');
+        setCourseBroadcastId(existingBroadcast?.id ?? null);
       })
       .finally(() => setLoading(false));
   }, [institutionId, courseId]);
@@ -137,6 +162,27 @@ export default function CourseBuilderScreen() {
     }
   }, [newProgramTitle, institutionId]);
 
+  const pickCoverImage = useCallback(async () => {
+    try {
+      const result = await launchImageLibrary({ mediaType: 'photo', quality: 1, selectionLimit: 1 });
+      if (result.didCancel) return;
+      const asset = result.assets?.[0];
+      if (!asset?.uri) {
+        Alert.alert('Cover image', 'Please pick a valid image.');
+        return;
+      }
+      setCoverImageAsset({
+        uri: asset.uri,
+        name: asset.fileName || `course-cover-${Date.now()}.jpg`,
+        type: asset.type || 'image/jpeg',
+        size: asset.fileSize ?? undefined,
+      });
+      setCoverImageUrl(asset.uri);
+    } catch (error: any) {
+      Alert.alert('Cover image', error?.message || 'Unable to pick image.');
+    }
+  }, []);
+
   const loadCurriculum = useCallback(async () => {
     if (!courseId) return;
     setLoadingCurriculum(true);
@@ -159,6 +205,22 @@ export default function CourseBuilderScreen() {
     }
     setSaving(true);
     try {
+      let coverImageAttachment: { media_id: string } | undefined;
+      if (coverImageAsset) {
+        setUploadingCover(true);
+        try {
+          const uploaded = await uploadEducationMedia({
+            context: 'education_module_cover_image',
+            file: coverImageAsset,
+            institutionId,
+          });
+          coverImageAttachment = { media_id: uploaded.mediaId };
+        } catch (uploadErr: any) {
+          Alert.alert('Cover image', uploadErr?.message || 'Unable to upload cover image — the rest of the course was still saved.');
+        } finally {
+          setUploadingCover(false);
+        }
+      }
       const body = {
         title: title.trim(),
         summary: summary.trim(),
@@ -167,6 +229,9 @@ export default function CourseBuilderScreen() {
         duration_minutes: Number(durationMinutes) || 0,
         status,
         program_id: programId || null,
+        seat_limit: seatLimit.trim() ? Number(seatLimit) : null,
+        visibility,
+        cover_image_attachment: coverImageAttachment,
       };
       const response = courseId
         ? await patchRequest(ROUTES.broadcasts.educationInstitutionCourse(institutionId, courseId), body, { errorMessage: 'Unable to save course.' })
@@ -176,15 +241,46 @@ export default function CourseBuilderScreen() {
         return;
       }
       const saved = response.data?.course;
+      const savedCourseId = saved?.id || courseId;
       if (saved?.id && !courseId) {
         setCourseId(saved.id);
         setTab('curriculum');
       }
+
+      // Publishing = the course exists AND a broadcast points at it (see
+      // the field comment above courseBroadcastId for why). Draft = no
+      // learner-visible broadcast at all, rather than leaving a stale
+      // published one around pointing at an unpublished course.
+      if (savedCourseId) {
+        if (status === 'published' && !courseBroadcastId) {
+          const broadcastRes = await postRequest(
+            ROUTES.broadcasts.educationInstitutionBroadcasts(institutionId),
+            { course_id: savedCourseId, status: 'published' },
+            { errorMessage: 'Course was saved, but publishing it to learners failed.' },
+          );
+          if (broadcastRes?.success && broadcastRes.data?.broadcast?.id) {
+            setCourseBroadcastId(broadcastRes.data.broadcast.id);
+          }
+        } else if (status === 'published' && courseBroadcastId) {
+          await patchRequest(
+            ROUTES.broadcasts.educationInstitutionBroadcast(institutionId, courseBroadcastId),
+            { status: 'published' },
+            { errorMessage: 'Unable to re-publish this course.' },
+          );
+        } else if (status !== 'published' && courseBroadcastId) {
+          await patchRequest(
+            ROUTES.broadcasts.educationInstitutionBroadcast(institutionId, courseBroadcastId),
+            { status: 'draft' },
+            { errorMessage: 'Unable to unpublish this course.' },
+          );
+        }
+      }
+
       Alert.alert('Course', 'Saved.');
     } finally {
       setSaving(false);
     }
-  }, [title, summary, description, priceAmount, durationMinutes, status, programId, courseId, institutionId]);
+  }, [title, summary, description, priceAmount, durationMinutes, status, programId, courseId, institutionId, courseBroadcastId, seatLimit, visibility, coverImageAsset]);
 
   const createModule = useCallback(async () => {
     if (!courseId) return;
@@ -306,6 +402,22 @@ export default function CourseBuilderScreen() {
           {tab === 'details' ? (
             <View style={{ gap: 12 }}>
               <View>
+                <FieldLabel>Cover image</FieldLabel>
+                <Pressable
+                  onPress={() => void pickCoverImage()}
+                  style={{ height: 140, borderRadius: 14, borderWidth: 1, borderColor: palette.border, backgroundColor: palette.surface, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}
+                >
+                  {coverImageUrl ? (
+                    <Image source={{ uri: coverImageUrl }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+                  ) : (
+                    <View style={{ alignItems: 'center', gap: 6 }}>
+                      <KISIcon name="camera" size={20} color={palette.subtext} />
+                      <Text style={{ color: palette.subtext, fontSize: 12 }}>{uploadingCover ? 'Uploading…' : 'Tap to add a cover image'}</Text>
+                    </View>
+                  )}
+                </Pressable>
+              </View>
+              <View>
                 <FieldLabel>Title</FieldLabel>
                 <KISTextInput placeholder="Course title" value={title} onChangeText={setTitle} />
               </View>
@@ -327,6 +439,31 @@ export default function CourseBuilderScreen() {
                   <KISTextInput placeholder="0" value={durationMinutes} onChangeText={setDurationMinutes} keyboardType="numeric" />
                 </View>
               </View>
+              <View style={{ flexDirection: 'row', gap: 12 }}>
+                <View style={{ flex: 1 }}>
+                  <FieldLabel>Seat limit (blank = unlimited)</FieldLabel>
+                  <KISTextInput placeholder="Unlimited" value={seatLimit} onChangeText={setSeatLimit} keyboardType="numeric" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <FieldLabel>Visibility</FieldLabel>
+                  <View style={{ flexDirection: 'row', gap: 6 }}>
+                    {(['public', 'private'] as const).map(v => (
+                      <Pressable
+                        key={v}
+                        onPress={() => setVisibility(v)}
+                        style={{ flex: 1, paddingVertical: 10, borderRadius: 10, borderWidth: 1, alignItems: 'center', borderColor: visibility === v ? palette.primary : palette.border, backgroundColor: visibility === v ? palette.primarySoft : 'transparent' }}
+                      >
+                        <Text style={{ fontSize: 12, fontWeight: '700', textTransform: 'capitalize', color: visibility === v ? palette.primaryStrong : palette.subtext }}>{v}</Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                </View>
+              </View>
+              {visibility === 'private' ? (
+                <Text style={{ fontSize: 12, color: palette.subtext }}>
+                  Private courses require the institution to approve each learner's access request.
+                </Text>
+              ) : null}
               <View>
                 <FieldLabel>Program (optional)</FieldLabel>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
@@ -373,6 +510,9 @@ export default function CourseBuilderScreen() {
                     </Pressable>
                   ))}
                 </View>
+                <Text style={{ fontSize: 12, color: palette.subtext, marginTop: 6 }}>
+                  {status === 'published' ? 'Visible and enrollable for learners once saved.' : 'Hidden from learners until Published.'}
+                </Text>
               </View>
               <KISButton title={saving ? 'Saving…' : isNew ? 'Create course' : 'Save changes'} disabled={saving} loading={saving} onPress={() => void saveDetails()} />
               {status === 'published' && Number(priceAmount) > 0 ? (

@@ -8,12 +8,14 @@
 // handing everything off to the device browser — only genuinely
 // unsupported file types fall back to an explicit "Open" action.
 //
-// Backend note: EducationContentItemActionView only supports
+// Backend note: EducationContentItemActionView previously only supported
 // `mark_attended` (class sessions) and the three assessment actions
-// (start/save/submit) — there is currently no "mark lesson/material
-// complete" action on the backend at all, for either this screen or the
-// original sheet. Prev/Next here just moves between outline items; it
-// does not claim to mark anything "done" that the API has no way to record.
+// (start/save/submit) — lessons and materials had no completion action at
+// all. A `mark_complete` action was added for those two item types
+// (KIS_Django_Backend, branch education-lesson-material-completion, not
+// yet merged/deployed — see the v2 architecture note), reusing the exact
+// same enrollment-metadata update function the other actions already
+// call. This screen's "Mark as complete" button targets that action.
 import React, { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Linking, Pressable, ScrollView, Text, View } from 'react-native';
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
@@ -39,6 +41,19 @@ function flattenOutline(outline: any[]): EducationCourseOutlineItem[] {
   return (outline ?? []).flatMap(module => module.items ?? []);
 }
 
+function MarkCompleteButton({ isComplete, busy, onPress }: { isComplete: boolean; busy: boolean; onPress: () => void }) {
+  const { palette } = useKISTheme();
+  if (isComplete) {
+    return (
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, padding: 12, borderRadius: 12, backgroundColor: palette.primarySoft }}>
+        <KISIcon name="check" size={16} color={palette.primaryStrong} />
+        <Text style={{ color: palette.primaryStrong, fontWeight: '700' }}>Completed</Text>
+      </View>
+    );
+  }
+  return <KISButton title={busy ? 'Marking…' : 'Mark as complete'} variant="outline" disabled={busy} onPress={onPress} />;
+}
+
 export default function LearningPlayerScreen() {
   const navigation = useNavigation<Nav>();
   const route = useRoute<Route_>();
@@ -62,6 +77,8 @@ export default function LearningPlayerScreen() {
   const prevItem = index > 0 ? flatItems[index - 1] : null;
   const nextItem = index >= 0 && index < flatItems.length - 1 ? flatItems[index + 1] : null;
   const hasAccess = item ? hasLearningAccessForItem(item) : false;
+  const completedItemIds: string[] = (item as any)?.progress?.completedItemIds ?? [];
+  const isCurrentComplete = current ? completedItemIds.includes(current.id) : false;
 
   const runAction = useCallback(
     async (action: string, extra?: Record<string, any>) => {
@@ -167,6 +184,7 @@ export default function LearningPlayerScreen() {
                 })}
               </View>
             ) : null}
+            <MarkCompleteButton isComplete={isCurrentComplete} busy={busy} onPress={() => void runAction('mark_complete')} />
           </View>
         );
       case 'material': {
@@ -182,6 +200,7 @@ export default function LearningPlayerScreen() {
                 onPress={() => Linking.openURL(resourceUrl)}
               />
             ) : null}
+            <MarkCompleteButton isComplete={isCurrentComplete} busy={busy} onPress={() => void runAction('mark_complete')} />
           </View>
         );
       }

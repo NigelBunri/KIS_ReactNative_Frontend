@@ -33,7 +33,7 @@ export default function ContentEditor({ institutionId, courseId }: Props) {
   const [materials, setMaterials] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedLessonId, setExpandedLessonId] = useState<string | null>(null);
-  const [lessonDraft, setLessonDraft] = useState<{ title: string; summary: string; content: string }>({ title: '', summary: '', content: '' });
+  const [lessonDraft, setLessonDraft] = useState<{ title: string; summary: string; content: string; isPreview: boolean }>({ title: '', summary: '', content: '', isPreview: false });
   const [savingLesson, setSavingLesson] = useState(false);
   const [addingMaterial, setAddingMaterial] = useState(false);
   const [materialTitle, setMaterialTitle] = useState('');
@@ -66,7 +66,7 @@ export default function ContentEditor({ institutionId, courseId }: Props) {
       return;
     }
     setExpandedLessonId(lesson.id);
-    setLessonDraft({ title: lesson.title ?? '', summary: lesson.summary ?? '', content: lesson.content ?? '' });
+    setLessonDraft({ title: lesson.title ?? '', summary: lesson.summary ?? '', content: lesson.content ?? '', isPreview: Boolean(lesson.is_preview) });
   };
 
   const saveLesson = useCallback(async () => {
@@ -75,7 +75,7 @@ export default function ContentEditor({ institutionId, courseId }: Props) {
     try {
       const response = await patchRequest(
         ROUTES.broadcasts.educationInstitutionLesson(institutionId, expandedLessonId),
-        { title: lessonDraft.title.trim(), summary: lessonDraft.summary.trim(), content: lessonDraft.content.trim() },
+        { title: lessonDraft.title.trim(), summary: lessonDraft.summary.trim(), content: lessonDraft.content.trim(), is_preview: lessonDraft.isPreview },
         { errorMessage: 'Unable to save lesson.' },
       );
       if (response?.success) {
@@ -197,6 +197,15 @@ export default function ContentEditor({ institutionId, courseId }: Props) {
                     <FieldLabel>Lesson content</FieldLabel>
                     <KISTextInput value={lessonDraft.content} onChangeText={t => setLessonDraft(d => ({ ...d, content: t }))} multiline style={{ minHeight: 120 }} />
                   </View>
+                  <Pressable
+                    onPress={() => setLessonDraft(d => ({ ...d, isPreview: !d.isPreview }))}
+                    style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}
+                  >
+                    <View style={{ width: 20, height: 20, borderRadius: 6, borderWidth: 1, borderColor: lessonDraft.isPreview ? palette.primary : palette.border, backgroundColor: lessonDraft.isPreview ? palette.primarySoft : 'transparent', alignItems: 'center', justifyContent: 'center' }}>
+                      {lessonDraft.isPreview ? <KISIcon name="check" size={13} color={palette.primary} /> : null}
+                    </View>
+                    <Text style={{ color: palette.text, fontSize: 13 }}>Free preview — visible before enrolling</Text>
+                  </Pressable>
                   <KISButton title={savingLesson ? 'Saving…' : 'Save lesson'} disabled={savingLesson} loading={savingLesson} onPress={() => void saveLesson()} />
                 </View>
               ) : null}
