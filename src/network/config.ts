@@ -8,7 +8,10 @@ const envBool = (value?: string | null) =>
 export const DEV_BACKEND_HOST =
   trim(APP_ENV.KIS_DEV_BACKEND_HOST) ||
   (Platform.OS === 'android' ? '10.0.2.2' : 'localhost');
-export const API_PORT = 8000;
+// TEMPORARY: 8000 is occupied by an unrelated project's dev server right
+// now, so local KIS Django is running on 8001 instead. Revert to 8000
+// when done testing.
+export const API_PORT = 8001;
 export const CHAT_PORT = 4000;
 
 const USE_LOCAL_BACKENDS = envBool(APP_ENV.KIS_USE_LOCAL_BACKENDS);

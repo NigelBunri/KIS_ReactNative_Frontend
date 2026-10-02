@@ -13,16 +13,63 @@ import { useKISTheme } from '@/theme/useTheme';
 import { KISIcon } from '@/constants/kisIcons';
 import KISButton from '@/constants/KISButton';
 import KISTextInput from '@/constants/KISTextInput';
-import ROUTES from '@/network';
+import ROUTES, { useMediaHeaders } from '@/network';
 import { getRequest } from '@/network/get';
 import { postRequest } from '@/network/post';
 import { patchRequest } from '@/network/patch';
+import { deleteRequest } from '@/network/delete';
 import { uploadEducationMedia } from '@/services/uploadEducationMedia';
 import { inferMaterialKind } from '@/screens/broadcast/education/utils/materialPreview';
+import MaterialViewer from '@/screens/education/shared/MaterialViewer';
 
 function FieldLabel({ children }: { children: React.ReactNode }) {
   const { palette } = useKISTheme();
   return <Text style={{ fontSize: 12, fontWeight: '700', color: palette.subtext, marginBottom: 4 }}>{children}</Text>;
+}
+
+// Chip row used both when creating a material and when re-attaching an
+// existing one — a material can belong to at most one lesson here (the
+// backend also supports a lesson_ids many-link, but a single "which lesson
+// is this material's home" choice is what the provider actually needs).
+function LessonChipPicker({
+  lessons,
+  selectedId,
+  onSelect,
+}: {
+  lessons: any[];
+  selectedId: string | null;
+  onSelect: (lessonId: string | null) => void;
+}) {
+  const { palette } = useKISTheme();
+  const chips: Array<{ id: string | null; title: string }> = [
+    { id: null, title: 'No lesson (course-wide)' },
+    ...lessons.map(l => ({ id: l.id as string, title: l.title as string })),
+  ];
+  return (
+    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+      {chips.map(chip => {
+        const selected = selectedId === chip.id;
+        return (
+          <Pressable
+            key={chip.id ?? 'none'}
+            onPress={() => onSelect(chip.id)}
+            style={{
+              paddingHorizontal: 10,
+              paddingVertical: 6,
+              borderRadius: 999,
+              borderWidth: 1,
+              borderColor: selected ? palette.primary : palette.border,
+              backgroundColor: selected ? palette.primarySoft : 'transparent',
+            }}
+          >
+            <Text numberOfLines={1} style={{ fontSize: 12, fontWeight: '700', color: selected ? palette.primaryStrong : palette.subtext, maxWidth: 160 }}>
+              {chip.title}
+            </Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
 }
 
 type Props = { institutionId: string; courseId: string };
@@ -38,9 +85,14 @@ export default function ContentEditor({ institutionId, courseId }: Props) {
   const [addingMaterial, setAddingMaterial] = useState(false);
   const [materialTitle, setMaterialTitle] = useState('');
   const [materialUrl, setMaterialUrl] = useState('');
+  const [materialLessonId, setMaterialLessonId] = useState<string | null>(null);
   const [pickedFile, setPickedFile] = useState<{ uri: string; name: string; type: string; size?: number } | null>(null);
   const [uploadStatus, setUploadStatus] = useState<string | null>(null);
   const [savingMaterial, setSavingMaterial] = useState(false);
+  const [attachingMaterialId, setAttachingMaterialId] = useState<string | null>(null);
+  const [savingAttachment, setSavingAttachment] = useState(false);
+  const [previewMaterialId, setPreviewMaterialId] = useState<string | null>(null);
+  const mediaHeaders = useMediaHeaders();
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -89,7 +141,21 @@ export default function ContentEditor({ institutionId, courseId }: Props) {
 
   const pickMaterialFile = useCallback(async () => {
     try {
-      const document = await DocumentPicker.pickSingle({ type: [DocumentPicker.types.allFiles] });
+      // PDF/video/audio/image — matches the backend's education-material
+      // upload allowlist (apps/media/upload_intent.py), so a creator never
+      // picks a file the server will then reject. The reason for the
+      // allowlist at all: every material must be viewable inline via
+      // MaterialViewer (below) rather than forcing a student to leave the
+      // platform — MaterialViewer/inferMaterialKind already handle 'image'
+      // (see materialPreview.ts), this picker just wasn't offering it yet.
+      const document = await DocumentPicker.pickSingle({
+        type: [
+          DocumentPicker.types.pdf,
+          DocumentPicker.types.video,
+          DocumentPicker.types.audio,
+          DocumentPicker.types.images,
+        ],
+      });
       setPickedFile({
         uri: document.uri,
         name: document.name || `material-${Date.now()}`,
@@ -132,6 +198,7 @@ export default function ContentEditor({ institutionId, courseId }: Props) {
         {
           title: materialTitle.trim(),
           course_ids: [courseId],
+          lesson_id: materialLessonId ?? undefined,
           kind: pickedFile ? kind : 'link',
           resource_url: pickedFile ? undefined : materialUrl.trim(),
           resource_attachment: resourceAttachment,
@@ -147,13 +214,85 @@ export default function ContentEditor({ institutionId, courseId }: Props) {
       setAddingMaterial(false);
       setMaterialTitle('');
       setMaterialUrl('');
+      setMaterialLessonId(null);
       setPickedFile(null);
       setUploadStatus(null);
       await load();
     } finally {
       setSavingMaterial(false);
     }
-  }, [materialTitle, materialUrl, pickedFile, institutionId, courseId, load]);
+  }, [materialTitle, materialUrl, materialLessonId, pickedFile, institutionId, courseId, load]);
+
+  const deleteLesson = useCallback(
+    (lesson: any) => {
+      Alert.alert('Delete lesson', `Permanently delete "${lesson.title}"? This can't be undone.`, [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            const response = await deleteRequest(ROUTES.broadcasts.educationInstitutionLesson(institutionId, lesson.id), {
+              errorMessage: 'Unable to delete this lesson.',
+            });
+            if (response?.success || response === undefined) {
+              if (expandedLessonId === lesson.id) setExpandedLessonId(null);
+              await load();
+            } else {
+              Alert.alert('Delete lesson', response?.message || 'Unable to delete this lesson.');
+            }
+          },
+        },
+      ]);
+    },
+    [institutionId, expandedLessonId, load],
+  );
+
+  const deleteMaterial = useCallback(
+    (material: any) => {
+      Alert.alert('Delete material', `Permanently delete "${material.title}"? This can't be undone.`, [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            const response = await deleteRequest(ROUTES.broadcasts.educationInstitutionMaterial(institutionId, material.id), {
+              errorMessage: 'Unable to delete this material.',
+            });
+            if (response?.success || response === undefined) {
+              if (previewMaterialId === material.id) setPreviewMaterialId(null);
+              if (attachingMaterialId === material.id) setAttachingMaterialId(null);
+              await load();
+            } else {
+              Alert.alert('Delete material', response?.message || 'Unable to delete this material.');
+            }
+          },
+        },
+      ]);
+    },
+    [institutionId, previewMaterialId, attachingMaterialId, load],
+  );
+
+  const attachMaterialToLesson = useCallback(
+    async (materialId: string, lessonId: string | null) => {
+      setSavingAttachment(true);
+      try {
+        const response = await patchRequest(
+          ROUTES.broadcasts.educationInstitutionMaterial(institutionId, materialId),
+          { lesson_id: lessonId ?? '' },
+          { errorMessage: 'Unable to connect this material to a lesson.' },
+        );
+        if (!response?.success) {
+          Alert.alert('Material', response?.message || 'Unable to connect this material to a lesson.');
+          return;
+        }
+        setAttachingMaterialId(null);
+        await load();
+      } finally {
+        setSavingAttachment(false);
+      }
+    },
+    [institutionId, load],
+  );
 
   if (loading) {
     return <ActivityIndicator color={palette.primary} style={{ marginTop: 20 }} />;
@@ -181,6 +320,9 @@ export default function ContentEditor({ institutionId, courseId }: Props) {
               >
                 <KISIcon name="book" size={16} color={palette.primary} />
                 <Text style={{ color: palette.text, fontWeight: '700', flex: 1 }} numberOfLines={1}>{lesson.title}</Text>
+                <Pressable onPress={() => deleteLesson(lesson)} hitSlop={8}>
+                  <KISIcon name="trash" size={15} color={palette.danger} />
+                </Pressable>
                 <KISIcon name={expanded ? 'chevron-down' : 'chevron-right'} size={16} color={palette.subtext} />
               </Pressable>
               {expanded ? (
@@ -216,13 +358,54 @@ export default function ContentEditor({ institutionId, courseId }: Props) {
 
       <View style={{ gap: 10 }}>
         <Text style={{ fontWeight: '800', color: palette.text }}>Materials ({materials.length})</Text>
-        {materials.map(material => (
-          <View key={material.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, padding: 12, borderRadius: 12, borderWidth: 1, borderColor: palette.border, backgroundColor: palette.surface }}>
-            <KISIcon name="file" size={16} color={palette.primary} />
-            <Text style={{ color: palette.text, fontWeight: '700', flex: 1 }} numberOfLines={1}>{material.title}</Text>
-            <Text style={{ fontSize: 11, color: palette.subtext, textTransform: 'capitalize' }}>{material.kind}</Text>
-          </View>
-        ))}
+        <Text style={{ fontSize: 12, color: palette.subtext }}>
+          A material only shows up inside a lesson once it's connected to that lesson below.
+        </Text>
+        {materials.map(material => {
+          const connectedLesson = lessons.find(l => l.id === material.lesson_id);
+          const attaching = attachingMaterialId === material.id;
+          const previewing = previewMaterialId === material.id;
+          return (
+            <View key={material.id} style={{ gap: 8, padding: 12, borderRadius: 12, borderWidth: 1, borderColor: attaching ? palette.primary : palette.border, backgroundColor: palette.surface }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <KISIcon name="file" size={16} color={palette.primary} />
+                <Text style={{ color: palette.text, fontWeight: '700', flex: 1 }} numberOfLines={1}>{material.title}</Text>
+                <Text style={{ fontSize: 11, color: palette.subtext, textTransform: 'capitalize' }}>{material.kind}</Text>
+                <Pressable onPress={() => deleteMaterial(material)} hitSlop={8}>
+                  <KISIcon name="trash" size={15} color={palette.danger} />
+                </Pressable>
+              </View>
+              <View style={{ flexDirection: 'row', gap: 14 }}>
+                <Pressable onPress={() => setAttachingMaterialId(attaching ? null : material.id)}>
+                  <Text style={{ fontSize: 12, color: palette.primary, fontWeight: '700' }}>
+                    {connectedLesson ? `Lesson: ${connectedLesson.title}` : 'Not connected to a lesson'} · {attaching ? 'Close' : 'Change'}
+                  </Text>
+                </Pressable>
+                {material.resource_url || material.safe_resource_url ? (
+                  <Pressable onPress={() => setPreviewMaterialId(previewing ? null : material.id)}>
+                    <Text style={{ fontSize: 12, color: palette.primary, fontWeight: '700' }}>
+                      {previewing ? 'Hide preview' : 'Preview'}
+                    </Text>
+                  </Pressable>
+                ) : null}
+              </View>
+              {attaching ? (
+                <LessonChipPicker
+                  lessons={lessons}
+                  selectedId={material.lesson_id ?? null}
+                  onSelect={lessonId => void attachMaterialToLesson(material.id, lessonId)}
+                />
+              ) : null}
+              {savingAttachment && attaching ? <ActivityIndicator color={palette.primary} /> : null}
+              {previewing ? (
+                // Same viewer a student sees (MaterialViewer) — the creator
+                // gets a real preview of exactly what will render for
+                // learners, not just a filename/icon.
+                <MaterialViewer material={material} mediaHeaders={mediaHeaders} hasAccess />
+              ) : null}
+            </View>
+          );
+        })}
 
         {addingMaterial ? (
           <View style={{ gap: 10, padding: 12, borderRadius: 12, backgroundColor: palette.surface, borderWidth: 1, borderColor: palette.border }}>
@@ -240,6 +423,10 @@ export default function ContentEditor({ institutionId, courseId }: Props) {
               <FieldLabel>Paste a link instead</FieldLabel>
               <KISTextInput placeholder="https://…" value={materialUrl} onChangeText={setMaterialUrl} autoCapitalize="none" editable={!pickedFile} />
             </View>
+            <View>
+              <FieldLabel>Connect to a lesson</FieldLabel>
+              <LessonChipPicker lessons={lessons} selectedId={materialLessonId} onSelect={setMaterialLessonId} />
+            </View>
             {uploadStatus ? <Text style={{ fontSize: 12, color: palette.subtext, textTransform: 'capitalize' }}>{uploadStatus}…</Text> : null}
             <View style={{ flexDirection: 'row', gap: 8 }}>
               <KISButton title={savingMaterial ? 'Saving…' : 'Save material'} disabled={savingMaterial} loading={savingMaterial} onPress={() => void saveMaterial()} />
@@ -252,6 +439,7 @@ export default function ContentEditor({ institutionId, courseId }: Props) {
                   setPickedFile(null);
                   setMaterialTitle('');
                   setMaterialUrl('');
+                  setMaterialLessonId(null);
                 }}
               />
             </View>

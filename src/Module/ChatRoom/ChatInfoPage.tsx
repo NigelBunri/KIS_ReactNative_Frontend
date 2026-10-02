@@ -205,6 +205,15 @@ export const ChatInfoPage: React.FC<ChatInfoPageProps> = ({
 
   const isGroup =
     chat.isGroupChat || chat.isGroup || chat.kind === 'group';
+  // Channels (apps.channels.Channel, e.g. Education course rooms) are
+  // backed by the same Conversation/ConversationMember model as Groups -
+  // members, base_role, set-role, add, and remove all already work
+  // identically via the generic /chats/conversations/{id}/... endpoints
+  // below. Only group-specific features that need a resolved groupId
+  // (name/avatar edit, invite links, Ban - GroupBan has no Channel
+  // equivalent yet) stay gated on isGroup alone.
+  const isChannel = chat.kind === 'channel';
+  const hasMembers = isGroup || isChannel;
 
   if (__DEV__) console.log('ChatInfoPage rendered for chat:', chat);
 
@@ -232,14 +241,14 @@ export const ChatInfoPage: React.FC<ChatInfoPageProps> = ({
   }, [isGroup, resolvedGroupId, conversationId]);
 
   const directContact = useMemo(() => {
-    if (isGroup) return null;
+    if (hasMembers) return null;
     const meId = currentUserId ? String(currentUserId) : null;
     const other = participants.find((p) => {
       const userId = resolveUserId(p.user);
       return !meId || (userId && userId !== meId);
     });
     return other ?? null;
-  }, [participants, isGroup, currentUserId]);
+  }, [participants, hasMembers, currentUserId]);
 
   const contactUserId = useMemo(() => {
     if (!directContact?.user) return null;
@@ -340,18 +349,23 @@ export const ChatInfoPage: React.FC<ChatInfoPageProps> = ({
   useEffect(() => {
     let active = true;
     const loadMembers = async () => {
-      if (!isGroup || !groupId) return;
+      if (!hasMembers) return;
+      if (isGroup && !groupId) return;
       setMembersLoading(true);
       try {
-        const res = await getRequest(ROUTES.groups.members(groupId), {
-          errorMessage: 'Failed to load group members',
-        });
-        const list =
-          res?.data?.results ??
-          res?.results ??
-          res?.data ??
-          res ??
-          [];
+        // Groups keep their own richer members endpoint; Channels (no
+        // groupId) fall back to the generic conversation-detail members
+        // field - same ConversationMemberSerializer shape either way.
+        const res = isGroup
+          ? await getRequest(ROUTES.groups.members(groupId as string), {
+              errorMessage: 'Failed to load group members',
+            })
+          : await getRequest(ROUTES.chat.conversationDetail(conversationId), {
+              errorMessage: 'Failed to load channel members',
+            });
+        const list = isGroup
+          ? (res?.data?.results ?? res?.results ?? res?.data ?? res ?? [])
+          : (res?.data?.members ?? res?.members ?? []);
         if (active) {
           setMemberList(Array.isArray(list) ? list : []);
         }
@@ -363,7 +377,7 @@ export const ChatInfoPage: React.FC<ChatInfoPageProps> = ({
     return () => {
       active = false;
     };
-  }, [isGroup, groupId]);
+  }, [hasMembers, isGroup, groupId, conversationId]);
 
   const me = useMemo(() => {
     const meId = currentUserId ? String(currentUserId) : null;
@@ -464,6 +478,10 @@ export const ChatInfoPage: React.FC<ChatInfoPageProps> = ({
           const fresh = await getRequest(ROUTES.groups.members(groupId), {});
           const list = fresh?.data?.results ?? fresh?.results ?? fresh?.data ?? fresh ?? [];
           if (Array.isArray(list)) setMemberList(list);
+        } else if (isChannel) {
+          const fresh = await getRequest(ROUTES.chat.conversationDetail(conversationId), {});
+          const list = fresh?.data?.members ?? fresh?.members ?? [];
+          if (Array.isArray(list)) setMemberList(list);
         }
       } else {
         Alert.alert('Add member', res?.message ?? 'Unable to add member. Check the user ID.');
@@ -509,7 +527,7 @@ export const ChatInfoPage: React.FC<ChatInfoPageProps> = ({
     if (!userId) return;
     Alert.alert(
       'Transfer ownership',
-      `Make ${name} the new group owner? You will become an admin.`,
+      `Make ${name} the new ${isChannel ? 'channel' : 'group'} owner? You will become an admin.`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -744,11 +762,12 @@ export const ChatInfoPage: React.FC<ChatInfoPageProps> = ({
     const name = resolveUserName(p.user) || 'Member';
     const convId = conversationId;
 
+    const roomNoun = isChannel ? 'channel' : 'group';
     const removeAction = {
-      text: 'Remove from group',
+      text: `Remove from ${roomNoun}`,
       style: 'destructive' as const,
       onPress: () =>
-        Alert.alert('Remove member', `Remove ${name} from the group?`, [
+        Alert.alert('Remove member', `Remove ${name} from the ${roomNoun}?`, [
           { text: 'Cancel', style: 'cancel' },
           {
             text: 'Remove',
@@ -776,12 +795,17 @@ export const ChatInfoPage: React.FC<ChatInfoPageProps> = ({
     }
 
     if (isOwner && !isTargetOwner) {
-      options.push({ text: 'Make group owner', onPress: () => handleTransferOwnership(p) });
+      options.push({ text: `Make ${roomNoun} owner`, onPress: () => handleTransferOwnership(p) });
     }
 
     if (!isTargetOwner) {
       options.push(removeAction);
-      options.push({ text: 'Ban from group', style: 'destructive', onPress: () => handleBanMember(p) });
+      // Ban has no Channel equivalent yet (GroupBan is a group-specific
+      // model with its own rejoin-prevention semantics) - Channels only
+      // get the generic remove above until that's built.
+      if (isGroup) {
+        options.push({ text: 'Ban from group', style: 'destructive', onPress: () => handleBanMember(p) });
+      }
     }
 
     options.push({ text: 'Message', onPress: async () => {
@@ -797,12 +821,12 @@ export const ChatInfoPage: React.FC<ChatInfoPageProps> = ({
 
     options.push({ text: 'Cancel', style: 'cancel' });
 
-    Alert.alert(name, isTargetOwner ? 'Group owner' : `Role: ${targetRole}`, options);
+    Alert.alert(name, isTargetOwner ? `${isChannel ? 'Channel' : 'Group'} owner` : `Role: ${targetRole}`, options);
   };
 
   const groupMembers = memberList.length ? memberList : participants;
   const memberCount = groupMembers.length || 0;
-  const infoTitle = isGroup ? 'Group info' : 'Contact info';
+  const infoTitle = isGroup ? 'Group info' : isChannel ? 'Channel info' : 'Contact info';
 
   useEffect(() => {
     let active = true;
@@ -1068,7 +1092,7 @@ export const ChatInfoPage: React.FC<ChatInfoPageProps> = ({
             </Pressable>
           )}
           <Text style={[styles.subtitle, { color: palette.subtext }]} numberOfLines={1}>
-            {isGroup ? `${memberCount} members` : 'Direct chat'}
+            {hasMembers ? `${memberCount} members` : 'Direct chat'}
           </Text>
 
           {isGroup && isAdmin && (
@@ -1099,12 +1123,12 @@ export const ChatInfoPage: React.FC<ChatInfoPageProps> = ({
               Type
             </Text>
             <Text style={[styles.detailValue, { color: palette.text }]}>
-              {isGroup ? 'Group conversation' : 'Direct conversation'}
+              {isGroup ? 'Group conversation' : isChannel ? 'Channel conversation' : 'Direct conversation'}
             </Text>
           </View>
         </View>
 
-        {!isGroup && (
+        {!hasMembers && (
           <View style={[styles.section, { paddingHorizontal: responsive.pageGutter }]}>
             <Text style={[styles.sectionTitle, { color: palette.text }]}>
               Contact
@@ -1137,7 +1161,7 @@ export const ChatInfoPage: React.FC<ChatInfoPageProps> = ({
           </View>
         )}
 
-        {!isGroup && (
+        {!hasMembers && (
           <View style={[styles.section, { paddingHorizontal: responsive.pageGutter }]}>
             <Text style={[styles.sectionTitle, { color: palette.text }]}>
               Public profile
@@ -1242,7 +1266,7 @@ export const ChatInfoPage: React.FC<ChatInfoPageProps> = ({
           </View>
         )}
 
-        {!isGroup && (
+        {!hasMembers && (
           <>
             {renderSummaryList(
               'Experience',
@@ -1436,11 +1460,11 @@ export const ChatInfoPage: React.FC<ChatInfoPageProps> = ({
           </View>
         )}
 
-        {isGroup && (
+        {hasMembers && (
           <View style={[styles.section, { paddingHorizontal: responsive.pageGutter }]}>
             <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
               <Text style={[styles.sectionTitle, { color: palette.text, marginBottom: 0, flex: 1 }]}>
-                Members ({memberCount})
+                {isChannel ? `Subscribers (${memberCount})` : `Members (${memberCount})`}
               </Text>
               {isAdmin && (
                 <Pressable

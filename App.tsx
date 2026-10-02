@@ -130,13 +130,20 @@ import MyLearningScreen from './src/screens/education/learner/MyLearningScreen';
 import CourseDetailScreen from './src/screens/education/learner/CourseDetailScreen';
 import LearningPlayerScreen from './src/screens/education/learner/LearningPlayerScreen';
 import CertificatesScreen from './src/screens/education/learner/CertificatesScreen';
+import InstitutionProfileScreen from './src/screens/education/learner/InstitutionProfileScreen';
 import InstitutionPickerScreen from './src/screens/education/provider/InstitutionPickerScreen';
 import InstitutionDashboardScreen from './src/screens/education/provider/InstitutionDashboardScreen';
 import CoursesListScreen from './src/screens/education/provider/CoursesListScreen';
+import ProgramsListScreen from './src/screens/education/provider/ProgramsListScreen';
+import ProgramFormScreen from './src/screens/education/provider/ProgramFormScreen';
+import ProgramDashboardScreen from './src/screens/education/provider/ProgramDashboardScreen';
+import ClassFormScreen from './src/screens/education/provider/ClassFormScreen';
+import ClassDashboardScreen from './src/screens/education/provider/ClassDashboardScreen';
 import CourseBuilderScreen from './src/screens/education/provider/CourseBuilderScreen';
 import LearnersScreen from './src/screens/education/provider/LearnersScreen';
 import EventsLiveScreen from './src/screens/education/provider/EventsLiveScreen';
 import InstitutionSettingsScreen from './src/screens/education/provider/InstitutionSettingsScreen';
+import BroadcastsScreen from './src/screens/education/provider/BroadcastsScreen';
 import ClinicalCommandCenterScreen from './src/screens/health/ClinicalCommandCenterScreen';
 import WebsiteBuilderScreen from './src/screens/website-builder/WebsiteBuilderScreen';
 import WebsitePreviewScreen from './src/screens/website-builder/WebsitePreviewScreen';
@@ -196,6 +203,9 @@ import { ErrorBoundary } from '@/components/common/ErrorBoundary';
 import CartsListPage from '@/screens/market/cart/CartsListPage';
 import CartDetailPage from '@/screens/market/cart/CartDetailPage';
 import MyOrdersPage from '@/screens/market/orders/MyOrdersPage';
+import WishlistPage from '@/screens/market/wishlist/WishlistPage';
+import AddressListPage from '@/screens/market/addresses/AddressListPage';
+import FulfillmentQueuePage from '@/screens/market/fulfillment/FulfillmentQueuePage';
 import MarketplaceOrderDetailPage from '@/screens/market/orders/MarketplaceOrderDetailPage';
 import ProviderOrdersPage from '@/screens/market/orders/ProviderOrdersPage';
 import ProfileRecentActivityScreen from '@/screens/profile/ProfileRecentActivityScreen';
@@ -546,6 +556,13 @@ function AppContent() {
   const { themeMode } = useThemeMode();
   const sysScheme = useColorScheme();
   const scheme = themeMode === 'system' ? sysScheme : themeMode;
+  // Matches theme/constants.ts dark.bg / light.bg exactly, so a modal
+  // sheet's own content and the native chrome behind it are seamless -
+  // see the comment above RootStack.Navigator for why this is needed at
+  // all (NavigationContainer's background is forced transparent).
+  const educationModalContentStyle = {
+    backgroundColor: scheme === 'dark' ? '#0A090F' : '#F8F6F3',
+  };
   // Start null so the gold gradient never flashes before navigation is ready.
   // syncActiveRoute fires via onReady/onStateChange and sets the real value.
   const [activeRouteName, setActiveRouteName] = useState<string | null>(null);
@@ -1442,6 +1459,7 @@ function AppContent() {
                   EducationCertificates: 'education/certificates',
                   EducationInstitutionPicker: 'education/institutions',
                   EducationCourseDetail: 'education/courses/:contentId',
+                  EducationInstitutionProfile: 'education/institutions/:institutionId/profile',
                   EducationInstitutionDashboard: 'education/institutions/:institutionId',
 
                   MainTabs: {
@@ -1456,6 +1474,15 @@ function AppContent() {
           >
             <MiniPlayerProvider>
             <GlobalProfilePreviewProvider>
+              {/* NavigationContainer's theme.colors.background is forced to
+                  'transparent' above (so tab screens' own gradient/animated
+                  backgrounds show through) - that leaves nothing behind a
+                  screen's own content, and on a presentation:'modal' sheet
+                  the native OS chrome (white by default) shows through the
+                  gap, most visibly as a white strip at the bottom of the
+                  sheet in dark mode. educationModalContentStyle explicitly
+                  repaints that gap to match the current theme, for every
+                  Education modal screen below. */}
               <RootStack.Navigator screenOptions={{ headerShown: false }}>
                 {isAuth ? (
                   <>
@@ -1689,6 +1716,21 @@ function AppContent() {
                       options={{ presentation: 'modal' }}
                     />
                     <RootStack.Screen
+                      name="Wishlist"
+                      getComponent={() => WishlistPage}
+                      options={{ presentation: 'modal' }}
+                    />
+                    <RootStack.Screen
+                      name="Addresses"
+                      getComponent={() => AddressListPage}
+                      options={{ presentation: 'modal' }}
+                    />
+                    <RootStack.Screen
+                      name="FulfillmentQueue"
+                      getComponent={() => FulfillmentQueuePage}
+                      options={{ presentation: 'modal' }}
+                    />
+                    <RootStack.Screen
                       name="MarketplaceProviderOrders"
                       getComponent={() => ProviderOrdersPage}
                       options={{ presentation: 'modal' }}
@@ -1863,18 +1905,35 @@ function AppContent() {
                       getComponent={() => ClinicalCommandCenterScreen}
                     />
                     {/* Education UX v2 */}
-                    <RootStack.Screen name="EducationHome" getComponent={() => EducationHomeScreen} />
-                    <RootStack.Screen name="EducationMyLearning" getComponent={() => MyLearningScreen} />
-                    <RootStack.Screen name="EducationCourseDetail" getComponent={() => CourseDetailScreen} />
-                    <RootStack.Screen name="EducationLearningPlayer" getComponent={() => LearningPlayerScreen} />
-                    <RootStack.Screen name="EducationCertificates" getComponent={() => CertificatesScreen} />
-                    <RootStack.Screen name="EducationInstitutionPicker" getComponent={() => InstitutionPickerScreen} />
-                    <RootStack.Screen name="EducationInstitutionDashboard" getComponent={() => InstitutionDashboardScreen} />
-                    <RootStack.Screen name="EducationCourses" getComponent={() => CoursesListScreen} />
-                    <RootStack.Screen name="EducationCourseBuilder" getComponent={() => CourseBuilderScreen} />
-                    <RootStack.Screen name="EducationLearners" getComponent={() => LearnersScreen} />
-                    <RootStack.Screen name="EducationEventsLive" getComponent={() => EventsLiveScreen} />
-                    <RootStack.Screen name="EducationInstitutionSettings" getComponent={() => InstitutionSettingsScreen} />
+                    {/* Education UX v2 — presentation: 'modal' on every screen in this
+                        flow (same convention as the other modal.-tagged registrations
+                        above) so pushing from the inline Education broadcast sub-tab
+                        slides up as a sheet instead of a full lateral push. This does
+                        NOT keep the Golden Section mounted underneath — react-navigation
+                        blurs the screen below regardless of presentation style, and
+                        useGoldenSectionContent unregisters on blur by design (see
+                        GoldenSectionContext.tsx) — every screen in the app already works
+                        this way. It only changes the transition/chrome so it *reads* as
+                        opening over the tab rather than replacing it. */}
+                    <RootStack.Screen name="EducationHome" getComponent={() => EducationHomeScreen} options={{ presentation: 'modal', contentStyle: educationModalContentStyle }} />
+                    <RootStack.Screen name="EducationMyLearning" getComponent={() => MyLearningScreen} options={{ presentation: 'modal', contentStyle: educationModalContentStyle }} />
+                    <RootStack.Screen name="EducationCourseDetail" getComponent={() => CourseDetailScreen} options={{ presentation: 'modal', contentStyle: educationModalContentStyle }} />
+                    <RootStack.Screen name="EducationLearningPlayer" getComponent={() => LearningPlayerScreen} options={{ presentation: 'modal', contentStyle: educationModalContentStyle }} />
+                    <RootStack.Screen name="EducationCertificates" getComponent={() => CertificatesScreen} options={{ presentation: 'modal', contentStyle: educationModalContentStyle }} />
+                    <RootStack.Screen name="EducationInstitutionProfile" getComponent={() => InstitutionProfileScreen} options={{ presentation: 'modal', contentStyle: educationModalContentStyle }} />
+                    <RootStack.Screen name="EducationInstitutionPicker" getComponent={() => InstitutionPickerScreen} options={{ presentation: 'modal', contentStyle: educationModalContentStyle }} />
+                    <RootStack.Screen name="EducationInstitutionDashboard" getComponent={() => InstitutionDashboardScreen} options={{ presentation: 'modal', contentStyle: educationModalContentStyle }} />
+                    <RootStack.Screen name="EducationCourses" getComponent={() => CoursesListScreen} options={{ presentation: 'modal', contentStyle: educationModalContentStyle }} />
+                    <RootStack.Screen name="EducationPrograms" getComponent={() => ProgramsListScreen} options={{ presentation: 'modal', contentStyle: educationModalContentStyle }} />
+                    <RootStack.Screen name="EducationProgramForm" getComponent={() => ProgramFormScreen} options={{ presentation: 'modal', contentStyle: educationModalContentStyle }} />
+                    <RootStack.Screen name="EducationProgramDashboard" getComponent={() => ProgramDashboardScreen} options={{ presentation: 'modal', contentStyle: educationModalContentStyle }} />
+                    <RootStack.Screen name="EducationClassForm" getComponent={() => ClassFormScreen} options={{ presentation: 'modal', contentStyle: educationModalContentStyle }} />
+                    <RootStack.Screen name="EducationClassDashboard" getComponent={() => ClassDashboardScreen} options={{ presentation: 'modal', contentStyle: educationModalContentStyle }} />
+                    <RootStack.Screen name="EducationCourseBuilder" getComponent={() => CourseBuilderScreen} options={{ presentation: 'modal', contentStyle: educationModalContentStyle }} />
+                    <RootStack.Screen name="EducationLearners" getComponent={() => LearnersScreen} options={{ presentation: 'modal', contentStyle: educationModalContentStyle }} />
+                    <RootStack.Screen name="EducationEventsLive" getComponent={() => EventsLiveScreen} options={{ presentation: 'modal', contentStyle: educationModalContentStyle }} />
+                    <RootStack.Screen name="EducationInstitutionSettings" getComponent={() => InstitutionSettingsScreen} options={{ presentation: 'modal', contentStyle: educationModalContentStyle }} />
+                    <RootStack.Screen name="EducationBroadcasts" getComponent={() => BroadcastsScreen} options={{ presentation: 'modal', contentStyle: educationModalContentStyle }} />
                     <RootStack.Screen
                       name="WebsiteBuilder"
                       getComponent={() => WebsiteBuilderScreen}

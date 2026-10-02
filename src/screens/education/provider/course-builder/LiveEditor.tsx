@@ -10,8 +10,11 @@
 // ISO timestamps client-side — safer (no malformed-date parsing) and
 // faster to use than typing a timestamp string.
 import React, { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, Text, View } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useKISTheme } from '@/theme/useTheme';
+import type { RootStackParamList } from '@/navigation/types';
 import { KISIcon } from '@/constants/kisIcons';
 import KISButton from '@/constants/KISButton';
 import KISTextInput from '@/constants/KISTextInput';
@@ -19,6 +22,8 @@ import ROUTES from '@/network';
 import { getRequest } from '@/network/get';
 import { postRequest } from '@/network/post';
 import { patchRequest } from '@/network/patch';
+import { useDetachedChatOverlayProps } from '@/contexts/DetachedChatOverlayContext';
+import { getOrCreateCourseGroupChat } from '@/screens/education/shared/courseGroupChat';
 
 function FieldLabel({ children }: { children: React.ReactNode }) {
   const { palette } = useKISTheme();
@@ -33,10 +38,14 @@ const DAY_PRESETS = [
 ];
 const DURATION_PRESETS = [30, 60, 90, 120];
 
-type Props = { institutionId: string; courseId: string };
+type Props = { institutionId: string; courseId: string; courseTitle: string };
 
-export default function LiveEditor({ institutionId, courseId }: Props) {
+type Nav = NativeStackNavigationProp<RootStackParamList>;
+
+export default function LiveEditor({ institutionId, courseId, courseTitle }: Props) {
   const { palette } = useKISTheme();
+  const navigation = useNavigation<Nav>();
+  const chatOverlay = useDetachedChatOverlayProps();
   const [sessions, setSessions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [adding, setAdding] = useState(false);
@@ -50,6 +59,7 @@ export default function LiveEditor({ institutionId, courseId }: Props) {
   const [locationText, setLocationText] = useState('');
   const [seatLimit, setSeatLimit] = useState('');
   const [saving, setSaving] = useState(false);
+  const [connectingGroupChat, setConnectingGroupChat] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -110,12 +120,51 @@ export default function LiveEditor({ institutionId, courseId }: Props) {
     if (response?.success) await load();
   }, [institutionId, load]);
 
+  // The course's one persistent group chat/call — see courseGroupChat.ts.
+  // Same resolved group whichever student or instructor opens it first.
+  // popToTop() before opening it for the same reason LearningPlayerScreen's
+  // matching handler does — the overlay already paints above everything on
+  // its own, this is purely so closing the chat lands the instructor back
+  // at their base tab instead of a deep stack of course-builder modals.
+  const openGroupChat = useCallback(async () => {
+    setConnectingGroupChat(true);
+    try {
+      const group = await getOrCreateCourseGroupChat(courseId, courseTitle);
+      if (!group) {
+        Alert.alert('Group chat', 'Unable to open the group chat right now.');
+        return;
+      }
+      navigation.popToTop();
+      chatOverlay?.openChat({
+        id: group.conversationId,
+        conversationId: group.conversationId,
+        name: group.name,
+        kind: 'group',
+        isGroup: true,
+        isGroupChat: true,
+        groupId: group.groupId,
+      } as any);
+    } finally {
+      setConnectingGroupChat(false);
+    }
+  }, [courseId, courseTitle, chatOverlay, navigation]);
+
   if (loading) {
     return <ActivityIndicator color={palette.primary} style={{ marginTop: 20 }} />;
   }
 
   return (
     <View style={{ gap: 16 }}>
+      <View style={{ padding: 12, borderRadius: 12, borderWidth: 1, borderColor: palette.border, backgroundColor: palette.surface, gap: 8 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <KISIcon name="people" size={16} color={palette.primary} />
+          <Text style={{ color: palette.text, fontWeight: '700', flex: 1 }}>Class group chat</Text>
+        </View>
+        <Text style={{ fontSize: 12, color: palette.subtext }}>
+          One shared room for this course — students can text or call from inside it once they join. Unlike students, you're not time-gated to a session window here.
+        </Text>
+        <KISButton title={connectingGroupChat ? 'Opening…' : 'Join live session'} disabled={connectingGroupChat} loading={connectingGroupChat} onPress={() => void openGroupChat()} />
+      </View>
       {sessions.length === 0 ? <Text style={{ color: palette.subtext, fontSize: 13 }}>No live classes scheduled yet.</Text> : null}
       {sessions.map(session => (
         <View key={session.id} style={{ padding: 12, borderRadius: 12, borderWidth: 1, borderColor: palette.border, backgroundColor: palette.surface, gap: 6 }}>

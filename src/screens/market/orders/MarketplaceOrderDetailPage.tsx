@@ -70,6 +70,18 @@ export default function MarketplaceOrderDetailPage() {
   const [complaintSubmitting, setComplaintSubmitting] = useState(false);
   const [receiptLoading, setReceiptLoading] = useState(false);
   const [paymentOpening, setPaymentOpening] = useState(false);
+  const [fulfillment, setFulfillment] = useState<any | null>(null);
+
+  const fetchFulfillment = useCallback(async () => {
+    const response = await getRequest(ROUTES.commerce.marketplaceOrderFulfillment(orderId), {
+      errorMessage: 'Unable to load shipping status.',
+    });
+    if (response.success) {
+      setFulfillment(response.data);
+    } else {
+      setFulfillment(null);
+    }
+  }, [orderId]);
 
   const fetchOrder = useCallback(async () => {
     setLoading(true);
@@ -94,7 +106,8 @@ export default function MarketplaceOrderDetailPage() {
 
   useEffect(() => {
     void fetchOrder();
-  }, [fetchOrder]);
+    void fetchFulfillment();
+  }, [fetchOrder, fetchFulfillment]);
 
   const handleAction = useCallback(
     async (endpoint: string, label: string) => {
@@ -382,6 +395,47 @@ export default function MarketplaceOrderDetailPage() {
           </Text>
         ) : null}
       </View>
+      {fulfillment ? (
+        <View
+          style={[
+            styles.detailCard,
+            { borderColor: palette.divider, backgroundColor: palette.surface },
+          ]}
+        >
+          <Text style={[styles.sectionLabel, { color: palette.subtext }]}>
+            Shipping
+          </Text>
+          <Text style={[styles.sectionValue, { color: palette.text }]}>
+            {String(fulfillment.status || '')
+              .replace(/_/g, ' ')
+              .replace(/^./, (c: string) => c.toUpperCase())}
+          </Text>
+          {fulfillment.estimated_delivery_min ? (
+            <Text style={[styles.itemMeta, { color: palette.subtext }]}>
+              Estimated delivery · {fulfillment.estimated_delivery_min} to {fulfillment.estimated_delivery_max}
+            </Text>
+          ) : null}
+          {(fulfillment.shipments || []).map((shipment: any) => (
+            <View key={shipment.id} style={styles.shipmentBlock}>
+              <Text style={[styles.itemMeta, { color: palette.text, fontWeight: '700' }]}>
+                {shipment.reference}
+                {shipment.tracking_number ? ` · ${shipment.tracking_number}` : ''}
+              </Text>
+              <Text style={[styles.itemMeta, { color: palette.subtext }]}>
+                {String(shipment.status || '').replace(/_/g, ' ')}
+                {shipment.carrier_name ? ` · ${shipment.carrier_name}` : ''}
+              </Text>
+              {(shipment.events || []).slice(0, 5).map((event: any) => (
+                <Text key={event.id} style={[styles.itemMeta, { color: palette.subtext, marginLeft: 8 }]}>
+                  • {String(event.status || '').replace(/_/g, ' ')}
+                  {event.location ? ` — ${event.location}` : ''}
+                  {event.description ? `: ${event.description}` : ''}
+                </Text>
+              ))}
+            </View>
+          ))}
+        </View>
+      ) : null}
       {isAwaitingSatisfaction ? (
         <View
           style={[styles.awaitingBanner, { borderColor: palette.primaryLight }]}
@@ -654,6 +708,10 @@ const styles = StyleSheet.create({
   },
   itemMeta: {
     fontSize: 12,
+  },
+  shipmentBlock: {
+    marginTop: 10,
+    gap: 2,
   },
   attributeRow: {
     flexDirection: 'row',

@@ -181,6 +181,9 @@ export type RootStackParamList = {
   MarketplaceOrders: undefined;
   MarketplaceProviderOrders: undefined;
   MarketplaceOrderDetail: { orderId: string; mode: 'buyer' | 'provider' };
+  Wishlist: undefined;
+  Addresses: undefined;
+  FulfillmentQueue: undefined;
   ProfileRecentActivity: undefined;
   ProfileImpactSnapshot: undefined;
   ProfileNotifications: undefined;
@@ -210,6 +213,14 @@ export type RootStackParamList = {
     itemId: string;
   };
   EducationCertificates: undefined;
+  // Learner-facing institution profile: reached by tapping an institution
+  // spotlight card on EducationHome. Shows the institution's public
+  // courses plus its published Broadcast records (announcements/updates) -
+  // the learner-facing half of the provider Broadcasts screen below.
+  EducationInstitutionProfile: {
+    institutionId: string;
+    institutionName?: string;
+  };
   // Provider-facing: real destinations replacing the internal
   // hub/form/dashboard/module/detail state machine in
   // EducationManagementModal.tsx (kept in place as the underlying data/
@@ -225,10 +236,42 @@ export type RootStackParamList = {
     institutionId: string;
     institutionName?: string;
   };
+  EducationPrograms: {
+    institutionId: string;
+    institutionName?: string;
+  };
+  EducationProgramForm: {
+    institutionId: string;
+    institutionName?: string;
+    programId?: string;
+  };
+  EducationProgramDashboard: {
+    institutionId: string;
+    institutionName?: string;
+    programId: string;
+    programTitle?: string;
+  };
+  EducationClassForm: {
+    institutionId: string;
+    institutionName?: string;
+    classId?: string;
+    programId?: string;
+  };
+  EducationClassDashboard: {
+    institutionId: string;
+    institutionName?: string;
+    classId: string;
+    className?: string;
+  };
   EducationCourseBuilder: {
     institutionId: string;
     institutionName?: string;
     courseId?: string;
+    // Preset the Program/Class picker when creating a course from a
+    // Program or Class Dashboard's "+ Add Course" — ignored once
+    // courseId is set (an existing course's own program/class wins).
+    presetProgramId?: string;
+    presetInstitutionClassId?: string;
   };
   EducationLearners: {
     institutionId: string;
@@ -239,6 +282,16 @@ export type RootStackParamList = {
     institutionName?: string;
   };
   EducationInstitutionSettings: {
+    institutionId: string;
+    institutionName?: string;
+  };
+  // Broadcasts: publish institution announcements (institution_notice) and
+  // manually broadcast programs/lessons/class sessions/training
+  // sessions/events that don't get the automatic course-publish sync
+  // CourseBuilderScreen does for courses. Cut entirely from the v2
+  // rewrite's first pass - this restores it as its own destination rather
+  // than the old checklist-style module tab.
+  EducationBroadcasts: {
     institutionId: string;
     institutionName?: string;
   };

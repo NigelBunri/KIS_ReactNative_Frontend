@@ -30,11 +30,13 @@ import ROUTES from '@/network';
 import { getRequest } from '@/network/get';
 import { postRequest } from '@/network/post';
 import { patchRequest } from '@/network/patch';
+import { deleteRequest } from '@/network/delete';
 import { uploadEducationMedia } from '@/services/uploadEducationMedia';
 import ContentEditor from '@/screens/education/provider/course-builder/ContentEditor';
 import AssessmentsEditor from '@/screens/education/provider/course-builder/AssessmentsEditor';
 import LiveEditor from '@/screens/education/provider/course-builder/LiveEditor';
 import type { RootStackParamList } from '@/navigation/types';
+import { EducationSectionCard } from '@/screens/education/shared/components';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 type Route_ = RouteProp<RootStackParamList, 'EducationCourseBuilder'>;
@@ -82,10 +84,14 @@ export default function CourseBuilderScreen() {
   const [priceAmount, setPriceAmount] = useState('0');
   const [durationMinutes, setDurationMinutes] = useState('0');
   const [status, setStatus] = useState<'draft' | 'published' | 'archived'>('draft');
-  const [programId, setProgramId] = useState<string | null>(null);
+  const [programId, setProgramId] = useState<string | null>(route.params.presetProgramId ?? null);
   const [programs, setPrograms] = useState<any[]>([]);
   const [newProgramTitle, setNewProgramTitle] = useState('');
   const [creatingProgram, setCreatingProgram] = useState(false);
+  const [classId, setClassId] = useState<string | null>(route.params.presetInstitutionClassId ?? null);
+  const [classes, setClasses] = useState<any[]>([]);
+  const [newClassName, setNewClassName] = useState('');
+  const [creatingClass, setCreatingClass] = useState(false);
   const [seatLimit, setSeatLimit] = useState('');
   const [visibility, setVisibility] = useState<'public' | 'private'>('public');
   const [coverImageUrl, setCoverImageUrl] = useState('');
@@ -111,6 +117,12 @@ export default function CourseBuilderScreen() {
   // so "Published" in this UI means what a non-technical provider expects
   // it to mean.
   const [courseBroadcastId, setCourseBroadcastId] = useState<string | null>(null);
+  // Tracked separately from courseBroadcastId because a broadcast record can
+  // exist but sit in 'draft' (previously live, then removed) — "is this
+  // course actually live right now" needs the status, not just presence.
+  const [courseBroadcastStatus, setCourseBroadcastStatus] = useState<string | null>(null);
+  const [togglingLive, setTogglingLive] = useState(false);
+  const isLive = courseBroadcastStatus === 'published';
 
   useEffect(() => {
     if (!courseId) return;
@@ -126,21 +138,116 @@ export default function CourseBuilderScreen() {
           setDurationMinutes(String(course.duration_minutes ?? 0));
           setStatus(course.status ?? 'draft');
           setProgramId(course.program?.id ?? course.program_id ?? null);
+          setClassId(course.institution_class?.id ?? course.institution_class_id ?? null);
           setSeatLimit(course.seat_limit != null ? String(course.seat_limit) : '');
           setVisibility(course.visibility === 'private' ? 'private' : 'public');
           setCoverImageUrl(course.cover_image_url ?? course.coverUrl ?? '');
         }
         const existingBroadcast = (response?.data?.broadcasts ?? []).find((b: any) => b.broadcast_kind === 'course');
         setCourseBroadcastId(existingBroadcast?.id ?? null);
+        setCourseBroadcastStatus(existingBroadcast?.status ?? null);
       })
       .finally(() => setLoading(false));
   }, [institutionId, courseId]);
+
+  // The backend now guarantees status=published <-> a published course-kind
+  // broadcast exists (see _ensure_course_broadcast_matches_status on the
+  // course create/patch endpoints) — this just re-reads whatever the
+  // backend decided after a save, instead of this screen managing the
+  // broadcast itself.
+  const refreshCourseBroadcastStatus = useCallback(
+    async (id: string) => {
+      const response = await getRequest(ROUTES.broadcasts.educationInstitutionCourseDetail(institutionId, id), { forceNetwork: true });
+      const existingBroadcast = (response?.data?.broadcasts ?? []).find((b: any) => b.broadcast_kind === 'course');
+      setCourseBroadcastId(existingBroadcast?.id ?? null);
+      setCourseBroadcastStatus(existingBroadcast?.status ?? null);
+    },
+    [institutionId],
+  );
+
+  // Explicit "Broadcast" action — independent of Save, so going live/removing
+  // from live doesn't require touching (or accidentally changing) any other
+  // field. Same broadcast record and payload shape saveDetails already
+  // manages automatically on status changes; this just exposes it directly.
+  const toggleBroadcastLive = useCallback(async () => {
+    if (!courseId) {
+      Alert.alert('Broadcast', 'Save this course first, then you can broadcast it.');
+      return;
+    }
+    setTogglingLive(true);
+    try {
+      if (isLive) {
+        const response = await patchRequest(
+          ROUTES.broadcasts.educationInstitutionBroadcast(institutionId, courseBroadcastId!),
+          { status: 'draft' },
+          { errorMessage: 'Unable to remove this course from live.' },
+        );
+        if (!response?.success) {
+          Alert.alert('Broadcast', response?.message || 'Unable to remove this course from live.');
+          return;
+        }
+        setCourseBroadcastStatus('draft');
+      } else if (courseBroadcastId) {
+        const response = await patchRequest(
+          ROUTES.broadcasts.educationInstitutionBroadcast(institutionId, courseBroadcastId),
+          { status: 'published' },
+          { errorMessage: 'Unable to make this course live.' },
+        );
+        if (!response?.success) {
+          Alert.alert('Broadcast', response?.message || 'Unable to make this course live.');
+          return;
+        }
+        setCourseBroadcastStatus('published');
+      } else {
+        const response = await postRequest(
+          ROUTES.broadcasts.educationInstitutionBroadcasts(institutionId),
+          { course_id: courseId, status: 'published' },
+          { errorMessage: 'Unable to make this course live.' },
+        );
+        if (!response?.success) {
+          Alert.alert('Broadcast', response?.message || 'Unable to make this course live.');
+          return;
+        }
+        setCourseBroadcastId(response.data?.broadcast?.id ?? null);
+        setCourseBroadcastStatus('published');
+      }
+    } finally {
+      setTogglingLive(false);
+    }
+  }, [courseId, institutionId, isLive, courseBroadcastId]);
 
   useEffect(() => {
     getRequest(ROUTES.broadcasts.educationInstitutionPrograms(institutionId), { forceNetwork: true }).then(response => {
       setPrograms(response?.data?.programs ?? []);
     });
+    getRequest(ROUTES.broadcasts.educationInstitutionClasses(institutionId), { forceNetwork: true }).then(response => {
+      setClasses(response?.data?.classes ?? []);
+    });
   }, [institutionId]);
+
+  const createClass = useCallback(async () => {
+    if (!newClassName.trim()) return;
+    setCreatingClass(true);
+    try {
+      // A class does not need a program - it can be created standalone
+      // from right here, same "create inline while picking" pattern as
+      // createProgram below. If a program is already selected, the new
+      // class is created under it; otherwise it's a standalone class.
+      const response = await postRequest(
+        ROUTES.broadcasts.educationInstitutionClasses(institutionId),
+        { name: newClassName.trim(), status: 'published', program_id: programId || undefined },
+        { errorMessage: 'Unable to create class.' },
+      );
+      const created = response?.data?.class;
+      if (created) {
+        setClasses(prev => [...prev, created]);
+        setClassId(created.id);
+        setNewClassName('');
+      }
+    } finally {
+      setCreatingClass(false);
+    }
+  }, [newClassName, institutionId, programId]);
 
   const createProgram = useCallback(async () => {
     if (!newProgramTitle.trim()) return;
@@ -229,6 +336,7 @@ export default function CourseBuilderScreen() {
         duration_minutes: Number(durationMinutes) || 0,
         status,
         program_id: programId || null,
+        institution_class_id: classId || null,
         seat_limit: seatLimit.trim() ? Number(seatLimit) : null,
         visibility,
         cover_image_attachment: coverImageAttachment,
@@ -250,37 +358,21 @@ export default function CourseBuilderScreen() {
       // Publishing = the course exists AND a broadcast points at it (see
       // the field comment above courseBroadcastId for why). Draft = no
       // learner-visible broadcast at all, rather than leaving a stale
-      // published one around pointing at an unpublished course.
+      // published one around pointing at an unpublished course. The
+      // course create/patch endpoint itself now enforces this (see
+      // _ensure_course_broadcast_matches_status on the backend) — this
+      // screen just re-reads the result instead of managing it separately,
+      // so the invariant holds even when a course is published from
+      // somewhere other than this screen.
       if (savedCourseId) {
-        if (status === 'published' && !courseBroadcastId) {
-          const broadcastRes = await postRequest(
-            ROUTES.broadcasts.educationInstitutionBroadcasts(institutionId),
-            { course_id: savedCourseId, status: 'published' },
-            { errorMessage: 'Course was saved, but publishing it to learners failed.' },
-          );
-          if (broadcastRes?.success && broadcastRes.data?.broadcast?.id) {
-            setCourseBroadcastId(broadcastRes.data.broadcast.id);
-          }
-        } else if (status === 'published' && courseBroadcastId) {
-          await patchRequest(
-            ROUTES.broadcasts.educationInstitutionBroadcast(institutionId, courseBroadcastId),
-            { status: 'published' },
-            { errorMessage: 'Unable to re-publish this course.' },
-          );
-        } else if (status !== 'published' && courseBroadcastId) {
-          await patchRequest(
-            ROUTES.broadcasts.educationInstitutionBroadcast(institutionId, courseBroadcastId),
-            { status: 'draft' },
-            { errorMessage: 'Unable to unpublish this course.' },
-          );
-        }
+        await refreshCourseBroadcastStatus(savedCourseId);
       }
 
       Alert.alert('Course', 'Saved.');
     } finally {
       setSaving(false);
     }
-  }, [title, summary, description, priceAmount, durationMinutes, status, programId, courseId, institutionId, courseBroadcastId, seatLimit, visibility, coverImageAsset]);
+  }, [title, summary, description, priceAmount, durationMinutes, status, programId, classId, courseId, institutionId, refreshCourseBroadcastStatus, seatLimit, visibility, coverImageAsset]);
 
   const createModule = useCallback(async () => {
     if (!courseId) return;
@@ -291,6 +383,48 @@ export default function CourseBuilderScreen() {
     );
     if (response?.success) await loadCurriculum();
   }, [institutionId, courseId, modules.length, loadCurriculum]);
+
+  // Deletes the underlying content record itself (not just its link into
+  // this module) — same routes/behavior as the old modal's
+  // handleDeleteModuleRecord, one detail route per item_type.
+  const deleteModuleItem = useCallback(
+    (item: any) => {
+      const routeByType: Record<string, ((instId: string, id: string) => string) | undefined> = {
+        lesson: ROUTES.broadcasts.educationInstitutionLesson,
+        material: ROUTES.broadcasts.educationInstitutionMaterial,
+        class_session: ROUTES.broadcasts.educationInstitutionClassSession,
+        assessment: ROUTES.broadcasts.educationInstitutionAssessment,
+        event: ROUTES.broadcasts.educationInstitutionEvent,
+      };
+      const idField = `${item.item_type}_id`;
+      const targetId = item[idField];
+      const routeFn = routeByType[item.item_type];
+      if (!routeFn || !targetId) return;
+      const label = String(item.item_type || 'item').replace('_', ' ');
+      Alert.alert(
+        `Delete ${label}`,
+        `This will permanently delete this ${label}, not just remove it from the module. Are you sure?`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Delete',
+            style: 'destructive',
+            onPress: async () => {
+              const response = await deleteRequest(routeFn(institutionId, targetId), {
+                errorMessage: `Unable to delete this ${label}.`,
+              });
+              if (response?.success || response === undefined) {
+                await loadCurriculum();
+              } else {
+                Alert.alert('Delete', response?.message || `Unable to delete this ${label}.`);
+              }
+            },
+          },
+        ],
+      );
+    },
+    [institutionId, loadCurriculum],
+  );
 
   const createAndLinkItem = useCallback(async () => {
     if (!courseId || !addContentModuleId || !addContentType) return;
@@ -361,7 +495,7 @@ export default function CourseBuilderScreen() {
   const isNew = !courseId;
 
   return (
-    <SafeAreaView edges={['bottom']} style={{ flex: 1, backgroundColor: palette.bg }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: responsive.pageGutter, paddingTop: 10 }}>
         <Pressable onPress={() => navigation.goBack()} style={{ padding: 4, marginLeft: -4 }}>
           <KISIcon name="back" size={20} color={palette.text} />
@@ -371,7 +505,18 @@ export default function CourseBuilderScreen() {
         </Text>
       </View>
 
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingHorizontal: responsive.pageGutter, paddingVertical: 12 }}>
+      {/* flexGrow/flexShrink pinned to 0 — a bare <ScrollView> defaults its
+          outer container to flexGrow:1/flexShrink:1, which made this row
+          compete for vertical space with the content ScrollView below it:
+          squished (text clipped) when that content was tall, stretched
+          (oddly tall) when it was short. This row's height should only ever
+          come from its own pill content. */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={{ flexGrow: 0, flexShrink: 0 }}
+        contentContainerStyle={{ gap: 8, paddingHorizontal: responsive.pageGutter, paddingVertical: 12 }}
+      >
         {TABS.map(t => {
           const disabled = t.needsCourse && isNew;
           return (
@@ -398,9 +543,10 @@ export default function CourseBuilderScreen() {
       {loading ? (
         <ActivityIndicator color={palette.primary} style={{ marginTop: 30 }} />
       ) : (
-        <ScrollView contentContainerStyle={{ padding: responsive.pageGutter, gap: 14, paddingBottom: 60 }}>
+        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: responsive.pageGutter, gap: 14, paddingBottom: 60 }}>
           {tab === 'details' ? (
-            <View style={{ gap: 12 }}>
+            <EducationSectionCard palette={palette} eyebrow={isNew ? 'New course' : 'Course details'} title={isNew ? 'Create a course' : 'Edit course details'}>
+            <View style={{ gap: 12, marginTop: 4 }}>
               <View>
                 <FieldLabel>Cover image</FieldLabel>
                 <Pressable
@@ -491,6 +637,32 @@ export default function CourseBuilderScreen() {
                 </View>
               </View>
               <View>
+                <FieldLabel>Class (optional)</FieldLabel>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
+                  <Pressable
+                    onPress={() => setClassId(null)}
+                    style={{ paddingHorizontal: 12, paddingVertical: 7, borderRadius: 999, borderWidth: 1, borderColor: !classId ? palette.primary : palette.border, backgroundColor: !classId ? palette.primarySoft : 'transparent' }}
+                  >
+                    <Text style={{ fontSize: 12, fontWeight: '700', color: !classId ? palette.primaryStrong : palette.subtext }}>None</Text>
+                  </Pressable>
+                  {classes.map(cls => (
+                    <Pressable
+                      key={cls.id}
+                      onPress={() => setClassId(cls.id)}
+                      style={{ paddingHorizontal: 12, paddingVertical: 7, borderRadius: 999, borderWidth: 1, borderColor: classId === cls.id ? palette.primary : palette.border, backgroundColor: classId === cls.id ? palette.primarySoft : 'transparent' }}
+                    >
+                      <Text style={{ fontSize: 12, fontWeight: '700', color: classId === cls.id ? palette.primaryStrong : palette.subtext }} numberOfLines={1}>{cls.name}</Text>
+                    </Pressable>
+                  ))}
+                </ScrollView>
+                <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
+                  <View style={{ flex: 1 }}>
+                    <KISTextInput placeholder="New class name" value={newClassName} onChangeText={setNewClassName} />
+                  </View>
+                  <KISButton title={creatingClass ? '…' : 'Add'} size="sm" disabled={creatingClass} onPress={() => void createClass()} />
+                </View>
+              </View>
+              <View>
                 <FieldLabel>Status</FieldLabel>
                 <View style={{ flexDirection: 'row', gap: 8 }}>
                   {(['draft', 'published'] as const).map(s => (
@@ -514,6 +686,28 @@ export default function CourseBuilderScreen() {
                   {status === 'published' ? 'Visible and enrollable for learners once saved.' : 'Hidden from learners until Published.'}
                 </Text>
               </View>
+              <View style={{ padding: 14, borderRadius: 14, borderWidth: 1, borderColor: isLive ? palette.primary : palette.border, backgroundColor: isLive ? palette.primarySoft : palette.surface, gap: 8 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: isLive ? palette.primaryStrong : palette.subtext }} />
+                  <Text style={{ fontWeight: '800', color: palette.text, flex: 1 }}>
+                    {isLive ? 'Live in Broadcast → Education' : 'Not live'}
+                  </Text>
+                </View>
+                <Text style={{ fontSize: 12, color: palette.subtext }}>
+                  {isNew
+                    ? 'Save this course first, then broadcast it to make it visible under the Education tab.'
+                    : isLive
+                      ? 'Learners can find and enroll in this course from the Education tab right now.'
+                      : 'Broadcast this course to make it visible under the Education tab.'}
+                </Text>
+                <KISButton
+                  title={togglingLive ? 'Working…' : isLive ? 'Remove from live' : 'Broadcast'}
+                  variant={isLive ? 'outline' : 'primary'}
+                  disabled={isNew || togglingLive}
+                  loading={togglingLive}
+                  onPress={() => void toggleBroadcastLive()}
+                />
+              </View>
               <KISButton title={saving ? 'Saving…' : isNew ? 'Create course' : 'Save changes'} disabled={saving} loading={saving} onPress={() => void saveDetails()} />
               {status === 'published' && Number(priceAmount) > 0 ? (
                 <Text style={{ fontSize: 12, color: palette.subtext }}>
@@ -521,6 +715,7 @@ export default function CourseBuilderScreen() {
                 </Text>
               ) : null}
             </View>
+            </EducationSectionCard>
           ) : null}
 
           {tab === 'curriculum' ? (
@@ -541,6 +736,9 @@ export default function CourseBuilderScreen() {
                         {itemIndex + 1}. {item.title_override || item.item_type}
                       </Text>
                       <Text style={{ fontSize: 11, color: palette.subtext, textTransform: 'capitalize' }}>{item.item_type?.replace('_', ' ')}</Text>
+                      <Pressable onPress={() => deleteModuleItem(item)} hitSlop={8} style={{ padding: 2 }}>
+                        <KISIcon name="trash" size={15} color={palette.danger} />
+                      </Pressable>
                     </View>
                   ))}
 
@@ -594,7 +792,7 @@ export default function CourseBuilderScreen() {
 
           {tab === 'content' && courseId ? <ContentEditor institutionId={institutionId} courseId={courseId} /> : null}
           {tab === 'assessments' && courseId ? <AssessmentsEditor institutionId={institutionId} courseId={courseId} /> : null}
-          {tab === 'live' && courseId ? <LiveEditor institutionId={institutionId} courseId={courseId} /> : null}
+          {tab === 'live' && courseId ? <LiveEditor institutionId={institutionId} courseId={courseId} courseTitle={title || 'Course'} /> : null}
 
           {tab === 'settings' ? (
             <View style={{ gap: 12 }}>

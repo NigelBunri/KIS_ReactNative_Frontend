@@ -97,6 +97,18 @@ const parseContent = (content: string): ContentBlock[] => {
   return blocks;
 };
 
+// Splits one paragraph into sentences for read-aloud highlighting. Only
+// breaks before a capital letter/quote/paren following sentence-ending
+// punctuation, so common citation text like "(Matthew 28:19)." doesn't get
+// mis-split mid-reference — not perfect (no splitter for free-form prose
+// is), but a slightly-off boundary here only shifts which words the
+// highlight covers, it never touches the underlying content.
+const SENTENCE_SPLIT = /(?<=[.!?])\s+(?=[A-Z"“(])/;
+const splitSentences = (text: string): string[] => {
+  const parts = text.split(SENTENCE_SPLIT).map(s => s.trim()).filter(Boolean);
+  return parts.length ? parts : [text];
+};
+
 type ViewMode = 'intro' | 'steps' | 'days' | 'lesson' | 'quiz' | 'results';
 
 type QuizResult = { score: number; total: number; passed: boolean };
@@ -164,19 +176,35 @@ export default function TwelvePillarsPanel() {
   // "Listen" — reuses useBibleReadAloud's own on-device TTS engine
   // wiring (play/pause/stop platform quirks, speed persistence) instead
   // of a parallel implementation. It's built around verse-by-verse
-  // BibleReaderPayload/BibleVerse shapes, so each parsed content block
-  // (heading or paragraph) stands in for one "verse" - the hook doesn't
-  // care that the text isn't Scripture, only that verses[].text exists.
-  // navigation.next is always empty here, so a finished reading just
-  // stops (no cross-day auto-continue, unlike the Bible's cross-chapter
-  // one - there's no "next" that would make sense to keep reading into).
+  // BibleReaderPayload/BibleVerse shapes; the hook doesn't care that the
+  // text isn't Scripture, only that verses[].text exists and speaks one
+  // entry at a time. Each "verse" here is one SENTENCE (not one whole
+  // paragraph block) specifically so the hook's existing currentVerseNumber
+  // - already used to know which verse is on-screen while speaking - gives
+  // sentence-granular position for free, without touching react-native-tts's
+  // event wiring (see useBibleReadAloud's own comment on why only
+  // 'tts-start'/'tts-finish' are safe to listen for on this library version;
+  // a word/character progress event is a real, separate crash risk, not
+  // something to add here). navigation.next is always empty here, so a
+  // finished reading just stops (no cross-day auto-continue, unlike the
+  // Bible's cross-chapter one - there's no "next" that would make sense to
+  // keep reading into).
   const readAloudBlocks = useMemo(
     () => parseContent(activeDayContent?.content || ''),
     [activeDayContent],
   );
-  const readAloudVerses = useMemo<BibleVerse[]>(
-    () => readAloudBlocks.map((b, i) => ({ id: `block-${i}`, number: i + 1, text: b.text })),
+  const readAloudSentences = useMemo(
+    () =>
+      readAloudBlocks.flatMap((b, blockIndex) =>
+        b.kind === 'p'
+          ? splitSentences(b.text).map((text, sentenceIndex) => ({ blockIndex, sentenceIndex, text }))
+          : [{ blockIndex, sentenceIndex: 0, text: b.text }],
+      ),
     [readAloudBlocks],
+  );
+  const readAloudVerses = useMemo<BibleVerse[]>(
+    () => readAloudSentences.map((s, i) => ({ id: `sentence-${i}`, number: i + 1, text: s.text })),
+    [readAloudSentences],
   );
   const readAloudReader = useMemo<BibleReaderPayload | null>(() => {
     if (!activeDayContent || activeDoctrineOrder == null || activeDayIndex == null) return null;
@@ -193,6 +221,13 @@ export default function TwelvePillarsPanel() {
     onLoadChapter: () => {},
   });
   const [readAloudSheetOpen, setReadAloudSheetOpen] = useState(false);
+  // currentVerseNumber is 1-indexed and only meaningful while actually
+  // speaking/paused-mid-sentence — null the rest of the time (including
+  // 'finished'), so nothing stays highlighted after the reading ends.
+  const activeReadAloudSentence =
+    readAloud.isActive && readAloud.currentVerseNumber != null
+      ? readAloudSentences[readAloud.currentVerseNumber - 1] ?? null
+      : null;
 
   const openDoctrine = (order: number, locked: boolean) => {
     if (locked) return;
@@ -294,13 +329,13 @@ export default function TwelvePillarsPanel() {
               Be grounded in the faith
             </Text>
             <Text style={{ color: palette.subtext, textAlign: 'center', lineHeight: 22, fontSize: 14 }}>
-              This is a guided walk through the twelve foundational pillars of the Christian faith —
-              God, Christ, the Spirit, man, sin, salvation, the church, and more — built to root you
+              This is a guided walk through the twelve foundational pillars of the Christian faith
+              (God, Christ, the Spirit, man, sin, salvation, the church, and more), built to root you
               deeply, not water anything down.
             </Text>
             <Text style={{ color: palette.subtext, textAlign: 'center', lineHeight: 22, fontSize: 14 }}>
               Each pillar unfolds over six days of focused study, and each day ends with a short test.
-              Score 70% or higher to move forward — you can't skip ahead, and you can always try again.
+              Score 70% or higher to move forward: you can't skip ahead, and you can always try again.
             </Text>
             <View style={[styles.introBanner, { backgroundColor: `${palette.gold}14`, borderColor: `${palette.gold}33` }]}>
               <KISIcon name="trophy" size={18} color={palette.gold} />
@@ -371,7 +406,7 @@ export default function TwelvePillarsPanel() {
             </View>
             <Text style={{ color: palette.text, fontWeight: '900', fontSize: 17 }}>Discipleship Badge earned</Text>
             <Text style={{ color: palette.subtext, textAlign: 'center' }}>
-              You've completed all twelve pillars — well done.
+              You've completed all twelve pillars. Well done.
             </Text>
           </BibleSectionCard>
         ) : null}
@@ -400,7 +435,7 @@ export default function TwelvePillarsPanel() {
             <KISButton title="Lesson" size="xs" variant="outline" onPress={() => setMode('lesson')} />
             <View style={{ flex: 1 }}>
               <Text style={[styles.title, { color: palette.text, fontSize: compact ? 17 : 20 }]}>
-                {activeDayContent.title} — Test
+                {activeDayContent.title}: Test
               </Text>
               <Text style={{ color: palette.subtext, marginTop: 2 }}>
                 Score {activeDayContent.passScore}% or higher to unlock the next day.
@@ -456,7 +491,7 @@ export default function TwelvePillarsPanel() {
                 />
                 <View style={{ flex: 1 }}>
                   <Text style={{ color: result.passed ? palette.success : palette.danger, fontWeight: '900', fontSize: 15 }}>
-                    {result.passed ? 'Passed — next day unlocked' : 'Not passed yet'}
+                    {result.passed ? 'Passed: next day unlocked' : 'Not passed yet'}
                   </Text>
                   <Text style={{ color: palette.subtext, marginTop: 2 }}>
                     {Math.round((result.score / Math.max(1, result.total)) * 100)}% ({result.score}/{result.total})
@@ -523,15 +558,45 @@ export default function TwelvePillarsPanel() {
 
         <BibleSectionCard>
           <View style={{ gap: 12 }}>
-            {readAloudBlocks.map((b, i) =>
-              b.kind === 'h2' ? (
-                <Text key={i} style={[styles.h2, { color: palette.primaryStrong }]}>{b.text}</Text>
-              ) : b.kind === 'h3' ? (
-                <Text key={i} style={[styles.h3, { color: palette.text }]}>{b.text}</Text>
-              ) : (
-                <Text key={i} style={[styles.copy, { color: palette.text }]}>{b.text}</Text>
-              ),
-            )}
+            {readAloudBlocks.map((b, blockIndex) => {
+              const isActiveBlock = activeReadAloudSentence?.blockIndex === blockIndex;
+              if (b.kind === 'h2') {
+                return (
+                  <Text key={blockIndex} style={[styles.h2, { color: palette.primaryStrong }, isActiveBlock && { backgroundColor: `${palette.gold}40` }]}>
+                    {b.text}
+                  </Text>
+                );
+              }
+              if (b.kind === 'h3') {
+                return (
+                  <Text key={blockIndex} style={[styles.h3, { color: palette.text }, isActiveBlock && { backgroundColor: `${palette.gold}40` }]}>
+                    {b.text}
+                  </Text>
+                );
+              }
+              // Re-split with the exact same function used to build
+              // readAloudSentences, so sentence indices line up 1:1 with
+              // whichever one useBibleReadAloud reports as currently
+              // speaking (activeReadAloudSentence.sentenceIndex).
+              const sentences = splitSentences(b.text);
+              return (
+                <Text key={blockIndex} style={[styles.copy, { color: palette.text }]}>
+                  {sentences.map((sentence, sentenceIndex) => (
+                    <Text
+                      key={sentenceIndex}
+                      style={
+                        isActiveBlock && activeReadAloudSentence?.sentenceIndex === sentenceIndex
+                          ? { backgroundColor: `${palette.gold}40` }
+                          : undefined
+                      }
+                    >
+                      {sentence}
+                      {sentenceIndex < sentences.length - 1 ? ' ' : ''}
+                    </Text>
+                  ))}
+                </Text>
+              );
+            })}
           </View>
         </BibleSectionCard>
 

@@ -1,6 +1,6 @@
 // src/screens/broadcast/education/components/EducationContentCard.tsx
 import React from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Image, Pressable, Text, View } from 'react-native';
 import { useKISTheme } from '@/theme/useTheme';
 import { useResponsiveLayout } from '@/theme/responsive';
 import KISButton from '@/constants/KISButton';
@@ -24,6 +24,10 @@ type Props = {
   downloadDisabled?: boolean;
   downloaded?: boolean;
   progress?: EducationProgress | null;
+  // Card fills the width of its parent (grid usage) instead of the fixed
+  // horizontal-scroll-row width — see BroadcastEducationPage's "View all"
+  // grids vs. its teaser rows.
+  fillWidth?: boolean;
 };
 
 const getTypeLabel = (type: EducationContentType) => {
@@ -36,19 +40,24 @@ const getTypeLabel = (type: EducationContentType) => {
       return 'Workshop';
     case 'program':
       return 'Program';
+    case 'class':
+      return 'Class';
     case 'credential':
       return 'Credential';
     case 'mentorship':
       return 'Mentorship';
+    case 'institution':
+      return '🏫 Institution';
     default:
       return 'Content';
   }
 };
 
-const getSubtitle = (item: EducationContentItem) => {
-  if ('partnerName' in item && item.partnerName) return item.partnerName;
-  if ('instructor' in item && item.instructor) return item.instructor;
-  return item.summary ?? item.title;
+const getDescription = (item: EducationContentItem) => {
+  // Institution cards: partnerName duplicates the title (both are the
+  // institution's own name) — show its description instead.
+  if (item.type === 'institution') return item.summary || item.description || null;
+  return item.summary || item.description || null;
 };
 
 const formatPrice = (item: EducationContentItem) => {
@@ -66,6 +75,13 @@ const formatSchedule = (item: EducationContentItem) => {
   return value.toLocaleDateString();
 };
 
+// Luxurious "feed post" card, top to bottom: the posting institution
+// (circular gold-ringed logo + name) up top, then the content's own title,
+// then a full-width cover image, then the description, then stat/trust
+// badges, then the action buttons. Institution-spotlight cards skip their
+// own "posted by" row (the card already IS the institution) but otherwise
+// share the exact same shell/order — used identically in the public
+// broadcast feed and in the creator's course list.
 export default function EducationContentCard({
   item,
   onSelect,
@@ -78,13 +94,12 @@ export default function EducationContentCard({
   downloadDisabled,
   downloaded,
   progress,
+  fillWidth,
 }: Props) {
   const { palette } = useKISTheme();
   const responsive = useResponsiveLayout();
-  const stackCard = responsive.isWatch || responsive.width < 340;
-  const cardWidth: number | '100%' = stackCard ? '100%' : responsive.isTablet ? 336 : 304;
-  const thumbWidth = stackCard ? '100%' : responsive.isCompactPhone ? 68 : 78;
-  const thumbHeight = stackCard ? 132 : responsive.isCompactPhone ? 92 : 106;
+  const cardWidth: number | '100%' = fillWidth ? '100%' : responsive.isTablet ? 320 : 272;
+  const imageHeight = responsive.isWatch ? 130 : responsive.isCompactPhone ? 150 : 176;
 
   const handlePrimary = () => {
     if (onPrimaryAction) {
@@ -94,15 +109,28 @@ export default function EducationContentCard({
     }
   };
 
-  const metadata = [
-    formatPrice(item),
-    item.durationMinutes ? `${item.durationMinutes} mins` : null,
-    item.reviewSummary?.reviewCount
-      ? `${Number(item.reviewSummary.rating || 0).toFixed(1)} stars`
-      : null,
-    formatSchedule(item),
-    item.deliveryMode ? String(item.deliveryMode).replace(/_/g, ' ') : null,
-  ].filter(Boolean);
+  const isInstitution = item.type === 'institution';
+  const institutionName = 'partnerName' in item ? item.partnerName : undefined;
+  const institutionLogoUrl = 'partnerLogoUrl' in item ? item.partnerLogoUrl : undefined;
+  const showInstitutionHeader = !isInstitution && !!institutionName;
+
+  // A promotional institution card advertises the institution as a whole —
+  // course/member counts are the relevant stats here, not price/duration/
+  // schedule, which don't apply to the institution itself.
+  const metadata = isInstitution
+    ? [
+        typeof item.courseCount === 'number' ? `${item.courseCount} courses` : null,
+        typeof item.memberCount === 'number' ? `${item.memberCount} members` : null,
+      ].filter(Boolean)
+    : [
+        formatPrice(item),
+        item.durationMinutes ? `${item.durationMinutes} mins` : null,
+        item.reviewSummary?.reviewCount
+          ? `${Number(item.reviewSummary.rating || 0).toFixed(1)} stars`
+          : null,
+        formatSchedule(item),
+        item.deliveryMode ? String(item.deliveryMode).replace(/_/g, ' ') : null,
+      ].filter(Boolean);
 
   return (
     <Pressable
@@ -113,68 +141,104 @@ export default function EducationContentCard({
       onPress={handlePrimary}
       style={{
         width: cardWidth,
-        minHeight: stackCard ? 0 : 186,
-        borderWidth: 1,
-        borderColor: palette.border,
-        borderRadius: 24,
-        backgroundColor: palette.surface,
-        padding: responsive.isWatch ? 10 : 12,
-        marginBottom: 12,
-        marginRight: 12,
-        flexDirection: stackCard ? 'column' : 'row',
-        gap: 10,
-        shadowColor: palette.shadow ?? palette.royalInk,
-        shadowOpacity: 0.08,
-        shadowRadius: 16,
-        shadowOffset: { width: 0, height: 8 },
-        elevation: 3,
+        borderWidth: 1.5,
+        borderColor: isInstitution ? palette.primary : `${palette.gold ?? palette.primary}55`,
+        borderRadius: 26,
+        backgroundColor: isInstitution ? palette.primarySoft : palette.surface,
+        overflow: 'hidden',
+        marginBottom: 14,
+        marginRight: fillWidth ? 0 : 14,
+        shadowColor: palette.goldShadow ?? palette.shadow ?? palette.royalInk,
+        shadowOpacity: isInstitution ? 0.18 : 0.14,
+        shadowRadius: 20,
+        shadowOffset: { width: 0, height: 10 },
+        elevation: isInstitution ? 6 : 5,
       }}
     >
-      {item.coverUrl ? (
-        <PermanentRemoteImage
-          uri={item.coverUrl}
-          domain="Education"
-          stableKey={`education_content_${item.id}_${item.coverUrl}`}
-          containerStyle={{ width: thumbWidth, height: thumbHeight, borderRadius: 18 }}
-        />
-      ) : (
+      {/* 1. Posting institution — circular gold-ringed logo + name, feed-post style */}
+      {showInstitutionHeader ? (
         <View
           style={{
-            width: thumbWidth,
-            height: thumbHeight,
-            borderRadius: 18,
-            backgroundColor: palette.primarySoft,
+            flexDirection: 'row',
             alignItems: 'center',
-            justifyContent: 'center',
-            borderWidth: 1,
-            borderColor: palette.border,
+            gap: 9,
+            paddingHorizontal: 14,
+            paddingTop: 13,
+            paddingBottom: 10,
           }}
         >
-          <KISIcon name="book" size={24} color={palette.primaryStrong} />
-        </View>
-      )}
-      <View style={{ flex: 1 }}>
-        <View
-          style={{
-            flexDirection: stackCard ? 'column' : 'row',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            gap: 6,
-          }}
-        >
+          {institutionLogoUrl ? (
+            <Image
+              source={{ uri: institutionLogoUrl }}
+              style={{
+                width: 34,
+                height: 34,
+                borderRadius: 17,
+                borderWidth: 1.5,
+                borderColor: palette.gold ?? palette.primary,
+                backgroundColor: palette.bg,
+              }}
+            />
+          ) : (
+            <View
+              style={{
+                width: 34,
+                height: 34,
+                borderRadius: 17,
+                borderWidth: 1.5,
+                borderColor: palette.gold ?? palette.primary,
+                backgroundColor: palette.primarySoft,
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <KISIcon name="school" size={16} color={palette.primaryStrong} />
+            </View>
+          )}
+          <Text style={{ color: palette.text, fontWeight: '800', fontSize: 13, flex: 1 }} numberOfLines={1}>
+            {institutionName}
+          </Text>
           <Text
-            style={{
-              color: palette.primaryStrong,
-              fontWeight: '900',
-              fontSize: 11,
-              textTransform: 'uppercase',
-              letterSpacing: 0.6,
-            }}
+            style={{ color: palette.goldDeep ?? palette.primaryStrong, fontWeight: '900', fontSize: 10, textTransform: 'uppercase', letterSpacing: 0.6 }}
             numberOfLines={1}
           >
             {getTypeLabel(item.type)}
           </Text>
-          {statusLabel ? (
+        </View>
+      ) : null}
+
+      {/* 2. Title (eyebrow + status/progress above it when there's no institution header) */}
+      <View style={{ paddingHorizontal: 14, paddingTop: showInstitutionHeader ? 0 : 14, paddingBottom: 8 }}>
+        {!showInstitutionHeader ? (
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 6 }}>
+            <Text
+              style={{ color: palette.goldDeep ?? palette.primaryStrong, fontWeight: '900', fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.6 }}
+              numberOfLines={1}
+            >
+              {getTypeLabel(item.type)}
+            </Text>
+            {statusLabel ? (
+              <View
+                style={{
+                  borderRadius: 999,
+                  paddingHorizontal: 10,
+                  paddingVertical: 4,
+                  borderWidth: 1,
+                  borderColor: palette.primary,
+                  backgroundColor: palette.primarySoft,
+                  maxWidth: 100,
+                }}
+              >
+                <Text style={{ color: palette.primaryStrong, fontSize: 10, fontWeight: '900' }} numberOfLines={1}>
+                  {statusLabel}
+                </Text>
+              </View>
+            ) : progress ? (
+              <Text style={{ color: palette.subtext, fontSize: 12 }}>{progress.progressPercent}% complete</Text>
+            ) : null}
+          </View>
+        ) : statusLabel ? (
+          <View style={{ alignItems: 'flex-start', marginBottom: 4 }}>
             <View
               style={{
                 borderRadius: 999,
@@ -183,153 +247,107 @@ export default function EducationContentCard({
                 borderWidth: 1,
                 borderColor: palette.primary,
                 backgroundColor: palette.primarySoft,
-                maxWidth: responsive.isWatch ? 70 : 82,
               }}
             >
-              <Text
-                style={{
-                  color: palette.primaryStrong,
-                  fontSize: 10,
-                  fontWeight: '900',
-                }}
-                numberOfLines={1}
-              >
+              <Text style={{ color: palette.primaryStrong, fontSize: 10, fontWeight: '900' }} numberOfLines={1}>
                 {statusLabel}
               </Text>
             </View>
-          ) : progress ? (
-            <Text style={{ color: palette.subtext, fontSize: 12 }}>
-              {progress.progressPercent}% complete
-            </Text>
-          ) : null}
-        </View>
-        <Text
-          style={{
-            color: palette.text,
-            fontWeight: '900',
-            fontSize: 16,
-            marginTop: 5,
-            lineHeight: 19,
-          }}
-          numberOfLines={2}
-        >
+          </View>
+        ) : null}
+        <Text style={{ color: palette.text, fontWeight: '900', fontSize: 18, letterSpacing: -0.3, lineHeight: 22 }} numberOfLines={2}>
           {item.title}
         </Text>
-        {getSubtitle(item) ? (
-          <Text
-            style={{
-              color: palette.subtext,
-              fontSize: 12,
-              marginTop: 4,
-              lineHeight: 16,
-            }}
-            numberOfLines={2}
-          >
-            {getSubtitle(item)}
+      </View>
+
+      {/* 3. Cover image — full card width */}
+      {item.coverUrl ? (
+        <PermanentRemoteImage
+          uri={item.coverUrl}
+          domain="Education"
+          stableKey={`education_content_${item.id}_${item.coverUrl}`}
+          containerStyle={{ width: '100%', height: imageHeight }}
+        />
+      ) : (
+        <View
+          style={{
+            width: '100%',
+            height: imageHeight,
+            backgroundColor: palette.primarySoft,
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <KISIcon name="book" size={32} color={palette.primaryStrong} />
+        </View>
+      )}
+
+      <View style={{ padding: 14, paddingTop: 11 }}>
+        {/* 4. Description */}
+        {getDescription(item) ? (
+          <Text style={{ color: palette.subtext, fontSize: 13.5, lineHeight: 19 }} numberOfLines={3}>
+            {getDescription(item)}
           </Text>
         ) : null}
+
         {metadata.length ? (
-          <View
-            style={{
-              flexDirection: stackCard ? 'column' : 'row',
-              alignItems: 'center',
-              gap: 6,
-              marginTop: 8,
-            }}
-          >
-            {metadata.slice(0, responsive.isWatch ? 1 : 2).map((value, index) => (
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6, marginTop: 9 }}>
+            {metadata.map((value, index) => (
               <View
                 key={`${String(value)}-${index}`}
                 style={{
                   borderRadius: 999,
-                  paddingHorizontal: 8,
+                  paddingHorizontal: 9,
                   paddingVertical: 4,
                   borderWidth: 1,
-                  borderColor: palette.border,
+                  borderColor: `${palette.gold ?? palette.border}66`,
                   backgroundColor: palette.card,
-                  maxWidth: index === 0 ? 82 : 74,
                 }}
               >
-                <Text
-                  style={{
-                    color: palette.subtext,
-                    fontSize: 10,
-                    fontWeight: '800',
-                  }}
-                  numberOfLines={1}
-                >
+                <Text style={{ color: palette.subtext, fontSize: 10, fontWeight: '800' }} numberOfLines={1}>
                   {value}
                 </Text>
               </View>
             ))}
           </View>
         ) : null}
-        <View
-          style={{
-            flexDirection: stackCard ? 'column' : 'row',
-            alignItems: 'center',
-            flexWrap: 'wrap',
-            gap: 6,
-            marginTop: 8,
-          }}
-        >
-          {item.trustSummary?.verified ? (
-            <View
-              style={{
-                borderRadius: 999,
-                paddingHorizontal: 8,
-                paddingVertical: 4,
-                backgroundColor: palette.primarySoft,
-                borderWidth: 1,
-                borderColor: palette.primary,
-              }}
-            >
-              <Text
+
+        {item.trustSummary?.verified || item.offlineSummary?.offlineReady ? (
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
+            {item.trustSummary?.verified ? (
+              <View
                 style={{
-                  color: palette.primaryStrong,
-                  fontSize: 10,
-                  fontWeight: '900',
+                  borderRadius: 999,
+                  paddingHorizontal: 8,
+                  paddingVertical: 4,
+                  backgroundColor: palette.goldSoft ?? palette.primarySoft,
+                  borderWidth: 1,
+                  borderColor: palette.gold ?? palette.primary,
                 }}
               >
-                Verified institution
+                <Text style={{ color: palette.goldDeep ?? palette.primaryStrong, fontSize: 10, fontWeight: '900' }}>✦ Verified institution</Text>
+              </View>
+            ) : null}
+            {item.offlineSummary?.offlineReady ? (
+              <Text style={{ color: palette.subtext, fontSize: 10, fontWeight: '800' }} numberOfLines={1}>
+                Low-bandwidth ready
               </Text>
-            </View>
+            ) : null}
+          </View>
+        ) : null}
+
+        {/* 5. Buttons */}
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', marginTop: 12, gap: 8 }}>
+          <KISButton title={primaryLabel || (isInstitution ? 'View Institution' : 'Open')} size="xs" onPress={handlePrimary} />
+          {!isInstitution ? (
+            <KISButton
+              title={secondaryLabel || 'Details'}
+              size="xs"
+              onPress={() => (onSecondaryAction ? onSecondaryAction(item) : onSelect ? onSelect(item) : handlePrimary())}
+              variant="outline"
+            />
           ) : null}
-          {item.offlineSummary?.offlineReady ? (
-            <Text
-              style={{ color: palette.subtext, fontSize: 10, fontWeight: '800' }}
-              numberOfLines={1}
-            >
-              Low-bandwidth ready
-            </Text>
-          ) : null}
-        </View>
-        <View
-          style={{
-            flexDirection: stackCard ? 'column' : 'row',
-            alignItems: 'center',
-            marginTop: 10,
-            gap: 6,
-          }}
-        >
-          <KISButton
-            title={primaryLabel || 'Open'}
-            size="xs"
-            onPress={handlePrimary}
-          />
-          <KISButton
-            title={secondaryLabel || 'Details'}
-            size="xs"
-            onPress={() =>
-              onSecondaryAction
-                ? onSecondaryAction(item)
-                : onSelect
-                ? onSelect(item)
-                : handlePrimary()
-            }
-            variant="outline"
-          />
-          {onDownload ? (
+          {onDownload && !isInstitution ? (
             <KISButton
               title={downloaded ? 'Downloaded' : 'Download'}
               size="xs"

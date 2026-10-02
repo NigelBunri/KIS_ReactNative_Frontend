@@ -12,17 +12,23 @@
 // My Learning's "Completed" section already shows, then downloads each
 // certificate PDF on demand exactly as EducationDetailSheet already does
 // (RNFS.downloadFile with authenticated media headers).
+//
+// Visual pass: rebuilt on the shared premium education component kit.
 import React, { useCallback, useState } from 'react';
-import { ActivityIndicator, Alert, FlatList, Linking, RefreshControl, Share, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, FlatList, Linking, RefreshControl, Share } from 'react-native';
 import RNFS from 'react-native-fs';
 import { SafeAreaView } from '@/components/common/SafeAreaViewWithTopPadding';
 import { useKISTheme } from '@/theme/useTheme';
 import { useResponsiveLayout } from '@/theme/responsive';
-import { KISIcon } from '@/constants/kisIcons';
-import KISButton from '@/constants/KISButton';
 import ROUTES, { useMediaHeaders } from '@/network';
 import useEducationDiscovery from '@/screens/broadcast/education/hooks/useEducationDiscovery';
 import type { EducationProgress } from '@/screens/broadcast/education/api/education.models';
+import {
+  EducationScreenScaffold,
+  EducationListCard,
+  EducationEmptyState,
+  EducationActionButton,
+} from '@/screens/education/shared/components';
 
 export default function CertificatesScreen() {
   const { palette } = useKISTheme();
@@ -78,57 +84,41 @@ export default function CertificatesScreen() {
   );
 
   return (
-    <SafeAreaView edges={['bottom']} style={{ flex: 1, backgroundColor: palette.bg }}>
-      <FlatList
-        data={completed}
-        keyExtractor={row => `${row.contentType}-${row.contentId}`}
-        contentContainerStyle={{ padding: responsive.pageGutter, gap: 14 }}
-        refreshControl={<RefreshControl refreshing={loading} onRefresh={refresh} tintColor={palette.primary} />}
-        ListHeaderComponent={<Text style={{ fontSize: 24, fontWeight: '900', color: palette.text, marginBottom: 6 }}>Certificates</Text>}
-        ListEmptyComponent={
-          !loading ? (
-            <View style={{ alignItems: 'center', gap: 10, paddingVertical: 60 }}>
-              <KISIcon name="star" size={36} color={palette.subtext} />
-              <Text style={{ color: palette.subtext, fontWeight: '700', textAlign: 'center' }}>
-                Complete a course to earn your first certificate.
-              </Text>
-            </View>
-          ) : (
-            <ActivityIndicator color={palette.primary} style={{ marginTop: 40 }} />
-          )
-        }
-        renderItem={({ item }) => {
-          const busy = downloadingId === item.contentId;
-          return (
-            <View
-              style={{
-                borderRadius: 16,
-                borderWidth: 1,
-                borderColor: palette.border,
-                backgroundColor: palette.surface,
-                padding: 16,
-                gap: 10,
-              }}
-            >
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: palette.primarySoft, alignItems: 'center', justifyContent: 'center' }}>
-                  <KISIcon name="star" size={18} color={palette.primaryStrong} />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={{ fontWeight: '800', color: palette.text }} numberOfLines={2}>
-                    {item.contentTitle || 'Certificate'}
-                  </Text>
-                  <Text style={{ fontSize: 12, color: palette.subtext }}>Completed</Text>
-                </View>
-              </View>
-              <View style={{ flexDirection: 'row', gap: 10 }}>
-                <KISButton title={busy ? 'Loading…' : 'View'} size="sm" disabled={busy} onPress={() => void handleView(item)} />
-                <KISButton title="Share" size="sm" variant="outline" disabled={busy} onPress={() => void handleShare(item)} />
-              </View>
-            </View>
-          );
-        }}
-      />
+    <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg }}>
+      <EducationScreenScaffold
+        palette={palette}
+        title="Certificates"
+        scrollable={false}
+        contentContainerStyle={{ flex: 1, padding: 0 }}
+      >
+        <FlatList
+          style={{ flex: 1 }}
+          data={completed}
+          keyExtractor={row => `${row.contentType}-${row.contentId}`}
+          contentContainerStyle={{ padding: responsive.pageGutter, gap: 12 }}
+          refreshControl={<RefreshControl refreshing={loading} onRefresh={refresh} tintColor={palette.primary} />}
+          ListEmptyComponent={
+            !loading ? (
+              <EducationEmptyState palette={palette} title="No certificates yet" description="Complete a course to earn your first certificate." />
+            ) : (
+              <ActivityIndicator color={palette.primary} style={{ marginTop: 40 }} />
+            )
+          }
+          renderItem={({ item }) => {
+            const busy = downloadingId === item.contentId;
+            return (
+              <EducationListCard
+                palette={palette}
+                eyebrow="Certificate"
+                title={item.contentTitle || 'Certificate'}
+                subtitle="Completed"
+                primaryAction={<EducationActionButton palette={palette} label={busy ? 'Loading…' : 'View'} disabled={busy} onPress={() => void handleView(item)} />}
+                secondaryAction={<EducationActionButton palette={palette} label="Share" variant="secondary" disabled={busy} onPress={() => void handleShare(item)} />}
+              />
+            );
+          }}
+        />
+      </EducationScreenScaffold>
     </SafeAreaView>
   );
 }

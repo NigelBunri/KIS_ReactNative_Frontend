@@ -129,15 +129,11 @@ export function routeDeepLink(url: string, navigation: any): boolean {
       return true;
     }
 
-    // Courses, lessons, workshops, programs, credentials, mentorships, and
-    // events all open through EducationV2DiscoverPage's detail sheet (see
-    // BroadcastEducationPage's openContentId prop) — the content id alone
-    // is enough to hydrate it.
+    // Education UX v2: courses/events open the real EducationCourseDetail
+    // destination directly - the content id alone is enough to hydrate it
+    // (same ROUTES.education.detail(id) call the old sheet used).
     if (first === 'education' && (second === 'courses' || second === 'events') && third) {
-      navigation.navigate('MainTabs', {
-        screen: 'Broadcast',
-        params: { mainTab: 'education', actionId: third },
-      });
+      navigation.navigate('EducationCourseDetail', { contentId: third });
       return true;
     }
 

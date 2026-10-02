@@ -240,7 +240,7 @@ export default function FeedsMainListSection({
                     subtitle="Learn something new this week"
                     footerLeft="Courses, live classes, and certificates from Kingdom institutions"
                     ctaLabel="Explore"
-                    onPress={() => navigation.navigate('EducationHome')}
+                    onPress={() => navigation.navigate('Broadcast', { mainTab: 'education' })}
                   />
                 ) : null}
                 </React.Fragment>

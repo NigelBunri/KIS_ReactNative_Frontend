@@ -4,19 +4,25 @@
 // institution's class sessions and events (previously two separate
 // module-list modes inside EducationManagementModal.tsx) into one
 // calendar-flavored view.
+//
+// Visual pass: rebuilt on the shared premium education component kit.
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, RefreshControl, ScrollView } from 'react-native';
 import { useNavigation, useRoute, useFocusEffect, type RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { SafeAreaView } from '@/components/common/SafeAreaViewWithTopPadding';
 import { useKISTheme } from '@/theme/useTheme';
 import { useResponsiveLayout } from '@/theme/responsive';
-import { KISIcon } from '@/constants/kisIcons';
-import KISButton from '@/constants/KISButton';
 import ROUTES from '@/network';
 import { getRequest } from '@/network/get';
 import { postRequest } from '@/network/post';
 import type { RootStackParamList } from '@/navigation/types';
+import {
+  EducationScreenScaffold,
+  EducationListCard,
+  EducationEmptyState,
+  EducationActionButton,
+} from '@/screens/education/shared/components';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 type Route_ = RouteProp<RootStackParamList, 'EducationEventsLive'>;
@@ -79,50 +85,45 @@ export default function EventsLiveScreen() {
   }, [institutionId, load]);
 
   return (
-    <SafeAreaView edges={['bottom']} style={{ flex: 1, backgroundColor: palette.bg }}>
-      <ScrollView
-        contentContainerStyle={{ padding: responsive.pageGutter, gap: 14, paddingBottom: 60 }}
-        refreshControl={<RefreshControl refreshing={loading} onRefresh={load} tintColor={palette.primary} />}
+    <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg }}>
+      <EducationScreenScaffold
+        palette={palette}
+        breadcrumb={institutionName}
+        title="Events & Live"
+        onBack={() => navigation.goBack()}
+        actions={<EducationActionButton palette={palette} label={creating ? 'Creating…' : '+ Create'} disabled={creating} onPress={() => void createQuickEvent()} />}
+        scrollable={false}
+        contentContainerStyle={{ flex: 1, padding: 0 }}
       >
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-          <Pressable onPress={() => navigation.goBack()} style={{ padding: 4, marginLeft: -4 }}>
-            <KISIcon name="back" size={20} color={palette.text} />
-          </Pressable>
-          <View>
-            <Text style={{ fontSize: 22, fontWeight: '900', color: palette.text }}>Events & Live</Text>
-            {institutionName ? <Text style={{ fontSize: 12, color: palette.subtext }}>{institutionName}</Text> : null}
-          </View>
-        </View>
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={{ padding: responsive.pageGutter, gap: 10, paddingBottom: 60 }}
+          refreshControl={<RefreshControl refreshing={loading} onRefresh={load} tintColor={palette.primary} />}
+        >
+          {loading && combined.length === 0 ? <ActivityIndicator color={palette.primary} /> : null}
 
-        <KISButton title={creating ? 'Creating…' : '+ Create event'} disabled={creating} onPress={() => void createQuickEvent()} />
-
-        {loading && combined.length === 0 ? <ActivityIndicator color={palette.primary} /> : null}
-
-        {combined.length === 0 && !loading ? (
-          <View style={{ padding: 18, alignItems: 'center' }}>
-            <KISIcon name="calendar" size={28} color={palette.subtext} />
-            <Text style={{ color: palette.subtext, textAlign: 'center', marginTop: 8 }}>
-              You don't have any upcoming classes or events.
-            </Text>
-          </View>
-        ) : (
-          <View style={{ gap: 10 }}>
-            {combined.map(row => (
-              <View key={`${row.kind}-${row.id}`} style={{ padding: 14, borderRadius: 14, borderWidth: 1, borderColor: palette.border, backgroundColor: palette.surface, gap: 6 }}>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <Text style={{ fontWeight: '800', color: palette.text }} numberOfLines={1}>{row.title}</Text>
-                  <View style={{ paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999, backgroundColor: palette.primarySoft }}>
-                    <Text style={{ fontSize: 11, fontWeight: '700', color: palette.primaryStrong }}>{row.kind}</Text>
-                  </View>
-                </View>
-                <Text style={{ fontSize: 12, color: palette.subtext }}>
-                  {row.starts_at ? new Date(row.starts_at).toLocaleString() : 'Unscheduled'}
-                </Text>
-              </View>
-            ))}
-          </View>
-        )}
-      </ScrollView>
+          {combined.length === 0 && !loading ? (
+            <EducationEmptyState
+              palette={palette}
+              title="Nothing scheduled"
+              description="You don't have any upcoming classes or events."
+              action={<EducationActionButton palette={palette} label="+ Create event" disabled={creating} onPress={() => void createQuickEvent()} />}
+            />
+          ) : (
+            combined.map(row => (
+              <EducationListCard
+                key={`${row.kind}-${row.id}`}
+                palette={palette}
+                eyebrow={row.kind}
+                title={row.title}
+                subtitle={row.starts_at ? new Date(row.starts_at).toLocaleString() : 'Unscheduled'}
+                statusLabel={row.status}
+                statusTone={row.status === 'published' || row.status === 'scheduled' ? 'success' : 'muted'}
+              />
+            ))
+          )}
+        </ScrollView>
+      </EducationScreenScaffold>
     </SafeAreaView>
   );
 }

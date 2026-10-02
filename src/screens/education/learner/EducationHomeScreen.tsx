@@ -6,6 +6,14 @@
 // Broadcast-tab discovery page; this screen only changes the IA (a real
 // "Education" destination instead of a sub-tab) and adds the "My
 // Learning" / "Certificates" entry points that previously didn't exist.
+//
+// Visual pass: institution spotlight cards now open a real
+// InstitutionProfileScreen (courses + published broadcasts/announcements)
+// instead of just running a text search for the institution's name — that
+// search-only behavior was the only way to "see" an institution at all,
+// and it dead-ended before ever reaching any broadcast the institution had
+// published. Layout also moved onto the shared premium education
+// component kit for visual parity with the provider side.
 import React, { useCallback, useMemo } from 'react';
 import {
   ActivityIndicator,
@@ -21,7 +29,6 @@ import { SafeAreaView } from '@/components/common/SafeAreaViewWithTopPadding';
 import { useKISTheme } from '@/theme/useTheme';
 import { useResponsiveLayout } from '@/theme/responsive';
 import { KISIcon } from '@/constants/kisIcons';
-import KISButton from '@/constants/KISButton';
 import PermanentRemoteImage from '@/components/media/PermanentRemoteImage';
 import useEducationDiscovery from '@/screens/broadcast/education/hooks/useEducationDiscovery';
 import EducationContentCard from '@/screens/broadcast/education/components/EducationContentCard';
@@ -32,6 +39,10 @@ import type {
   EducationProgress,
   EducationInstitutionSpotlight,
 } from '@/screens/broadcast/education/api/education.models';
+import {
+  EducationActionButton,
+  EducationEmptyState,
+} from '@/screens/education/shared/components';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
@@ -59,14 +70,19 @@ function HeaderIconButton({
       accessibilityRole="button"
       accessibilityLabel={label}
       style={{
-        width: 38,
-        height: 38,
-        borderRadius: 19,
+        width: 40,
+        height: 40,
+        borderRadius: 20,
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: palette.surface,
+        backgroundColor: `${palette.surfaceElevated ?? palette.surface}F0`,
         borderWidth: 1,
-        borderColor: palette.border,
+        borderColor: `${palette.divider ?? palette.border}AA`,
+        shadowColor: palette.shadow,
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.16,
+        shadowRadius: 10,
+        elevation: 3,
       }}
     >
       <KISIcon name={icon} size={18} color={palette.text} />
@@ -85,8 +101,8 @@ function SectionHeader({ title, onSeeAll }: { title: string; onSeeAll?: () => vo
         marginBottom: 10,
       }}
     >
-      <Text style={{ fontSize: 17, fontWeight: '800', color: palette.text }}>{title}</Text>
-      {onSeeAll ? <KISButton title="See all" size="sm" variant="ghost" onPress={onSeeAll} /> : null}
+      <Text style={{ fontSize: 18, fontWeight: '800', color: palette.text, letterSpacing: -0.3 }}>{title}</Text>
+      {onSeeAll ? <EducationActionButton palette={palette} label="See all" variant="ghost" onPress={onSeeAll} /> : null}
     </View>
   );
 }
@@ -130,11 +146,15 @@ export default function EducationHomeScreen() {
     [setSort, updateFilter],
   );
 
-  const handleSpotlight = useCallback(
+  const openInstitution = useCallback(
     (spotlight: EducationInstitutionSpotlight) => {
-      setSearch(spotlight.name);
+      if (!spotlight?.id) {
+        setSearch(spotlight.name);
+        return;
+      }
+      navigation.navigate('EducationInstitutionProfile', { institutionId: spotlight.id, institutionName: spotlight.name });
     },
-    [setSearch],
+    [navigation, setSearch],
   );
 
   const greeting = useMemo(() => {
@@ -145,16 +165,16 @@ export default function EducationHomeScreen() {
   }, []);
 
   return (
-    <SafeAreaView edges={['bottom']} style={{ flex: 1, backgroundColor: palette.bg }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg }}>
       <ScrollView
-        contentContainerStyle={{ padding: responsive.pageGutter, paddingBottom: 40, gap: 26 }}
+        contentContainerStyle={{ padding: responsive.pageGutter, paddingBottom: 40, gap: 28 }}
         refreshControl={<RefreshControl refreshing={loading} onRefresh={refresh} tintColor={palette.primary} />}
       >
         {/* Header */}
         <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' }}>
           <View>
-            <Text style={{ fontSize: 13, color: palette.subtext, fontWeight: '600' }}>{greeting} 👋</Text>
-            <Text style={{ fontSize: 26, fontWeight: '900', color: palette.text, marginTop: 2 }}>Education</Text>
+            <Text style={{ fontSize: 13, color: palette.subtext, fontWeight: '700' }}>{greeting} 👋</Text>
+            <Text style={{ fontSize: 28, fontWeight: '900', color: palette.text, marginTop: 2, letterSpacing: -0.8 }}>Education</Text>
           </View>
           <View style={{ flexDirection: 'row', gap: 10 }}>
             <HeaderIconButton icon="star" label="Certificates" onPress={() => navigation.navigate('EducationCertificates')} />
@@ -182,7 +202,7 @@ export default function EducationHomeScreen() {
           <SectionHeader title="Explore" />
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
             {EXPLORE_TABS.map(tab => (
-              <KISButton key={tab.key} title={tab.title} size="sm" variant="outline" onPress={() => handleExploreTab(tab)} />
+              <EducationActionButton key={tab.key} palette={palette} label={tab.title} variant="secondary" onPress={() => handleExploreTab(tab)} />
             ))}
           </ScrollView>
         </View>
@@ -195,26 +215,31 @@ export default function EducationHomeScreen() {
               {spotlights.map(spotlight => (
                 <Pressable
                   key={spotlight.id}
-                  onPress={() => handleSpotlight(spotlight)}
+                  onPress={() => openInstitution(spotlight)}
                   style={{
-                    width: 160,
-                    borderRadius: 18,
+                    width: 170,
+                    borderRadius: 20,
                     borderWidth: 1,
-                    borderColor: palette.border,
-                    backgroundColor: palette.surface,
-                    padding: 12,
+                    borderColor: `${palette.divider ?? palette.border}AA`,
+                    backgroundColor: `${palette.surfaceElevated ?? palette.surface}F0`,
+                    padding: 14,
                     gap: 8,
+                    shadowColor: palette.shadow,
+                    shadowOffset: { width: 0, height: 8 },
+                    shadowOpacity: 0.16,
+                    shadowRadius: 14,
+                    elevation: 4,
                   }}
                 >
                   <PermanentRemoteImage
                     uri={spotlight.logoUrl || spotlight.imageUrl || ''}
                     domain="Education"
-                    style={{ width: 44, height: 44, borderRadius: 12, backgroundColor: palette.border }}
+                    style={{ width: 46, height: 46, borderRadius: 14, backgroundColor: palette.border }}
                   />
                   <Text numberOfLines={2} style={{ fontWeight: '800', color: palette.text }}>
                     {spotlight.name}
                   </Text>
-                  <Text style={{ fontSize: 12, color: palette.subtext }}>
+                  <Text style={{ fontSize: 12, color: palette.subtext, fontWeight: '600' }}>
                     {spotlight.courseCount ?? 0} courses · {spotlight.memberCount ?? 0} members
                   </Text>
                 </Pressable>
@@ -240,13 +265,12 @@ export default function EducationHomeScreen() {
         {loading && sections.length === 0 ? <ActivityIndicator color={palette.primary} style={{ marginTop: 20 }} /> : null}
 
         {!loading && sections.length === 0 && continueLearning.length === 0 ? (
-          <View style={{ alignItems: 'center', gap: 10, paddingVertical: 40 }}>
-            <KISIcon name="book" size={40} color={palette.subtext} />
-            <Text style={{ color: palette.subtext, fontWeight: '700', textAlign: 'center' }}>
-              No courses to show yet. Check back soon, or create your own institution.
-            </Text>
-            <KISButton title="Create an institution" onPress={() => navigation.navigate('EducationInstitutionPicker')} />
-          </View>
+          <EducationEmptyState
+            palette={palette}
+            title="No courses to show yet"
+            description="Check back soon, or create your own institution."
+            action={<EducationActionButton palette={palette} label="Create an institution" onPress={() => navigation.navigate('EducationInstitutionPicker')} />}
+          />
         ) : null}
       </ScrollView>
     </SafeAreaView>

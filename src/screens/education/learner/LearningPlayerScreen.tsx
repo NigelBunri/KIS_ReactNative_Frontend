@@ -31,6 +31,8 @@ import useEducationCourseDetail from '@/screens/broadcast/education/hooks/useEdu
 import { hasLearningAccessForItem } from '@/screens/broadcast/education/utils/educationAccess';
 import { inferMaterialKind } from '@/screens/broadcast/education/utils/materialPreview';
 import MaterialViewer from '@/screens/education/shared/MaterialViewer';
+import { useDetachedChatOverlayProps } from '@/contexts/DetachedChatOverlayContext';
+import { getOrCreateCourseGroupChat, joinCourseGroupChat } from '@/screens/education/shared/courseGroupChat';
 import type { RootStackParamList } from '@/navigation/types';
 import type { EducationCourseOutlineItem } from '@/screens/broadcast/education/api/education.models';
 
@@ -62,10 +64,12 @@ export default function LearningPlayerScreen() {
   const responsive = useResponsiveLayout();
   const { item, loading, hydrate } = useEducationCourseDetail();
   const mediaHeaders = useMediaHeaders();
+  const chatOverlay = useDetachedChatOverlayProps();
   const [expandedMaterialId, setExpandedMaterialId] = useState<string | null>(null);
   const [assessmentDraft, setAssessmentDraft] = useState<Record<string, string[]>>({});
   const [submissionId, setSubmissionId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [connectingGroupChat, setConnectingGroupChat] = useState(false);
 
   React.useEffect(() => {
     hydrate(contentId);
@@ -113,9 +117,47 @@ export default function LearningPlayerScreen() {
     navigation.setParams({ contentId, itemId: targetItemId } as any);
   };
 
+  // The course's one persistent group chat/call — see courseGroupChat.ts.
+  // Self-joins on first use so a student who's never opened this before
+  // still lands in the same room as everyone else in the course, instead of
+  // only working for whoever the instructor happened to add manually.
+  //
+  // popToTop() first: the chat overlay itself already paints above every
+  // screen regardless (it's detached to a true top-level sibling of the
+  // whole navigator — see DetachedChatOverlayContext.tsx), so this isn't
+  // needed for the chat to be visible. It's here so closing the chat later
+  // doesn't dump the student back into whatever stack of Education modal
+  // screens (institution picker, course detail, this player, ...) they
+  // drilled through to get here — joining a live session should feel like
+  // arriving somewhere, not tunneling one layer deeper into the stack.
+  const openGroupChat = useCallback(async () => {
+    if (!item) return;
+    setConnectingGroupChat(true);
+    try {
+      const group = await getOrCreateCourseGroupChat(contentId, item.title || 'Course');
+      if (!group) {
+        Alert.alert('Group chat', 'Unable to open the group chat right now.');
+        return;
+      }
+      await joinCourseGroupChat(group.groupId);
+      navigation.popToTop();
+      chatOverlay?.openChat({
+        id: group.conversationId,
+        conversationId: group.conversationId,
+        name: group.name,
+        kind: 'group',
+        isGroup: true,
+        isGroupChat: true,
+        groupId: group.groupId,
+      } as any);
+    } finally {
+      setConnectingGroupChat(false);
+    }
+  }, [contentId, item, chatOverlay, navigation]);
+
   if (loading && !current) {
     return (
-      <SafeAreaView edges={['bottom']} style={{ flex: 1, backgroundColor: palette.bg, alignItems: 'center', justifyContent: 'center' }}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg, alignItems: 'center', justifyContent: 'center' }}>
         <ActivityIndicator color={palette.primary} />
       </SafeAreaView>
     );
@@ -123,7 +165,7 @@ export default function LearningPlayerScreen() {
 
   if (!current) {
     return (
-      <SafeAreaView edges={['bottom']} style={{ flex: 1, backgroundColor: palette.bg, alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg, alignItems: 'center', justifyContent: 'center', padding: 24 }}>
         <Text style={{ color: palette.subtext, fontWeight: '700', textAlign: 'center' }}>This item is not available.</Text>
         <KISButton title="Back to course" onPress={() => navigation.goBack()} />
       </SafeAreaView>
@@ -132,7 +174,7 @@ export default function LearningPlayerScreen() {
 
   if (!current.is_preview && !hasAccess) {
     return (
-      <SafeAreaView edges={['bottom']} style={{ flex: 1, backgroundColor: palette.bg, alignItems: 'center', justifyContent: 'center', padding: 24, gap: 12 }}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg, alignItems: 'center', justifyContent: 'center', padding: 24, gap: 12 }}>
         <KISIcon name="lock" size={32} color={palette.subtext} />
         <Text style={{ color: palette.subtext, fontWeight: '700', textAlign: 'center' }}>
           Enroll in this course to unlock this item.
@@ -146,6 +188,20 @@ export default function LearningPlayerScreen() {
   }
 
   const content: any = current.content ?? {};
+
+  // Live class group room is only reachable in a tight window around the
+  // scheduled start — 5 minutes early (so people can settle in) through 5
+  // minutes after (a late-join cutoff), not open-ended before or after.
+  const FIVE_MIN_MS = 5 * 60 * 1000;
+  const sessionStartMs = current.type === 'class_session' && content.starts_at ? new Date(content.starts_at).getTime() : null;
+  const nowMs = Date.now();
+  const canJoinLiveSessionRoom = sessionStartMs == null ? false : nowMs >= sessionStartMs - FIVE_MIN_MS && nowMs <= sessionStartMs + FIVE_MIN_MS;
+  const liveSessionWindowMessage =
+    sessionStartMs == null
+      ? 'This session has no scheduled time yet.'
+      : nowMs < sessionStartMs - FIVE_MIN_MS
+        ? 'Opens 5 minutes before the scheduled time.'
+        : 'The join window for this session has closed.';
 
   const renderBody = () => {
     switch (current.type) {
@@ -217,6 +273,15 @@ export default function LearningPlayerScreen() {
               <KISButton title="Join session" onPress={() => Linking.openURL(content.meeting_url)} />
             ) : null}
             <KISButton
+              title={connectingGroupChat ? 'Joining…' : 'Join live session'}
+              disabled={connectingGroupChat || !canJoinLiveSessionRoom}
+              loading={connectingGroupChat}
+              onPress={() => void openGroupChat()}
+            />
+            {!canJoinLiveSessionRoom ? (
+              <Text style={{ fontSize: 12, color: palette.subtext }}>{liveSessionWindowMessage}</Text>
+            ) : null}
+            <KISButton
               title={busy ? 'Marking…' : "I attended this session"}
               variant="outline"
               disabled={busy}
@@ -286,7 +351,7 @@ export default function LearningPlayerScreen() {
   };
 
   return (
-    <SafeAreaView edges={['bottom']} style={{ flex: 1, backgroundColor: palette.bg }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg }}>
       <ScrollView contentContainerStyle={{ padding: responsive.pageGutter, gap: 18, paddingBottom: 100 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
           <Pressable onPress={() => navigation.navigate('EducationCourseDetail', { contentId })} style={{ padding: 4, marginLeft: -4 }}>

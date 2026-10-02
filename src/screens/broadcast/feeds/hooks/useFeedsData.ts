@@ -47,6 +47,24 @@ const toTrendingClipItem = (item: BroadcastFeedItem): TrendingClipItem => ({
   },
 });
 
+// Mirrors FeedsDiscoverPage's generalFeed exclusion list - Market/Education
+// (and Healthcare) content has its own dedicated Broadcast sub-tabs and
+// shouldn't surface unprompted in the general feed's highlights either.
+// getTopTrendingFeeds just sorts by reaction_count with no type filtering
+// of its own, so without this, the "Trending Clips" carousel at the top of
+// the default For You feed - the single most prominent spot on the whole
+// Feeds tab - could be dominated by whichever excluded-type items happen
+// to have the most reactions, even though the list right below it
+// correctly filters them out.
+const TRENDING_EXCLUDED_SOURCE_TYPES = new Set([
+  'market', 'market_product', 'market_service',
+  'education', 'lesson', 'broadcast_education', 'education_broadcast', 'education_course', 'education_profile',
+  'healthcare',
+]);
+
+const filterForGeneralTrending = (items: BroadcastFeedItem[]): BroadcastFeedItem[] =>
+  items.filter(item => !TRENDING_EXCLUDED_SOURCE_TYPES.has(String(item.source_type || '').toLowerCase()));
+
 const getTopTrendingFeeds = (items: BroadcastFeedItem[], limit = 20) => {
   return [...items]
     .sort((a, b) => (b.reaction_count ?? 0) - (a.reaction_count ?? 0))
@@ -230,14 +248,17 @@ export default function useFeedsData({ q = '', code = null }: Params) {
   const applyItems = useCallback((nextItems: BroadcastFeedItem[]) => {
     itemsRef.current = nextItems;
     setItems(nextItems);
-    const topTrending = getTopTrendingFeeds(nextItems);
+    // code set = this hook instance IS the dedicated Market/Education feed
+    // (backend already filtered nextItems down to just that type), so
+    // trending there should highlight that same content, not exclude it.
+    const topTrending = getTopTrendingFeeds(code ? nextItems : filterForGeneralTrending(nextItems));
     setTrendingFeeds(topTrending);
     setTrending(topTrending.map(toTrendingClipItem));
     // A fresh top page fully replaces the window, so whatever was
     // previously trimmed off the top no longer applies.
     trimmedFromTopRef.current = false;
     persistCache(nextItems, topTrending, topTrending.map(toTrendingClipItem));
-  }, [persistCache]);
+  }, [persistCache, code]);
 
   const loadFirstPage = useCallback(async () => {
     setLoading(true);
@@ -373,7 +394,7 @@ export default function useFeedsData({ q = '', code = null }: Params) {
       }
 
       itemsRef.current = windowed;
-      const topTrending = getTopTrendingFeeds(windowed);
+      const topTrending = getTopTrendingFeeds(code ? windowed : filterForGeneralTrending(windowed));
       setTrendingFeeds(topTrending);
       setTrending(topTrending.map(toTrendingClipItem));
       nextUrlRef.current = page.next ?? null;
@@ -382,7 +403,7 @@ export default function useFeedsData({ q = '', code = null }: Params) {
     });
 
     setLoadingMore(false);
-  }, [loadingMore, persistCache]);
+  }, [loadingMore, persistCache, code]);
 
   // Re-fetches page 1 when the user scrolls back up near the top of a
   // window that's had its original top trimmed off (see loadMore above) -

@@ -4,6 +4,8 @@
 // separate module-list modes inside EducationManagementModal.tsx
 // (students, staff, memberships, course-access-requests) with one screen
 // grouped by task: Requests (needs a decision), Students, Staff.
+//
+// Visual pass: rebuilt on the shared premium education component kit.
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
 import { useNavigation, useRoute, useFocusEffect, type RouteProp } from '@react-navigation/native';
@@ -11,12 +13,16 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { SafeAreaView } from '@/components/common/SafeAreaViewWithTopPadding';
 import { useKISTheme } from '@/theme/useTheme';
 import { useResponsiveLayout } from '@/theme/responsive';
-import { KISIcon } from '@/constants/kisIcons';
-import KISButton from '@/constants/KISButton';
 import ROUTES from '@/network';
 import { getRequest } from '@/network/get';
 import { postRequest } from '@/network/post';
 import type { RootStackParamList } from '@/navigation/types';
+import {
+  EducationScreenScaffold,
+  EducationListCard,
+  EducationEmptyState,
+  EducationActionButton,
+} from '@/screens/education/shared/components';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 type Route_ = RouteProp<RootStackParamList, 'EducationLearners'>;
@@ -103,99 +109,98 @@ export default function LearnersScreen() {
   const renderRequests = () => (
     <View style={{ gap: 10 }}>
       {pendingMemberships.map(m => (
-        <View key={m.id} style={{ padding: 14, borderRadius: 14, borderWidth: 1, borderColor: palette.border, backgroundColor: palette.surface, gap: 8 }}>
-          <Text style={{ fontWeight: '800', color: palette.text }}>{m.display_name || m.phone || 'Applicant'}</Text>
-          <Text style={{ fontSize: 12, color: palette.subtext }}>Wants to join as {m.role}</Text>
-          <View style={{ flexDirection: 'row', gap: 8 }}>
-            <KISButton title="Approve" size="sm" disabled={busyId === m.id} onPress={() => void decideMembership(m.id, 'approve')} />
-            <KISButton title="Reject" size="sm" variant="outline" disabled={busyId === m.id} onPress={() => void decideMembership(m.id, 'reject')} />
-          </View>
-        </View>
+        <EducationListCard
+          key={m.id}
+          palette={palette}
+          avatarLabel={m.display_name || m.phone || 'Applicant'}
+          avatarUrl={m.avatar_url}
+          title={m.display_name || m.phone || 'Applicant'}
+          subtitle={`Wants to join as ${m.role}`}
+          primaryAction={<EducationActionButton palette={palette} label="Approve" disabled={busyId === m.id} onPress={() => void decideMembership(m.id, 'approve')} />}
+          secondaryAction={<EducationActionButton palette={palette} label="Reject" variant="secondary" disabled={busyId === m.id} onPress={() => void decideMembership(m.id, 'reject')} />}
+        />
       ))}
       {accessRequests.map((r: any) => (
-        <View key={r.id} style={{ padding: 14, borderRadius: 14, borderWidth: 1, borderColor: palette.border, backgroundColor: palette.surface, gap: 8 }}>
-          <Text style={{ fontWeight: '800', color: palette.text }}>{r.display_name || 'Learner'}</Text>
-          <Text style={{ fontSize: 12, color: palette.subtext }}>Requesting access to {r.course_title}</Text>
-          <View style={{ flexDirection: 'row', gap: 8 }}>
-            <KISButton title="Approve" size="sm" disabled={busyId === r.id} onPress={() => void decideAccessRequest(r.course_id, r.id, 'approve')} />
-            <KISButton title="Reject" size="sm" variant="outline" disabled={busyId === r.id} onPress={() => void decideAccessRequest(r.course_id, r.id, 'reject')} />
-          </View>
-        </View>
+        <EducationListCard
+          key={r.id}
+          palette={palette}
+          avatarLabel={r.display_name || 'Learner'}
+          avatarUrl={r.avatar_url}
+          title={r.display_name || 'Learner'}
+          subtitle={`Requesting access to ${r.course_title}`}
+          primaryAction={<EducationActionButton palette={palette} label="Approve" disabled={busyId === r.id} onPress={() => void decideAccessRequest(r.course_id, r.id, 'approve')} />}
+          secondaryAction={<EducationActionButton palette={palette} label="Reject" variant="secondary" disabled={busyId === r.id} onPress={() => void decideAccessRequest(r.course_id, r.id, 'reject')} />}
+        />
       ))}
       {requestCount === 0 && !loading ? (
-        <View style={{ padding: 18, alignItems: 'center' }}>
-          <Text style={{ color: palette.subtext, textAlign: 'center' }}>Nothing needs your attention right now.</Text>
-        </View>
+        <EducationEmptyState palette={palette} title="All caught up" description="Nothing needs your attention right now." />
       ) : null}
     </View>
   );
 
   const renderPeople = (rows: any[], emptyLabel: string) => (
-    <View style={{ gap: 8 }}>
+    <View style={{ gap: 10 }}>
       {rows.map(m => (
-        <View key={m.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, borderRadius: 12, borderWidth: 1, borderColor: palette.border, backgroundColor: palette.surface }}>
-          <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: palette.primarySoft, alignItems: 'center', justifyContent: 'center' }}>
-            <KISIcon name="person" size={16} color={palette.primaryStrong} />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={{ fontWeight: '700', color: palette.text }} numberOfLines={1}>{m.display_name || m.phone}</Text>
-            <Text style={{ fontSize: 12, color: palette.subtext, textTransform: 'capitalize' }}>{m.role}{m.title ? ` · ${m.title}` : ''}</Text>
-          </View>
-        </View>
+        <EducationListCard
+          key={m.id}
+          palette={palette}
+          avatarLabel={m.display_name || m.phone}
+          avatarUrl={m.avatar_url}
+          title={m.display_name || m.phone}
+          subtitle={`${m.role}${m.title ? ` · ${m.title}` : ''}`}
+        />
       ))}
       {rows.length === 0 && !loading ? (
-        <View style={{ padding: 18, alignItems: 'center' }}>
-          <Text style={{ color: palette.subtext, textAlign: 'center' }}>{emptyLabel}</Text>
-        </View>
+        <EducationEmptyState palette={palette} title="Nobody here yet" description={emptyLabel} />
       ) : null}
     </View>
   );
 
   return (
-    <SafeAreaView edges={['bottom']} style={{ flex: 1, backgroundColor: palette.bg }}>
-      <ScrollView
-        contentContainerStyle={{ padding: responsive.pageGutter, gap: 16, paddingBottom: 40 }}
-        refreshControl={<RefreshControl refreshing={loading} onRefresh={load} tintColor={palette.primary} />}
+    <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg }}>
+      <EducationScreenScaffold
+        palette={palette}
+        breadcrumb={institutionName}
+        title="Learners"
+        onBack={() => navigation.goBack()}
+        scrollable={false}
+        contentContainerStyle={{ flex: 1, padding: 0 }}
       >
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-          <Pressable onPress={() => navigation.goBack()} style={{ padding: 4, marginLeft: -4 }}>
-            <KISIcon name="back" size={20} color={palette.text} />
-          </Pressable>
-          <View>
-            <Text style={{ fontSize: 22, fontWeight: '900', color: palette.text }}>Learners</Text>
-            {institutionName ? <Text style={{ fontSize: 12, color: palette.subtext }}>{institutionName}</Text> : null}
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={{ padding: responsive.pageGutter, gap: 16, paddingBottom: 40 }}
+          refreshControl={<RefreshControl refreshing={loading} onRefresh={load} tintColor={palette.primary} />}
+        >
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            {([
+              { key: 'requests' as const, title: `Requests${requestCount ? ` (${requestCount})` : ''}` },
+              { key: 'students' as const, title: `Students (${students.length})` },
+              { key: 'staff' as const, title: `Staff (${staff.length})` },
+            ]).map(t => (
+              <Pressable
+                key={t.key}
+                onPress={() => setSubTab(t.key)}
+                style={{
+                  paddingHorizontal: 12,
+                  paddingVertical: 7,
+                  borderRadius: 999,
+                  borderWidth: 1,
+                  borderColor: subTab === t.key ? palette.primary : palette.border,
+                  backgroundColor: subTab === t.key ? palette.primarySoft : 'transparent',
+                }}
+              >
+                <Text style={{ fontWeight: '700', fontSize: 12, color: subTab === t.key ? palette.primaryStrong : palette.subtext }}>{t.title}</Text>
+              </Pressable>
+            ))}
           </View>
-        </View>
 
-        <View style={{ flexDirection: 'row', gap: 8 }}>
-          {([
-            { key: 'requests' as const, title: `Requests${requestCount ? ` (${requestCount})` : ''}` },
-            { key: 'students' as const, title: `Students (${students.length})` },
-            { key: 'staff' as const, title: `Staff (${staff.length})` },
-          ]).map(t => (
-            <Pressable
-              key={t.key}
-              onPress={() => setSubTab(t.key)}
-              style={{
-                paddingHorizontal: 12,
-                paddingVertical: 7,
-                borderRadius: 999,
-                borderWidth: 1,
-                borderColor: subTab === t.key ? palette.primary : palette.border,
-                backgroundColor: subTab === t.key ? palette.primarySoft : 'transparent',
-              }}
-            >
-              <Text style={{ fontWeight: '700', fontSize: 12, color: subTab === t.key ? palette.primaryStrong : palette.subtext }}>{t.title}</Text>
-            </Pressable>
-          ))}
-        </View>
+          {loading && memberships.length === 0 ? <ActivityIndicator color={palette.primary} /> : null}
 
-        {loading && memberships.length === 0 ? <ActivityIndicator color={palette.primary} /> : null}
-
-        {subTab === 'requests' ? renderRequests() : null}
-        {subTab === 'students' ? renderPeople(students, "Your institution doesn't have learners yet.") : null}
-        {subTab === 'staff' ? renderPeople(staff, 'No staff members yet.') : null}
-      </ScrollView>
+          {subTab === 'requests' ? renderRequests() : null}
+          {subTab === 'students' ? renderPeople(students, "Your institution doesn't have learners yet.") : null}
+          {subTab === 'staff' ? renderPeople(staff, 'No staff members yet.') : null}
+        </ScrollView>
+      </EducationScreenScaffold>
     </SafeAreaView>
   );
 }

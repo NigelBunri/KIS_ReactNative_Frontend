@@ -2,10 +2,10 @@
 // Do not put secrets here. React Native bundles this file into the app.
 
 export const APP_ENV = {
-  KIS_ENV: "production",
-  KIS_USE_LOCAL_BACKENDS: "false",
-  KIS_DEV_BACKEND_HOST: "10.165.154.99",
-  KIS_DJANGO_BASE_URL: "https://api.kingdomimpactventures.org",
+  KIS_ENV: "local",
+  KIS_USE_LOCAL_BACKENDS: "true",
+  KIS_DEV_BACKEND_HOST: "192.168.0.2",
+  KIS_DJANGO_BASE_URL: "",
   KIS_NEST_BASE_URL: "https://chat.kingdomimpactventures.org",
   KIS_CHAT_WS_URL: "wss://chat.kingdomimpactventures.org",
   KIS_CHAT_WS_PATH: "/ws",

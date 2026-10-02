@@ -4,6 +4,12 @@
 // learner had no way to see their enrolled courses except by scrolling
 // back through Discover's "Continue learning" rail, which only showed
 // in-progress items and had no notion of "completed" at all.
+//
+// Visual pass: rebuilt on the shared premium education component kit, and
+// adds a "Downloaded" tab backed by useEducationOfflineStore — restores
+// the offline-save bookmark the old Broadcast-tab discovery page had
+// (CourseDetailScreen now exposes the save/remove toggle) but that had no
+// destination of its own in the v2 rewrite until now.
 import React, { useMemo } from 'react';
 import { ActivityIndicator, RefreshControl, ScrollView, Text, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
@@ -11,15 +17,20 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { SafeAreaView } from '@/components/common/SafeAreaViewWithTopPadding';
 import { useKISTheme } from '@/theme/useTheme';
 import { useResponsiveLayout } from '@/theme/responsive';
-import { KISIcon } from '@/constants/kisIcons';
-import KISButton from '@/constants/KISButton';
 import useEducationDiscovery from '@/screens/broadcast/education/hooks/useEducationDiscovery';
+import useEducationOfflineStore from '@/screens/broadcast/education/hooks/useEducationOfflineStore';
 import type { RootStackParamList } from '@/navigation/types';
 import type { EducationProgress } from '@/screens/broadcast/education/api/education.models';
+import {
+  EducationScreenScaffold,
+  EducationListCard,
+  EducationEmptyState,
+  EducationActionButton,
+} from '@/screens/education/shared/components';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
-function ProgressRow({ item, onOpen, onCertificate }: {
+function ProgressCard({ item, onOpen, onCertificate }: {
   item: EducationProgress;
   onOpen: () => void;
   onCertificate?: () => void;
@@ -27,37 +38,23 @@ function ProgressRow({ item, onOpen, onCertificate }: {
   const { palette } = useKISTheme();
   const percent = Math.max(0, Math.min(100, Math.round(item.progressPercent || 0)));
   return (
-    <View
-      style={{
-        borderRadius: 16,
-        borderWidth: 1,
-        borderColor: palette.border,
-        backgroundColor: palette.surface,
-        padding: 14,
-        gap: 8,
-      }}
+    <EducationListCard
+      palette={palette}
+      title={item.contentTitle || 'Untitled course'}
+      subtitle={item.lastLessonTitle ? `Last: ${item.lastLessonTitle}` : undefined}
+      metaItems={[`${percent}% complete`]}
+      onPress={onOpen}
+      primaryAction={<EducationActionButton palette={palette} label={item.isCompleted ? 'Review' : 'Continue'} onPress={onOpen} />}
+      secondaryAction={
+        item.isCompleted && onCertificate ? (
+          <EducationActionButton palette={palette} label="Certificate" variant="ghost" onPress={onCertificate} />
+        ) : undefined
+      }
     >
-      <Text style={{ fontWeight: '800', color: palette.text }} numberOfLines={2}>
-        {item.contentTitle || 'Untitled course'}
-      </Text>
-      {item.lastLessonTitle ? (
-        <Text style={{ fontSize: 12, color: palette.subtext }} numberOfLines={1}>
-          Last: {item.lastLessonTitle}
-        </Text>
-      ) : null}
-      <View style={{ height: 6, borderRadius: 3, backgroundColor: palette.border, overflow: 'hidden' }}>
+      <View style={{ height: 6, borderRadius: 3, backgroundColor: palette.border, overflow: 'hidden', marginTop: 2 }}>
         <View style={{ width: `${percent}%`, height: '100%', backgroundColor: palette.primary }} />
       </View>
-      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-        <Text style={{ fontSize: 12, fontWeight: '700', color: palette.subtext }}>{percent}% complete</Text>
-        <View style={{ flexDirection: 'row', gap: 8 }}>
-          {item.isCompleted && onCertificate ? (
-            <KISButton title="Certificate" size="sm" variant="ghost" onPress={onCertificate} />
-          ) : null}
-          <KISButton title={item.isCompleted ? 'Review' : 'Continue'} size="sm" variant="primary" onPress={onOpen} />
-        </View>
-      </View>
-    </View>
+    </EducationListCard>
   );
 }
 
@@ -66,6 +63,7 @@ export default function MyLearningScreen() {
   const { palette } = useKISTheme();
   const responsive = useResponsiveLayout();
   const { data, loading, refresh } = useEducationDiscovery();
+  const { offlineItems } = useEducationOfflineStore();
 
   const { inProgress, completed } = useMemo(() => {
     const all = data?.continueLearning ?? [];
@@ -83,60 +81,86 @@ export default function MyLearningScreen() {
   };
 
   return (
-    <SafeAreaView edges={['bottom']} style={{ flex: 1, backgroundColor: palette.bg }}>
-      <ScrollView
-        contentContainerStyle={{ padding: responsive.pageGutter, paddingBottom: 40, gap: 24 }}
-        refreshControl={<RefreshControl refreshing={loading} onRefresh={refresh} tintColor={palette.primary} />}
+    <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg }}>
+      <EducationScreenScaffold
+        palette={palette}
+        title="My Learning"
+        onBack={() => navigation.goBack()}
+        scrollable={false}
+        contentContainerStyle={{ flex: 1, padding: 0 }}
       >
-        <Text style={{ fontSize: 24, fontWeight: '900', color: palette.text }}>My Learning</Text>
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={{ padding: responsive.pageGutter, paddingBottom: 40, gap: 24 }}
+          refreshControl={<RefreshControl refreshing={loading} onRefresh={refresh} tintColor={palette.primary} />}
+        >
+          <View style={{ gap: 12 }}>
+            <Text style={{ fontSize: 15, fontWeight: '800', color: palette.text }}>
+              In progress {inProgress.length > 0 ? `(${inProgress.length})` : ''}
+            </Text>
+            {inProgress.length === 0 && !loading ? (
+              <EducationEmptyState
+                palette={palette}
+                title="Nothing in progress"
+                description="Enroll in a course from the Education tab to get started."
+                action={
+                  <EducationActionButton
+                    palette={palette}
+                    label="Browse courses"
+                    onPress={() => navigation.popToTop()}
+                  />
+                }
+              />
+            ) : (
+              <View style={{ gap: 10 }}>
+                {inProgress.map(item => (
+                  <ProgressCard key={`${item.contentType}-${item.contentId}`} item={item} onOpen={() => openCourse(item)} />
+                ))}
+              </View>
+            )}
+          </View>
 
-        <View style={{ gap: 12 }}>
-          <Text style={{ fontSize: 15, fontWeight: '800', color: palette.text }}>
-            In progress {inProgress.length > 0 ? `(${inProgress.length})` : ''}
-          </Text>
-          {inProgress.length === 0 && !loading ? (
-            <View style={{ padding: 18, borderRadius: 16, borderWidth: 1, borderColor: palette.border, backgroundColor: palette.surface, alignItems: 'center', gap: 8 }}>
-              <KISIcon name="book" size={28} color={palette.subtext} />
-              <Text style={{ color: palette.subtext, fontWeight: '600', textAlign: 'center' }}>
-                Nothing in progress yet. Enroll in a course from Education Home to get started.
+          <View style={{ gap: 12 }}>
+            <Text style={{ fontSize: 15, fontWeight: '800', color: palette.text }}>
+              Completed {completed.length > 0 ? `(${completed.length})` : ''}
+            </Text>
+            {completed.length === 0 && !loading ? (
+              <EducationEmptyState palette={palette} title="Nothing completed yet" description="Complete a course to see it here." />
+            ) : (
+              <View style={{ gap: 10 }}>
+                {completed.map(item => (
+                  <ProgressCard
+                    key={`${item.contentType}-${item.contentId}`}
+                    item={item}
+                    onOpen={() => openCourse(item)}
+                    onCertificate={() => navigation.navigate('EducationCertificates')}
+                  />
+                ))}
+              </View>
+            )}
+          </View>
+
+          {offlineItems.length > 0 ? (
+            <View style={{ gap: 12 }}>
+              <Text style={{ fontSize: 15, fontWeight: '800', color: palette.text }}>
+                Saved for offline ({offlineItems.length})
               </Text>
-              <KISButton title="Browse courses" size="sm" onPress={() => navigation.navigate('EducationHome')} />
+              <View style={{ gap: 10 }}>
+                {offlineItems.map(item => (
+                  <EducationListCard
+                    key={`offline-${item.contentType}-${item.contentId}`}
+                    palette={palette}
+                    title={item.contentTitle || 'Saved course'}
+                    onPress={() => navigation.navigate('EducationCourseDetail', { contentId: item.contentId, contentType: item.contentType })}
+                  />
+                ))}
+              </View>
             </View>
-          ) : (
-            <View style={{ gap: 10 }}>
-              {inProgress.map(item => (
-                <ProgressRow key={`${item.contentType}-${item.contentId}`} item={item} onOpen={() => openCourse(item)} />
-              ))}
-            </View>
-          )}
-        </View>
+          ) : null}
 
-        <View style={{ gap: 12 }}>
-          <Text style={{ fontSize: 15, fontWeight: '800', color: palette.text }}>
-            Completed {completed.length > 0 ? `(${completed.length})` : ''}
-          </Text>
-          {completed.length === 0 && !loading ? (
-            <View style={{ padding: 18, borderRadius: 16, borderWidth: 1, borderColor: palette.border, backgroundColor: palette.surface, alignItems: 'center' }}>
-              <Text style={{ color: palette.subtext, fontWeight: '600', textAlign: 'center' }}>
-                Complete a course to see it here.
-              </Text>
-            </View>
-          ) : (
-            <View style={{ gap: 10 }}>
-              {completed.map(item => (
-                <ProgressRow
-                  key={`${item.contentType}-${item.contentId}`}
-                  item={item}
-                  onOpen={() => openCourse(item)}
-                  onCertificate={() => navigation.navigate('EducationCertificates')}
-                />
-              ))}
-            </View>
-          )}
-        </View>
-
-        {loading ? <ActivityIndicator color={palette.primary} /> : null}
-      </ScrollView>
+          {loading ? <ActivityIndicator color={palette.primary} /> : null}
+        </ScrollView>
+      </EducationScreenScaffold>
     </SafeAreaView>
   );
 }

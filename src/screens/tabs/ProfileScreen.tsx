@@ -176,16 +176,13 @@ import {
   EditProfileModal,
   FeedManagementModal,
   MarketManagementModal,
-  EducationManagementModal,
   PrivacyModal,
   UpgradeModal,
   WalletModal,
   buildDefaultFeedMediaOptions,
   getSheetTitle,
-  PROFILE_MANAGEMENT_TYPE,
 } from './profile-screen';
 import type {
-  EducationFormState,
   FeedMediaType,
   FeedMediaOptions,
   HealthInstitutionType,
@@ -322,8 +319,6 @@ export default function ProfileScreen() {
   const [panelFeedExistingAttachments, setPanelFeedExistingAttachments] =
     useState<any[]>([]);
   const [panelFeedAdding, setPanelFeedAdding] = useState(false);
-  const [panelAttachmentUploading, setPanelAttachmentUploading] =
-    useState(false);
   const [editingFeedItemId, setEditingFeedItemId] = useState<string | null>(
     null,
   );
@@ -383,27 +378,6 @@ export default function ProfileScreen() {
     },
     [],
   );
-  const [educationForm, setEducationForm] = useState<EducationFormState>({
-    title: '',
-    summary: '',
-  });
-  const [educationFormMode, setEducationFormMode] = useState<'add' | 'edit'>(
-    'add',
-  );
-  const [educationFormLoading, setEducationFormLoading] = useState(false);
-  const [educationModuleForm, setEducationModuleForm] = useState({
-    title: '',
-    summary: '',
-    resource_url: '',
-  });
-  const [educationModuleSubmitting, setEducationModuleSubmitting] =
-    useState(false);
-  const [educationLessonsData, setEducationLessonsData] = useState<any[]>([]);
-  const [educationAnalyticsLoading, setEducationAnalyticsLoading] =
-    useState(false);
-  const [educationAnalyticsError, setEducationAnalyticsError] = useState<
-    string | null
-  >(null);
   const [inAppNotifications, setInAppNotifications] = useState<
     InAppNotification[]
   >([]);
@@ -567,39 +541,6 @@ export default function ProfileScreen() {
   const removeTemporaryFeedAsset = useCallback((index: number) => {
     setPanelFeedAssets(prev => prev.filter((_, idx) => idx !== index));
   }, []);
-
-  const handleAttachProfileFile = useCallback(async () => {
-    if (!managementPanelKey) return;
-    setPanelAttachmentUploading(true);
-    try {
-      const result = await launchImageLibrary({
-        mediaType: 'mixed',
-        selectionLimit: 1,
-        quality: 1,
-      });
-      if (result.didCancel || !result.assets?.length) return;
-      const asset = result.assets[0];
-      if (!asset?.uri) return;
-      const attachment = await c.uploadProfileAttachment(
-        asset,
-        managementPanelKey,
-      );
-      if (!attachment) {
-        throw new Error('Unable to upload attachment.');
-      }
-      if (managementPanelKey === 'broadcast_feed') return;
-      const profileType = PROFILE_MANAGEMENT_TYPE[managementPanelKey];
-      await c.manageProfileSection(profileType, { attachments: [attachment] });
-      Alert.alert('Attachment uploaded', 'It has been added to the profile.');
-    } catch (error: any) {
-      Alert.alert(
-        'Attachment',
-        error?.message || 'Unable to upload attachment.',
-      );
-    } finally {
-      setPanelAttachmentUploading(false);
-    }
-  }, [managementPanelKey, c]);
 
   const accountTier = c.profile?.account?.tier;
   const points = c.profile?.account?.points ?? 0;
@@ -1171,6 +1112,16 @@ export default function ProfileScreen() {
   const rootNavigation =
     tabsNavigation.getParent<NativeStackNavigationProp<RootStackParamList>>();
 
+  // Education UX v2: EducationManagementModal is removed. Any trigger that
+  // still opens the 'education' management panel (deep links, the generic
+  // profile-type grid, DeviceEventEmitter re-open events) is redirected
+  // here to the real EducationInstitutionPicker destination instead.
+  useEffect(() => {
+    if (managementPanelKey !== 'education') return;
+    closeManagementPanel();
+    rootNavigation?.navigate('EducationInstitutionPicker');
+  }, [managementPanelKey, closeManagementPanel, rootNavigation]);
+
   const [openToWork, setOpenToWork] = useState(false);
   const [openToWorkLoading, setOpenToWorkLoading] = useState(false);
 
@@ -1252,19 +1203,6 @@ export default function ProfileScreen() {
     [rootNavigation, closeManagementPanel],
   );
 
-  const openEducationLandingBuilder = useCallback(
-    (institution?: any) => {
-      if (!institution?.id) return;
-      closeManagementPanel();
-      rootNavigation?.navigate('WebsiteBuilder', {
-        ownerType: 'education_institution',
-        ownerId: institution.id,
-        ownerLabel: institution?.name || 'Education Profile',
-      });
-    },
-    [rootNavigation, closeManagementPanel],
-  );
-
   const openPartnerLandingBuilder = useCallback(
     (partnerId: string, partnerName?: string | null) => {
       if (!partnerId) return;
@@ -1334,22 +1272,6 @@ export default function ProfileScreen() {
     setMarketFormMode('add');
     setActiveShop(null);
     setShopEditorMode('create');
-  }, []);
-
-  const resetEducationForm = useCallback(() => {
-    setEducationForm({
-      title: '',
-      summary: '',
-    });
-    setEducationFormMode('add');
-  }, []);
-
-  const resetEducationModuleForm = useCallback(() => {
-    setEducationModuleForm({
-      title: '',
-      summary: '',
-      resource_url: '',
-    });
   }, []);
 
   const unwrapList = useCallback((payload: any) => {
@@ -1545,26 +1467,6 @@ export default function ProfileScreen() {
     }
   }, [currentUserId]);
 
-  const handleEducationFormTitleChange = useCallback((value: string) => {
-    setEducationForm(prev => ({ ...prev, title: value }));
-  }, []);
-
-  const handleEducationFormSummaryChange = useCallback((value: string) => {
-    setEducationForm(prev => ({ ...prev, summary: value }));
-  }, []);
-
-  const handleEducationModuleTitleChange = useCallback((value: string) => {
-    setEducationModuleForm(prev => ({ ...prev, title: value }));
-  }, []);
-
-  const handleEducationModuleSummaryChange = useCallback((value: string) => {
-    setEducationModuleForm(prev => ({ ...prev, summary: value }));
-  }, []);
-
-  const handleEducationModuleResourceChange = useCallback((value: string) => {
-    setEducationModuleForm(prev => ({ ...prev, resource_url: value }));
-  }, []);
-
   const resolveAttachmentUrl = useCallback((attachment: any) => {
     return (
       attachment?.url ??
@@ -1641,19 +1543,6 @@ export default function ProfileScreen() {
     },
     [attachmentKey, c, editingFeedItemId, setPanelFeedExistingAttachments],
   );
-
-  const openModuleResource = useCallback(async (url?: string | null) => {
-    if (!url) {
-      Alert.alert('Module', 'No resource link provided.');
-      return;
-    }
-    const canOpen = await Linking.canOpenURL(url);
-    if (!canOpen) {
-      Alert.alert('Module', 'Unable to open the resource URL.');
-      return;
-    }
-    Linking.openURL(url);
-  }, []);
 
   const beginMarketEdit = useCallback((shop: any) => {
     const previewUri = getShopPreviewUri(shop);
@@ -1815,35 +1704,6 @@ export default function ProfileScreen() {
     }
   }, [shopEditorVisible, shopEditorMode, fetchManageableShopPartners]);
 
-  const formatLessonTime = useCallback((value?: string | null) => {
-    if (!value) return 'Starts soon';
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) return 'TBD';
-    return date.toLocaleString();
-  }, []);
-
-  const loadEducationAnalytics = useCallback(async () => {
-    setEducationAnalyticsLoading(true);
-    try {
-      const lessonRes = await getRequest(ROUTES.broadcasts.lessons, {
-        errorMessage: 'Unable to load lessons.',
-      });
-      if (lessonRes.success) {
-        const lessons = unwrapList(lessonRes.data);
-        setEducationLessonsData(lessons);
-        setEducationAnalyticsError(null);
-      } else {
-        setEducationAnalyticsError(lessonRes.message ?? null);
-      }
-    } catch (error: any) {
-      setEducationAnalyticsError(
-        error?.message || 'Unable to load lesson insights.',
-      );
-    } finally {
-      setEducationAnalyticsLoading(false);
-    }
-  }, [unwrapList]);
-
   const loadMarketplaceOrders = useCallback(async () => {
     try {
       const cached = await AsyncStorage.getItem(ORDERS_CACHE_KEY);
@@ -1888,36 +1748,6 @@ export default function ProfileScreen() {
     }, [loadMarketplaceOrders]),
   );
 
-  useEffect(() => {
-    if (managementPanelKey === 'education') {
-      void loadEducationAnalytics();
-    }
-  }, [managementPanelKey, loadEducationAnalytics]);
-
-  const upcomingLessons = useMemo(() => {
-    const now = Date.now();
-    return educationLessonsData
-      .filter(lesson => {
-        if (!lesson?.starts_at) return false;
-        const startsAt = new Date(lesson.starts_at).getTime();
-        return !Number.isNaN(startsAt) && startsAt >= now;
-      })
-      .sort(
-        (a, b) =>
-          new Date(a.starts_at).getTime() - new Date(b.starts_at).getTime(),
-      );
-  }, [educationLessonsData]);
-
-  const totalEnrollments = useMemo(
-    () =>
-      educationLessonsData.reduce<number>((sum, lesson) => {
-        const count = Number(lesson?.enrollment_count ?? 0);
-        return sum + (Number.isFinite(count) ? count : 0);
-      }, 0),
-    [educationLessonsData],
-  );
-
-  const nextLesson = upcomingLessons[0] ?? null;
 
   const recentMarketplaceOrders = useMemo(() => {
     const sorted = [...marketplaceOrders];
@@ -2041,6 +1871,30 @@ export default function ProfileScreen() {
         onPress: openShopEditorForCreate,
       },
       {
+        key: 'wishlist',
+        title: 'Wishlist',
+        subtitle: 'Items you saved for later',
+        icon: 'heart' as const,
+        tone: 'warning' as const,
+        onPress: () => rootNavigation?.navigate('Wishlist'),
+      },
+      {
+        key: 'addresses',
+        title: 'Addresses',
+        subtitle: 'Manage delivery addresses',
+        icon: 'home' as const,
+        tone: 'info' as const,
+        onPress: () => rootNavigation?.navigate('Addresses'),
+      },
+      {
+        key: 'fulfillment-queue',
+        title: 'Orders to fulfill',
+        subtitle: 'Ship orders for your shops',
+        icon: 'cart' as const,
+        tone: 'primary' as const,
+        onPress: () => rootNavigation?.navigate('FulfillmentQueue'),
+      },
+      {
         key: 'view-events',
         title: 'Community Events',
         subtitle: 'Browse and RSVP to events',
@@ -2066,14 +1920,6 @@ export default function ProfileScreen() {
         icon: 'people' as const,
         tone: 'success' as const,
         onPress: () => rootNavigation?.navigate('Connections', {}),
-      },
-      {
-        key: 'testimony-network',
-        title: 'Testimony Network',
-        subtitle: 'Your seasons & testimonies',
-        icon: 'heart' as const,
-        tone: 'primary' as const,
-        onPress: () => rootNavigation?.navigate('TestimonyHub'),
       },
       {
         key: 'contact-share-link',
@@ -2233,31 +2079,6 @@ export default function ProfileScreen() {
     [broadcastProfiles, handleBroadcastCTA],
   );
 
-  const handleEducationModuleSave = useCallback(async () => {
-    const title = educationModuleForm.title.trim();
-    if (!title) {
-      Alert.alert('Module', 'Please provide a title for the module.');
-      return;
-    }
-    setEducationModuleSubmitting(true);
-    try {
-      await c.manageProfileSection('education_profile', {
-        modules: [
-          {
-            title,
-            summary: educationModuleForm.summary.trim(),
-            resource_url: educationModuleForm.resource_url.trim(),
-          },
-        ],
-      });
-      Alert.alert('Module', 'Module joined your education profile.');
-      resetEducationModuleForm();
-    } catch (error: any) {
-      Alert.alert('Module', error?.message || 'Unable to add module.');
-    } finally {
-      setEducationModuleSubmitting(false);
-    }
-  }, [educationModuleForm, c, resetEducationModuleForm]);
 
   const handleMarketFormSave = useCallback(async (draft: boolean) => {
     const name = marketForm.name.trim();
@@ -2373,65 +2194,6 @@ export default function ProfileScreen() {
     canDeleteActiveShop,
   ]);
 
-  const handleEducationFormSave = useCallback(async () => {
-    const title = educationForm.title.trim();
-    if (!title) {
-      Alert.alert('Education profile', 'Provide a course title.');
-      return;
-    }
-    const courses = managementPanelData?.courses ?? [];
-    const nextCourses =
-      educationFormMode === 'edit' && educationForm.id
-        ? courses.map((course: any) =>
-            course.id === educationForm.id
-              ? { ...course, title, summary: educationForm.summary.trim() }
-              : course,
-          )
-        : [...courses, { title, summary: educationForm.summary.trim() }];
-
-    setEducationFormLoading(true);
-    try {
-      await c.manageProfileSection('education_profile', {
-        courses: nextCourses,
-      });
-      resetEducationForm();
-    } catch (error: any) {
-      Alert.alert(
-        'Education profile',
-        error?.message || 'Unable to update courses.',
-      );
-    } finally {
-      setEducationFormLoading(false);
-    }
-  }, [
-    c,
-    educationForm,
-    educationFormMode,
-    managementPanelData,
-    resetEducationForm,
-  ]);
-
-  const handleEducationFormDelete = useCallback(async () => {
-    if (!educationForm.id) return;
-    const courses = managementPanelData?.courses ?? [];
-    const nextCourses = courses.filter(
-      (course: any) => course.id !== educationForm.id,
-    );
-    setEducationFormLoading(true);
-    try {
-      await c.manageProfileSection('education_profile', {
-        courses: nextCourses,
-      });
-      resetEducationForm();
-    } catch (error: any) {
-      Alert.alert(
-        'Education profile',
-        error?.message || 'Unable to delete course.',
-      );
-    } finally {
-      setEducationFormLoading(false);
-    }
-  }, [c, educationForm.id, managementPanelData, resetEducationForm]);
 
   const renderManagementPanelContent = () => {
     if (!managementPanelKey) return null;
@@ -2441,10 +2203,6 @@ export default function ProfileScreen() {
     const panelHint = isEmpty
       ? 'Use the create modal to start this profile, then return here to manage it.'
       : managementPanelDefinition?.helper;
-
-    const attachments = Array.isArray(managementPanelData?.attachments)
-      ? managementPanelData.attachments
-      : [];
 
     if (managementPanelKey === 'broadcast_feed') {
       const feeds: any[] = Array.isArray(managementPanelData?.feeds)
@@ -2554,59 +2312,12 @@ export default function ProfileScreen() {
     }
 
     if (managementPanelKey === 'education') {
-      const courses: any[] = Array.isArray(managementPanelData?.courses)
-        ? managementPanelData.courses
-        : [];
-      const modules: any[] = Array.isArray(managementPanelData?.modules)
-        ? managementPanelData.modules
-        : [];
-      return (
-        <EducationManagementModal
-          palette={palette}
-          title={panelTitle}
-          subtitle={panelHint ?? ''}
-          managementData={managementPanelData}
-          tierLabel={tierLabel}
-          accountTier={accountTier}
-          courses={courses}
-          modules={modules}
-          educationForm={educationForm}
-          educationFormMode={educationFormMode}
-          educationFormLoading={educationFormLoading}
-          educationModuleForm={educationModuleForm}
-          educationModuleSubmitting={educationModuleSubmitting}
-          handleEducationFormSave={handleEducationFormSave}
-          handleEducationFormDelete={handleEducationFormDelete}
-          resetEducationForm={resetEducationForm}
-          handleEducationModuleSave={handleEducationModuleSave}
-          resetEducationModuleForm={resetEducationModuleForm}
-          openModuleResource={openModuleResource}
-          onEducationFormTitleChange={handleEducationFormTitleChange}
-          onEducationFormSummaryChange={handleEducationFormSummaryChange}
-          onEducationModuleTitleChange={handleEducationModuleTitleChange}
-          onEducationModuleSummaryChange={handleEducationModuleSummaryChange}
-          onEducationModuleResourceChange={handleEducationModuleResourceChange}
-          loadEducationAnalytics={loadEducationAnalytics}
-          educationAnalyticsLoading={educationAnalyticsLoading}
-          educationAnalyticsError={educationAnalyticsError}
-          upcomingLessons={upcomingLessons}
-          totalEnrollments={totalEnrollments}
-          nextLesson={nextLesson}
-          formatLessonTime={formatLessonTime}
-          attachments={attachments}
-          panelAttachmentUploading={panelAttachmentUploading}
-          handleAttachProfileFile={handleAttachProfileFile}
-          onOpenLandingBuilder={openEducationLandingBuilder}
-          onOpenVerificationCenter={(institution: any) =>
-            setVerificationCenterTarget({
-              subject: { type: 'education_institution', id: institution?.id },
-              title: 'Education verification',
-              subtitle: 'Submit accreditation and authorization metadata using private media references.',
-              summary: normalizeVerificationSummary(institution),
-            })
-          }
-        />
-      );
+      // Education UX v2: EducationManagementModal is removed. The
+      // useEffect above (near rootNavigation) redirects to
+      // EducationInstitutionPicker as soon as this key is set; this
+      // branch only needs to render nothing for the one frame before
+      // that effect fires.
+      return null;
     }
 
     return (

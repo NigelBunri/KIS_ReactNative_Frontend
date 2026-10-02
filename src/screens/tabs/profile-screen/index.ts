@@ -5,7 +5,6 @@ export * from './types';
 export * from './FeedManagementModal';
 export * from './HealthManagementModal';
 export * from './MarketManagementModal';
-export * from './EducationManagementModal';
 export * from './ManagementAttachments';
 export * from './CompliancePanel';
 export * from './FinancialPanel';

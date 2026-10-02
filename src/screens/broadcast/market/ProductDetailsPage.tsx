@@ -15,6 +15,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { useKISTheme } from '@/theme/useTheme';
 import { getRequest } from '@/network/get';
+import { queueableJsonRequest } from '@/services/offlineActionQueue';
 import ROUTES from '@/network';
 import KISButton from '@/constants/KISButton';
 import { KISIcon } from '@/constants/kisIcons';
@@ -208,6 +209,9 @@ export default function ProductDetailsPage() {
       buildCartProductIndex(getShopCartState()),
     );
   const [cartState, setCartState] = useState(getShopCartState());
+  const [isSaved, setIsSaved] = useState(false);
+  const [savedItemId, setSavedItemId] = useState<string | null>(null);
+  const [savingWishlist, setSavingWishlist] = useState(false);
 
   const variants = useMemo<VariantRecord[]>(
     () =>
@@ -637,6 +641,72 @@ export default function ProductDetailsPage() {
   }, [loadProduct]);
 
   useEffect(() => {
+    let cancelled = false;
+    if (!product?.id) {
+      setIsSaved(false);
+      setSavedItemId(null);
+      return;
+    }
+    (async () => {
+      const response = await getRequest(ROUTES.commerce.savedItems, {
+        errorMessage: 'Unable to load wishlist status.',
+      });
+      if (cancelled || !response.success) return;
+      const payload = response.data;
+      const list = Array.isArray(payload)
+        ? payload
+        : Array.isArray(payload?.results)
+        ? payload.results
+        : [];
+      const match = list.find(
+        (entry: any) => entry?.product_detail?.id === product.id,
+      );
+      setIsSaved(Boolean(match));
+      setSavedItemId(match?.id ?? null);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [product?.id]);
+
+  const handleToggleWishlist = useCallback(async () => {
+    if (!product?.id || savingWishlist) return;
+    setSavingWishlist(true);
+    try {
+      if (isSaved) {
+        const response = await queueableJsonRequest({
+          domain: 'Market',
+          kind: 'market.wishlist.remove',
+          method: 'DELETE',
+          url: ROUTES.commerce.savedItemByProduct(product.id),
+          dedupeKey: `market:wishlist:${product.id}`,
+          errorMessage: 'Unable to remove from wishlist.',
+        });
+        if (!response.success) throw new Error(response.message || 'Unable to remove from wishlist.');
+        setIsSaved(false);
+        setSavedItemId(null);
+      } else {
+        const response = await queueableJsonRequest({
+          domain: 'Market',
+          kind: 'market.wishlist.add',
+          method: 'POST',
+          url: ROUTES.commerce.savedItems,
+          body: { product_id: product.id },
+          dedupeKey: `market:wishlist:${product.id}`,
+          errorMessage: 'Unable to save to wishlist.',
+        });
+        if (!response.success) throw new Error(response.message || 'Unable to save to wishlist.');
+        setIsSaved(true);
+        setSavedItemId(response.data?.id ?? null);
+      }
+    } catch (toggleError: any) {
+      Alert.alert('Wishlist', toggleError?.message || 'Unable to update wishlist.');
+    } finally {
+      setSavingWishlist(false);
+    }
+  }, [product?.id, isSaved, savingWishlist]);
+
+  useEffect(() => {
     if (matchingCartItem) return;
     setQuantity(quantityLimit > 0 ? 1 : 0);
     setSelectedAttributeOptions({});
@@ -999,7 +1069,21 @@ export default function ProductDetailsPage() {
           Product details
         </Text>
 
-        <View style={styles.headerRightPlaceholder} />
+        <Pressable
+          onPress={handleToggleWishlist}
+          disabled={!product?.id || savingWishlist}
+          style={[
+            styles.headerIconButton,
+            { backgroundColor: palette.surface, borderColor: palette.divider },
+          ]}
+        >
+          <KISIcon
+            name="heart"
+            size={18}
+            focused={isSaved}
+            color={isSaved ? palette.danger : palette.text}
+          />
+        </Pressable>
       </View>
 
       <ScrollView

@@ -1,5 +1,7 @@
 // src/screens/broadcast/education/api/education.models.ts
-export type EducationContentType = 'course' | 'lesson' | 'workshop' | 'program' | 'credential' | 'mentorship';
+// 'institution' promotes the institution itself (no course/program/lesson
+// target) — see EducationBroadcastKind.INSTITUTION on the backend.
+export type EducationContentType = 'course' | 'lesson' | 'workshop' | 'program' | 'class' | 'credential' | 'mentorship' | 'institution';
 
 export interface EducationPricing {
   id: string;
@@ -136,6 +138,7 @@ export interface EducationBase {
   coverUrl?: string | null;
   partnerId?: string | null;
   partnerName?: string | null;
+  partnerLogoUrl?: string | null;
   language?: string;
   level?: 'beginner' | 'intermediate' | 'advanced' | 'all';
   topics?: ContentTag[];
@@ -157,6 +160,18 @@ export interface EducationBase {
   bookingEnabled?: boolean;
   membershipPolicy?: string;
   targetLabel?: string;
+  // Present only on type: 'institution' items — merged in from the same
+  // institution-summary payload the (separate) home-screen spotlight
+  // carousel uses, so this card can show the same counts/branding without
+  // a second fetch. See _build_public_institution_summary on the backend.
+  institutionType?: string;
+  logoUrl?: string;
+  imageUrl?: string;
+  programCount?: number;
+  courseCount?: number;
+  eventCount?: number;
+  publishedBroadcastCount?: number;
+  memberCount?: number;
   detailSummary?: EducationDetailSummary | null;
   detail_summary?: EducationDetailSummary | null;
   reviewSummary?: EducationReviewSummary | null;
@@ -291,6 +306,27 @@ export interface EducationCourse extends EducationBase {
   institutionSummary?: EducationInstitutionSpotlight;
   trustSignals?: EducationTrustSignals;
   instructors?: Array<{ id: string; name: string; role?: string }>;
+  // Present when this course sits under a Class — just enough to place
+  // it in the Program -> Class -> Course hierarchy, not a full class
+  // detail (a Class has no discovery/broadcast card of its own).
+  institutionClass?: { id: string; name: string; programId?: string | null; programTitle?: string | null } | null;
+}
+
+// Present on an EducationProgram's `courses` list only — each entry is a
+// EducationCourse-shaped row plus the broadcast id needed to actually
+// navigate to it (EducationContentDetailView/ROUTES.education.detail is
+// keyed by broadcast id, not course id; a course with no published
+// broadcast of its own has nowhere to link to yet).
+export interface EducationProgramCourseSummary extends EducationCourse {
+  broadcastId?: string;
+}
+
+export interface EducationProgramClassSummary {
+  id: string;
+  name: string;
+  description?: string;
+  status?: string;
+  course_count?: number;
 }
 
 export interface EducationLesson extends EducationBase {
@@ -318,10 +354,22 @@ export interface EducationWorkshop extends EducationBase {
 export interface EducationProgram extends EducationBase {
   type: 'program';
   // Programs keep learners on structured pathways.
-  courses?: EducationCourse[];
+  courses?: EducationProgramCourseSummary[];
+  classes?: EducationProgramClassSummary[];
   durationWeeks?: number;
   cohortStartsAt?: string | null;
   completionCredentialId?: string | null;
+}
+
+export interface EducationClass extends EducationBase {
+  type: 'class';
+  // A Class has no discovery card/broadcast kind of its own for its
+  // *courses* — this is the broadcast for the Class entity itself. Its
+  // courses are the same EducationProgramCourseSummary shape a Program's
+  // course list uses (carries broadcastId so each is actually linkable).
+  courses?: EducationProgramCourseSummary[];
+  programId?: string | null;
+  programTitle?: string | null;
 }
 
 export interface EducationCredential extends EducationBase {
@@ -342,13 +390,19 @@ export interface EducationMentorship extends EducationBase {
   meetUrl?: string;
 }
 
+export interface EducationInstitutionSpotlightItem extends EducationBase {
+  type: 'institution';
+}
+
 export type EducationContentItem =
   | EducationCourse
   | EducationLesson
   | EducationWorkshop
   | EducationProgram
+  | EducationClass
   | EducationCredential
-  | EducationMentorship;
+  | EducationMentorship
+  | EducationInstitutionSpotlightItem;
 
 export interface EducationEnrollment {
   id: string;

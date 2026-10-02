@@ -123,6 +123,10 @@ const broadcastRoutes = {
     // which returns a completely different response shape and silently
     // broke the entire learner discovery/enroll/progress flow.
     discovery: `${API_BASE_URL}/api/v1/education/discovery/`,
+    // Every active institution on the platform, not just the capped
+    // (12) featured/spotlight subset discovery.institutionSpotlights
+    // derives from institutions that currently have a live broadcast.
+    institutionDirectory: `${API_BASE_URL}/api/v1/education/institutions/directory/`,
     // No dedicated search endpoint exists on the backend; discovery already
     // supports a `?q=` filter, so search is just discovery with a query.
     search: `${API_BASE_URL}/api/v1/education/discovery/`,
@@ -690,6 +694,13 @@ const broadcastRoutes = {
       programId: string,
     ) =>
       `${API_BASE_URL}/api/v1/broadcasts/education/institutions/${institutionId}/programs/${programId}/`,
+    educationInstitutionClasses: (id: string) =>
+      `${API_BASE_URL}/api/v1/broadcasts/education/institutions/${id}/classes/`,
+    educationInstitutionClassDetail: (
+      institutionId: string,
+      classId: string,
+    ) =>
+      `${API_BASE_URL}/api/v1/broadcasts/education/institutions/${institutionId}/classes/${classId}/`,
     educationInstitutionCourses: (id: string) =>
       `${API_BASE_URL}/api/v1/broadcasts/education/institutions/${id}/courses/`,
     educationInstitutionCourse: (institutionId: string, courseId: string) =>
@@ -1044,6 +1055,31 @@ const broadcastRoutes = {
       `${API_BASE_URL}/api/v1/commerce/marketplace-orders/${id}/`,
     marketplaceOrderReceipt: (id: string) =>
       `${API_BASE_URL}/api/v1/commerce/marketplace-orders/${id}/receipt/`,
+    marketplaceOrderFulfillment: (id: string) =>
+      `${API_BASE_URL}/api/v1/commerce/marketplace-orders/${id}/fulfillment/`,
+    addresses: `${API_BASE_URL}/api/v1/commerce/addresses/`,
+    address: (id: string) => `${API_BASE_URL}/api/v1/commerce/addresses/${id}/`,
+    addressSetDefault: (id: string) =>
+      `${API_BASE_URL}/api/v1/commerce/addresses/${id}/set_default/`,
+    shippingOptions: `${API_BASE_URL}/api/v1/commerce/shipping/options/`,
+    fulfillments: `${API_BASE_URL}/api/v1/commerce/fulfillments/`,
+    fulfillment: (id: string) => `${API_BASE_URL}/api/v1/commerce/fulfillments/${id}/`,
+    fulfillmentAccept: (id: string) =>
+      `${API_BASE_URL}/api/v1/commerce/fulfillments/${id}/accept/`,
+    fulfillmentStartProcessing: (id: string) =>
+      `${API_BASE_URL}/api/v1/commerce/fulfillments/${id}/start-processing/`,
+    fulfillmentMarkReady: (id: string) =>
+      `${API_BASE_URL}/api/v1/commerce/fulfillments/${id}/mark-ready/`,
+    fulfillmentCancel: (id: string) =>
+      `${API_BASE_URL}/api/v1/commerce/fulfillments/${id}/cancel/`,
+    shipments: `${API_BASE_URL}/api/v1/commerce/shipments/`,
+    shipmentTransition: (id: string) =>
+      `${API_BASE_URL}/api/v1/commerce/shipments/${id}/transition/`,
+    shipmentEvents: (id: string) =>
+      `${API_BASE_URL}/api/v1/commerce/shipments/${id}/events/`,
+    savedItems: `${API_BASE_URL}/api/v1/commerce/saved-items/`,
+    savedItemByProduct: (productId: string) =>
+      `${API_BASE_URL}/api/v1/commerce/saved-items/by-product/${productId}/`,
     promotions: `${API_BASE_URL}/api/v1/commerce/promotions/`,
     promotion: (id: string) => `${API_BASE_URL}/api/v1/commerce/promotions/${id}/`,
     shopVerifications: `${API_BASE_URL}/api/v1/commerce/shop-verifications/`,

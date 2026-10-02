@@ -134,7 +134,7 @@ export default function DiscipleshipReadAloudSheet({
             </View>
             {isPaused ? (
               <Text style={{ color: palette.subtext, textAlign: 'center', marginTop: 4 }}>
-                Paused — tap play to continue from here.
+                Paused: tap play to continue from here.
               </Text>
             ) : null}
           </View>

@@ -79,6 +79,18 @@ type EducationListCardProps = {
   subtitle?: string;
   eyebrow?: string;
   imageUrl?: string | null;
+  // Circular gold-ringed logo + name shown above the title, feed-post
+  // style — e.g. "which institution owns this course" in a course list.
+  // Omit both on a card that already represents the institution itself.
+  institutionName?: string | null;
+  institutionLogoUrl?: string | null;
+  // Same circular-avatar-+-label row as institutionName/institutionLogoUrl
+  // above, for when the card represents a *person* (an enrolled learner, a
+  // staff member) rather than a course/institution - e.g. the Learners tab
+  // on a Program/Class Dashboard. Only one of the two pairs is shown;
+  // institutionName takes priority if both are somehow given.
+  avatarLabel?: string | null;
+  avatarUrl?: string | null;
   statusLabel?: string;
   statusTone?: EducationTone;
   metaItems?: string[];
@@ -418,6 +430,10 @@ export function EducationListCard({
   subtitle,
   eyebrow,
   imageUrl,
+  institutionName,
+  institutionLogoUrl,
+  avatarLabel,
+  avatarUrl,
   statusLabel,
   statusTone = 'default',
   metaItems,
@@ -426,53 +442,103 @@ export function EducationListCard({
   secondaryAction,
   children,
 }: EducationListCardProps) {
+  const headerLabel = institutionName || avatarLabel;
+  const headerLogoUrl = institutionName ? institutionLogoUrl : avatarUrl;
+  const showInstitutionHeader = !!headerLabel;
+
+  // Luxurious "feed post" layout, top to bottom: the owning institution
+  // (circular gold-ringed logo + name) when given, then the title (with
+  // eyebrow/status above it), then a full-width image, then subtitle/
+  // description, then meta/children, then action buttons — matches
+  // EducationContentCard's order so the creator's view and the public
+  // broadcast feed read the same way.
   const body = (
     <View
       style={[
         styles.listCard,
         getSurface(palette),
         {
+          padding: 0,
+          overflow: 'hidden',
           borderWidth: 1.5,
-          borderColor: `${palette.primaryStrong}66`,
+          borderColor: `${palette.gold ?? palette.primaryStrong}66`,
           backgroundColor: `${palette.surfaceElevated ?? palette.card}F6`,
+          gap: 0,
+          shadowColor: palette.goldShadow ?? palette.royalInk,
+          shadowOpacity: 0.16,
+          shadowRadius: 20,
+          shadowOffset: { width: 0, height: 10 },
+          elevation: 5,
         },
       ]}
     >
-      <View style={styles.listCardHeader}>
-        <View style={styles.listCardHeaderMain}>
-          {imageUrl ? (
+      {showInstitutionHeader ? (
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 9, paddingHorizontal: 16, paddingTop: 14, paddingBottom: 4 }}>
+          {headerLogoUrl ? (
             <Image
-              source={{ uri: imageUrl }}
-              style={[styles.listCardImage, { borderColor: `${palette.divider}99`, backgroundColor: palette.bg, }]}
-              resizeMode="cover"
+              source={{ uri: headerLogoUrl }}
+              style={{
+                width: 34,
+                height: 34,
+                borderRadius: 17,
+                borderWidth: 1.5,
+                borderColor: palette.gold ?? palette.primary,
+                backgroundColor: palette.bg,
+              }}
             />
-          ) : null}
-          <View style={styles.listCardCopy}>
-            {eyebrow ? <Text style={[styles.listEyebrow, { color: palette.primaryStrong }]}>{eyebrow}</Text> : null}
-            <Text style={[styles.listTitle, { color: palette.text }]}>{title}</Text>
-            {subtitle ? <Text style={[styles.listSubtitle, { color: palette.subtext }]}>{subtitle}</Text> : null}
-          </View>
+          ) : (
+            <View
+              style={{
+                width: 34,
+                height: 34,
+                borderRadius: 17,
+                borderWidth: 1.5,
+                borderColor: palette.gold ?? palette.primary,
+                backgroundColor: palette.primarySoft,
+              }}
+            />
+          )}
+          <Text style={{ color: palette.text, fontWeight: '800', fontSize: 13, flex: 1 }} numberOfLines={1}>
+            {headerLabel}
+          </Text>
         </View>
-        {statusLabel ? (
-          <EducationStatusBadge palette={palette} label={statusLabel} tone={statusTone} />
+      ) : null}
+
+      <View style={{ padding: 16, paddingTop: showInstitutionHeader ? 6 : 16, paddingBottom: 8, gap: 5 }}>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
+          {eyebrow ? <Text style={[styles.listEyebrow, { color: palette.goldDeep ?? palette.primaryStrong }]}>{eyebrow}</Text> : <View />}
+          {statusLabel ? <EducationStatusBadge palette={palette} label={statusLabel} tone={statusTone} /> : null}
+        </View>
+        <Text style={[styles.listTitle, { color: palette.text }]}>{title}</Text>
+      </View>
+
+      {imageUrl ? (
+        <Image
+          source={{ uri: imageUrl }}
+          style={{ width: '100%', height: 160, backgroundColor: palette.bg }}
+          resizeMode="cover"
+        />
+      ) : null}
+
+      <View style={{ padding: 16, paddingTop: 10, gap: 10 }}>
+        {subtitle ? <Text style={[styles.listSubtitle, { color: palette.subtext }]}>{subtitle}</Text> : null}
+        {metaItems?.length ? (
+          <View style={styles.listMetaRow}>
+            {metaItems.filter(Boolean).map((item, index) => (
+              <Text key={`${item}-${index}`} style={[styles.listMetaText, { color: palette.subtext }]}>
+                {item}
+              </Text>
+            ))}
+          </View>
+        ) : null}
+        {children}
+        {primaryAction || secondaryAction ? (
+          <View style={styles.listActionRow}>
+            {primaryAction}
+            {secondaryAction}
+          </View>
         ) : null}
       </View>
-      {metaItems?.length ? (
-        <View style={styles.listMetaRow}>
-          {metaItems.filter(Boolean).map((item, index) => (
-            <Text key={`${item}-${index}`} style={[styles.listMetaText, { color: palette.subtext }]}>
-              {item}
-            </Text>
-          ))}
-        </View>
-      ) : null}
-      {children}
-      {primaryAction || secondaryAction ? (
-        <View style={styles.listActionRow}>
-          {primaryAction}
-          {secondaryAction}
-        </View>
-      ) : null}
     </View>
   );
 

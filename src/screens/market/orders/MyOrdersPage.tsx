@@ -41,6 +41,9 @@ type MarketplaceOrder = {
   shop_info?: { id?: string; name?: string } | null;
   shop?: { name?: string } | string;
   items?: Array<{ id?: string }>;
+  payment_url?: string | null;
+  payment_required?: boolean;
+  next_action?: { code?: string; label?: string; enabled?: boolean } | null;
 };
 
 export default function MyOrdersPage() {
@@ -136,6 +139,24 @@ export default function MyOrdersPage() {
     [loadOrders],
   );
 
+  const completePayment = useCallback(async (orderId: string, paymentUrl: string) => {
+    setActionLoading(prev => ({ ...prev, [orderId]: 'pay' }));
+    try {
+      await Linking.openURL(paymentUrl);
+    } catch (err: any) {
+      Alert.alert(
+        'Unable to open checkout',
+        err?.message || 'Unable to open the secure checkout page. Please try again from this order.',
+      );
+    } finally {
+      setActionLoading(prev => {
+        const next = { ...prev };
+        delete next[orderId];
+        return next;
+      });
+    }
+  }, []);
+
   const downloadReceipt = useCallback(async (orderId: string) => {
     setActionLoading(prev => ({ ...prev, [orderId]: 'receipt' }));
     try {
@@ -177,6 +198,8 @@ export default function MyOrdersPage() {
     const canDelete =
       item.status === 'cancelled' || item.status === 'satisfied';
     const isAwaitingSatisfaction = item.status === 'awaiting_satisfaction';
+    const canCompletePayment =
+      item.next_action?.code === 'open_checkout' && Boolean(item.payment_url);
 
     const loadingKey = actionLoading[item.id];
 
@@ -289,6 +312,16 @@ export default function MyOrdersPage() {
               })
             }
           />
+          {canCompletePayment ? (
+            <KISButton
+              title={loadingKey === 'pay' ? 'Opening…' : 'Complete payment'}
+              loading={loadingKey === 'pay'}
+              size="xs"
+              variant="primary"
+              onPress={() => completePayment(item.id, item.payment_url as string)}
+              disabled={Boolean(loadingKey)}
+            />
+          ) : null}
           {canCancel ? (
             <KISButton
               title={loadingKey === 'cancel' ? 'Cancelling…' : 'Cancel'}

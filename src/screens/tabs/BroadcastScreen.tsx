@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import {
   DeviceEventEmitter,
   PanResponder,
@@ -156,6 +156,22 @@ export default function BroadcastScreen() {
   const [activeMainTab, setActiveMainTab] =
     useState<BroadcastMainTabId>('feeds');
 
+  // Read by useGoldenSectionContent's keepFrozenOnBlurRef option below.
+  // Flipped true by BroadcastEducationPage right before it pushes one of the
+  // Education modal screens (EducationCourseDetail, EducationInstitutionPicker,
+  // etc.) so this header stays frozen in place instead of collapsing out from
+  // under the modal — see that option's doc comment in GoldenSectionContext.tsx
+  // for why this is scoped to just this one flow. Reset back to false the
+  // instant Broadcast regains focus (the whole Education modal stack only
+  // ever pops back to here), so every *other* blur (switching tabs, opening
+  // an unrelated modal) still clears normally, unaffected.
+  const educationModalOpenRef = useRef(false);
+  useFocusEffect(
+    useCallback(() => {
+      educationModalOpenRef.current = false;
+    }, []),
+  );
+
   // Bell icon in the header — see BroadcastHeaderBar's onNotifications prop.
   // Reuses the same backend-backed badge count every other main tab's
   // unread dot already reads, refreshed on the same shared event bus
@@ -181,10 +197,11 @@ export default function BroadcastScreen() {
   // param is the standard react-navigation way to reach in from a sibling).
   const broadcastRouteParams = useRoute<RouteProp<MainTabsParamList, 'Broadcast'>>().params;
   const routeMainTabParam = broadcastRouteParams?.mainTab;
-  // actionId is a deep-link (kis:// / https://kis.app) pass-through — see
-  // src/push/deepLinkRouter.ts — identifying a specific item to auto-open
-  // once the matching sub-tab is active (currently: an education course).
-  const routeActionId = broadcastRouteParams?.actionId;
+  // Education UX v2: education deep links (kis://education/courses/<id>)
+  // now navigate straight to EducationCourseDetail (see
+  // src/push/deepLinkRouter.ts) instead of passing an actionId through
+  // this tab to the old inline sub-tab - actionId itself was only ever
+  // consumed by that removed path.
   useFocusEffect(
     useCallback(() => {
       if (routeMainTabParam && MAIN_TAB_ORDER.includes(routeMainTabParam as BroadcastMainTabId)) {
@@ -603,7 +620,7 @@ export default function BroadcastScreen() {
     ),
     colors: broadcastGoldGradient,
     shellStyle: styles.headerContainer,
-  });
+  }, { keepFrozenOnBlurRef: educationModalOpenRef });
 
   return (
     <View style={{ flex: 1, backgroundColor: palette.bg, }}>
@@ -649,7 +666,15 @@ export default function BroadcastScreen() {
             />
           )}
           {activeMainTab === 'channels' && <ChannelsDiscoverPage searchTerm={currentSearchTerm} searchContext={currentFilter} />}
-          {activeMainTab === 'education' && <BroadcastEducationPage searchTerm={currentSearchTerm} searchContext={currentFilter} openContentId={routeActionId} />}
+          {activeMainTab === 'education' && (
+            <BroadcastEducationPage
+              searchTerm={currentSearchTerm}
+              searchContext={currentFilter}
+              onBeforeOpenEducationModal={() => {
+                educationModalOpenRef.current = true;
+              }}
+            />
+          )}
           {activeMainTab === 'market' && <BroadcastMarketPage searchTerm={currentSearchTerm} searchContext={currentFilter} />}
           {activeMainTab === 'healthcare' && <BroadcastHealthcarePage searchTerm={currentSearchTerm} searchContext={currentFilter} />}
           {activeMainTab === 'jobs' && <BroadcastJobsPage searchTerm={currentSearchTerm} searchContext={currentFilter} />}

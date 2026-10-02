@@ -3,6 +3,8 @@
 // Education UX v2 — real "Courses" destination (All / Published / Drafts),
 // replacing the generic module-list's "courses" mode inside
 // EducationManagementModal.tsx.
+//
+// Visual pass: rebuilt on the shared premium education component kit.
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, RefreshControl, Text, View } from 'react-native';
 import { useNavigation, useRoute, useFocusEffect, type RouteProp } from '@react-navigation/native';
@@ -10,11 +12,15 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { SafeAreaView } from '@/components/common/SafeAreaViewWithTopPadding';
 import { useKISTheme } from '@/theme/useTheme';
 import { useResponsiveLayout } from '@/theme/responsive';
-import { KISIcon } from '@/constants/kisIcons';
-import KISButton from '@/constants/KISButton';
 import ROUTES from '@/network';
 import { getRequest } from '@/network/get';
 import type { RootStackParamList } from '@/navigation/types';
+import {
+  EducationScreenScaffold,
+  EducationListCard,
+  EducationEmptyState,
+  EducationActionButton,
+} from '@/screens/education/shared/components';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 type Route_ = RouteProp<RootStackParamList, 'EducationCourses'>;
@@ -34,6 +40,7 @@ export default function CoursesListScreen() {
   const [courses, setCourses] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState('all');
+  const [institutionLogoUrl, setInstitutionLogoUrl] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -52,6 +59,18 @@ export default function CoursesListScreen() {
     load();
   }, [load]);
 
+  // For the card's "posted by" header — same branding logo shown
+  // everywhere else this institution appears (spotlights, discovery feed).
+  useEffect(() => {
+    let cancelled = false;
+    getRequest(ROUTES.broadcasts.educationInstitution(institutionId)).then(response => {
+      if (!cancelled && response?.success) setInstitutionLogoUrl(response.data?.institution?.logoUrl || null);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [institutionId]);
+
   useFocusEffect(
     useCallback(() => {
       load();
@@ -64,23 +83,24 @@ export default function CoursesListScreen() {
   }, [courses, tab]);
 
   return (
-    <SafeAreaView edges={['bottom']} style={{ flex: 1, backgroundColor: palette.bg }}>
-      <FlatList
-        data={filtered}
-        keyExtractor={row => row.id}
-        contentContainerStyle={{ padding: responsive.pageGutter, gap: 10, paddingBottom: 100 }}
-        refreshControl={<RefreshControl refreshing={loading} onRefresh={load} tintColor={palette.primary} />}
-        ListHeaderComponent={
-          <View style={{ gap: 14, marginBottom: 6 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              <Pressable onPress={() => navigation.goBack()} style={{ padding: 4, marginLeft: -4 }}>
-                <KISIcon name="back" size={20} color={palette.text} />
-              </Pressable>
-              <Text style={{ fontSize: 22, fontWeight: '900', color: palette.text }} numberOfLines={1}>
-                Courses
-              </Text>
-            </View>
-            <View style={{ flexDirection: 'row', gap: 8 }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg }}>
+      <EducationScreenScaffold
+        palette={palette}
+        breadcrumb={institutionName}
+        title="Courses"
+        onBack={() => navigation.goBack()}
+        actions={<EducationActionButton palette={palette} label="+ Create" onPress={() => navigation.navigate('EducationCourseBuilder', { institutionId, institutionName })} />}
+        scrollable={false}
+        contentContainerStyle={{ flex: 1, padding: 0 }}
+      >
+        <FlatList
+          style={{ flex: 1 }}
+          data={filtered}
+          keyExtractor={row => row.id}
+          contentContainerStyle={{ padding: responsive.pageGutter, gap: 10, paddingBottom: 100 }}
+          refreshControl={<RefreshControl refreshing={loading} onRefresh={load} tintColor={palette.primary} />}
+          ListHeaderComponent={
+            <View style={{ flexDirection: 'row', gap: 8, marginBottom: 6 }}>
               {TABS.map(row => (
                 <Pressable
                   key={row.key}
@@ -100,49 +120,45 @@ export default function CoursesListScreen() {
                 </Pressable>
               ))}
             </View>
-          </View>
-        }
-        ListEmptyComponent={
-          !loading ? (
-            <View style={{ padding: 24, alignItems: 'center', gap: 10 }}>
-              <Text style={{ color: palette.subtext, textAlign: 'center', fontWeight: '600' }}>
-                No {tab === 'all' ? '' : tab} courses yet.
-              </Text>
-              <KISButton title="Create course" size="sm" onPress={() => navigation.navigate('EducationCourseBuilder', { institutionId, institutionName })} />
-            </View>
-          ) : (
-            <ActivityIndicator color={palette.primary} style={{ marginTop: 30 }} />
-          )
-        }
-        renderItem={({ item }) => (
-          <Pressable
-            onPress={() => navigation.navigate('EducationCourseBuilder', { institutionId, institutionName, courseId: item.id })}
-            style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: 16, borderWidth: 1, borderColor: palette.border, backgroundColor: palette.surface }}
-          >
-            <View style={{ flex: 1 }}>
-              <Text style={{ fontWeight: '800', color: palette.text }} numberOfLines={1}>{item.title}</Text>
-              <Text style={{ fontSize: 12, color: palette.subtext }}>
-                {item.price_amount > 0 ? `${item.price_amount} ${item.price_currency ?? ''}` : 'Free'} · {item.seat_limit ?? '∞'} seats
-              </Text>
-            </View>
-            <View
-              style={{
-                paddingHorizontal: 8,
-                paddingVertical: 3,
-                borderRadius: 999,
-                backgroundColor: item.status === 'published' ? palette.primarySoft : palette.border,
-              }}
-            >
-              <Text style={{ fontSize: 11, fontWeight: '700', color: item.status === 'published' ? palette.primaryStrong : palette.subtext, textTransform: 'capitalize' }}>
-                {item.status}
-              </Text>
-            </View>
-          </Pressable>
-        )}
-      />
-      <View style={{ position: 'absolute', right: responsive.pageGutter, bottom: 24 }}>
-        <KISButton title="+ Create course" onPress={() => navigation.navigate('EducationCourseBuilder', { institutionId, institutionName })} />
-      </View>
+          }
+          ListEmptyComponent={
+            !loading ? (
+              <EducationEmptyState
+                palette={palette}
+                title={`No ${tab === 'all' ? '' : tab} courses yet`}
+                description="Create your first course to get started."
+                action={<EducationActionButton palette={palette} label="Create course" onPress={() => navigation.navigate('EducationCourseBuilder', { institutionId, institutionName })} />}
+              />
+            ) : (
+              <ActivityIndicator color={palette.primary} style={{ marginTop: 30 }} />
+            )
+          }
+          renderItem={({ item }) => (
+            <EducationListCard
+              palette={palette}
+              title={item.title}
+              subtitle={item.summary || item.description || 'No description yet.'}
+              imageUrl={item.coverUrl || item.cover_url || item.cover_image_url || null}
+              institutionName={institutionName}
+              institutionLogoUrl={institutionLogoUrl}
+              metaItems={[
+                item.price_amount > 0 ? `${item.price_amount} ${item.price_currency ?? ''}` : 'Free',
+                `${item.seat_limit ?? '∞'} seats`,
+              ]}
+              statusLabel={item.status}
+              statusTone={item.status === 'published' ? 'success' : 'muted'}
+              onPress={() => navigation.push('EducationCourseBuilder', { institutionId, institutionName, courseId: item.id })}
+              primaryAction={
+                <EducationActionButton
+                  palette={palette}
+                  label="Edit"
+                  onPress={() => navigation.push('EducationCourseBuilder', { institutionId, institutionName, courseId: item.id })}
+                />
+              }
+            />
+          )}
+        />
+      </EducationScreenScaffold>
     </SafeAreaView>
   );
 }

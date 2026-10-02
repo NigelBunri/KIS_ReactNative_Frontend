@@ -171,18 +171,50 @@ export function useGoldenSection() {
  * React re-renders. Subscribing only to the (stable) setters context above
  * means this never causes the calling screen itself to re-render.
  */
-export function useGoldenSectionContent(payload: GoldenSectionPayload | null) {
+export type UseGoldenSectionContentOptions = {
+  /**
+   * Opt-in escape hatch, off by default (every existing caller is
+   * unaffected). When this ref reads `true` at the moment this screen would
+   * normally clear its slot on blur, the clear is skipped instead — the
+   * last-registered payload stays put and visibly frozen rather than
+   * collapsing the Golden Section to nothing.
+   *
+   * For one specific, narrow case: a screen that owns the slot is about to
+   * push a *modal* screen that has no gold content of its own (e.g.
+   * Broadcast's inline Education tab pushing EducationCourseDetail) and
+   * wants its own header to keep reading as "still there, underneath" while
+   * that modal is open, rather than vanishing and collapsing the layout out
+   * from under it. The caller is responsible for flipping this back to
+   * `false` once it would be wrong to keep freezing (see BroadcastScreen's
+   * use — set true right before navigating into the Education modal stack,
+   * reset on refocus).
+   *
+   * This does not re-render or re-register anything by itself — it's read
+   * once, inside the blur cleanup, so toggling it never causes the owning
+   * screen to re-run this effect.
+   */
+  keepFrozenOnBlurRef?: React.MutableRefObject<boolean>;
+};
+
+export function useGoldenSectionContent(
+  payload: GoldenSectionPayload | null,
+  options?: UseGoldenSectionContentOptions,
+) {
   const { setGoldenSection, clearGoldenSection } = useContext(GoldenSectionSettersContext);
   const isFocused = useIsFocused();
   const ownerRef = useRef<Owner | null>(null);
   if (ownerRef.current === null) ownerRef.current = createOwner('goldenSectionOwner');
+  const keepFrozenOnBlurRef = options?.keepFrozenOnBlurRef;
 
   useEffect(() => {
     if (!isFocused || !payload) return;
     const owner = ownerRef.current!;
     setGoldenSection(owner, payload);
-    return () => clearGoldenSection(owner);
-  }, [isFocused, payload, setGoldenSection, clearGoldenSection]);
+    return () => {
+      if (keepFrozenOnBlurRef?.current) return;
+      clearGoldenSection(owner);
+    };
+  }, [isFocused, payload, setGoldenSection, clearGoldenSection, keepFrozenOnBlurRef]);
 }
 
 /**

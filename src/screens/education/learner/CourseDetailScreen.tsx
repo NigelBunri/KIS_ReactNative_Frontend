@@ -22,6 +22,7 @@ import ROUTES from '@/network';
 import { queueableJsonRequest } from '@/services/offlineActionQueue';
 import { getDirectPaymentInfo, openDirectPaymentUrl } from '@/utils/directPaymentHandoff';
 import useEducationCourseDetail from '@/screens/broadcast/education/hooks/useEducationCourseDetail';
+import useEducationOfflineStore from '@/screens/broadcast/education/hooks/useEducationOfflineStore';
 import EducationEnrollmentSheet from '@/screens/broadcast/education/components/EducationEnrollmentSheet';
 import {
   hasLearningAccessForItem,
@@ -41,6 +42,7 @@ export default function CourseDetailScreen() {
   const { palette } = useKISTheme();
   const responsive = useResponsiveLayout();
   const { item, loading, hydrate } = useEducationCourseDetail(seed as any);
+  const { isDownloaded, scheduleDownload, cancelDownload } = useEducationOfflineStore();
   const [enrollmentVisible, setEnrollmentVisible] = useState(false);
   const [requestingAccess, setRequestingAccess] = useState(false);
   const [paymentState, setPaymentState] = useState<'idle' | 'processing' | 'success' | 'error'>('idle');
@@ -153,7 +155,7 @@ export default function CourseDetailScreen() {
 
   if (loading && !item) {
     return (
-      <SafeAreaView edges={['bottom']} style={{ flex: 1, backgroundColor: palette.bg, alignItems: 'center', justifyContent: 'center' }}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg, alignItems: 'center', justifyContent: 'center' }}>
         <ActivityIndicator color={palette.primary} />
       </SafeAreaView>
     );
@@ -161,7 +163,7 @@ export default function CourseDetailScreen() {
 
   if (!item) {
     return (
-      <SafeAreaView edges={['bottom']} style={{ flex: 1, backgroundColor: palette.bg, alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg, alignItems: 'center', justifyContent: 'center', padding: 24 }}>
         <Text style={{ color: palette.subtext, fontWeight: '700', textAlign: 'center' }}>
           This course is no longer available.
         </Text>
@@ -188,7 +190,7 @@ export default function CourseDetailScreen() {
   };
 
   return (
-    <SafeAreaView edges={['bottom']} style={{ flex: 1, backgroundColor: palette.bg }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg }}>
       <ScrollView contentContainerStyle={{ paddingBottom: 120 }}>
         <PermanentRemoteImage uri={item.coverUrl || ''} domain="Education" style={{ width: '100%', height: 200, backgroundColor: palette.border }} />
         <View style={{ padding: responsive.pageGutter, gap: 14 }}>
@@ -196,9 +198,30 @@ export default function CourseDetailScreen() {
             <Pressable onPress={() => navigation.goBack()} style={{ padding: 4, marginLeft: -4 }}>
               <KISIcon name="back" size={20} color={palette.text} />
             </Pressable>
-            <Text style={{ fontSize: 12, fontWeight: '700', color: palette.subtext, textTransform: 'uppercase' }}>
+            <Text style={{ fontSize: 12, fontWeight: '700', color: palette.subtext, textTransform: 'uppercase', flex: 1 }}>
               {item.type}
             </Text>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={isDownloaded(item.id, item.type) ? 'Remove from offline' : 'Save for offline'}
+              onPress={() =>
+                isDownloaded(item.id, item.type)
+                  ? void cancelDownload(item.id, item.type)
+                  : void scheduleDownload({
+                      contentId: item.id,
+                      contentType: item.type,
+                      contentTitle: item.title,
+                      progressPercent: (item as any)?.progress?.progressPercent ?? 0,
+                    })
+              }
+              style={{ padding: 6 }}
+            >
+              <KISIcon
+                name={isDownloaded(item.id, item.type) ? 'check' : 'download'}
+                size={18}
+                color={isDownloaded(item.id, item.type) ? palette.primary : palette.subtext}
+              />
+            </Pressable>
           </View>
           <Text style={{ fontSize: 24, fontWeight: '900', color: palette.text }}>{item.title}</Text>
           <Text style={{ color: palette.subtext, fontWeight: '600' }}>
@@ -228,6 +251,77 @@ export default function CourseDetailScreen() {
           <Text style={{ color: palette.text, lineHeight: 21 }}>{item.description || item.summary}</Text>
 
           <KISButton title={primaryLabel} onPress={handlePrimaryAction} />
+
+          {item.type === 'course' && (item as any).institutionClass ? (
+            <Text style={{ fontSize: 13, color: palette.subtext }}>
+              Class: {(item as any).institutionClass.name}
+              {(item as any).institutionClass.programTitle ? ` · Program: ${(item as any).institutionClass.programTitle}` : ''}
+            </Text>
+          ) : null}
+
+          {item.type === 'class' ? (
+            <Text style={{ fontSize: 13, color: palette.subtext }}>
+              {(item as any).programTitle ? `Program: ${(item as any).programTitle}` : 'Standalone Class'}
+            </Text>
+          ) : null}
+
+          {(item.type === 'program' || item.type === 'class') && ((item as any).classes?.length > 0 || (item as any).courses?.length > 0) ? (
+            <View style={{ gap: 14, marginTop: 10 }}>
+              {(item as any).classes?.length > 0 ? (
+                <View style={{ gap: 8 }}>
+                  <Text style={{ fontSize: 17, fontWeight: '800', color: palette.text }}>Classes</Text>
+                  {(item as any).classes.map((cls: any) => (
+                    <View
+                      key={cls.id}
+                      style={{ padding: 12, borderRadius: 12, borderWidth: 1, borderColor: palette.border, backgroundColor: palette.surface }}
+                    >
+                      <Text style={{ color: palette.text, fontWeight: '700' }}>{cls.name}</Text>
+                      {cls.description ? (
+                        <Text style={{ color: palette.subtext, fontSize: 12, marginTop: 2 }} numberOfLines={2}>
+                          {cls.description}
+                        </Text>
+                      ) : null}
+                    </View>
+                  ))}
+                </View>
+              ) : null}
+              {(item as any).courses?.length > 0 ? (
+                <View style={{ gap: 8 }}>
+                  <Text style={{ fontSize: 17, fontWeight: '800', color: palette.text }}>
+                    {item.type === 'class' ? 'Courses in this class' : 'Courses in this program'}
+                  </Text>
+                  {(item as any).courses.map((course: any) => (
+                    <Pressable
+                      key={course.id}
+                      disabled={!course.broadcastId}
+                      onPress={() => course.broadcastId && navigation.navigate('EducationCourseDetail', { contentId: course.broadcastId })}
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: 10,
+                        padding: 12,
+                        borderRadius: 12,
+                        borderWidth: 1,
+                        borderColor: palette.border,
+                        backgroundColor: palette.surface,
+                        opacity: course.broadcastId ? 1 : 0.6,
+                      }}
+                    >
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ color: palette.text, fontWeight: '700' }} numberOfLines={1}>
+                          {course.title}
+                        </Text>
+                        {!course.broadcastId ? (
+                          <Text style={{ color: palette.subtext, fontSize: 11 }}>Not yet published</Text>
+                        ) : null}
+                      </View>
+                      {course.broadcastId ? <KISIcon name="chevron-right" size={16} color={palette.subtext} /> : null}
+                    </Pressable>
+                  ))}
+                </View>
+              ) : null}
+            </View>
+          ) : null}
 
           {outline.length > 0 ? (
             <View style={{ gap: 14, marginTop: 10 }}>

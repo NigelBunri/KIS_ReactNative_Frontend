@@ -3,6 +3,8 @@ import {
   ActivityIndicator,
   FlatList,
   Image,
+  Linking,
+  Modal,
   Pressable,
   StyleSheet,
   Text,
@@ -49,6 +51,12 @@ const CartsListPage = () => {
     Record<string, boolean>
   >({});
   const [ordersLoading, setOrdersLoading] = useState(false);
+  const [shippingModalCart, setShippingModalCart] = useState<ShopCart | null>(null);
+  const [shippingAddresses, setShippingAddresses] = useState<any[]>([]);
+  const [selectedAddressId, setSelectedAddressId] = useState<string | null>(null);
+  const [shippingOptions, setShippingOptions] = useState<any[]>([]);
+  const [selectedMethodId, setSelectedMethodId] = useState<string | null>(null);
+  const [shippingOptionsLoading, setShippingOptionsLoading] = useState(false);
 
   useEffect(() => {
     const unsubscribe = subscribeToShopCart(setCartState);
@@ -113,20 +121,8 @@ const CartsListPage = () => {
     });
   }, [cartState.carts, orderPlacedShops]);
 
-  const handlePlaceOrder = useCallback(async (cart: ShopCart) => {
-    if (!cart?.items?.length) {
-      setOrderFeedback(prev => ({
-        ...prev,
-        [cart.shopId]: { type: 'error', message: 'This cart is empty.' },
-      }));
-      return;
-    }
-
-    const totalValue = cart.items.reduce(
-      (sum, item) => sum + item.price * item.quantity,
-      0,
-    );
-    const normalizedItems = cart.items.map(item => {
+  const buildNormalizedItems = useCallback((cart: ShopCart) => {
+    return cart.items.map(item => {
       const quantity = Math.max(1, Math.floor(item.quantity));
       const unitPriceCents = Math.max(
         1,
@@ -141,6 +137,17 @@ const CartsListPage = () => {
         custom_description: item.customDescription ?? '',
       };
     });
+  }, []);
+
+  const submitOrder = useCallback(async (
+    cart: ShopCart,
+    shipping?: { addressId: string; shippingMethodId: string },
+  ) => {
+    const totalValue = cart.items.reduce(
+      (sum, item) => sum + item.price * item.quantity,
+      0,
+    );
+    const normalizedItems = buildNormalizedItems(cart);
 
     setOrderLoadingShopId(cart.shopId);
     setOrderFeedback(prev => ({
@@ -158,6 +165,10 @@ const CartsListPage = () => {
       if (cart.remoteCartId) {
         metadata.cart_id = cart.remoteCartId;
       }
+      if (shipping) {
+        metadata.address_id = shipping.addressId;
+        metadata.shipping_method_id = shipping.shippingMethodId;
+      }
       const response = await postRequest(
         ROUTES.commerce.marketplaceOrders,
         {
@@ -171,13 +182,43 @@ const CartsListPage = () => {
       );
 
       if (response.success) {
-        setOrderFeedback(prev => ({
-          ...prev,
-          [cart.shopId]: {
-            type: 'success',
-            message: `Order placed for ${cart.shopName ?? 'your shop'}.`,
-          },
-        }));
+        // The order is created in a payment-pending state whenever the
+        // buyer isn't paying from their KIS wallet (the normal USD/
+        // provider-checkout path - see place_marketplace_order on the
+        // backend) - it already creates a real DirectPaymentIntent and
+        // returns its payment_url/next_action right here in the create
+        // response. This used to just say "Order placed" and stop,
+        // leaving the order sitting unpaid forever with nothing telling
+        // the buyer a payment step still existed.
+        const order = response.data;
+        const nextAction = order?.next_action;
+        const paymentUrl = order?.payment_url;
+        if (nextAction?.code === 'open_checkout' && paymentUrl) {
+          setOrderFeedback(prev => ({
+            ...prev,
+            [cart.shopId]: {
+              type: 'success',
+              message: 'Redirecting to secure checkout to complete payment…',
+            },
+          }));
+          Linking.openURL(paymentUrl).catch(() => {
+            setOrderFeedback(prev => ({
+              ...prev,
+              [cart.shopId]: {
+                type: 'error',
+                message: 'Order created, but the checkout page could not be opened. Open it from My Orders.',
+              },
+            }));
+          });
+        } else {
+          setOrderFeedback(prev => ({
+            ...prev,
+            [cart.shopId]: {
+              type: 'success',
+              message: `Order placed for ${cart.shopName ?? 'your shop'}.`,
+            },
+          }));
+        }
         setOrderPlacedShops(prev => ({ ...prev, [cart.shopId]: true }));
         void setShopCartStatus(cart.shopId, 'checked_out');
         void refreshShopCartForShop(cart.shopId);
@@ -201,7 +242,87 @@ const CartsListPage = () => {
     } finally {
       setOrderLoadingShopId(null);
     }
+  }, [buildNormalizedItems]);
+
+  const closeShippingModal = useCallback(() => {
+    setShippingModalCart(null);
+    setShippingAddresses([]);
+    setSelectedAddressId(null);
+    setShippingOptions([]);
+    setSelectedMethodId(null);
   }, []);
+
+  const loadShippingOptionsForAddress = useCallback(async (cart: ShopCart, addressId: string) => {
+    setShippingOptionsLoading(true);
+    setShippingOptions([]);
+    setSelectedMethodId(null);
+    const response = await postRequest(ROUTES.commerce.shippingOptions, {
+      shop_id: cart.shopId,
+      address_id: addressId,
+      items: buildNormalizedItems(cart),
+    }, { errorMessage: 'Unable to load shipping options.' });
+    setShippingOptionsLoading(false);
+    if (response.success) {
+      const options = response.data?.options ?? [];
+      setShippingOptions(options);
+      if (options.length) setSelectedMethodId(options[0].shipping_method_id);
+    }
+  }, [buildNormalizedItems]);
+
+  // Entry point for the "Place order" button - checks whether this buyer has
+  // a saved address and this shop has any shipping configured for it at
+  // all. If either is missing, checkout proceeds exactly as it always has
+  // (place_marketplace_order treats shipping as fully optional), so shops
+  // that haven't set up shipping yet, and buyers with no saved address, are
+  // completely unaffected rather than being blocked.
+  const handlePlaceOrder = useCallback(async (cart: ShopCart) => {
+    if (!cart?.items?.length) {
+      setOrderFeedback(prev => ({
+        ...prev,
+        [cart.shopId]: { type: 'error', message: 'This cart is empty.' },
+      }));
+      return;
+    }
+
+    const addressResponse = await getRequest(ROUTES.commerce.addresses, {
+      errorMessage: 'Unable to load your addresses.',
+    });
+    const addresses = addressResponse.success
+      ? (Array.isArray(addressResponse.data) ? addressResponse.data : addressResponse.data?.results ?? [])
+      : [];
+
+    if (!addresses.length) {
+      // No saved address at all - ship-less checkout is still valid for
+      // shops with no shipping configured, and for shops that do require
+      // it the server will reject with a clear "address_id required"
+      // error the buyer can act on from the feedback message.
+      await submitOrder(cart);
+      return;
+    }
+
+    const defaultAddress = addresses.find((a: any) => a.is_default) ?? addresses[0];
+    setShippingAddresses(addresses);
+    setSelectedAddressId(defaultAddress.id);
+    setShippingModalCart(cart);
+    await loadShippingOptionsForAddress(cart, defaultAddress.id);
+  }, [submitOrder, loadShippingOptionsForAddress]);
+
+  const handleConfirmShipping = useCallback(async () => {
+    if (!shippingModalCart) return;
+    const cart = shippingModalCart;
+    const shipping = selectedAddressId && selectedMethodId
+      ? { addressId: selectedAddressId, shippingMethodId: selectedMethodId }
+      : undefined;
+    closeShippingModal();
+    await submitOrder(cart, shipping);
+  }, [shippingModalCart, selectedAddressId, selectedMethodId, closeShippingModal, submitOrder]);
+
+  const handleSkipShipping = useCallback(async () => {
+    if (!shippingModalCart) return;
+    const cart = shippingModalCart;
+    closeShippingModal();
+    await submitOrder(cart);
+  }, [shippingModalCart, closeShippingModal, submitOrder]);
 
   const renderCart = (cart: ShopCart) => {
     const itemCount = cart.items.reduce((sum, item) => sum + item.quantity, 0);
@@ -377,6 +498,92 @@ const CartsListPage = () => {
           }
         />
       )}
+
+      <Modal
+        visible={Boolean(shippingModalCart)}
+        animationType="slide"
+        transparent
+        onRequestClose={closeShippingModal}
+      >
+        <View style={styles.shippingModalOverlay}>
+          <View style={[styles.shippingModalCard, { backgroundColor: palette.surface }]}>
+            <Text style={[styles.headerTitle, { color: palette.text }]}>
+              Choose delivery
+            </Text>
+            <Text style={[styles.headerSubtitle, { color: palette.subtext, marginBottom: 12 }]}>
+              {shippingModalCart?.shopName ?? 'This shop'}
+            </Text>
+
+            <Text style={[styles.shippingSectionLabel, { color: palette.subtext }]}>
+              Delivery address
+            </Text>
+            {shippingAddresses.map(address => (
+              <Pressable
+                key={address.id}
+                style={[
+                  styles.shippingOptionRow,
+                  {
+                    borderColor: selectedAddressId === address.id ? palette.primaryStrong : palette.divider,
+                    backgroundColor: palette.surfaceElevated,
+                  },
+                ]}
+                onPress={() => {
+                  setSelectedAddressId(address.id);
+                  if (shippingModalCart) void loadShippingOptionsForAddress(shippingModalCart, address.id);
+                }}
+              >
+                <Text style={{ color: palette.text, fontSize: 13, fontWeight: '600' }} numberOfLines={1}>
+                  {address.label ? `${address.label} · ` : ''}{address.recipient_name}
+                </Text>
+                <Text style={{ color: palette.subtext, fontSize: 11 }} numberOfLines={1}>
+                  {[address.street_address, address.city, address.country].filter(Boolean).join(', ')}
+                </Text>
+              </Pressable>
+            ))}
+
+            <Text style={[styles.shippingSectionLabel, { color: palette.subtext, marginTop: 10 }]}>
+              Shipping method
+            </Text>
+            {shippingOptionsLoading ? (
+              <ActivityIndicator color={palette.primaryStrong} style={{ marginVertical: 12 }} />
+            ) : shippingOptions.length ? (
+              shippingOptions.map(option => (
+                <Pressable
+                  key={option.shipping_method_id}
+                  style={[
+                    styles.shippingOptionRow,
+                    {
+                      borderColor: selectedMethodId === option.shipping_method_id ? palette.primaryStrong : palette.divider,
+                      backgroundColor: palette.surfaceElevated,
+                    },
+                  ]}
+                  onPress={() => setSelectedMethodId(option.shipping_method_id)}
+                >
+                  <Text style={{ color: palette.text, fontSize: 13, fontWeight: '600' }}>
+                    {option.shipping_method_name} · {(option.cost_cents / 100).toFixed(2)} USD
+                  </Text>
+                  <Text style={{ color: palette.subtext, fontSize: 11 }}>
+                    Estimated {option.estimated_delivery_min} to {option.estimated_delivery_max}
+                  </Text>
+                </Pressable>
+              ))
+            ) : (
+              <Text style={{ color: palette.subtext, fontSize: 12, marginBottom: 8 }}>
+                This shop hasn't configured shipping for this address yet - you can still place the order and arrange delivery directly.
+              </Text>
+            )}
+
+            <View style={styles.shippingModalActions}>
+              <KISButton title="Skip shipping" variant="ghost" onPress={handleSkipShipping} />
+              <KISButton
+                title="Confirm & place order"
+                onPress={handleConfirmShipping}
+                disabled={shippingOptions.length > 0 && !selectedMethodId}
+              />
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -385,6 +592,35 @@ const makeStyles = (palette: ReturnType<typeof useKISTheme>['palette']) =>
   StyleSheet.create({
     root: {
       flex: 1,
+    },
+    shippingModalOverlay: {
+      flex: 1,
+      backgroundColor: 'rgba(0,0,0,0.5)',
+      justifyContent: 'flex-end',
+    },
+    shippingModalCard: {
+      borderTopLeftRadius: 20,
+      borderTopRightRadius: 20,
+      padding: 20,
+      maxHeight: '80%',
+    },
+    shippingSectionLabel: {
+      fontSize: 11,
+      fontWeight: '700',
+      textTransform: 'uppercase',
+      marginBottom: 6,
+    },
+    shippingOptionRow: {
+      borderWidth: 1,
+      borderRadius: 12,
+      padding: 10,
+      marginBottom: 8,
+    },
+    shippingModalActions: {
+      flexDirection: 'row',
+      justifyContent: 'flex-end',
+      gap: 10,
+      marginTop: 12,
     },
     header: {
       padding: 16,
