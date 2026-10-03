@@ -206,6 +206,10 @@ import MyOrdersPage from '@/screens/market/orders/MyOrdersPage';
 import WishlistPage from '@/screens/market/wishlist/WishlistPage';
 import AddressListPage from '@/screens/market/addresses/AddressListPage';
 import FulfillmentQueuePage from '@/screens/market/fulfillment/FulfillmentQueuePage';
+import MyReturnsPage from '@/screens/market/returns/MyReturnsPage';
+import ReturnsManagementPage from '@/screens/market/returns/ReturnsManagementPage';
+import ReturnRequestCreatePage from '@/screens/market/returns/ReturnRequestCreatePage';
+import MarketAdminScreen from '@/screens/market/admin/MarketAdminScreen';
 import MarketplaceOrderDetailPage from '@/screens/market/orders/MarketplaceOrderDetailPage';
 import ProviderOrdersPage from '@/screens/market/orders/ProviderOrdersPage';
 import ProfileRecentActivityScreen from '@/screens/profile/ProfileRecentActivityScreen';
@@ -1728,6 +1732,26 @@ function AppContent() {
                     <RootStack.Screen
                       name="FulfillmentQueue"
                       getComponent={() => FulfillmentQueuePage}
+                      options={{ presentation: 'modal' }}
+                    />
+                    <RootStack.Screen
+                      name="MyReturns"
+                      getComponent={() => MyReturnsPage}
+                      options={{ presentation: 'modal' }}
+                    />
+                    <RootStack.Screen
+                      name="ReturnsManagement"
+                      getComponent={() => ReturnsManagementPage}
+                      options={{ presentation: 'modal' }}
+                    />
+                    <RootStack.Screen
+                      name="ReturnRequestCreate"
+                      getComponent={() => ReturnRequestCreatePage}
+                      options={{ presentation: 'modal' }}
+                    />
+                    <RootStack.Screen
+                      name="MarketAdmin"
+                      getComponent={() => MarketAdminScreen}
                       options={{ presentation: 'modal' }}
                     />
                     <RootStack.Screen

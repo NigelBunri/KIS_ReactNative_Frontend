@@ -86,6 +86,7 @@ type ProductFormState = {
   inventory_type: 'PHYSICAL' | 'DIGITAL' | 'SERVICE';
   stock_qty: string;
   low_stock_threshold: string;
+  weight_kg: string;
   is_active: boolean;
   is_featured: boolean;
   requires_shipping: boolean;
@@ -129,6 +130,7 @@ type ExistingProduct = {
   inventory_type?: 'PHYSICAL' | 'DIGITAL' | 'SERVICE';
   stock_qty?: number | string | null;
   low_stock_threshold?: number | string | null;
+  weight_kg?: number | string | null;
   is_active?: boolean;
   is_featured?: boolean;
   requires_shipping?: boolean;
@@ -154,6 +156,7 @@ type ProductEditorPayload = {
   inventory_type: 'PHYSICAL' | 'DIGITAL' | 'SERVICE';
   stock_qty: string;
   low_stock_threshold: string | null;
+  weight_kg: string | null;
   is_active: boolean;
   is_featured: boolean;
   requires_shipping: boolean;
@@ -195,6 +198,7 @@ const DEFAULT_PRODUCT_FORM: ProductFormState = {
   inventory_type: 'PHYSICAL',
   stock_qty: '',
   low_stock_threshold: '',
+  weight_kg: '',
   is_active: true,
   is_featured: false,
   requires_shipping: true,
@@ -498,6 +502,7 @@ export default function ProductEditorDrawer({
         stock_qty: product.stock_qty != null ? String(product.stock_qty) : '',
         low_stock_threshold:
           product.low_stock_threshold != null ? String(product.low_stock_threshold) : '',
+        weight_kg: product.weight_kg != null ? String(product.weight_kg) : '',
         is_active: product.is_active ?? true,
         is_featured: product.is_featured ?? false,
         requires_shipping: product.requires_shipping ?? true,
@@ -677,6 +682,10 @@ export default function ProductEditorDrawer({
       low_stock_threshold: form.low_stock_threshold.trim()
         ? form.low_stock_threshold.trim()
         : null,
+      weight_kg:
+        form.inventory_type === 'PHYSICAL' && form.weight_kg.trim()
+          ? form.weight_kg.trim()
+          : null,
       is_active: form.is_active,
       is_featured: form.is_featured,
       requires_shipping: form.inventory_type === 'PHYSICAL' ? form.requires_shipping : false,
@@ -1167,6 +1176,22 @@ export default function ProductEditorDrawer({
                   thumbColor={palette.surface}
                 />
               </View>
+
+              {form.inventory_type === 'PHYSICAL' && (
+                <View style={{ marginTop: 12 }}>
+                  <KISTextInput
+                    label="Weight (kg)"
+                    value={form.weight_kg}
+                    onChangeText={(value) => updateField({ weight_kg: sanitizeDecimalInput(value) })}
+                    keyboardType="numeric"
+                  />
+                  <Text style={{ color: palette.subtext, fontSize: 11, marginTop: 4 }}>
+                    Required for weight-based shipping rates. Leave blank and
+                    weight-based rates simply won't be offered at checkout for
+                    this product — it is never treated as zero.
+                  </Text>
+                </View>
+              )}
 
               <View style={{ marginTop: 20 }}>
                 <Text style={{ color: palette.subtext, fontSize: 12, fontWeight: '600', marginBottom: 8 }}>

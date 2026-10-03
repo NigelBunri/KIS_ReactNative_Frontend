@@ -184,6 +184,10 @@ export type RootStackParamList = {
   Wishlist: undefined;
   Addresses: undefined;
   FulfillmentQueue: undefined;
+  MyReturns: undefined;
+  ReturnsManagement: undefined;
+  ReturnRequestCreate: { orderId: string };
+  MarketAdmin: undefined;
   ProfileRecentActivity: undefined;
   ProfileImpactSnapshot: undefined;
   ProfileNotifications: undefined;

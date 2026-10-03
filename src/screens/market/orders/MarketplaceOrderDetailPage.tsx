@@ -298,6 +298,7 @@ export default function MarketplaceOrderDetailPage() {
     orderPaymentReady &&
     (order.status === 'temporal' || isAwaitingSatisfaction);
   const canComplete = mode === 'provider' && orderPaymentReady && order.status === 'temporal';
+  const canRequestReturn = mode === 'buyer' && ['satisfied', 'completed'].includes(order.status);
 
   return (
     <ScrollView
@@ -579,6 +580,14 @@ export default function MarketplaceOrderDetailPage() {
                 )
               }
               loading={actionLoading === 'complete'}
+            />
+          ) : null}
+          {canRequestReturn ? (
+            <KISButton
+              title="Request a return"
+              size="sm"
+              variant="secondary"
+              onPress={() => navigation.navigate('ReturnRequestCreate', { orderId: order.id })}
             />
           ) : null}
         </View>

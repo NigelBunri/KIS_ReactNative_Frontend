@@ -1895,6 +1895,22 @@ export default function ProfileScreen() {
         onPress: () => rootNavigation?.navigate('FulfillmentQueue'),
       },
       {
+        key: 'my-returns',
+        title: 'My Returns',
+        subtitle: 'Track return requests you submitted',
+        icon: 'cart' as const,
+        tone: 'info' as const,
+        onPress: () => rootNavigation?.navigate('MyReturns'),
+      },
+      {
+        key: 'returns-management',
+        title: 'Returns to manage',
+        subtitle: 'Review and resolve returns for your shops',
+        icon: 'cart' as const,
+        tone: 'primary' as const,
+        onPress: () => rootNavigation?.navigate('ReturnsManagement'),
+      },
+      {
         key: 'view-events',
         title: 'Community Events',
         subtitle: 'Browse and RSVP to events',
@@ -2591,6 +2607,14 @@ export default function ProfileScreen() {
                       title="Verification review"
                       variant="secondary"
                       onPress={() => setVerificationStaffConsoleVisible(true)}
+                      style={{ flexGrow: 1, flexBasis: '47%', minWidth: 168 }}
+                    />
+                  ) : null}
+                  {canOpenVerificationStaffConsole ? (
+                    <KISButton
+                      title="Marketplace admin"
+                      variant="secondary"
+                      onPress={() => rootNavigation?.navigate('MarketAdmin')}
                       style={{ flexGrow: 1, flexBasis: '47%', minWidth: 168 }}
                     />
                   ) : null}

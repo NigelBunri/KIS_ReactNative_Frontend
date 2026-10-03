@@ -971,6 +971,7 @@ const broadcastRoutes = {
     shopStripeAccountConnect: (id: string) =>
       `${API_BASE_URL}/api/v1/commerce/shops/${id}/stripe-account/connect/`,
     products: `${API_BASE_URL}/api/v1/commerce/products/`,
+    product: (id: string) => `${API_BASE_URL}/api/v1/commerce/products/${id}/`,
     discovery: `${API_BASE_URL}/api/v1/commerce/discovery/`,
     // Direct-to-S3 presigned-upload handshake for marketplace media — see
     // apps/commerce/media_uploads.py on the backend. Confirmation reuses
@@ -1077,6 +1078,16 @@ const broadcastRoutes = {
       `${API_BASE_URL}/api/v1/commerce/shipments/${id}/transition/`,
     shipmentEvents: (id: string) =>
       `${API_BASE_URL}/api/v1/commerce/shipments/${id}/events/`,
+    returns: `${API_BASE_URL}/api/v1/commerce/returns/`,
+    returnDetail: (id: string) => `${API_BASE_URL}/api/v1/commerce/returns/${id}/`,
+    returnApprove: (id: string) => `${API_BASE_URL}/api/v1/commerce/returns/${id}/approve/`,
+    returnReject: (id: string) => `${API_BASE_URL}/api/v1/commerce/returns/${id}/reject/`,
+    returnShip: (id: string) => `${API_BASE_URL}/api/v1/commerce/returns/${id}/ship/`,
+    returnReceive: (id: string) => `${API_BASE_URL}/api/v1/commerce/returns/${id}/receive/`,
+    returnComplete: (id: string) => `${API_BASE_URL}/api/v1/commerce/returns/${id}/complete/`,
+    returnCancel: (id: string) => `${API_BASE_URL}/api/v1/commerce/returns/${id}/cancel/`,
+    refunds: `${API_BASE_URL}/api/v1/commerce/refunds/`,
+    refundDetail: (id: string) => `${API_BASE_URL}/api/v1/commerce/refunds/${id}/`,
     savedItems: `${API_BASE_URL}/api/v1/commerce/saved-items/`,
     savedItemByProduct: (productId: string) =>
       `${API_BASE_URL}/api/v1/commerce/saved-items/by-product/${productId}/`,
@@ -1084,10 +1095,13 @@ const broadcastRoutes = {
     promotion: (id: string) => `${API_BASE_URL}/api/v1/commerce/promotions/${id}/`,
     shopVerifications: `${API_BASE_URL}/api/v1/commerce/shop-verifications/`,
     shopVerification: (id: string) => `${API_BASE_URL}/api/v1/commerce/shop-verifications/${id}/`,
+    shopVerificationReview: (id: string) => `${API_BASE_URL}/api/v1/commerce/shop-verifications/${id}/review/`,
     productAuthChecks: `${API_BASE_URL}/api/v1/commerce/product-auth-checks/`,
     productAuthCheck: (id: string) => `${API_BASE_URL}/api/v1/commerce/product-auth-checks/${id}/`,
     marketplaceComplaints: `${API_BASE_URL}/api/v1/commerce/marketplace-complaints/`,
     marketplaceComplaint: (id: string) => `${API_BASE_URL}/api/v1/commerce/marketplace-complaints/${id}/`,
+    marketplaceComplaintReview: (id: string) => `${API_BASE_URL}/api/v1/commerce/marketplace-complaints/${id}/review/`,
+    marketplaceComplaintResolve: (id: string) => `${API_BASE_URL}/api/v1/commerce/marketplace-complaints/${id}/resolve/`,
   },
   websites: {
     mine: `${API_BASE_URL}/api/v1/websites/mine/`,
