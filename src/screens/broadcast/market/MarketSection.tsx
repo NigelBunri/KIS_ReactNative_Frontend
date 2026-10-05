@@ -34,7 +34,7 @@ export default function MarketSection({
     if (tab === 'drops') return <MarketDropsPage ownerId={ownerId} searchTerm={searchTerm} />;
     if (tab === 'shops') return <MarketShopsPage ownerId={ownerId} canUseMarket={canUseMarket} onUpgrade={onUpgrade} />;
     if (tab === 'products') return <MarketProductsPage ownerId={ownerId} />;
-    return <MarketInsightsPage hasAnalyticsAccess={hasAnalyticsAccess} isMarketPro={isMarketPro} onUpgrade={onUpgrade} />;
+    return <MarketInsightsPage ownerId={ownerId} hasAnalyticsAccess={hasAnalyticsAccess} isMarketPro={isMarketPro} onUpgrade={onUpgrade} />;
   }, [tab, ownerId, searchTerm, canUseMarket, onUpgrade, hasAnalyticsAccess, isMarketPro]);
 
   return (
