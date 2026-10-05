@@ -4,6 +4,7 @@ import {
   Alert,
   Linking,
   Modal,
+  Platform,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -11,10 +12,13 @@ import {
   Text,
   View,
 } from 'react-native';
+import RNFS from 'react-native-fs';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useKISTheme } from '@/theme/useTheme';
 import { useNavigation } from '@react-navigation/native';
 import ROUTES from '@/network';
 import { getRequest } from '@/network/get';
+import { getAccessToken } from '@/security/authStorage';
 import { SafeAreaView } from '@/components/common/SafeAreaViewWithTopPadding';
 
 type Invoice = {
@@ -98,6 +102,34 @@ export default function InvoiceListScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
+  const [downloading, setDownloading] = useState(false);
+
+  const downloadInvoicePdf = useCallback(async (invoice: Invoice) => {
+    const sourceUrl = invoice.pdf_url ?? invoice.download_url ?? invoice.url;
+    if (!sourceUrl) {
+      Alert.alert('Not Available', 'PDF not yet generated for this invoice.');
+      return;
+    }
+    setDownloading(true);
+    try {
+      const token = await getAccessToken();
+      const deviceId = await AsyncStorage.getItem('device_id');
+      const toFile = `${RNFS.DocumentDirectoryPath}/invoice-${invoice.id}.pdf`;
+      const headers: Record<string, string> = { Accept: '*/*' };
+      if (token) headers.Authorization = `Bearer ${token}`;
+      if (deviceId) headers['X-Device-Id'] = deviceId;
+      const result = await RNFS.downloadFile({ fromUrl: sourceUrl, toFile, headers }).promise;
+      if (result.statusCode && result.statusCode >= 400) {
+        throw new Error('Unable to download invoice.');
+      }
+      const uri = Platform.OS === 'android' ? `file://${toFile}` : toFile;
+      await Linking.openURL(uri);
+    } catch (err: any) {
+      Alert.alert('Error', err?.message ?? 'Could not open the invoice PDF.');
+    } finally {
+      setDownloading(false);
+    }
+  }, []);
 
   const fetchInvoices = useCallback(async (isRefresh = false) => {
     if (isRefresh) {
@@ -388,25 +420,11 @@ export default function InvoiceListScreen() {
 
                   <Pressable
                     style={[s.downloadBtn, { borderColor: palette.primaryStrong }]}
-                    onPress={() => {
-                      const pdfUrl =
-                        selectedInvoice.pdf_url ??
-                        selectedInvoice.download_url ??
-                        selectedInvoice.url;
-                      if (pdfUrl) {
-                        Linking.openURL(pdfUrl).catch(() => {
-                          Alert.alert('Error', 'Could not open the PDF link.');
-                        });
-                      } else {
-                        Alert.alert(
-                          'Not Available',
-                          'PDF not yet generated for this invoice.',
-                        );
-                      }
-                    }}
+                    onPress={() => void downloadInvoicePdf(selectedInvoice)}
+                    disabled={downloading}
                   >
                     <Text style={[s.downloadBtnText, { color: palette.primaryStrong }]}>
-                      Download PDF
+                      {downloading ? 'Downloading…' : 'Download PDF'}
                     </Text>
                   </Pressable>
 

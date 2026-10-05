@@ -49,6 +49,7 @@ const SECTION_CARDS: {
   { label: 'Milestones', icon: 'ribbon-outline', route: 'FamilyMilestones' },
   { label: 'Time Capsules', icon: 'time-outline', route: 'FamilyTimeCapsules' },
   { label: 'Grief Support', icon: 'hand-left-outline', route: 'GriefSupport' },
+  { label: 'Memorials', icon: 'flower-outline', route: 'FamilyMemorials' },
   { label: 'Family Tree', icon: 'git-network-outline', route: 'FamilyTree', routeParams: {} },
 ];
 

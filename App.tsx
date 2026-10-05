@@ -278,6 +278,8 @@ import FamilyTimeCapsuleScreen from '@/screens/family/TimeCapsuleScreen';
 import FamilyNoticeBoardScreen from '@/screens/family/FamilyNoticeBoardScreen';
 import FamilyPrayerScreen from '@/screens/family/FamilyPrayerScreen';
 import GriefSupportScreen from '@/screens/family/GriefSupportScreen';
+import MemorialPagesScreen from '@/screens/family/MemorialPagesScreen';
+import MemorialPageScreen from '@/screens/family/MemorialPageScreen';
 import ParentalControlsScreen from '@/screens/family/ParentalControlsScreen';
 import FamilySOSScreen from '@/screens/family/SOSScreen';
 
@@ -286,6 +288,7 @@ import ChurchScreen from '@/screens/church/ChurchScreen';
 import GiveNowScreen from '@/screens/church/giving/GiveNowScreen';
 import ChurchGivingScreen from '@/screens/church/giving/GivingDashboardScreen';
 import TitheStatementScreen from '@/screens/church/giving/TitheStatementScreen';
+import ChurchPledgeScreen from '@/screens/church/giving/ChurchPledgeScreen';
 import PrayerWallScreen from '@/screens/church/prayer/PrayerWallScreen';
 import NewPrayerRequestScreen from '@/screens/church/prayer/NewPrayerRequestScreen';
 import FastingTrackerScreen from '@/screens/church/prayer/FastingTrackerScreen';
@@ -2093,6 +2096,8 @@ function AppContent() {
                     <RootStack.Screen name="FamilyNoticeBoard" getComponent={() => FamilyNoticeBoardScreen} options={{ headerShown: false }} />
                     <RootStack.Screen name="FamilyPrayer" getComponent={() => FamilyPrayerScreen} options={{ headerShown: false }} />
                     <RootStack.Screen name="GriefSupport" getComponent={() => GriefSupportScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="FamilyMemorials" getComponent={() => MemorialPagesScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="MemorialPage" getComponent={() => MemorialPageScreen} options={{ headerShown: false }} />
                     <RootStack.Screen name="ParentalControls" getComponent={() => ParentalControlsScreen} options={{ headerShown: false }} />
                     <RootStack.Screen name="FamilySOS" getComponent={() => FamilySOSScreen} options={{ headerShown: false }} />
 
@@ -2101,6 +2106,7 @@ function AppContent() {
                     <RootStack.Screen name="GiveNow" getComponent={() => GiveNowScreen} options={{ headerShown: false }} />
                     <RootStack.Screen name="ChurchGiving" getComponent={() => ChurchGivingScreen} options={{ headerShown: false }} />
                     <RootStack.Screen name="TitheStatement" getComponent={() => TitheStatementScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="ChurchPledge" getComponent={() => ChurchPledgeScreen} options={{ headerShown: false }} />
                     <RootStack.Screen name="PrayerWall" getComponent={() => PrayerWallScreen} options={{ headerShown: false }} />
                     <RootStack.Screen name="NewPrayerRequest" getComponent={() => NewPrayerRequestScreen} options={{ headerShown: false }} />
                     <RootStack.Screen name="FastingTracker" getComponent={() => FastingTrackerScreen} options={{ headerShown: false }} />

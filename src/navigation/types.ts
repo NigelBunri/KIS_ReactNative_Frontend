@@ -412,6 +412,7 @@ export type RootStackParamList = {
   FamilyMilestones: undefined;
   FamilyTimeCapsules: undefined;
   FamilyPrayer: undefined;
+  FamilyMemorials: undefined;
   MemorialPage: { memorialId: string };
   GriefSupport: undefined;
   FamilyTree: { familyId: string };

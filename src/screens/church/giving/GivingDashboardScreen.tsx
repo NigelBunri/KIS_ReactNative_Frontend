@@ -156,6 +156,12 @@ export default function GivingDashboardScreen({ navigation }: Props) {
             style={styles.ctaBtn}
             onPress={() => navigation.navigate('TitheStatement')}
           />
+          <KISButton
+            title="Make a Pledge"
+            variant="outline"
+            style={styles.ctaBtn}
+            onPress={() => navigation.navigate('ChurchPledge')}
+          />
         </View>
       </ScrollView>
     </SafeAreaView>

@@ -47,9 +47,13 @@ const adminRoutes = {
 
   // ── Platform analytics ────────────────────────────────────────────────
   analytics: {
-    // Public app-level dashboards — accessible to all authenticated users.
-    // Used by PartnerInsightsScreen via fetchDashboardInsights().
-    dashboards: `${API_BASE_URL}/api/v1/dashboards/`,
+    // Real KPI aggregation, scoped by ?target=analytics|partner|profile.
+    // Used by AdminDashboardScreen/AnalyticsDashboardScreen/PartnerInsightsScreen/
+    // ProfileInsightsScreen via fetchDashboardInsights(). This used to point at
+    // /api/v1/dashboards/ (DashboardViewSet — staff-only CRUD over a saved
+    // widget-layout *definition*, not a live KPI source), which returned the
+    // wrong shape of data entirely and 403'd for every non-staff caller.
+    dashboards: `${API_BASE_URL}/api/v1/analytics/insights/`,
     // Admin-scoped analytics (superuser / staff only)
     adminDashboards: `${ADMIN_BASE}/analytics/dashboards/`,
     revenue: `${ADMIN_BASE}/analytics/revenue/`,

@@ -9,6 +9,7 @@ import {
   Alert,
   Modal,
   FlatList,
+  ScrollView,
 } from 'react-native';
 import { useKeyboardState } from 'react-native-keyboard-controller';
 import { postRequest } from '@/network/post';
@@ -130,6 +131,47 @@ const StickerPicker = ({
 
 const audioRecorderPlayer = new AudioRecorderPlayer();
 audioRecorderPlayer.setSubscriptionDuration(0.1);
+
+/* -------------------------------------------------------------------------- */
+/*                           QUICK REPLY SUGGESTIONS                          */
+/* -------------------------------------------------------------------------- */
+
+// A static, client-side set of common one-tap replies. Deliberately no
+// backend/AI involved - this inserts text into the composer rather than
+// auto-sending, so the user still reviews/edits before hitting send.
+const QUICK_REPLIES = ['👍', 'Thanks!', 'On my way', 'Sounds good', 'Yes', 'No'];
+
+const QuickReplyRow = ({
+  palette,
+  onSelect,
+}: {
+  palette: any;
+  onSelect: (text: string) => void;
+}) => (
+  <ScrollView
+    horizontal
+    showsHorizontalScrollIndicator={false}
+    contentContainerStyle={{ paddingHorizontal: 10, paddingTop: 6, paddingBottom: 2, gap: 8 }}
+    keyboardShouldPersistTaps="handled"
+  >
+    {QUICK_REPLIES.map((reply) => (
+      <Pressable
+        key={reply}
+        onPress={() => onSelect(reply)}
+        style={({ pressed }) => ({
+          paddingHorizontal: 14,
+          paddingVertical: 7,
+          borderRadius: 16,
+          borderWidth: 1,
+          borderColor: palette.divider,
+          backgroundColor: pressed ? (palette.surfaceSoft ?? palette.surface) : palette.surface,
+        })}
+      >
+        <Text style={{ fontSize: 13, color: palette.text, fontWeight: '600' }}>{reply}</Text>
+      </Pressable>
+    ))}
+  </ScrollView>
+);
 
 /* -------------------------------------------------------------------------- */
 /*                              COMPONENT PROPS                                */
@@ -941,6 +983,18 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
       )}
 
       {renderReplyOrEditBanner()}
+
+      {/* QUICK REPLY SUGGESTIONS - only while idle, so they don't crowd an
+          in-progress reply/edit or voice recording */}
+      {!editing && !replyTo && !isVoiceActive && value.trim().length === 0 && (
+        <QuickReplyRow
+          palette={palette}
+          onSelect={(text) => {
+            onChangeText(value ? `${value} ${text}` : text);
+            textInputRef.current?.focus();
+          }}
+        />
+      )}
 
       {/* LINK PREVIEW CARD */}
       {(composerLinkPreview || linkPreviewLoading) && (

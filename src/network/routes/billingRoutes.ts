@@ -34,7 +34,12 @@ const billingRoutes = {
   walletTransactions: `${API_BASE_URL}/api/v1/wallet/transactions/`,
   walletTransactionDelete: (id: string) => `${API_BASE_URL}/api/v1/wallet/transactions/${id}/`,
   walletTransactionEmailReceipt: (id: string) => `${API_BASE_URL}/api/v1/wallet/transactions/${id}/email-receipt/`,
-  invoices: `${API_BASE_URL}/api/v1/invoices/`,
+  // /api/v1/invoices/ was dead (apps.tiers' quarantined placeholder, never
+  // routed — see config/urls.py). Real invoices are a formatted view over
+  // paid MarketplaceOrders; see apps.commerce.InvoiceListView/
+  // InvoiceDetailView.
+  invoices: `${API_BASE_URL}/api/v1/commerce/invoices/`,
+  invoice: (id: string) => `${API_BASE_URL}/api/v1/commerce/invoices/${id}/`,
   loyalty: `${API_BASE_URL}/api/v1/commerce/loyalty/`,
   loyaltyBalance: `${API_BASE_URL}/api/v1/commerce/loyalty/balance/`,
   loyaltyRules: `${API_BASE_URL}/api/v1/commerce/loyalty/rules/`,

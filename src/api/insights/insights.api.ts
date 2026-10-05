@@ -186,17 +186,17 @@ const mapProductEntries = (entries: any[]): ProductInsightItem[] =>
     ),
   }));
 
-export const fetchPartnerCampaigns = async (limit = 6): Promise<CampaignInsightItem[]> => {
-  try {
-    const res = await getRequest(ROUTES.tiers.campaigns, { params: { limit } });
-    // Same fix as fetchNotificationsSummary above.
-    if (!res?.success) return [];
-    const list = arrayize(res?.data?.results ?? res?.data ?? []);
-    return mapCampaignEntries(list);
-  } catch (err) {
-    console.warn('[insights] partner campaigns fetch failed', err);
-    return [];
-  }
+export const fetchPartnerCampaigns = async (_limit = 6): Promise<CampaignInsightItem[]> => {
+  // ROUTES.tiers.campaigns (/api/v1/campaigns/) is not registered anywhere
+  // in the Django backend - it was a leftover reference into the
+  // quarantined apps.tiers Organization/subscription subsystem. No real
+  // campaign concept scoped to a Partner org exists in this codebase (the
+  // only other "Campaign" models found - apps.tiers.DonationCampaign and
+  // apps.analytics.OutreachCampaign - belong to different, unrelated org
+  // concepts). Returning [] directly rather than hitting a dead endpoint;
+  // CampaignsSection already renders a clean "No campaigns tracked yet"
+  // empty state for this.
+  return [];
 };
 
 export const fetchMarketplaceProducts = async (limit = 6): Promise<ProductInsightItem[]> => {
