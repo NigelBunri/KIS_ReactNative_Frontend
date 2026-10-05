@@ -39,7 +39,7 @@ type BloodDonor = {
 
 const BLOOD_TYPES = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
 
-export default function EmergencyScreen({ navigation }: Props) {
+export default function EmergencyScreen({}: Props) {
   const { palette } = useKISTheme();
   const layout = useResponsiveLayout();
   const sp = layout.pageGutter;
@@ -95,11 +95,17 @@ export default function EmergencyScreen({ navigation }: Props) {
   const handleSOS = async () => {
     Alert.alert(
       'Send SOS Alert',
-      'This will alert your emergency contacts and nearby responders. Continue?',
+      // This app does not yet have an emergency-contact list or an SMS/push
+      // dispatch pipeline, and nearby-hospital lookup only works where a
+      // provider is configured (see hospital_proximity.py). Promising
+      // "we'll alert your contacts" or "help is on the way" here would be
+      // false reassurance to someone in a real emergency.
+      'If you are in immediate danger, call your local emergency number now. ' +
+        'This will also save an alert with your location to your account. Continue?',
       [
         { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Send SOS',
+          text: 'Save Alert',
           style: 'destructive',
           onPress: async () => {
             setSendingSOS(true);
@@ -108,9 +114,16 @@ export default function EmergencyScreen({ navigation }: Props) {
             });
             setSendingSOS(false);
             if (res.success) {
-              Alert.alert('SOS Sent', 'Emergency alert has been sent. Help is on the way.');
+              const hospitals = Array.isArray(res.data?.nearest_hospitals) ? res.data.nearest_hospitals : [];
+              const hospitalNote = hospitals.length > 0
+                ? `Nearest hospital: ${hospitals[0].name}.`
+                : 'Nearby-hospital lookup is not available in this area yet.';
+              Alert.alert(
+                'Alert Saved',
+                `Your emergency alert has been saved. ${hospitalNote} Call local emergency services directly for immediate dispatch.`,
+              );
             } else {
-              Alert.alert('Error', res.message || 'Failed to send SOS alert.');
+              Alert.alert('Error', res.message || 'Failed to save SOS alert.');
             }
           },
         },

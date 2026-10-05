@@ -704,7 +704,7 @@ export default function BroadcastHealthcarePage({
             justifyContent: 'center',
           }}
         >
-          <KISIcon name="person-circle-outline" size={24} color={palette.onPrimary} />
+          <KISIcon name="person" size={24} color={palette.onPrimary} />
         </View>
         <View style={{ flex: 1, gap: 2 }}>
           <Text style={{ color: palette.primaryStrong, fontWeight: '900', fontSize: 15 }}>
@@ -714,7 +714,7 @@ export default function BroadcastHealthcarePage({
             Offer e-consultations, video sessions & more as a solo provider
           </Text>
         </View>
-        <KISIcon name="chevron-forward-outline" size={18} color={palette.primaryStrong} />
+        <KISIcon name="chevron-right" size={18} color={palette.primaryStrong} />
       </Pressable>
 
       {/* Solo Practitioner Dashboard Modal */}
@@ -726,6 +726,115 @@ export default function BroadcastHealthcarePage({
       >
         <SoloPractitionerDashboard onClose={() => setShowPractitionerDashboard(false)} />
       </Modal>
+
+      {/* Find a Doctor Entry Card — this is the only reachable entry point
+          into TelemedicineHub/DoctorDirectory/ConsultDetail. Those three
+          screens were already registered in App.tsx's RootStack and fully
+          functional, but nothing in the live Health tab ever navigated to
+          them — a real user had no way to actually reach the doctor
+          directory. Same Pressable styling and plain navigation.navigate
+          push already used by the card above and elsewhere in this file,
+          not a new pattern. */}
+      <Pressable
+        onPress={() => navigation.navigate('TelemedicineHub')}
+        style={{
+          borderWidth: 1.5,
+          borderColor: palette.primary,
+          backgroundColor: palette.card,
+          borderRadius: 18,
+          padding: 14,
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 12,
+        }}
+      >
+        <View
+          style={{
+            width: 44,
+            height: 44,
+            borderRadius: 22,
+            backgroundColor: palette.primarySoft,
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <KISIcon name="heart" size={22} color={palette.primary} />
+        </View>
+        <View style={{ flex: 1, gap: 2 }}>
+          <Text style={{ color: palette.text, fontWeight: '900', fontSize: 15 }}>
+            Find a Doctor
+          </Text>
+          <Text style={{ color: palette.subtext, fontWeight: '700', fontSize: 12 }}>
+            Browse verified practitioners and book a telemedicine consult
+          </Text>
+        </View>
+        <KISIcon name="chevron-right" size={18} color={palette.subtext} />
+      </Pressable>
+
+      {/* Quick Tools grid — same discovery as above: 9 of the app's 13
+          "Health Extended" screens (EmergencyHub, MentalHealthHub +
+          its own sub-screens, AddictionRecovery, SobrietyTracker,
+          PregnancyTrackerScreen, BabyMilestones, Medications, HealthGoals,
+          SymptomChecker) were registered in App.tsx's RootStack and fully
+          functional, but had zero reachable entry point anywhere in the
+          app — not a menu item, not a card, nothing. A patient could not
+          reach the emergency SOS screen at all. This grid is the fix:
+          plain navigation.navigate pushes, same pattern as the card above,
+          nothing new invented. */}
+      <Text style={{ color: palette.text, fontWeight: '900', fontSize: 15, marginTop: 4 }}>
+        Quick Tools
+      </Text>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
+        {[
+          { label: 'Emergency SOS', icon: 'warning', screen: 'EmergencyHub', danger: true },
+          { label: 'Symptom Checker', icon: 'search', screen: 'SymptomChecker' },
+          { label: 'Medications', icon: 'document', screen: 'Medications' },
+          { label: 'Health Goals', icon: 'trophy', screen: 'HealthGoals' },
+          { label: 'Mental Health', icon: 'sparkles', screen: 'MentalHealthHub' },
+          { label: 'Pregnancy Tracker', icon: 'calendar', screen: 'PregnancyTrackerScreen' },
+          { label: 'Baby Milestones', icon: 'star', screen: 'BabyMilestones' },
+          { label: 'Addiction Recovery', icon: 'shield', screen: 'AddictionRecovery' },
+          { label: 'Sobriety Tracker', icon: 'flame', screen: 'SobrietyTracker' },
+        ].map(tool => (
+          <Pressable
+            key={tool.screen}
+            onPress={() => navigation.navigate(tool.screen as never)}
+            style={{
+              width: '31%',
+              alignItems: 'center',
+              gap: 6,
+              backgroundColor: palette.card,
+              borderRadius: 14,
+              paddingVertical: 14,
+              borderWidth: 1,
+              borderColor: tool.danger ? palette.danger : palette.divider,
+            }}
+          >
+            <View
+              style={{
+                width: 38,
+                height: 38,
+                borderRadius: 19,
+                backgroundColor: tool.danger ? `${palette.danger}22` : palette.primarySoft,
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <KISIcon name={tool.icon as any} size={18} color={tool.danger ? palette.danger : palette.primary} />
+            </View>
+            <Text
+              style={{
+                color: tool.danger ? palette.danger : palette.text,
+                fontWeight: '700',
+                fontSize: 11,
+                textAlign: 'center',
+              }}
+            >
+              {tool.label}
+            </Text>
+          </Pressable>
+        ))}
+      </View>
 
       {withTimeFilter.map(item => {
         const card = item.health_card || {};

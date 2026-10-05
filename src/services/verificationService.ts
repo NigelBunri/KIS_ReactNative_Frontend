@@ -8,6 +8,7 @@ export type VerificationSubjectType =
   | 'shop'
   | 'partner'
   | 'health_institution'
+  | 'health_practitioner'
   | 'education_institution';
 
 export type VerificationBadgeSummary = {
@@ -159,6 +160,8 @@ const routeForStatus = (subject: VerificationSubjectRef): string | null => {
       return id ? ROUTES.partners.verificationStatus(id) : null;
     case 'health_institution':
       return id ? ROUTES.healthOps.institutionVerificationStatus(id) : null;
+    case 'health_practitioner':
+      return id ? ROUTES.healthExtended.practitionerVerificationStatus(id) : null;
     case 'education_institution':
       return id ? ROUTES.broadcasts.educationInstitutionVerificationStatus(id) : null;
     default:
@@ -177,6 +180,8 @@ const routeForStart = (subject: VerificationSubjectRef): string | null => {
       return id ? ROUTES.partners.verificationStart(id) : null;
     case 'health_institution':
       return id ? ROUTES.healthOps.institutionVerificationStart(id) : null;
+    case 'health_practitioner':
+      return id ? ROUTES.healthExtended.practitionerVerificationStart(id) : null;
     case 'education_institution':
       return id ? ROUTES.broadcasts.educationInstitutionVerificationStart(id) : null;
     default:

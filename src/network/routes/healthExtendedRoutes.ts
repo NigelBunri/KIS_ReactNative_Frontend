@@ -7,6 +7,11 @@ const healthExtendedRoutes = {
     consultStart: (id: string) => API_BASE_URL + "/api/v1/health/extended/consults/" + id + "/start/",
     consultComplete: (id: string) => API_BASE_URL + "/api/v1/health/extended/consults/" + id + "/complete/",
     doctors: API_BASE_URL + "/api/v1/health/extended/doctors/",
+    practitionerMe: API_BASE_URL + "/api/v1/health/extended/practitioners/me/",
+    practitionerVerificationStatus: (practitionerId: string) =>
+      API_BASE_URL + "/api/v1/health/extended/practitioners/" + practitionerId + "/verification/status/",
+    practitionerVerificationStart: (practitionerId: string) =>
+      API_BASE_URL + "/api/v1/health/extended/practitioners/" + practitionerId + "/verification/start/",
     consultReviews: API_BASE_URL + "/api/v1/health/extended/consult-reviews/",
     mentalSessions: API_BASE_URL + "/api/v1/health/extended/mental-sessions/",
     moodEntries: API_BASE_URL + "/api/v1/health/extended/mood/",

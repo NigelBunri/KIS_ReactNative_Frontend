@@ -17,37 +17,29 @@ import { useResponsiveLayout } from '@/theme/responsive';
 import KISButton from '@/constants/KISButton';
 import { KISIcon } from '@/constants/kisIcons';
 import { getRequest } from '@/network/get';
+import { postRequest } from '@/network/post';
 import ROUTES from '@/network';
 import type { RootStackParamList } from '@/navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'DoctorDirectory'>;
 
+// Matches PractitionerDirectoryEntrySerializer (apps/health_ops/
+// extended_serializers.py) exactly — this directory used to render a
+// `rating`/`review_count`/`avatar_url` shape that the real backend has
+// never sent (even its old is_staff-scaffold predecessor didn't send
+// those fields), which crashed on doc.rating.toFixed(1) the first time
+// this screen actually talked to a live server.
 type Doctor = {
   id: string;
-  name: string;
+  user: string;
+  legal_name: string;
+  profession_type: string;
   specialty: string;
-  rating: number;
-  review_count: number;
-  avatar_url?: string;
+  institution_name?: string;
+  verification_status: { is_verified: boolean; badges: Array<{ code?: string; label?: string }> };
 };
 
 const SPECIALTIES = ['All', 'General', 'Cardiology', 'Dermatology', 'Pediatrics', 'Mental Health', 'Gynecology', 'Orthopedics'];
-
-function StarRating({ rating, color }: { rating: number; color: string }) {
-  return (
-    <View style={{ flexDirection: 'row', gap: 2 }}>
-      {[1, 2, 3, 4, 5].map((s) => (
-        <KISIcon
-          key={s}
-          name="star"
-          size={12}
-          color={s <= Math.round(rating) ? color : color + '44'}
-          focused={s <= Math.round(rating)}
-        />
-      ))}
-    </View>
-  );
-}
 
 export default function DoctorDirectoryScreen({ navigation }: Props) {
   const { palette } = useKISTheme();
@@ -57,6 +49,7 @@ export default function DoctorDirectoryScreen({ navigation }: Props) {
   const [doctors, setDoctors] = useState<Doctor[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedSpecialty, setSelectedSpecialty] = useState('All');
+  const [bookingId, setBookingId] = useState<string | null>(null);
 
   const fetchDoctors = useCallback(async (specialty?: string) => {
     setLoading(true);
@@ -74,6 +67,24 @@ export default function DoctorDirectoryScreen({ navigation }: Props) {
   const handleSpecialtyChange = (s: string) => {
     setSelectedSpecialty(s);
     fetchDoctors(s);
+  };
+
+  // Previously this navigated straight to ConsultDetail with
+  // {doctorId, doctorName} — a screen that only ever reads
+  // route.params.consultId, so this was a confirmed dead end: no consult
+  // was ever created, the detail screen fetched /consults/undefined/ and
+  // sat there. This now actually creates the consult first.
+  const handleBook = async (doc: Doctor) => {
+    setBookingId(doc.id);
+    const res = await postRequest(ROUTES.healthExtended.consults, {
+      doctor: doc.user,
+      specialty: doc.specialty,
+      type: 'scheduled',
+    });
+    setBookingId(null);
+    if (res.success && res.data?.id) {
+      navigation.navigate('ConsultDetail', { consultId: res.data.id });
+    }
   };
 
   const styles = makeStyles(palette, sp);
@@ -145,12 +156,24 @@ export default function DoctorDirectoryScreen({ navigation }: Props) {
                   <KISIcon name="person" size={22} color={palette.primary} />
                 </View>
                 <View style={styles.cardInfo}>
-                  <Text style={styles.doctorName}>{doc.name}</Text>
-                  <Text style={styles.specialty}>{doc.specialty}</Text>
+                  <Text style={styles.doctorName}>{doc.legal_name}</Text>
+                  <Text style={styles.specialty}>{doc.specialty || doc.profession_type}</Text>
+                  {doc.institution_name ? (
+                    <Text style={styles.specialty}>{doc.institution_name}</Text>
+                  ) : null}
                   <View style={styles.ratingRow}>
-                    <StarRating rating={doc.rating} color={palette.gold} />
-                    <Text style={styles.ratingText}>
-                      {doc.rating.toFixed(1)} ({doc.review_count})
+                    <KISIcon
+                      name={doc.verification_status?.is_verified ? 'shield' : 'info'}
+                      size={13}
+                      color={doc.verification_status?.is_verified ? palette.primary : palette.subtext}
+                    />
+                    <Text
+                      style={[
+                        styles.ratingText,
+                        doc.verification_status?.is_verified && { color: palette.primary, fontWeight: '700' },
+                      ]}
+                    >
+                      {doc.verification_status?.is_verified ? 'Verified practitioner' : 'Not yet verified'}
                     </Text>
                   </View>
                 </View>
@@ -159,8 +182,10 @@ export default function DoctorDirectoryScreen({ navigation }: Props) {
                 title="Book"
                 variant="primary"
                 size="sm"
+                loading={bookingId === doc.id}
+                disabled={bookingId !== null}
                 style={styles.bookBtn}
-                onPress={() => navigation.navigate('ConsultDetail', { doctorId: doc.id, doctorName: doc.name })}
+                onPress={() => handleBook(doc)}
               />
             </View>
           )}

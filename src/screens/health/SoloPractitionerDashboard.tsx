@@ -6,6 +6,7 @@
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  ActivityIndicator,
   Alert,
   Animated,
   Modal,
@@ -30,6 +31,9 @@ import { SafeAreaView } from '@/components/common/SafeAreaViewWithTopPadding';
 import { useKISTheme } from '@/theme/useTheme';
 import { HealthCard, StatTile, SectionHeader, HealthTabBar, EmptyState, StatusPill } from '@/components/health';
 import type { HealthTab } from '@/components/health';
+import { VerificationBadgeRow, VerificationCenterSheet } from '@/components/verification';
+import type { VerificationSummary } from '@/services/verificationService';
+import KISButton from '@/constants/KISButton';
 
 type Specialty =
   | 'general_practice'
@@ -178,6 +182,161 @@ function PulseDot({ color }: { color: string }) {
   );
 }
 
+const PROFESSION_TYPES: { value: string; label: string }[] = [
+  { value: 'doctor', label: 'Doctor' },
+  { value: 'nurse', label: 'Nurse' },
+  { value: 'dentist', label: 'Dentist' },
+  { value: 'pharmacist', label: 'Pharmacist' },
+  { value: 'physiotherapist', label: 'Physiotherapist' },
+  { value: 'psychologist', label: 'Psychologist / Mental Health' },
+  { value: 'nutritionist', label: 'Nutritionist / Dietitian' },
+  { value: 'lab_professional', label: 'Laboratory Professional' },
+  { value: 'specialist', label: 'Specialist' },
+  { value: 'other', label: 'Other' },
+];
+
+// Self-contained — deliberately does NOT reuse this screen's own
+// `profile`/`profileDraft` state, which belongs to a separate, older
+// profile system (ROUTES.healthcare.profile, apps.core.Appointment) that
+// predates and is unrelated to the real HealthPractitioner/verification
+// backend (apps.health_ops.HealthPractitioner + apps.verification). Wiring
+// those two together is a real architectural decision this screen's own
+// prior pass already flagged as unresolved (see startVideoSession's
+// comment above) — not something to quietly merge here.
+function PractitionerVerificationCard({ palette, kisPalette }: { palette: any; kisPalette: any }) {
+  const [loading, setLoading] = useState(true);
+  const [practitioner, setPractitioner] = useState<{ id: string; legal_name: string; profession_type: string } | null>(null);
+  const [summary, setSummary] = useState<VerificationSummary | null>(null);
+  const [sheetVisible, setSheetVisible] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [legalName, setLegalName] = useState('');
+  const [professionType, setProfessionType] = useState('doctor');
+  const [createError, setCreateError] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    const res = await getRequest(ROUTES.healthExtended.practitionerMe, {});
+    if (res.success && res.data?.id) {
+      setPractitioner(res.data);
+      const statusRes = await getRequest(
+        ROUTES.healthExtended.practitionerVerificationStatus(res.data.id),
+        {},
+      );
+      if (statusRes.success) setSummary(statusRes.data);
+    } else {
+      setPractitioner(null);
+    }
+    setLoading(false);
+  }, []);
+
+  useEffect(() => {
+    load().catch(() => setLoading(false));
+  }, [load]);
+
+  const createProfile = async () => {
+    if (!legalName.trim()) {
+      setCreateError('Enter your legal name as it appears on your license.');
+      return;
+    }
+    setCreating(true);
+    setCreateError(null);
+    const res = await postRequest(ROUTES.healthExtended.practitionerMe, {
+      legal_name: legalName.trim(),
+      profession_type: professionType,
+    });
+    setCreating(false);
+    if (res.success) {
+      await load();
+    } else {
+      setCreateError(res.message || 'Unable to create practitioner profile.');
+    }
+  };
+
+  if (loading) {
+    return (
+      <HealthCard palette={palette} padding={16} style={{ alignItems: 'center' }}>
+        <ActivityIndicator color={palette.primary} />
+      </HealthCard>
+    );
+  }
+
+  if (!practitioner) {
+    return (
+      <HealthCard palette={palette} padding={16} style={{ gap: 10 }}>
+        <Text style={{ color: palette.text, fontWeight: '900', fontSize: 15 }}>Practitioner Verification</Text>
+        <Text style={{ color: palette.subtext, fontWeight: '600', fontSize: 12.5, lineHeight: 18 }}>
+          Create your practitioner profile to request verification. Patients only ever see your name, specialty, and
+          whether you're verified — never your license number or submitted documents.
+        </Text>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+          {PROFESSION_TYPES.map((p) => {
+            const isSelected = professionType === p.value;
+            return (
+              <Pressable
+                key={p.value}
+                onPress={() => setProfessionType(p.value)}
+                style={{
+                  borderWidth: 1.5,
+                  borderColor: isSelected ? palette.primary : palette.divider,
+                  backgroundColor: isSelected ? palette.cardAccent : palette.card,
+                  borderRadius: 8,
+                  paddingHorizontal: 12,
+                  paddingVertical: 6,
+                }}
+              >
+                <Text style={{ color: isSelected ? palette.accentPrimary : palette.subtext, fontWeight: '800', fontSize: 12 }}>
+                  {p.label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+        <TextInput
+          value={legalName}
+          onChangeText={setLegalName}
+          placeholder="Legal name, as on your license"
+          placeholderTextColor={palette.subtext}
+          style={{
+            color: palette.text,
+            fontWeight: '700',
+            fontSize: 15,
+            borderBottomWidth: 1,
+            borderBottomColor: palette.divider,
+            paddingVertical: 6,
+          }}
+        />
+        {createError ? (
+          <Text style={{ color: kisPalette.danger, fontWeight: '700', fontSize: 12 }}>{createError}</Text>
+        ) : null}
+        <KISButton title={creating ? 'Creating...' : 'Create profile'} loading={creating} onPress={createProfile} disabled={creating} />
+      </HealthCard>
+    );
+  }
+
+  return (
+    <HealthCard palette={palette} padding={16} style={{ gap: 10 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+        <Text style={{ color: palette.text, fontWeight: '900', fontSize: 15 }}>Practitioner Verification</Text>
+        <VerificationBadgeRow palette={kisPalette} summary={summary} compact />
+      </View>
+      <Text style={{ color: palette.subtext, fontWeight: '600', fontSize: 12.5 }}>
+        {practitioner.legal_name} · {PROFESSION_TYPES.find((p) => p.value === practitioner.profession_type)?.label ?? practitioner.profession_type}
+      </Text>
+      <KISButton title="Manage verification" variant="secondary" onPress={() => setSheetVisible(true)} />
+      <VerificationCenterSheet
+        visible={sheetVisible}
+        palette={kisPalette}
+        subject={{ type: 'health_practitioner', id: practitioner.id }}
+        initialSummary={summary}
+        title="Practitioner Verification"
+        subtitle="Submit your license and credentials for review. Only private references are sent — never raw documents."
+        onClose={() => setSheetVisible(false)}
+        onSubmitted={(next) => setSummary(next ?? summary)}
+      />
+    </HealthCard>
+  );
+}
+
 type TabId = 'dashboard' | 'consultations' | 'services' | 'schedule' | 'profile';
 
 const TABS: { id: TabId; label: string; icon: string }[] = [
@@ -201,7 +360,6 @@ export default function SoloPractitionerDashboard({ onClose }: Props) {
 
   const [tab, setTab] = useState<TabId>('dashboard');
   const [loading, setLoading] = useState(false);
-  const [activeConsult, setActiveConsult] = useState<string | null>(null);
 
   const [profile, setProfile] = useState<PractitionerProfile>({
     displayName: '',
@@ -269,7 +427,7 @@ export default function SoloPractitionerDashboard({ onClose }: Props) {
           })),
         );
       }
-    } catch (_) {
+    } catch {
     } finally {
       setLoading(false);
     }
@@ -298,7 +456,7 @@ export default function SoloPractitionerDashboard({ onClose }: Props) {
         replaceExisting: true,
         errorMessage: '',
       });
-    } catch (_) {}
+    } catch {}
   }, [profile.id]);
 
   // videoSessionStart/messagingSessionStart both require a workflow_session_id
@@ -350,7 +508,7 @@ export default function SoloPractitionerDashboard({ onClose }: Props) {
         { errorMessage: '' },
       );
       Alert.alert('Profile', 'Profile saved successfully.');
-    } catch (_) {
+    } catch {
       Alert.alert('Profile', 'Profile saved on this device. We could not reach the server — changes will sync when back online.');
     }
   }, [profile, profileDraft]);
@@ -958,6 +1116,8 @@ export default function SoloPractitionerDashboard({ onClose }: Props) {
           </Text>
         )}
       </HealthCard>
+
+      <PractitionerVerificationCard palette={palette} kisPalette={kisPalette} />
 
       {/* Partner account CTA */}
       <Pressable

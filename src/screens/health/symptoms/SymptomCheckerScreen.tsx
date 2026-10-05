@@ -27,6 +27,7 @@ type CheckResult = {
   recommendations: string[];
   possible_conditions?: string[];
   seek_care_within?: string;
+  disclaimer?: string;
 };
 
 const COMMON_SYMPTOMS = [
@@ -39,8 +40,6 @@ const COMMON_SYMPTOMS = [
   { key: 'shortness_of_breath', label: 'Shortness of Breath', icon: 'info' },
   { key: 'dizziness', label: 'Dizziness', icon: 'sparkles' },
 ];
-
-const TRIAGE_COLORS: Record<string, string> = {};
 
 const TRIAGE_LABELS: Record<string, string> = {
   emergency: 'Emergency — Seek immediate care',
@@ -211,7 +210,7 @@ export default function SymptomCheckerScreen({ navigation }: Props) {
             <View style={[styles.triageBanner, { backgroundColor: triageColor(result.triage_level) }]}>
               <KISIcon name="shield" size={18} color={palette.ivory} focused />
               <Text style={styles.triageText}>
-                {TRIAGE_LABELS[result.triage_level] ?? result.triage_level.toUpperCase()}
+                {TRIAGE_LABELS[result.triage_level] ?? String(result.triage_level ?? 'Unknown').toUpperCase()}
               </Text>
             </View>
 
@@ -223,8 +222,12 @@ export default function SymptomCheckerScreen({ navigation }: Props) {
               </View>
             )}
 
+            {result.disclaimer && (
+              <Text style={styles.disclaimerFooter}>{result.disclaimer}</Text>
+            )}
+
             {/* Recommendations */}
-            {result.recommendations.length > 0 && (
+            {(result.recommendations ?? []).length > 0 && (
               <View style={styles.resultSection}>
                 <Text style={styles.resultSectionTitle}>Recommendations</Text>
                 {result.recommendations.map((r, i) => (
@@ -401,6 +404,14 @@ function makeStyles(palette: any, sp: number) {
       borderColor: palette.divider,
     },
     conditionText: { fontSize: 12, color: palette.subtext },
+    disclaimerFooter: {
+      fontSize: 11,
+      color: palette.subtext,
+      fontStyle: 'italic',
+      paddingHorizontal: 14,
+      paddingTop: 10,
+      paddingBottom: 14,
+    },
     bookingCta: {
       margin: 14,
       marginTop: 12,
