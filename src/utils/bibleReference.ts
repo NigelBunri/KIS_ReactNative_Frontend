@@ -163,6 +163,16 @@ export function formatBibleShareText(reference: string, quoteText: string): stri
   return `${reference}\n"${oneLineQuote}"`;
 }
 
+/**
+ * External kis:// deep link for a verse reference (e.g. "Genesis 12:16") -
+ * opens straight to that verse via deepLinkRouter.ts's 'bible' branch, even
+ * when the message carrying it is forwarded/copied outside the app (where
+ * the in-app BIBLE_QUOTE_BLOCK_RE tap-to-jump no longer applies).
+ */
+export function buildBibleDeepLink(reference: string): string {
+  return `kis://bible/${encodeURIComponent(reference)}`;
+}
+
 // Matches a reference line immediately followed by a quoted passage on the
 // next line (the exact shape formatBibleShareText produces) — the WHOLE
 // block (reference + quote) renders as a single tappable link, per product

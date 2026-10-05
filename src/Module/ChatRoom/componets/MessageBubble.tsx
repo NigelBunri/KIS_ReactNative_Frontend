@@ -1985,7 +1985,12 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
     : [];
 
   const INVITE_PATH_RE = /\/join\/(group|community)\/([A-Za-z0-9_-]+)/;
-  const URL_OR_MENTION_RE = /https?:\/\/[^\s<>"{}|\\^`[\]]+|@\w+/g;
+  // kis:// alongside http(s):// so an in-app-shared custom-scheme deep
+  // link (e.g. a Bible verse's external link - see buildBibleDeepLink in
+  // bibleReference.ts) renders as a real tappable link here too, not just
+  // inert text; INVITE_PATH_RE below matches on path shape alone, so this
+  // doesn't change how invite links already behave.
+  const URL_OR_MENTION_RE = /(?:https?|kis):\/\/[^\s<>"{}|\\^`[\]]+|@\w+/g;
 
   const openBibleReference = (ref: ParsedBibleReference) => {
     // The chat room is a full-screen overlay layered above the tab

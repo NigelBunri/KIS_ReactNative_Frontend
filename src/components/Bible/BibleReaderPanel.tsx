@@ -81,7 +81,7 @@ import {
   type LocalBibleLibraryItem,
 } from '@/services/bibleUserPersistence';
 import { scheduleBibleReadingEventReminders } from '@/services/inAppNotificationService';
-import { formatBibleReference, formatBibleShareText } from '@/utils/bibleReference';
+import { formatBibleReference, formatBibleShareText, buildBibleDeepLink } from '@/utils/bibleReference';
 import type { BibleVerseMessage } from '@/Module/ChatRoom/chatTypes';
 import type { Chat } from '@/Module/ChatRoom/messagesUtils';
 import ShareToChatModal from '@/components/broadcast/ShareToChatModal';
@@ -1035,7 +1035,12 @@ const BibleReaderPanel = forwardRef<BibleReaderPanelHandle, Props>(function Bibl
         conversationId,
         clientId: `client_${Date.now()}_${Math.random().toString(36).slice(2)}`,
         kind: 'text',
-        text: formatBibleShareText(payload.reference, payload.text ?? ''),
+        // The quote block above still renders as an in-app tappable jump
+        // (BIBLE_QUOTE_BLOCK_RE in MessageBubble.tsx); this trailing link
+        // line is what keeps the verse reachable once the message is
+        // forwarded/copied outside the app, where that in-app regex no
+        // longer applies - see deepLinkRouter.ts's 'bible' branch.
+        text: `${formatBibleShareText(payload.reference, payload.text ?? '')}\n${buildBibleDeepLink(payload.reference)}`,
       },
       (err: any, ackResult: { ok?: boolean; error?: string } | undefined) => {
         if (err) {
