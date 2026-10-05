@@ -109,6 +109,12 @@ const CallsTab = forwardRef<ScrollableHandle, CallsTabProps>(function CallsTab({
   const [conversationParticipantsById, setConversationParticipantsById] = useState<Record<string, string[]>>({});
   const [showNewCallSheet, setShowNewCallSheet] = useState(false);
   const [showDiagnostics, setShowDiagnostics] = useState(false);
+  // History only ever fetched the newest 100 calls with no way to page past
+  // them, so anyone with >100 calls permanently lost access to older history
+  // in the UI even though the server supports a `before` cursor. These track
+  // whether a next page exists and whether one is currently loading.
+  const [hasMoreCalls, setHasMoreCalls] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
 
   const loadCalls = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true); else setLoading(true);
@@ -146,6 +152,7 @@ const CallsTab = forwardRef<ScrollableHandle, CallsTabProps>(function CallsTab({
 
       if (serverCalls) {
         setCalls(serverCalls);
+        setHasMoreCalls(serverCalls.length >= 100);
         // Persist under the real userId so the next reload shows cached data
         // immediately. Also save under the empty-string key as an emergency
         // fallback for the window before currentUserId is resolved.
@@ -171,6 +178,45 @@ const CallsTab = forwardRef<ScrollableHandle, CallsTabProps>(function CallsTab({
       setRefreshing(false);
     }
   }, [currentUserId]);
+
+  const loadMoreCalls = useCallback(async () => {
+    if (loadingMore || !hasMoreCalls || calls.length === 0) return;
+    const oldest = calls.reduce<CallHistoryItem | null>((min, c) => {
+      if (!c.startedAt) return min;
+      if (!min || !min.startedAt) return c;
+      return new Date(c.startedAt) < new Date(min.startedAt) ? c : min;
+    }, null);
+    if (!oldest?.startedAt) return;
+
+    setLoadingMore(true);
+    try {
+      const before = encodeURIComponent(oldest.startedAt);
+      const res = await getRequest(`${ROUTES.calls.history}?limit=100&before=${before}`);
+      const older: CallHistoryItem[] | null =
+        res.success && Array.isArray(res.data?.calls)
+          ? (res.data.calls as CallHistoryItem[])
+          : res.success && Array.isArray(res.data)
+          ? (res.data as CallHistoryItem[])
+          : null;
+      if (older) {
+        setHasMoreCalls(older.length >= 100);
+        if (older.length) {
+          setCalls((prev) => {
+            const seen = new Set(prev.map((c) => c.callId));
+            return [...prev, ...older.filter((c) => !seen.has(c.callId))];
+          });
+        }
+      } else {
+        setHasMoreCalls(false);
+      }
+    } catch (error) {
+      console.error('[CallsTab] loadMoreCalls failed', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [calls, hasMoreCalls, loadingMore]);
 
   // Run once on mount. When currentUserId resolves (null → real id),
   // loadCalls is recreated and this effect re-runs automatically.
@@ -611,6 +657,15 @@ const CallsTab = forwardRef<ScrollableHandle, CallsTabProps>(function CallsTab({
             <RefreshControl refreshing={refreshing} onRefresh={() => loadCalls(true)} tintColor={palette.primaryStrong} colors={[palette.primaryStrong]} />
           }
           stickySectionHeadersEnabled={false}
+          onEndReachedThreshold={0.3}
+          onEndReached={() => { void loadMoreCalls(); }}
+          ListFooterComponent={
+            loadingMore ? (
+              <View style={{ paddingVertical: 16, alignItems: 'center' }}>
+                <Skeleton width={120} height={12} radius={6} />
+              </View>
+            ) : null
+          }
         />
       )}
 

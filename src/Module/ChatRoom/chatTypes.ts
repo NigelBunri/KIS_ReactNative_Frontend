@@ -49,6 +49,7 @@ export type MessageKind =
   | 'poll'
   | 'event'
   | 'location'
+  | 'payment'
   | 'attachment'
   | 'call_event'
   | 'bible_verse'
@@ -245,6 +246,17 @@ export type LocationMessage = {
   expiresAt?: number | string;
 };
 
+/* ============================================================================
+ * PAYMENT
+ * ============================================================================
+ */
+
+export type PaymentMessage = {
+  amount: number;
+  currency: string;
+  note?: string;
+};
+
 /** Shared verse/chapter from the Bible screen — see src/utils/bibleReference.ts. */
 export type BibleVerseMessage = {
   /** Canonical "Book chapter:verseStart[-verseEnd]" string used to reopen the exact spot. */
@@ -437,6 +449,8 @@ export type ChatMessage = {
   event?: EventMessage;
 
   location?: LocationMessage;
+
+  payment?: PaymentMessage;
 
   bibleVerse?: BibleVerseMessage;
 

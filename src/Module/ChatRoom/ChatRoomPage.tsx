@@ -79,6 +79,7 @@ import {
 } from '@/services/calls/callHistoryStorage';
 import type { CallType } from '@/services/calls/callTypes';
 import ROUTES, { NEST_API_BASE_URL } from '@/network';
+import { patchRequest } from '@/network/patch';
 import { loadMessages } from './Storage/chatStorage';
 import RNFS from 'react-native-fs';
 import { stripFileScheme } from './chatMediaStorage';
@@ -486,6 +487,21 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
     const toSave = scheduledQueue.map(({ text, scheduledAt }) => ({ text, scheduledAt }));
     AsyncStorage.setItem(SCHED_KEY, JSON.stringify(toSave)).catch(() => {});
   }, [scheduledQueue, SCHED_KEY]);
+
+  // Initialize the disappearing-timer toggle from the real persisted value
+  // (see handleSetDisappearing) so reopening a chat reflects what's actually
+  // set server-side instead of always resetting to "off".
+  useEffect(() => {
+    const convId = String(conversationId ?? chat?.id ?? '');
+    if (!convId) return;
+    getRequest(ROUTES.chat.conversationDetail(convId)).then((res) => {
+      const raw = res?.data ?? res;
+      const days = raw?.settings?.message_retention_days;
+      if (typeof days === 'number' && days > 0) {
+        setDisappearingSeconds((days * 86400) as DisappearDuration);
+      }
+    }).catch(() => {});
+  }, [conversationId, chat?.id]);
 
   // Listen for incoming disappearing-message setting changes from the other party
   useEffect(() => {
@@ -896,6 +912,11 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
       Boolean(message.voice) ||
       Boolean(message.poll) ||
       Boolean(message.event) ||
+      Boolean(message.location) ||
+      Boolean(message.payment) ||
+      Boolean(message.bibleVerse) ||
+      Boolean(message.bibleGameStats) ||
+      Boolean(message.bibleDiscipleshipStats) ||
       Boolean(message.contacts?.length) ||
       attachments.length > 0;
 
@@ -910,6 +931,11 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
       contacts: message.contacts ?? null,
       poll: message.poll ?? null,
       event: message.event ?? null,
+      location: message.location ?? null,
+      payment: message.payment ?? null,
+      bibleVerse: message.bibleVerse ?? null,
+      bibleGameStats: message.bibleGameStats ?? null,
+      bibleDiscipleshipStats: message.bibleDiscipleshipStats ?? null,
       attachments,
     };
   }, []);
@@ -1998,6 +2024,14 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
     [ensureConversationId, sendRichMessage],
   );
 
+  const handleSendPayment = useCallback(
+    async (payment: { amount: number; currency: string; note?: string }) => {
+      await ensureConversationId();
+      sendRichMessage({ kind: 'payment', payment });
+    },
+    [ensureConversationId, sendRichMessage],
+  );
+
   const handleScheduleSend = useCallback(
     (scheduledAt: string) => {
       const text = draft.trim();
@@ -2065,9 +2099,18 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
     (seconds: DisappearDuration) => {
       setDisappearingSeconds(seconds);
       const convId = String(conversationId ?? chat?.id ?? '');
-      if (convId && socket) {
+      if (!convId) return;
+      if (socket) {
         (socket as any).emit('chat.disappear.set', { conversationId: convId, seconds });
       }
+      // The socket emit above has no server-side listener (chat.disappear.set
+      // is a declared event name with no @SubscribeMessage handler), so it
+      // never persists or reaches the other participant. The real, already-
+      // built persistence path is Django's per-conversation settings PATCH,
+      // which stores this as message_retention_days (whole days).
+      void patchRequest(ROUTES.chat.updateSettings(convId), {
+        message_retention_days: seconds > 0 ? seconds / 86400 : null,
+      });
     },
     [conversationId, chat?.id, socket],
   );
@@ -2561,6 +2604,7 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
           onCreateEvent={handleCreateEvent}
           onSendGif={handleSendGif}
           onSendLocation={handleSendLocation}
+          onSendPayment={handleSendPayment}
           onScheduleSend={handleScheduleSend}
           onStarMessage={handleStarMessage}
           onShowReadReceipts={handleShowReadReceipts}

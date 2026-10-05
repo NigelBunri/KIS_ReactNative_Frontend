@@ -42,9 +42,14 @@ const miscRoutes = {
     list: `${API_BASE_URL}/api/v1/users/`,
     detail: (id: string) => `${API_BASE_URL}/api/v1/users/${id}/`,
     suspend: (id: string) => `${API_BASE_URL}/api/v1/users/${id}/suspend/`,
-    ban: (id: string) => `${API_BASE_URL}/api/v1/users/${id}/ban/`,
-    unban: (id: string) => `${API_BASE_URL}/api/v1/users/${id}/unban/`,
-    setTier: (id: string) => `${API_BASE_URL}/api/v1/users/${id}/set-tier/`,
+    // UserViewSet (above) never defined ban/unban/set-tier @actions — these
+    // three 404'd against /api/v1/users/. The real, already-built
+    // implementations live on admin_control's own RBAC-gated views
+    // (AdminUserBanView/UnbanView/TierChangeView at /control/admin/users/),
+    // which is what every other admin action in this codebase goes through.
+    ban: (id: string) => `${API_BASE_URL}/control/admin/users/${id}/ban/`,
+    unban: (id: string) => `${API_BASE_URL}/control/admin/users/${id}/unban/`,
+    setTier: (id: string) => `${API_BASE_URL}/control/admin/users/${id}/set-tier/`,
     recalcTrust: (id: string) => `${API_BASE_URL}/api/v1/users/${id}/recalc_trust/`,
   },
   linkPreview: `${API_BASE_URL}/api/v1/link-preview/`,

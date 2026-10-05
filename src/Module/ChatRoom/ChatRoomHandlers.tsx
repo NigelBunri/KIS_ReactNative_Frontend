@@ -637,6 +637,33 @@ export const handleSendLocation = async ({
   });
 };
 
+export const handleSendPayment = async ({
+  payment,
+  chat,
+  currentUserId,
+  ensureConversationId,
+  sendRichMessage,
+}: {
+  payment: { amount: number; currency: string; note?: string };
+  chat: any;
+  currentUserId: string;
+  ensureConversationId: EnsureConversationId;
+  sendRichMessage: SendRichMessage;
+}) => {
+  if (!chat) return;
+
+  const convId = await ensureConversationId(`💰 ${payment.currency} ${payment.amount}`);
+  if (!convId) return;
+
+  await sendRichMessage({
+    kind: 'payment',
+    fromMe: true,
+    senderId: currentUserId,
+    conversationId: convId,
+    payment,
+  });
+};
+
 /* =========================================================
    REQUEST ACTIONS
 ========================================================= */

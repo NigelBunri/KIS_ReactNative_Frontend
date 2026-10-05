@@ -22,10 +22,10 @@ type Props = NativeStackScreenProps<RootStackParamList, 'MemberDirectory'>;
 
 type Member = {
   id: string;
-  first_name: string;
-  last_name: string;
+  user: string;
+  name: string;
   tier: string;
-  avatar?: string;
+  avatar_url?: string;
 };
 
 const TIERS = ['All', 'Visitor', 'Member', 'Deacon', 'Elder', 'Staff'];
@@ -67,14 +67,24 @@ export default function MemberDirectoryScreen({ navigation }: Props) {
   );
 
   const getInitials = (m: Member) =>
-    `${m.first_name?.[0] ?? ''}${m.last_name?.[0] ?? ''}`.toUpperCase();
+    (m.name ?? '')
+      .split(' ')
+      .filter(Boolean)
+      .slice(0, 2)
+      .map(part => part[0]?.toUpperCase() ?? '')
+      .join('');
 
   const renderItem = ({ item }: { item: Member }) => {
     const tierColor = TIER_COLORS[item.tier] ?? palette.subtext;
     return (
       <TouchableOpacity
         style={styles.memberRow}
-        onPress={() => navigation.navigate('MemberProfile', { memberId: item.id })}
+        onPress={() =>
+          navigation.navigate('ViewProfile', {
+            userId: item.user,
+            displayName: item.name,
+          })
+        }
         activeOpacity={0.7}
         hitSlop={{ top: 4, bottom: 4 }}
       >
@@ -82,9 +92,7 @@ export default function MemberDirectoryScreen({ navigation }: Props) {
           <Text style={styles.avatarText}>{getInitials(item)}</Text>
         </View>
         <View style={styles.memberInfo}>
-          <Text style={styles.memberName}>
-            {item.first_name} {item.last_name}
-          </Text>
+          <Text style={styles.memberName}>{item.name}</Text>
         </View>
         <View style={[styles.tierBadge, { backgroundColor: tierColor + '22', borderColor: tierColor }]}>
           <Text style={[styles.tierText, { color: tierColor }]}>{item.tier}</Text>

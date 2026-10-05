@@ -69,8 +69,13 @@ const adminRoutes = {
     create: `${API_BASE_URL}/api/v1/events/`,
     detail: (id: string) => `${API_BASE_URL}/api/v1/events/${id}/`,
     rsvp: `${API_BASE_URL}/api/v1/attendances/`,
-    tickets: `${API_BASE_URL}/api/v1/events/tickets/`,
-    attendances: `${API_BASE_URL}/api/v1/events/attendances/`,
+    // TicketViewSet/AttendanceViewSet are registered at top level by
+    // apps.events.urls (router.register(r"tickets"/r"attendances", ...)),
+    // not nested under /events/ — the old "/events/tickets/" path 404'd on
+    // every ticket purchase (EventsScreen.tsx's only caller of this key).
+    tickets: `${API_BASE_URL}/api/v1/tickets/`,
+    ticketPurchase: (id: string) => `${API_BASE_URL}/api/v1/tickets/${id}/purchase/`,
+    attendances: `${API_BASE_URL}/api/v1/attendances/`,
   },
   surveys: {
     list: `${API_BASE_URL}/api/v1/surveys/`,

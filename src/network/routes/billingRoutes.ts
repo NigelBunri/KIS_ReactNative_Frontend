@@ -45,8 +45,12 @@ const billingRoutes = {
   promoCodeRedeem: `${API_BASE_URL}/api/v1/promo-codes/redeem-code/`,
   directPaymentIntents: `${API_BASE_URL}/api/v1/direct-payments/intents/`,
   directPaymentAudit: `${API_BASE_URL}/api/v1/direct-payment-audit/`,
-  tierPlans: `${API_BASE_URL}/api/v1/plans/`,
-  tierPlan: (id: string) => `${API_BASE_URL}/api/v1/plans/${id}/`,
+  // apps.tiers' /plans/ was quarantined (dead, unrouted — see
+  // config/urls.py) and superseded by apps.accounts' AccountTier, exposed
+  // at /tiers/. This pointed at the dead URL, so the admin "Manage
+  // subscription tiers" dashboard always 404'd with an empty plans list.
+  tierPlans: `${API_BASE_URL}/api/v1/tiers/`,
+  tierPlan: (id: string) => `${API_BASE_URL}/api/v1/tiers/${id}/`,
   tierSubscriptions: `${API_BASE_URL}/api/v1/subscriptions/`,
   tierSubscription: (id: string) => `${API_BASE_URL}/api/v1/subscriptions/${id}/`,
   tierEntitlements: `${API_BASE_URL}/api/v1/entitlements/`,

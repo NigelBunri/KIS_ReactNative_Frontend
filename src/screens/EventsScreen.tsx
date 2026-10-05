@@ -528,10 +528,6 @@ export default function EventsScreen() {
   const cancelRSVP = useCallback(
     async (event: Event) => {
       const attendanceId = attendanceIds[event.id];
-      const url = attendanceId
-        ? ROUTES.events.detail(attendanceId).replace('/events/', '/attendances/')
-        : ROUTES.events.rsvp;
-      // Use query-param approach: DELETE to rsvp endpoint with event param
       const res = await deleteRequest(
         attendanceId
           ? `${ROUTES.events.rsvp}${attendanceId}/`
@@ -1248,11 +1244,26 @@ export default function EventsScreen() {
                               text: 'Buy Ticket',
                               onPress: async () => {
                                 try {
-                                  const res = await postRequest(ROUTES.events.tickets, { event: detailEvent.id, quantity: 1 });
+                                  // Ticket purchase is a two-step flow server-side: find an
+                                  // available ticket (tier) for this event, then purchase
+                                  // that specific ticket — there's no single "buy for event"
+                                  // endpoint. This screen has no tier picker yet, so we take
+                                  // the first ticket with stock, matching the single "Buy
+                                  // Ticket" button UX above.
+                                  const ticketsRes = await getRequest(ROUTES.events.tickets, {
+                                    params: { event: detailEvent.id },
+                                  });
+                                  const available = (ticketsRes?.data?.results ?? ticketsRes?.results ?? ticketsRes?.data ?? [])
+                                    .find((t: any) => (t.quantity_remaining ?? 0) > 0);
+                                  if (!available?.id) {
+                                    Alert.alert('Sold Out', 'No tickets are currently available for this event.');
+                                    return;
+                                  }
+                                  const res = await postRequest(ROUTES.events.ticketPurchase(available.id), { qty: 1 });
                                   if (res?.success || res?.id || res?.data?.id) {
                                     Alert.alert('Ticket Purchased', 'Your ticket has been confirmed. Check your email for details.');
                                   } else {
-                                    Alert.alert('Error', res?.message ?? 'Could not purchase ticket. Please try again.');
+                                    Alert.alert('Error', res?.message ?? res?.error ?? 'Could not purchase ticket. Please try again.');
                                   }
                                 } catch {
                                   Alert.alert('Error', 'Ticket purchase failed. Please try again.');
