@@ -172,7 +172,7 @@ describe('handleBackgroundPushMessage — incoming_call pipeline', () => {
   beforeEach(() => jest.clearAllMocks());
 
   it('parses an incoming_call payload and requests CallKeep display with the right args', async () => {
-    mockedDisplayIncomingCall.mockReturnValue(true);
+    mockedDisplayIncomingCall.mockResolvedValue(true);
 
     await handleBackgroundPushMessage({
       data: { type: 'incoming_call', callId: 'call-123', callerName: 'Jane', callType: 'video' },
@@ -186,7 +186,7 @@ describe('handleBackgroundPushMessage — incoming_call pipeline', () => {
   });
 
   it('logs the full pipeline stage sequence when CallKeep display succeeds', async () => {
-    mockedDisplayIncomingCall.mockReturnValue(true);
+    mockedDisplayIncomingCall.mockResolvedValue(true);
 
     await handleBackgroundPushMessage({
       data: { type: 'incoming_call', callId: 'call-123', callType: 'voice' },
@@ -203,7 +203,7 @@ describe('handleBackgroundPushMessage — incoming_call pipeline', () => {
   });
 
   it('logs CALLKEEP_DISPLAYED_FAILED — not OK — when displayIncomingCall reports failure', async () => {
-    mockedDisplayIncomingCall.mockReturnValue(false);
+    mockedDisplayIncomingCall.mockResolvedValue(false);
 
     await handleBackgroundPushMessage({
       data: { type: 'incoming_call', callId: 'call-456', callType: 'video' },
@@ -221,5 +221,57 @@ describe('handleBackgroundPushMessage — incoming_call pipeline', () => {
     });
 
     expect(mockedDisplayIncomingCall).not.toHaveBeenCalled();
+  });
+
+  // Coverage for FAILURE B's "a call is already ended when a delayed push
+  // arrives" case: a device that was offline (or on a flaky connection)
+  // can receive this push long after the call rang out and was marked
+  // missed server-side. Showing a ring UI for it would present a dead call
+  // as a live incoming one.
+  describe('stale push protection (sentAt / expiresInSeconds)', () => {
+    it('skips displaying the call when sentAt is older than the staleness threshold', async () => {
+      await handleBackgroundPushMessage({
+        data: {
+          type: 'incoming_call',
+          callId: 'call-123',
+          callerName: 'Jane',
+          callType: 'voice',
+          sentAt: String(Date.now() - 80_000), // older than the 75s cutoff
+        },
+      });
+
+      expect(mockedDisplayIncomingCall).not.toHaveBeenCalled();
+      const stages = mockedLogCallDiagnostic.mock.calls.map((c) => c[0].stage);
+      expect(stages).toContain('CALL_PUSH_STALE_SKIPPED');
+      expect(stages).not.toContain('CALLKEEP_REQUESTED');
+    });
+
+    it('still displays the call when sentAt is recent', async () => {
+      mockedDisplayIncomingCall.mockResolvedValue(true);
+
+      await handleBackgroundPushMessage({
+        data: {
+          type: 'incoming_call',
+          callId: 'call-123',
+          callerName: 'Jane',
+          callType: 'voice',
+          sentAt: String(Date.now() - 2_000),
+        },
+      });
+
+      expect(mockedDisplayIncomingCall).toHaveBeenCalledWith(
+        expect.objectContaining({ callUUID: 'call-123' }),
+      );
+    });
+
+    it('still displays the call when sentAt is absent (older server build, fail open)', async () => {
+      mockedDisplayIncomingCall.mockResolvedValue(true);
+
+      await handleBackgroundPushMessage({
+        data: { type: 'incoming_call', callId: 'call-123', callerName: 'Jane', callType: 'voice' },
+      });
+
+      expect(mockedDisplayIncomingCall).toHaveBeenCalled();
+    });
   });
 });

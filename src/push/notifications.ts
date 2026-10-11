@@ -163,6 +163,24 @@ export const handleBackgroundPushMessage = async (remoteMessage: any) => {
       const callId = String(data.callId);
       const callType = String((data.callType as any) ?? 'voice');
       void logCallDiagnostic({ stage: 'CALL_PAYLOAD_PARSED', callId, callType });
+
+      // This is the FCM path only (Android always; iOS only as the
+      // no-VoIP-token fallback) — NOT the iOS PushKit/VoIP path, which is
+      // handled natively in AppDelegate.swift and has no equivalent check:
+      // Apple's PushKit contract requires every VoIP push that arrives to
+      // be reported to CallKit unconditionally, so staleness there can
+      // only be handled server-side (see notifyIncomingCall's
+      // expiresInSeconds). Here, there's no such obligation — skip ringing
+      // for a push that's sat somewhere (a flaky connection, a device that
+      // was offline) long enough that the call would already have hit the
+      // server's 90s ring timeout and been marked missed, so an old call
+      // doesn't get shown as a fresh incoming one. A push with no sentAt
+      // (older server build) is treated as fresh rather than dropped.
+      const sentAtMs = Number(data.sentAt);
+      if (Number.isFinite(sentAtMs) && sentAtMs > 0 && Date.now() - sentAtMs > 75_000) {
+        void logCallDiagnostic({ stage: 'CALL_PUSH_STALE_SKIPPED', callId, callType, detail: `ageMs=${Date.now() - sentAtMs}` });
+        return;
+      }
       // Persist enough of the payload to reconstruct a working call session
       // later, in case the socket's own call.offer never reaches this
       // client (Socket.IO doesn't replay missed room broadcasts to a
@@ -180,7 +198,7 @@ export const handleBackgroundPushMessage = async (remoteMessage: any) => {
         });
       }
       void logCallDiagnostic({ stage: 'CALLKEEP_REQUESTED', callId, callType });
-      const displayed = displayIncomingCall({
+      const displayed = await displayIncomingCall({
         callUUID: callId,
         callerName: String(data.callerName ?? data.fromDisplayName ?? title ?? 'Incoming call'),
         callType: callType as any,

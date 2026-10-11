@@ -16,6 +16,19 @@ export type CallDiagnosticStage =
   | 'CALLKEEP_REQUESTED'
   | 'CALLKEEP_DISPLAYED_OK'
   | 'CALLKEEP_DISPLAYED_FAILED'
+  // Android only — the phone account that backs displayIncomingCall()'s
+  // native ring UI is disabled (user never completed, or dismissed, the
+  // one-time "allow KIS to manage calls" system prompt). Attempted anyway
+  // (so a false negative here doesn't block a call that would've worked),
+  // but recorded before the attempt so a true "never rings" report traces
+  // straight to this instead of looking identical to a lost push/socket
+  // event.
+  | 'CALLKEEP_PHONE_ACCOUNT_DISABLED'
+  // The FCM data-only push for this call arrived long enough after it was
+  // sent (see notifyIncomingCall's expiresInSeconds/sentAt) that the call
+  // would already have hit the server's ring timeout — skipped ringing
+  // rather than show a stale incoming-call UI for a call that's over.
+  | 'CALL_PUSH_STALE_SKIPPED'
   | 'USER_ANSWERED'
   | 'CALL_ENDED';
 
