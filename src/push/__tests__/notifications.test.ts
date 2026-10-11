@@ -25,6 +25,9 @@ jest.mock('@/services/calls/callKitService', () => ({
   callKeepAvailable: true,
   bringCallToForeground: jest.fn(),
 }));
+jest.mock('@/services/calls/incomingCallNotification', () => ({
+  showIncomingCallNotification: jest.fn().mockResolvedValue(true),
+}));
 jest.mock('@/services/calls/callDiagnostics', () => ({ logCallDiagnostic: jest.fn().mockResolvedValue(undefined) }));
 jest.mock('@/security/e2ee', () => ({ ensureDeviceId: jest.fn().mockResolvedValue('device-1') }));
 
@@ -33,6 +36,7 @@ import { postRequest } from '@/network/post';
 import ROUTES from '@/network';
 import { unregisterPushToken, reregisterPushTokensForCurrentUser, handleBackgroundPushMessage } from '../notifications';
 import { displayIncomingCall, bringCallToForeground } from '@/services/calls/callKitService';
+import { showIncomingCallNotification } from '@/services/calls/incomingCallNotification';
 import { logCallDiagnostic } from '@/services/calls/callDiagnostics';
 
 const mockedPostRequest = postRequest as jest.MockedFunction<typeof postRequest>;
@@ -41,6 +45,7 @@ const mockedSetItem = AsyncStorage.setItem as jest.MockedFunction<typeof AsyncSt
 const mockedRemoveItem = AsyncStorage.removeItem as jest.MockedFunction<typeof AsyncStorage.removeItem>;
 const mockedDisplayIncomingCall = displayIncomingCall as jest.MockedFunction<typeof displayIncomingCall>;
 const mockedBringCallToForeground = bringCallToForeground as jest.MockedFunction<typeof bringCallToForeground>;
+const mockedShowIncomingCallNotification = showIncomingCallNotification as jest.MockedFunction<typeof showIncomingCallNotification>;
 const mockedLogCallDiagnostic = logCallDiagnostic as jest.MockedFunction<typeof logCallDiagnostic>;
 
 describe('unregisterPushToken', () => {
@@ -187,8 +192,9 @@ describe('handleBackgroundPushMessage — incoming_call pipeline', () => {
     });
   });
 
-  it('logs the full pipeline stage sequence when CallKeep display succeeds', async () => {
+  it('logs the full pipeline stage sequence when CallKeep display and the full-screen notification both succeed', async () => {
     mockedDisplayIncomingCall.mockResolvedValue(true);
+    mockedShowIncomingCallNotification.mockResolvedValue(true);
 
     await handleBackgroundPushMessage({
       data: { type: 'incoming_call', callId: 'call-123', callType: 'voice' },
@@ -201,6 +207,7 @@ describe('handleBackgroundPushMessage — incoming_call pipeline', () => {
       'CALL_PAYLOAD_PARSED',
       'CALLKEEP_REQUESTED',
       'CALLKEEP_DISPLAYED_OK',
+      'FULLSCREEN_NOTIFICATION_SHOWN',
     ]);
   });
 
@@ -257,6 +264,77 @@ describe('handleBackgroundPushMessage — incoming_call pipeline', () => {
       });
 
       expect(mockedBringCallToForeground).not.toHaveBeenCalled();
+    });
+  });
+
+  // Coverage for the final root-cause fix: bringCallToForeground()'s raw
+  // startActivity() from a non-Activity context is not guaranteed by
+  // Android 10+'s background-activity-launch restrictions. The full-screen-
+  // intent notification is the BAL-exempt mechanism, and must be posted
+  // UNCONDITIONALLY — not gated on displayIncomingCall's own success —
+  // since it's an independent delivery path from Telecom/ConnectionService.
+  describe('showIncomingCallNotification wiring (final incoming-call-UI fix)', () => {
+    it('posts the full-screen notification after a successful display', async () => {
+      mockedDisplayIncomingCall.mockResolvedValue(true);
+
+      await handleBackgroundPushMessage({
+        data: { type: 'incoming_call', callId: 'call-123', callerName: 'Jane', callType: 'video' },
+      });
+
+      expect(mockedShowIncomingCallNotification).toHaveBeenCalledWith({
+        callId: 'call-123',
+        callerName: 'Jane',
+        callType: 'video',
+      });
+    });
+
+    it('still posts the full-screen notification even when native CallKeep display failed — it is an independent delivery path', async () => {
+      mockedDisplayIncomingCall.mockResolvedValue(false);
+
+      await handleBackgroundPushMessage({
+        data: { type: 'incoming_call', callId: 'call-456', callerName: 'Jane', callType: 'voice' },
+      });
+
+      expect(mockedShowIncomingCallNotification).toHaveBeenCalledWith({
+        callId: 'call-456',
+        callerName: 'Jane',
+        callType: 'voice',
+      });
+    });
+
+    it('does not post a full-screen notification for a non-call push', async () => {
+      await handleBackgroundPushMessage({
+        data: { type: 'message', conversationId: 'conv-1' },
+        notification: { title: 'New message', body: 'Hi' },
+      });
+
+      expect(mockedShowIncomingCallNotification).not.toHaveBeenCalled();
+    });
+
+    it('logs FULLSCREEN_NOTIFICATION_FAILED (not SHOWN) when notifee is unavailable or permission was denied', async () => {
+      mockedDisplayIncomingCall.mockResolvedValue(true);
+      mockedShowIncomingCallNotification.mockResolvedValue(false);
+
+      await handleBackgroundPushMessage({
+        data: { type: 'incoming_call', callId: 'call-789', callType: 'voice' },
+      });
+
+      const stages = mockedLogCallDiagnostic.mock.calls.map((c) => c[0].stage);
+      expect(stages).toContain('FULLSCREEN_NOTIFICATION_FAILED');
+      expect(stages).not.toContain('FULLSCREEN_NOTIFICATION_SHOWN');
+    });
+
+    it('does not post the full-screen notification for a stale push', async () => {
+      await handleBackgroundPushMessage({
+        data: {
+          type: 'incoming_call',
+          callId: 'call-stale',
+          callType: 'voice',
+          sentAt: String(Date.now() - 80_000),
+        },
+      });
+
+      expect(mockedShowIncomingCallNotification).not.toHaveBeenCalled();
     });
   });
 

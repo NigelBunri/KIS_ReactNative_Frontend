@@ -6,6 +6,7 @@ import { NEST_API_BASE_URL } from '@/network/config';
 import { routeNotification } from './notificationRouter';
 import { InAppNotificationToastRef } from './InAppNotificationToast';
 import { displayIncomingCall, callKeepAvailable, bringCallToForeground } from '@/services/calls/callKitService';
+import { showIncomingCallNotification } from '@/services/calls/incomingCallNotification';
 import { ensureDeviceId } from '@/security/e2ee';
 import { logCallDiagnostic } from '@/services/calls/callDiagnostics';
 import { dismissAllNotifications } from '@/services/pushNotificationDismissal';
@@ -219,6 +220,27 @@ export const handleBackgroundPushMessage = async (remoteMessage: any) => {
       if (displayed) {
         bringCallToForeground();
       }
+
+      // The actual reliable launch mechanism — see incomingCallNotification
+      // .ts's doc comment for the full evidence trail. backToForeground()'s
+      // raw startActivity() above is NOT guaranteed by Android 10+'s
+      // background-activity-launch restrictions when there's no visible
+      // Activity already (the exact backgrounded/killed case this whole
+      // push path exists for); a full-screen-intent notification is. Posted
+      // unconditionally (not gated on `displayed`) since it's an
+      // independent delivery path from Telecom/ConnectionService — if
+      // native ringing failed but this still shows, the user can still see
+      // and answer the call.
+      const shown = await showIncomingCallNotification({
+        callId,
+        callerName: String(data.callerName ?? data.fromDisplayName ?? title ?? 'Incoming call'),
+        callType: callType as any,
+      });
+      void logCallDiagnostic({
+        stage: shown ? 'FULLSCREEN_NOTIFICATION_SHOWN' : 'FULLSCREEN_NOTIFICATION_FAILED',
+        callId,
+        callType,
+      });
       return;
     }
 

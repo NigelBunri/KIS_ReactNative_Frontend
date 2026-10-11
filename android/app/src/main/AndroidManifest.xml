@@ -30,6 +30,17 @@
     <!-- Wake device for incoming call even on lock screen -->
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.DISABLE_KEYGUARD" />
+    <!-- Required for the incoming-call full-screen-intent notification
+         (src/services/calls/incomingCallNotification.ts) to be allowed to
+         launch MainActivity from the background/killed state — the one
+         Android-sanctioned exemption from Android 10+'s background-
+         activity-launch restrictions for exactly this use case. Normal
+         (not runtime-dangerous) permission on targetSdk <= 33; on
+         targetSdk 34+ (this app targets 36) the OS may additionally
+         require the user to grant it via the dedicated system Settings
+         screen for apps that aren't the default dialer/assistant — see
+         the final report's "Known Android restrictions" section. -->
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
 
     <!-- ─── Telephony / VoIP (react-native-callkeep ConnectionService) ──────── -->
     <!-- READ_PHONE_STATE: required to read current call state                   -->

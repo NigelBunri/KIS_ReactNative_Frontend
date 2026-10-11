@@ -42,6 +42,11 @@ const mockRNCallKeep = {
 
 jest.mock('react-native-callkeep', () => ({ default: mockRNCallKeep }), { virtual: true });
 
+const mockCancelIncomingCallNotification = jest.fn().mockResolvedValue(undefined);
+jest.mock('../incomingCallNotification', () => ({
+  cancelIncomingCallNotification: mockCancelIncomingCallNotification,
+}));
+
 // A minimal, fully-synthetic 'react-native' mock — callKitService.ts only
 // imports { Platform, PermissionsAndroid } from it, so there's no need to
 // pull in jest.requireActual('react-native') (which drags in the real
@@ -113,6 +118,58 @@ describe('callKitService — reportCallEnded native cleanup (Android orphaned-co
 
     expect(mockRNCallKeep.reportEndCallWithUUID).toHaveBeenCalledWith('call-5', 1);
     expect(mockRNCallKeep.endCall).not.toHaveBeenCalled();
+  });
+});
+
+describe('callKitService — cancelIncomingCallNotification wiring (final incoming-call-UI fix)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('reportCallAnswered cancels the full-screen notification for that call', () => {
+    const { reportCallAnswered } = loadServiceForPlatform('android');
+
+    reportCallAnswered('call-6');
+
+    expect(mockCancelIncomingCallNotification).toHaveBeenCalledWith('call-6');
+  });
+
+  it('reportCallEnded cancels the full-screen notification regardless of reason (decline, timeout, remote hangup all call this)', () => {
+    const { reportCallEnded } = loadServiceForPlatform('android');
+
+    reportCallEnded('call-7', 'missed');
+
+    expect(mockCancelIncomingCallNotification).toHaveBeenCalledWith('call-7');
+  });
+
+  it('cancels the notification even when RNCallKeep itself is unavailable — the notification is an independent delivery path', () => {
+    jest.resetModules();
+    jest.doMock('react-native-callkeep', () => {
+      throw new Error('native module not linked');
+    }, { virtual: true });
+    jest.doMock('react-native', () => ({
+      Platform: { OS: 'android', select: (obj: any) => obj.android ?? obj.default },
+      PermissionsAndroid: {
+        request: jest.fn().mockResolvedValue('granted'),
+        requestMultiple: jest.fn().mockResolvedValue({}),
+        PERMISSIONS: { READ_PHONE_STATE: 'READ_PHONE_STATE', RECORD_AUDIO: 'RECORD_AUDIO', CAMERA: 'CAMERA', CALL_PHONE: 'CALL_PHONE' },
+      },
+    }));
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const { reportCallEnded } = require('../callKitService');
+
+      reportCallEnded('call-8', 'ended');
+
+      expect(mockCancelIncomingCallNotification).toHaveBeenCalledWith('call-8');
+    } finally {
+      // jest.doMock's replacement factory (throwing) otherwise persists
+      // for every subsequent require() in this file, not just this test —
+      // restore the normal mock so later tests get the real mockRNCallKeep
+      // instance back.
+      jest.resetModules();
+      jest.doMock('react-native-callkeep', () => ({ default: mockRNCallKeep }), { virtual: true });
+    }
   });
 });
 

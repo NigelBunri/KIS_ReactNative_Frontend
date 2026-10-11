@@ -34,6 +34,7 @@
 import { Platform, PermissionsAndroid } from 'react-native';
 import type { CallType } from './callTypes';
 import { logCallDiagnostic } from './callDiagnostics';
+import { cancelIncomingCallNotification } from './incomingCallNotification';
 
 const CALLKIT_ENABLED = Platform.OS === 'android' ? true : !__DEV__;
 
@@ -368,6 +369,11 @@ export function startOutgoingCall(params: {
 }
 
 export function reportCallAnswered(callUUID: string): void {
+  // Independent of RNCallKeep availability — the full-screen notification
+  // (Android-only, see incomingCallNotification.ts) can exist even on a
+  // build where native CallKeep itself failed to load, so this must not be
+  // short-circuited by the `!RNCallKeep` guard below.
+  void cancelIncomingCallNotification(callUUID);
   if (!RNCallKeep) return;
   try {
     RNCallKeep.setCurrentCallActive(callUUID, true);
@@ -380,6 +386,11 @@ export function reportCallEnded(
   callUUID: string,
   reason: 'ended' | 'missed' | 'rejected' = 'ended',
 ): void {
+  // Same reasoning as reportCallAnswered() — must fire regardless of
+  // whether RNCallKeep itself is available, and covers every exit from
+  // ringing this function is already called for: decline, caller-cancel,
+  // timeout, and remote hangup.
+  void cancelIncomingCallNotification(callUUID);
   if (!RNCallKeep) return;
   const reasonCode = reason === 'missed' ? 2 : reason === 'rejected' ? 6 : 1;
   try {

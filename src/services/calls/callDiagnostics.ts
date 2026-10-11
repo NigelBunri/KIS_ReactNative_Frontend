@@ -38,6 +38,15 @@ export type CallDiagnosticStage =
   // Marks the point this gap closes: the pending payload is reconstructed
   // into a real incoming CallSession and presented proactively.
   | 'CALL_RESUMED_FROM_PENDING_PAYLOAD'
+  // Android only — the full-screen-intent notification (see
+  // incomingCallNotification.ts) that reliably launches MainActivity from a
+  // backgrounded/killed process, independent of Telecom/ConnectionService's
+  // own (BAL-restricted) backToForeground() attempt. FAILED means notifee
+  // was unavailable or POST_NOTIFICATIONS was denied — Telecom's own
+  // ringtone is unaffected either way, but no screen-launch backstop exists
+  // for that call.
+  | 'FULLSCREEN_NOTIFICATION_SHOWN'
+  | 'FULLSCREEN_NOTIFICATION_FAILED'
   | 'USER_ANSWERED'
   | 'CALL_ENDED';
 
