@@ -29,6 +29,15 @@ export type CallDiagnosticStage =
   // would already have hit the server's ring timeout — skipped ringing
   // rather than show a stale incoming-call UI for a call that's over.
   | 'CALL_PUSH_STALE_SKIPPED'
+  // The app came to the foreground (or mounted fresh) while a pending-call
+  // payload was sitting unconsumed — displayIncomingCall()'s native ring
+  // and (Android) bringCallToForeground()'s Activity launch had already
+  // fired, but nothing had yet told React Native to actually render
+  // IncomingCallScreen (that was previously wired only to the native
+  // answer/end events, which never fire without a native UI to tap).
+  // Marks the point this gap closes: the pending payload is reconstructed
+  // into a real incoming CallSession and presented proactively.
+  | 'CALL_RESUMED_FROM_PENDING_PAYLOAD'
   | 'USER_ANSWERED'
   | 'CALL_ENDED';
 

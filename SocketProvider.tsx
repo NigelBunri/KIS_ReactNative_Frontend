@@ -199,6 +199,46 @@ export function resolveEndCallAction(args: {
   return 'endAll';
 }
 
+/**
+ * Pure decision for whether a persisted pending-call payload should be
+ * proactively presented as a live IncomingCallScreen, extracted for
+ * unit-testability. Used when the app becomes active (or mounts) after a
+ * background push already rang the phone and (Android) brought the Activity
+ * forward, but nothing yet told React Native to actually render the call UI —
+ * see the 'Proactive pending-call presentation' effect below for the full
+ * root-cause writeup.
+ */
+export type PendingCallPresentationDecision =
+  | { action: 'skip_active_call' }
+  | { action: 'skip_no_payload' }
+  | { action: 'skip_stale'; ageMs: number }
+  | { action: 'skip_no_user' }
+  | { action: 'present' };
+
+export function decidePendingCallPresentation(args: {
+  hasActiveCall: boolean;
+  pending: { savedAtMs?: number } | null | undefined;
+  nowMs: number;
+  myUserId: string;
+}): PendingCallPresentationDecision {
+  if (args.hasActiveCall) return { action: 'skip_active_call' };
+  if (!args.pending) return { action: 'skip_no_payload' };
+
+  // Matches the server's own 90s ring timeout (cleanupStaleCalls) with a
+  // small margin — a payload older than this would already be marked missed
+  // server-side; presenting it now would show a ringing screen for a call
+  // that's already over. Payloads saved before the savedAtMs field existed
+  // are treated as fresh rather than silently dropped.
+  const ageMs = args.pending.savedAtMs ? args.nowMs - args.pending.savedAtMs : 0;
+  if (ageMs > 95_000) return { action: 'skip_stale', ageMs };
+
+  // Auth/user id not resolved yet — the caller re-runs this once
+  // currentUserId changes, so this isn't a dead end.
+  if (!args.myUserId) return { action: 'skip_no_user' };
+
+  return { action: 'present' };
+}
+
 /* ============================================================================
  * HELPERS
  * ============================================================================ */
@@ -1715,6 +1755,82 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     return () => teardownCallKit();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // ─── Proactive pending-call presentation ──────────────────────────────
+  //
+  // displayIncomingCall() (native ring) and, on Android,
+  // bringCallToForeground() (brings the Activity forward) both already
+  // fire correctly from the background push handler — but neither one, by
+  // itself, causes React Native to actually render IncomingCallScreen. The
+  // only code that ever read the persisted pending-call payload
+  // (resolveSessionForCallKitEvent, above) is wired exclusively to the
+  // native CallKit 'answerCall'/'endCall' events, which require a native
+  // incoming-call UI the user can tap Answer/Decline on. KIS's Android
+  // phone account is registered non-self-managed (CAPABILITY_CALL_PROVIDER)
+  // and the app renders its own call UI entirely in JS, so those native
+  // events never fire on their own — nothing was left to actually present
+  // the screen once the ring started and the Activity came forward. The
+  // phone rang; whatever screen the app happened to be showing before it
+  // was backgrounded just kept showing.
+  //
+  // This closes that gap: whenever the app becomes active (covers both the
+  // bringCallToForeground()-driven case and a plain user tap on the app
+  // icon) AND once on initial mount (covers a genuine cold start, where
+  // AppState's 'change' event — which only fires on a *transition* — never
+  // fires at all for the very first 'active' state), check for a pending
+  // call payload and, if one exists, is still fresh, and there isn't
+  // already an active call session, present it.
+  const tryPresentPendingIncomingCall = useCallback(async () => {
+    // Read once up front rather than inside decidePendingCallPresentation —
+    // activeCallRef may legitimately change between the await below and the
+    // decision, so the decision function takes a snapshot, not the ref.
+    const pending = activeCallRef.current ? null : await getPendingCallPayload();
+    const myUserId = currentUserIdRef.current ?? currentUserId ?? '';
+    const decision = decidePendingCallPresentation({
+      hasActiveCall: !!activeCallRef.current,
+      pending,
+      nowMs: Date.now(),
+      myUserId,
+    });
+
+    if (decision.action === 'skip_stale') {
+      void logCallDiagnostic({
+        stage: 'CALL_PUSH_STALE_SKIPPED',
+        callId: pending?.callId,
+        callType: pending?.callType,
+        detail: `ageMs=${decision.ageMs} source=foreground_resume`,
+      });
+      void clearPendingCallPayload(pending?.callId);
+      return;
+    }
+
+    if (decision.action !== 'present' || !pending) return;
+
+    void logCallDiagnostic({
+      stage: 'CALL_RESUMED_FROM_PENDING_PAYLOAD',
+      callId: pending.callId,
+      callType: pending.callType,
+    });
+    const rebuilt = buildCallSessionFromOfferLike({
+      callId: pending.callId,
+      conversationId: pending.conversationId,
+      callType: pending.callType as CallType,
+      callerName: pending.callerName,
+      fromUserId: pending.fromUserId,
+      myUserId,
+      state: 'incoming',
+    });
+    activeCallRef.current = rebuilt;
+    setActiveCall(rebuilt);
+  }, [currentUserId]);
+
+  useEffect(() => {
+    void tryPresentPendingIncomingCall();
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') void tryPresentPendingIncomingCall();
+    });
+    return () => sub.remove();
+  }, [tryPresentPendingIncomingCall]);
 
   /* ─── Video-call Picture-in-Picture ──────────────────────────────────────── */
   //

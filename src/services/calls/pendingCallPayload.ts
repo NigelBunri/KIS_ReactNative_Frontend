@@ -40,6 +40,16 @@ export type PendingCallPayload = {
   callerName?: string;
   fromUserId?: string;
   title?: string;
+  // Stamped at save time (defaulted below if the caller doesn't pass one) —
+  // lets a consumer that wants to PROACTIVELY show this as a fresh
+  // incoming-call screen (as opposed to just reconstructing state to act on
+  // a native answer/end event the user already triggered) tell "this just
+  // arrived" apart from "this has been sitting here since before the ring
+  // timed out server-side". The answer/end reconstruction path
+  // (resolveSessionForCallKitEvent) deliberately does NOT check this — the
+  // user is already taking an action on a specific native event, which is
+  // authoritative regardless of age.
+  savedAtMs?: number;
 };
 
 const KEY = 'KIS_PENDING_INCOMING_CALL_V1';
@@ -47,7 +57,7 @@ const KEY = 'KIS_PENDING_INCOMING_CALL_V1';
 export async function savePendingCallPayload(payload: PendingCallPayload): Promise<void> {
   if (!payload?.callId || !payload?.conversationId) return;
   try {
-    await AsyncStorage.setItem(KEY, JSON.stringify(payload));
+    await AsyncStorage.setItem(KEY, JSON.stringify({ ...payload, savedAtMs: payload.savedAtMs ?? Date.now() }));
   } catch { /* best-effort — the native-only fallback (iOS UserDefaults) may still have it */ }
 }
 
