@@ -34,7 +34,7 @@ import { useKISTheme } from '@/theme/useTheme';
 import { useResponsiveLayout } from '@/theme/responsive';
 import RichTextRenderer from '@/components/feeds/RichTextRenderer';
 import type { ComponentProps } from 'react';
-import type { BroadcastChannelContent, BroadcastChannelContentAsset, BroadcastChannelSummary } from '@/screens/broadcast/channels/api/channels.types';
+import type { BroadcastChannelContent, BroadcastChannelContentAsset, BroadcastChannelSummary, ChannelContentPoll } from '@/screens/broadcast/channels/api/channels.types';
 import {
   fetchChannelContentDetail,
   fetchWatchHistory,
@@ -51,6 +51,8 @@ import {
   createChannelContentClip,
   fetchContentSubtitles,
   fetchChannelContentChapters,
+  fetchChannelContentPoll,
+  voteChannelContentPoll,
 } from '@/screens/broadcast/channels/hooks/useChannelsData';
 import ChannelCommentsPanel from '@/screens/broadcast/channels/components/ChannelCommentsPanel';
 import ProductTagsDisplay from '@/screens/broadcast/channels/components/ProductTagsDisplay';
@@ -446,6 +448,198 @@ function VideoPlayerControls({
   );
 }
 
+function AudioPlayerControls({
+  content,
+  audioUrl,
+  stageHeight,
+  palette,
+}: {
+  content: BroadcastChannelContent;
+  audioUrl: string;
+  stageHeight: number;
+  palette: any;
+}) {
+  const audioRef = useRef<any>(null);
+  const [paused, setPaused] = useState(true);
+  const [buffering, setBuffering] = useState(true);
+  const [playerReady, setPlayerReady] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(content.duration_seconds ?? 0);
+  const [seeking, setSeeking] = useState(false);
+  const [seekValue, setSeekValue] = useState(0);
+
+  const formatTime = (secs: number) => {
+    const m = Math.floor(secs / 60);
+    const s = Math.floor(secs % 60);
+    return `${m}:${String(s).padStart(2, '0')}`;
+  };
+
+  const primaryTitle = content.first_asset?.caption || content.title || 'Audio broadcast';
+
+  return (
+    <View style={[styles.mediaStage, { backgroundColor: palette.surfaceElevated, height: stageHeight }]}>
+      <LinearGradient colors={[palette.primarySoft, palette.surfaceElevated, palette.surface]} style={StyleSheet.absoluteFillObject} />
+
+      {/* Zero-size — this element exists only for its audio output, same
+          convention as VoiceMessagePlayerContext.tsx's hidden <Video>. All
+          visible playback UI (play/pause bubble + scrubber) below is
+          hand-built around it, mirroring VideoPlayerControls above. */}
+      <Video
+        ref={audioRef}
+        source={{ uri: audioUrl }}
+        paused={paused}
+        onLoad={({ duration: d }) => { setDuration(d); setBuffering(false); setPlayerReady(true); }}
+        onProgress={({ currentTime: t }) => { if (!seeking) setCurrentTime(t); }}
+        onBuffer={({ isBuffering }) => setBuffering(isBuffering)}
+        onEnd={() => { setPaused(true); setCurrentTime(0); audioRef.current?.seek(0); }}
+        style={vstyles.audioHiddenPlayer}
+      />
+
+      <Pressable
+        onPress={() => setPaused(p => !p)}
+        style={[styles.largeIconBubble, { backgroundColor: palette.surface }]}
+      >
+        {buffering && !playerReady ? (
+          <ActivityIndicator color={palette.primaryStrong} />
+        ) : (
+          <KISIcon name={paused ? 'play' : 'pause'} size={36} color={palette.primaryStrong} />
+        )}
+      </Pressable>
+
+      <Text style={[styles.mediaStageTitle, { color: palette.text }]} numberOfLines={2}>{primaryTitle}</Text>
+
+      <View style={vstyles.audioScrubberWrap}>
+        <Text style={[vstyles.timeText, { color: palette.subtext, minWidth: 36 }]}>{formatTime(seeking ? seekValue : currentTime)}</Text>
+        <Slider
+          style={{ flex: 1 }}
+          disabled={!playerReady}
+          minimumValue={0}
+          maximumValue={Math.max(1, duration)}
+          value={seeking ? seekValue : currentTime}
+          minimumTrackTintColor={playerReady ? palette.primaryStrong : palette.divider}
+          maximumTrackTintColor={palette.divider}
+          thumbTintColor={playerReady ? palette.primaryStrong : palette.divider}
+          onSlidingStart={() => { if (!playerReady) return; setSeeking(true); setSeekValue(currentTime); }}
+          onValueChange={v => { if (!playerReady) return; setSeekValue(v); }}
+          onSlidingComplete={v => {
+            if (!playerReady) return;
+            setSeeking(false);
+            audioRef.current?.seek(v);
+            setCurrentTime(v);
+          }}
+        />
+        <Text style={[vstyles.timeText, { color: palette.subtext, minWidth: 36 }]}>{formatTime(duration)}</Text>
+      </View>
+    </View>
+  );
+}
+
+function PollCard({ content }: { content: BroadcastChannelContent }) {
+  const { palette } = useKISTheme();
+  const [poll, setPoll] = useState<ChannelContentPoll | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [voting, setVoting] = useState(false);
+  const [showResults, setShowResults] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+    fetchChannelContentPoll(content.id)
+      .then(next => { if (mounted) setPoll(next); })
+      .finally(() => { if (mounted) setLoading(false); });
+    return () => { mounted = false; };
+  }, [content.id]);
+
+  const handleVote = useCallback(async (optionIndex: number) => {
+    if (voting) return;
+    setVoting(true);
+    try {
+      const res = await voteChannelContentPoll(content.id, optionIndex);
+      if (res?.success) {
+        setPoll(res.data as ChannelContentPoll);
+      } else if (res?.status === 401) {
+        Alert.alert('Log in to vote', 'Please log in to vote in this poll.');
+      } else {
+        Alert.alert('Vote failed', res?.message || 'Unable to submit your vote. Please try again.');
+      }
+    } finally {
+      setVoting(false);
+    }
+  }, [content.id, voting]);
+
+  if (loading) {
+    return (
+      <View style={[styles.mediaStage, { backgroundColor: palette.surfaceElevated, minHeight: 240 }]}>
+        <ActivityIndicator color={palette.primaryStrong} />
+      </View>
+    );
+  }
+
+  if (!poll || !poll.options?.length) {
+    return (
+      <View style={[styles.mediaStage, { backgroundColor: palette.surfaceElevated, minHeight: 240 }]}>
+        <View style={[styles.largeIconBubble, { backgroundColor: palette.surface }]}>
+          <KISIcon name="poll" size={42} color={palette.primaryStrong} />
+        </View>
+        <Text style={[styles.mediaStageTitle, { color: palette.text }]}>Poll unavailable</Text>
+      </View>
+    );
+  }
+
+  const totalVotes = poll.total_votes || 0;
+  const hasVoted = poll.my_vote !== null && poll.my_vote !== undefined;
+  const revealResults = hasVoted || showResults;
+
+  return (
+    <View style={[pollStyles.wrap, { backgroundColor: palette.surfaceElevated, minHeight: 280, paddingTop: 70 }]}>
+      <Text style={[pollStyles.question, { color: palette.text }]}>{poll.question}</Text>
+
+      {poll.options.map(opt => {
+        const pct = totalVotes > 0 ? Math.round((opt.votes / totalVotes) * 100) : 0;
+        const isMine = poll.my_vote === opt.index;
+
+        if (!revealResults) {
+          return (
+            <Pressable
+              key={opt.index}
+              disabled={voting}
+              onPress={() => handleVote(opt.index)}
+              style={[pollStyles.optionRow, { borderColor: palette.border, backgroundColor: palette.surface, opacity: voting ? 0.7 : 1 }]}
+            >
+              <Text style={[pollStyles.optionLabel, { color: palette.text }]}>{opt.label}</Text>
+            </Pressable>
+          );
+        }
+
+        return (
+          <View key={opt.index} style={[pollStyles.resultRow, { borderColor: isMine ? palette.primaryStrong : palette.border, backgroundColor: palette.surface }]}>
+            <View style={[pollStyles.resultBarFill, { width: `${pct}%` as any, backgroundColor: isMine ? palette.primarySoft : palette.bg }]} />
+            <View style={pollStyles.resultLabelRow}>
+              <Text style={[pollStyles.optionLabel, { color: palette.text }]} numberOfLines={1}>
+                {opt.label}{isMine ? '  ✓' : ''}
+              </Text>
+              <Text style={[pollStyles.resultPct, { color: palette.subtext }]}>{pct}%</Text>
+            </View>
+          </View>
+        );
+      })}
+
+      <Text style={[pollStyles.totalVotes, { color: palette.subtext }]}>
+        {totalVotes} {totalVotes === 1 ? 'vote' : 'votes'}
+      </Text>
+
+      {!revealResults ? (
+        <Pressable onPress={() => setShowResults(true)}>
+          <Text style={[pollStyles.toggleLink, { color: palette.primaryStrong }]}>See results without voting</Text>
+        </Pressable>
+      ) : !hasVoted ? (
+        <Pressable onPress={() => setShowResults(false)}>
+          <Text style={[pollStyles.toggleLink, { color: palette.primaryStrong }]}>Back to voting</Text>
+        </Pressable>
+      ) : null}
+    </View>
+  );
+}
+
 function MediaStage({ content, relatedContent }: { content: BroadcastChannelContent; relatedContent?: { id: string; title: string; thumbnail_url?: string; channel?: { name: string } }[] }) {
   const { palette } = useKISTheme();
   const responsive = useResponsiveLayout();
@@ -469,6 +663,17 @@ function MediaStage({ content, relatedContent }: { content: BroadcastChannelCont
   }
 
   if (type === 'audio') {
+    const audioUrl = resolveAssetUrl(primary) || primary?.url || '';
+    if (audioUrl) {
+      return (
+        <AudioPlayerControls
+          content={content}
+          audioUrl={audioUrl}
+          stageHeight={stageHeight}
+          palette={palette}
+        />
+      );
+    }
     return (
       <View style={[styles.mediaStage, { backgroundColor: palette.surfaceElevated, height: stageHeight }]}>
         <LinearGradient colors={[palette.primarySoft, palette.surfaceElevated, palette.surface]} style={StyleSheet.absoluteFillObject} />
@@ -476,6 +681,79 @@ function MediaStage({ content, relatedContent }: { content: BroadcastChannelCont
           <KISIcon name="audio" size={42} color={palette.primaryStrong} />
         </View>
         <Text style={[styles.mediaStageTitle, { color: palette.text }]}>{primary?.caption || content.title || 'Audio broadcast'}</Text>
+        <Text style={[styles.linkUrlText, { color: palette.subtext }]}>Audio file unavailable.</Text>
+      </View>
+    );
+  }
+
+  if (type === 'poll') {
+    return <PollCard content={content} />;
+  }
+
+  if (type === 'link') {
+    // The composer (FeedComposerSheet.tsx) sends a plain `link` string,
+    // which lands directly on metadata.link for content created through a
+    // direct channel-content write, or nested under
+    // metadata.legacy_feed_entry.link for content synced over from the
+    // generic profile-feed composer path (see
+    // channel_content_payload_from_feed_entry on the backend, which
+    // deep-copies the whole composer entry under legacy_feed_entry rather
+    // than promoting link/event to top-level metadata keys). Checking both
+    // shapes means this renders correctly regardless of which path created
+    // the content.
+    const metadata: any = content.metadata || {};
+    const legacyEntry: any = metadata.legacy_feed_entry || {};
+    const linkUrl = String(
+      metadata.link || metadata.link_url || legacyEntry.link || legacyEntry.link_url || '',
+    ).trim();
+    return (
+      <View style={[styles.mediaStage, { backgroundColor: palette.surfaceElevated, height: stageHeight }]}>
+        <LinearGradient colors={[palette.primarySoft, palette.surfaceElevated, palette.surface]} style={StyleSheet.absoluteFillObject} />
+        <View style={[styles.largeIconBubble, { backgroundColor: palette.surface }]}>
+          <KISIcon name="link" size={42} color={palette.primaryStrong} />
+        </View>
+        <Text style={[styles.mediaStageTitle, { color: palette.text }]} numberOfLines={2}>{content.title || 'Shared link'}</Text>
+        {linkUrl ? (
+          <>
+            <Text style={[styles.linkUrlText, { color: palette.subtext }]} numberOfLines={1}>{linkUrl}</Text>
+            <Pressable onPress={() => Linking.openURL(linkUrl)} style={[styles.openFileButton, { backgroundColor: palette.text }]}>
+              <Text style={{ color: palette.surface, fontWeight: '900' }}>Open link</Text>
+            </Pressable>
+          </>
+        ) : (
+          <Text style={[styles.linkUrlText, { color: palette.subtext }]}>Link unavailable.</Text>
+        )}
+      </View>
+    );
+  }
+
+  if (type === 'event') {
+    // Same dual-shape lookup as the link branch above — see that comment.
+    const metadata: any = content.metadata || {};
+    const legacyEntry: any = metadata.legacy_feed_entry || {};
+    const eventMeta = metadata.event || legacyEntry.event || null;
+    const eventTitle = eventMeta?.title || content.title || 'Event';
+    const startsAtRaw = eventMeta?.startsAt || eventMeta?.starts_at || '';
+    const location = eventMeta?.location || '';
+    let startsAtLabel = '';
+    if (startsAtRaw) {
+      const parsed = new Date(startsAtRaw);
+      startsAtLabel = isNaN(parsed.getTime())
+        ? String(startsAtRaw)
+        : parsed.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+    }
+    return (
+      <View style={[styles.mediaStage, { backgroundColor: palette.surfaceElevated, height: stageHeight }]}>
+        <LinearGradient colors={[palette.primarySoft, palette.surfaceElevated, palette.surface]} style={StyleSheet.absoluteFillObject} />
+        <View style={[styles.largeIconBubble, { backgroundColor: palette.surface }]}>
+          <KISIcon name="calendar" size={42} color={palette.primaryStrong} />
+        </View>
+        <Text style={[styles.mediaStageTitle, { color: palette.text }]} numberOfLines={2}>{eventTitle}</Text>
+        {startsAtLabel ? <Text style={[styles.linkUrlText, { color: palette.subtext }]}>{startsAtLabel}</Text> : null}
+        {location ? <Text style={[styles.linkUrlText, { color: palette.subtext }]} numberOfLines={2}>{location}</Text> : null}
+        <Text style={[styles.linkUrlText, { color: palette.subtext, fontSize: 11, marginTop: 12 }]}>
+          RSVP isn't available yet — this is an info-only event card.
+        </Text>
       </View>
     );
   }
@@ -588,6 +866,32 @@ const vstyles = StyleSheet.create({
     position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
     alignItems: 'center', justifyContent: 'center', padding: 24,
   },
+  // Zero-size — exists only for its audio output, same convention as
+  // VoiceMessagePlayerContext.tsx's hidden <Video>.
+  audioHiddenPlayer: { width: 0, height: 0 },
+  audioScrubberWrap: {
+    flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 22, width: '84%',
+  },
+});
+
+const pollStyles = StyleSheet.create({
+  wrap: { paddingHorizontal: 24, paddingBottom: 24, justifyContent: 'center' },
+  question: { fontSize: 18, fontWeight: '900', marginBottom: 16, textAlign: 'center' },
+  optionRow: {
+    borderWidth: 1.5, borderRadius: 12, paddingVertical: 14, paddingHorizontal: 16, marginBottom: 10,
+  },
+  optionLabel: { fontSize: 14, fontWeight: '800' },
+  resultRow: {
+    borderWidth: 1.5, borderRadius: 12, marginBottom: 10, overflow: 'hidden', position: 'relative',
+  },
+  resultBarFill: { position: 'absolute', top: 0, left: 0, bottom: 0 },
+  resultLabelRow: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingVertical: 14, paddingHorizontal: 16, gap: 10,
+  },
+  resultPct: { fontSize: 13, fontWeight: '900' },
+  totalVotes: { fontSize: 12, fontWeight: '700', textAlign: 'center', marginTop: 4 },
+  toggleLink: { fontSize: 12, fontWeight: '800', textAlign: 'center', marginTop: 10 },
 });
 
 export default function ChannelContentDetailPage() {
@@ -1248,6 +1552,8 @@ const styles = StyleSheet.create({
   playBubble: { width: 72, height: 72, borderRadius: 36, backgroundColor: 'rgba(0,0,0,0.42)', alignItems: 'center', justifyContent: 'center' },
   largeIconBubble: { width: 94, height: 94, borderRadius: 47, alignItems: 'center', justifyContent: 'center' },
   mediaStageTitle: { marginTop: 18, fontSize: 18, fontWeight: '900' },
+  linkUrlText: { marginTop: 8, fontSize: 13, fontWeight: '700', textAlign: 'center', paddingHorizontal: 24 },
+  openFileButton: { marginTop: 14, borderRadius: 8, paddingHorizontal: 16, paddingVertical: 10 },
   liveBadge: { position: 'absolute', top: 78, left: 20, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 },
   liveBadgeText: { fontWeight: '900', fontSize: 11, textTransform: 'uppercase' },
   galleryCount: { position: 'absolute', right: 14, bottom: 14, backgroundColor: 'rgba(0,0,0,0.58)', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 },

@@ -24,6 +24,7 @@ export const channelModerationEndpoint = ROUTES.broadcasts.channelModeration;
 export const channelAnalyticsEndpoint = ROUTES.broadcasts.channelAnalytics;
 export const channelBroadcastEndpoint = ROUTES.broadcasts.channelBroadcast;
 export const channelContentReportEndpoint = ROUTES.broadcasts.channelContentReport;
+export const channelContentPollEndpoint = ROUTES.broadcasts.channelContentPoll;
 export const channelContentBroadcastEndpoint = ROUTES.broadcasts.channelContentBroadcast;
 export const channelCommentModerateEndpoint = ROUTES.broadcasts.channelCommentModerate;
 export const channelCommentReactEndpoint = ROUTES.broadcasts.channelCommentReact;
