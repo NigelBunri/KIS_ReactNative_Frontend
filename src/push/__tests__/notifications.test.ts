@@ -23,6 +23,7 @@ jest.mock('../InAppNotificationToast', () => ({ InAppNotificationToastRef: { cur
 jest.mock('@/services/calls/callKitService', () => ({
   displayIncomingCall: jest.fn(),
   callKeepAvailable: true,
+  bringCallToForeground: jest.fn(),
 }));
 jest.mock('@/services/calls/callDiagnostics', () => ({ logCallDiagnostic: jest.fn().mockResolvedValue(undefined) }));
 jest.mock('@/security/e2ee', () => ({ ensureDeviceId: jest.fn().mockResolvedValue('device-1') }));
@@ -31,7 +32,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { postRequest } from '@/network/post';
 import ROUTES from '@/network';
 import { unregisterPushToken, reregisterPushTokensForCurrentUser, handleBackgroundPushMessage } from '../notifications';
-import { displayIncomingCall } from '@/services/calls/callKitService';
+import { displayIncomingCall, bringCallToForeground } from '@/services/calls/callKitService';
 import { logCallDiagnostic } from '@/services/calls/callDiagnostics';
 
 const mockedPostRequest = postRequest as jest.MockedFunction<typeof postRequest>;
@@ -39,6 +40,7 @@ const mockedGetItem = AsyncStorage.getItem as jest.MockedFunction<typeof AsyncSt
 const mockedSetItem = AsyncStorage.setItem as jest.MockedFunction<typeof AsyncStorage.setItem>;
 const mockedRemoveItem = AsyncStorage.removeItem as jest.MockedFunction<typeof AsyncStorage.removeItem>;
 const mockedDisplayIncomingCall = displayIncomingCall as jest.MockedFunction<typeof displayIncomingCall>;
+const mockedBringCallToForeground = bringCallToForeground as jest.MockedFunction<typeof bringCallToForeground>;
 const mockedLogCallDiagnostic = logCallDiagnostic as jest.MockedFunction<typeof logCallDiagnostic>;
 
 describe('unregisterPushToken', () => {
@@ -223,6 +225,41 @@ describe('handleBackgroundPushMessage — incoming_call pipeline', () => {
     expect(mockedDisplayIncomingCall).not.toHaveBeenCalled();
   });
 
+  // Regression coverage for "phone rang audibly but the incoming-call
+  // screen never appeared until the user manually reopened the app": the
+  // Telecom/ConnectionService ring is independent of any UI on Android —
+  // nothing brings the app's Activity forward unless this is called.
+  describe('bringCallToForeground wiring', () => {
+    it('calls bringCallToForeground after a successful display', async () => {
+      mockedDisplayIncomingCall.mockResolvedValue(true);
+
+      await handleBackgroundPushMessage({
+        data: { type: 'incoming_call', callId: 'call-123', callType: 'voice' },
+      });
+
+      expect(mockedBringCallToForeground).toHaveBeenCalledTimes(1);
+    });
+
+    it('does NOT call bringCallToForeground when display itself failed — nothing to bring forward', async () => {
+      mockedDisplayIncomingCall.mockResolvedValue(false);
+
+      await handleBackgroundPushMessage({
+        data: { type: 'incoming_call', callId: 'call-456', callType: 'voice' },
+      });
+
+      expect(mockedBringCallToForeground).not.toHaveBeenCalled();
+    });
+
+    it('does not call bringCallToForeground for a non-call push', async () => {
+      await handleBackgroundPushMessage({
+        data: { type: 'message', conversationId: 'conv-1' },
+        notification: { title: 'New message', body: 'Hi' },
+      });
+
+      expect(mockedBringCallToForeground).not.toHaveBeenCalled();
+    });
+  });
+
   // Coverage for FAILURE B's "a call is already ended when a delayed push
   // arrives" case: a device that was offline (or on a flaky connection)
   // can receive this push long after the call rang out and was marked
@@ -241,6 +278,7 @@ describe('handleBackgroundPushMessage — incoming_call pipeline', () => {
       });
 
       expect(mockedDisplayIncomingCall).not.toHaveBeenCalled();
+      expect(mockedBringCallToForeground).not.toHaveBeenCalled();
       const stages = mockedLogCallDiagnostic.mock.calls.map((c) => c[0].stage);
       expect(stages).toContain('CALL_PUSH_STALE_SKIPPED');
       expect(stages).not.toContain('CALLKEEP_REQUESTED');

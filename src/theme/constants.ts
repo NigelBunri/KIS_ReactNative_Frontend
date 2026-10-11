@@ -621,9 +621,23 @@ export type KISAccentGradients = {
  */
 export const getAccentGradients = (tone: KISTone, accentId: string = DEFAULT_THEME_ID): KISAccentGradients => {
   if (!accentId || accentId === DEFAULT_THEME_ID) {
+    // Fresh tuples, never a direct reference into KIS_ROYAL_GRADIENTS. `as
+    // const` on that object only makes its arrays readonly at the TYPE
+    // level (compile-time) — it does not Object.freeze() them, so at
+    // runtime they're perfectly ordinary mutable arrays. Every consumer of
+    // .tabSelected passes it to LinearGradient's `colors` prop via an `as
+    // unknown as string[]` cast (needed because LinearGradient's prop type
+    // IS mutable string[], unlike this readonly tuple) — that cast also
+    // defeats TypeScript's readonly check for that consumer, so nothing
+    // stops a future in-place mutation (.sort()/.reverse()/index-assign)
+    // from permanently corrupting this shared singleton for every other
+    // consumer, for the rest of the app session, starting from the first
+    // render that triggers it. Returning copies here closes that off at
+    // the single source every consumer goes through, rather than relying
+    // on every current and future call site to remember to copy it first.
     return {
-      header: KIS_ROYAL_GRADIENTS.goldHeader,
-      tabSelected: tone === 'dark' ? (KIS_ROYAL_GRADIENTS.goldDark as any) : (KIS_ROYAL_GRADIENTS.goldLight as any),
+      header: [...KIS_ROYAL_GRADIENTS.goldHeader] as unknown as readonly [string, string, string, string],
+      tabSelected: (tone === 'dark' ? [...KIS_ROYAL_GRADIENTS.goldDark] : [...KIS_ROYAL_GRADIENTS.goldLight]) as unknown as readonly [string, string, string, string],
     };
   }
   const accent = getThemeById(accentId);

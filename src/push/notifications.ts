@@ -5,7 +5,7 @@ import { postRequest } from '@/network/post';
 import { NEST_API_BASE_URL } from '@/network/config';
 import { routeNotification } from './notificationRouter';
 import { InAppNotificationToastRef } from './InAppNotificationToast';
-import { displayIncomingCall, callKeepAvailable } from '@/services/calls/callKitService';
+import { displayIncomingCall, callKeepAvailable, bringCallToForeground } from '@/services/calls/callKitService';
 import { ensureDeviceId } from '@/security/e2ee';
 import { logCallDiagnostic } from '@/services/calls/callDiagnostics';
 import { dismissAllNotifications } from '@/services/pushNotificationDismissal';
@@ -209,6 +209,16 @@ export const handleBackgroundPushMessage = async (remoteMessage: any) => {
         callType,
         detail: displayed ? undefined : (callKeepAvailable ? 'native call returned false' : 'RNCallKeep unavailable'),
       });
+      // Android: the Telecom framework rings the backgrounded/killed device
+      // the instant displayIncomingCall() above succeeds, independent of
+      // any UI — but nothing shows the actual incoming-call screen on its
+      // own (see bringCallToForeground's doc comment). Without this, the
+      // phone rang audibly with no visible UI until the user manually
+      // reopened the app. No-op on iOS, where CallKit already presents the
+      // system lock-screen call UI natively from AppDelegate.swift.
+      if (displayed) {
+        bringCallToForeground();
+      }
       return;
     }
 

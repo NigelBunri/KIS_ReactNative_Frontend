@@ -79,7 +79,7 @@
         android:launchMode="singleTask"
         android:screenOrientation="portrait"
         android:windowSoftInputMode="adjustResize"
-        android:showOnLockScreen="true"
+        android:showWhenLocked="true"
         android:turnScreenOn="true"
         android:supportsPictureInPicture="true"
         android:exported="true">

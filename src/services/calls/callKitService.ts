@@ -387,6 +387,57 @@ export function reportCallEnded(
   } catch (e) {
     logCallKitError(`reportCallEnded callId=${callUUID}`, e);
   }
+  // Android only: react-native-callkeep's Android reportEndCallWithUUID
+  // (VoiceConnection.reportDisconnect) calls Connection.setDisconnected()
+  // but — unlike its iOS counterpart, which fully reports the end through
+  // CXProvider — never calls Connection.destroy() or removes the entry
+  // from VoiceConnectionService's connection map. Every call ever ended
+  // through this path left a permanently "active" native Telecom
+  // connection behind, for the lifetime of the app process. This is the
+  // root cause of calls becoming unable to ring at all after a prior call
+  // ended (a second/third call's telecomManager.addNewIncomingCall() can
+  // be refused while a stale, un-destroyed connection still exists for
+  // the account), recoverable only by fully restarting the app (which
+  // tears down the process-lifetime connection map). RNCallKeep.endCall()
+  // finds the same connection and performs the real
+  // destroy()/deinitConnection() cleanup reportDisconnect skips — safe to
+  // call here even though the connection is already marked disconnected.
+  // Calling it loops back through the native 'endCall' event listener
+  // (onEndCall in SocketProvider.tsx), but that handler is idempotent
+  // (guarded by call state already being terminal), so the redundant
+  // invocation is a safe no-op, not a duplicate side effect.
+  if (Platform.OS === 'android') {
+    try {
+      RNCallKeep.endCall(callUUID);
+    } catch (e) {
+      logCallKitError(`reportCallEnded (native connection cleanup) callId=${callUUID}`, e);
+    }
+  }
+}
+
+/**
+ * Android only. Explicitly brings the app's Activity to the foreground so
+ * the in-app incoming-call screen actually becomes visible.
+ *
+ * On Android, react-native-callkeep's incoming-call UI model relies
+ * entirely on the app rendering its own screen — there is no system call
+ * UI equivalent to iOS CallKit's lock-screen presentation (see
+ * VoiceConnection.onShowIncomingCallUi in the native module, which only
+ * emits a JS event; nothing in this app ever listens for it). The Telecom
+ * framework plays the ringtone for a ringing connection independently of
+ * whether any UI is shown, which is why a backgrounded recipient
+ * previously heard an audible ring with no visible incoming-call screen
+ * until they manually reopened the app. Call this right after a
+ * successful displayIncomingCall() from a background/headless context so
+ * the screen appears immediately, matching the ring.
+ */
+export function bringCallToForeground(): void {
+  if (!RNCallKeep || Platform.OS !== 'android') return;
+  try {
+    RNCallKeep.backToForeground();
+  } catch (e) {
+    logCallKitError('bringCallToForeground', e);
+  }
 }
 
 export function setMuted(callUUID: string, muted: boolean): void {

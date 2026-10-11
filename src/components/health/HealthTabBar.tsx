@@ -53,7 +53,14 @@ export default function HealthTabBar({ palette, badgeColor, tabs, activeTabId, o
               onPress={() => onChange(tab.id)}
               left={
                 tab.icon ? (
-                  <KISIcon name={tab.icon as any} size={13} color={isActive ? undefined : palette.subtext} />
+                  // Explicit color for both states — `undefined` on active
+                  // left the icon with no color prop at all, falling back to
+                  // KISIcon's own default rather than a color readable
+                  // against the selected pill's gold fill. White matches
+                  // KISButton's own primary-variant text color (onGold) for
+                  // the same pill, which HealthThemeColors has no equivalent
+                  // token for.
+                  <KISIcon name={tab.icon as any} size={13} color={isActive ? '#FFFFFF' : palette.subtext} />
                 ) : undefined
               }
               title={tab.label}
