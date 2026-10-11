@@ -24,13 +24,14 @@ type ContentRow = {
   title: string;
   impressions: number;
   views: number;
-  ctr_percent: number;
+  ctr_percent: number | null;
 };
 
 type ImpressionsData = {
   total_impressions?: number;
   total_views?: number;
-  ctr_percent?: number;
+  ctr_percent?: number | null;
+  has_impression_data?: boolean;
   avg_watch_time_seconds?: number;
   by_content?: ContentRow[];
 };
@@ -98,7 +99,11 @@ export default function ImpressionsAnalyticsPanel({ channelId }: Props) {
     },
     {
       label: 'CTR',
-      primary: fmtCtr(data?.ctr_percent ?? 0),
+      // Impression tracking isn't wired up yet (needs a client-reported
+      // "card was actually shown" event, not something the backend can
+      // infer) - showing a confident "0.0%" here would read as "nobody
+      // clicks your content" rather than "we aren't measuring this yet".
+      primary: data?.has_impression_data ? fmtCtr(data.ctr_percent ?? 0) : 'No data yet',
     },
     {
       label: 'Avg Watch Time',
@@ -187,7 +192,7 @@ export default function ImpressionsAnalyticsPanel({ channelId }: Props) {
                 {row.views.toLocaleString()}
               </Text>
               <Text style={[styles.tableCell, styles.ctrCell, { color: palette.primaryStrong }]}>
-                {fmtCtr(row.ctr_percent)}
+                {row.ctr_percent === null ? '—' : fmtCtr(row.ctr_percent)}
               </Text>
             </View>
           ))}

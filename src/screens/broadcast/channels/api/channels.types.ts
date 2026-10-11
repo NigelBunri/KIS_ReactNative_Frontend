@@ -157,6 +157,19 @@ export type ChannelContentComment = {
 };
 
 
+export type ChannelContentPollOption = {
+  index: number;
+  label: string;
+  votes: number;
+};
+
+export type ChannelContentPoll = {
+  question: string;
+  options: ChannelContentPollOption[];
+  total_votes: number;
+  my_vote: number | null;
+};
+
 export type ChannelContentChapter = {
   id: string;
   content?: string;

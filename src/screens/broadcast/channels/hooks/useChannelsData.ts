@@ -28,6 +28,7 @@ import {
   channelCommentReactEndpoint,
   channelCommentPinEndpoint,
   channelContentReportEndpoint,
+  channelContentPollEndpoint,
   channelBroadcastEndpoint,
   channelContentBroadcastEndpoint,
   channelModerationActionEndpoint,
@@ -74,6 +75,7 @@ import type {
   ChannelAnalyticsSummary,
   ChannelModerationRecord,
   ChannelContentChapter,
+  ChannelContentPoll,
 } from '@/screens/broadcast/channels/api/channels.types';
 
 type Params = {
@@ -415,6 +417,24 @@ export const reportChannel = async (channelId: string, reason: string) => {
 export const reportChannelContent = async (contentId: string, reason: string) => {
   const response = await postRequest(channelContentReportEndpoint(contentId), { reason }, { errorMessage: 'Unable to report content.' });
   return response?.success ? response.data : null;
+};
+
+// Poll results (GET, works for anonymous viewers too) + vote (POST, needs
+// auth — returns status 401 if not logged in, which the caller should
+// handle by prompting the user to log in rather than showing a generic
+// error).
+export const fetchChannelContentPoll = async (contentId: string): Promise<ChannelContentPoll | null> => {
+  const response = await getRequest(channelContentPollEndpoint(contentId), { errorMessage: 'Unable to load poll.' });
+  if (!response?.success) return null;
+  return response.data ?? null;
+};
+
+export const voteChannelContentPoll = async (contentId: string, optionIndex: number) => {
+  return postRequest(
+    channelContentPollEndpoint(contentId),
+    { option_index: optionIndex },
+    { errorMessage: 'Unable to submit your vote.' },
+  );
 };
 
 export const updateChannelDetail = async (

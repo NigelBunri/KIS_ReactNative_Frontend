@@ -549,6 +549,11 @@ const broadcastRoutes = {
       `${API_BASE_URL}/api/v1/broadcasts/channel-contents/${contentId}/view/`,
     channelContentReport: (contentId: string) =>
       `${API_BASE_URL}/api/v1/broadcasts/channel-contents/${contentId}/report/`,
+    // Poll results (GET, AllowAny) + vote (POST, requires auth) for
+    // content_type="poll" ChannelContent items — see apps.broadcasts.views
+    // ChannelContentPollView on the backend.
+    channelContentPoll: (contentId: string) =>
+      `${API_BASE_URL}/api/v1/broadcasts/channel-contents/${contentId}/poll/`,
     channelContentBroadcast: (contentId: string) =>
       `${API_BASE_URL}/api/v1/broadcasts/channel-contents/${contentId}/broadcast/`,
     channelContentComments: (contentId: string) =>
