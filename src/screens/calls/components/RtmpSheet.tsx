@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { KISIcon } from '@/constants/kisIcons';
+import KISButton from '@/constants/KISButton';
 import { useKISTheme } from '@/theme/useTheme';
 import { useSafeTopInset } from '@/hooks/useSafeTopInset';
 
@@ -86,19 +87,20 @@ export default function RtmpSheet({ visible, onClose, rtmpActive, rtmpUrl, onSta
         </View>
 
         {rtmpActive ? (
-          <Pressable onPress={onStop} style={[styles.btn, { backgroundColor: palette.danger }]}>
-            <KISIcon name="stop-circle" size={18} color={palette.ivory} />
-            <Text style={[styles.btnText, { color: palette.ivory }]}>Stop streaming</Text>
-          </Pressable>
+          <KISButton
+            title="Stop streaming"
+            variant="danger"
+            left={<KISIcon name="stop-circle" size={18} color={palette.ivory} />}
+            onPress={onStop}
+          />
         ) : (
-          <Pressable
-            onPress={() => { if (url.trim().startsWith('rtmp')) onStart(url.trim()); }}
+          <KISButton
+            title="Go live"
+            variant="danger"
+            left={<KISIcon name="radio" size={18} color={palette.ivory} />}
             disabled={!url.trim().startsWith('rtmp')}
-            style={[styles.btn, { backgroundColor: url.trim().startsWith('rtmp') ? palette.danger : `${palette.danger}40` }]}
-          >
-            <KISIcon name="radio" size={18} color={palette.ivory} />
-            <Text style={[styles.btnText, { color: palette.ivory }]}>Go live</Text>
-          </Pressable>
+            onPress={() => { if (url.trim().startsWith('rtmp')) onStart(url.trim()); }}
+          />
         )}
       </View>
     </Animated.View>
@@ -121,6 +123,4 @@ const styles = StyleSheet.create({
   input: { borderWidth: 1, borderRadius: 12, padding: 13, fontSize: 13 },
   note: { borderWidth: 1, borderRadius: 12, padding: 12, flexDirection: 'row', gap: 8 },
   noteText: { flex: 1, fontSize: 12, lineHeight: 18 },
-  btn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 28, paddingVertical: 14 },
-  btnText: { fontSize: 15, fontWeight: '900' },
 });

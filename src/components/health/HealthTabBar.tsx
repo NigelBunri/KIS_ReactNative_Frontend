@@ -1,6 +1,7 @@
 import React from 'react';
-import { View, Text, Pressable, ScrollView } from 'react-native';
+import { View, Text, ScrollView } from 'react-native';
 import { KISIcon } from '@/constants/kisIcons';
+import KISButton from '@/constants/KISButton';
 import { HealthThemeColors, HEALTH_THEME_SPACING } from '@/theme/health';
 
 export type HealthTab = {
@@ -20,12 +21,16 @@ type HealthTabBarProps = {
 };
 
 /**
- * Single shared horizontal tab bar for the health provider screens —
- * filled-pill active state (closer to Practo's segmented nav than a text
- * underline), compact footprint. Replaces both screens' previously
- * separate, visually inconsistent tab bar implementations.
+ * Single shared horizontal tab bar for the health provider screens, built
+ * on the app's one standard KISButton (primary = selected, outline =
+ * unselected) per the app-wide button-consistency pass — same selection
+ * look every other tab/segmented control in the app now uses, instead of
+ * this bar's own previously bespoke accent-tinted pill. accentColor/
+ * badgeColor are kept as props only for the badge-count dot (KISButton has
+ * no native badge slot), not for the tab's own selected/unselected fill
+ * anymore.
  */
-export default function HealthTabBar({ palette, accentColor, badgeColor, tabs, activeTabId, onChange }: HealthTabBarProps) {
+export default function HealthTabBar({ palette, badgeColor, tabs, activeTabId, onChange }: HealthTabBarProps) {
   return (
     <ScrollView
       horizontal
@@ -39,37 +44,26 @@ export default function HealthTabBar({ palette, accentColor, badgeColor, tabs, a
     >
       {tabs.map((tab) => {
         const isActive = activeTabId === tab.id;
+        const hasBadge = typeof tab.badgeCount === 'number' && tab.badgeCount > 0;
         return (
-          <Pressable
-            key={tab.id}
-            onPress={() => onChange(tab.id)}
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              gap: 6,
-              borderWidth: 1.5,
-              borderColor: isActive ? accentColor : palette.divider,
-              backgroundColor: isActive ? accentColor + '1F' : palette.surface,
-              borderRadius: 999,
-              paddingHorizontal: 12,
-              paddingVertical: 6,
-            }}
-          >
-            {tab.icon ? (
-              <KISIcon name={tab.icon as any} size={13} color={isActive ? accentColor : palette.subtext} />
-            ) : null}
-            <Text
-              style={{
-                color: isActive ? accentColor : palette.subtext,
-                fontWeight: '800',
-                fontSize: 12,
-              }}
-            >
-              {tab.label}
-            </Text>
-            {typeof tab.badgeCount === 'number' && tab.badgeCount > 0 ? (
+          <View key={tab.id} style={{ position: 'relative' }}>
+            <KISButton
+              size="xs"
+              variant={isActive ? 'primary' : 'outline'}
+              onPress={() => onChange(tab.id)}
+              left={
+                tab.icon ? (
+                  <KISIcon name={tab.icon as any} size={13} color={isActive ? undefined : palette.subtext} />
+                ) : undefined
+              }
+              title={tab.label}
+            />
+            {hasBadge ? (
               <View
                 style={{
+                  position: 'absolute',
+                  top: -4,
+                  right: -4,
                   width: 16,
                   height: 16,
                   borderRadius: 8,
@@ -81,7 +75,7 @@ export default function HealthTabBar({ palette, accentColor, badgeColor, tabs, a
                 <Text style={{ color: '#FFFFFF', fontWeight: '900', fontSize: 9 }}>{tab.badgeCount}</Text>
               </View>
             ) : null}
-          </Pressable>
+          </View>
         );
       })}
     </ScrollView>

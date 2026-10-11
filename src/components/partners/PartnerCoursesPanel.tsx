@@ -495,29 +495,14 @@ export default function PartnerCoursesPanel({
         {courseOptions.map((course) => {
           const selected = selectedCourseId === course.id;
           return (
-            <Pressable
+            <KISButton
               key={course.id}
+              variant={selected ? 'primary' : 'outline'}
+              size="sm"
               onPress={() => onSelectCourse(course.id)}
-              style={{
-                borderWidth: 1,
-                borderColor: selected ? palette.accentPrimary : palette.divider,
-                backgroundColor: selected ? `${palette.accentPrimary}22` : palette.surface,
-                borderRadius: 999,
-                paddingHorizontal: 12,
-                paddingVertical: 8,
-              }}
-            >
-              <Text
-                numberOfLines={1}
-                style={{
-                  color: selected ? palette.accentPrimary : palette.text,
-                  fontWeight: selected ? '800' : '700',
-                  maxWidth: 180,
-                }}
-              >
-                {course.title || course.id}
-              </Text>
-            </Pressable>
+              title={course.title || course.id}
+              textStyle={{ maxWidth: 180 }}
+            />
           );
         })}
       </ScrollView>

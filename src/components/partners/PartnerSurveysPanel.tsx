@@ -10,6 +10,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Animated, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import styles from '@/components/partners/partnersStyles';
 import { useKISTheme } from '@/theme/useTheme';
+import KISButton from '@/constants/KISButton';
 import ROUTES from '@/network';
 import { getRequest } from '@/network/get';
 import { postRequest } from '@/network/post';
@@ -373,13 +374,14 @@ export default function PartnerSurveysPanel({ isOpen, panelWidth, panelTranslate
                         {q.options.map((opt) => {
                           const selected = answers[q.id]?.choice_id === opt.id;
                           return (
-                            <Pressable
+                            <KISButton
                               key={opt.id}
+                              variant={selected ? 'primary' : 'outline'}
+                              size="sm"
                               onPress={() => setAnswer(q.id, { choice_id: opt.id })}
-                              style={{ paddingVertical: 8, paddingHorizontal: 12, borderRadius: 8, borderWidth: 1, borderColor: selected ? palette.primary : palette.borderMuted }}
-                            >
-                              <Text style={{ color: selected ? palette.primary : palette.text, fontSize: 13 }}>{opt.label}</Text>
-                            </Pressable>
+                              title={opt.label}
+                              style={{ alignSelf: 'flex-start' }}
+                            />
                           );
                         })}
                       </View>
@@ -388,13 +390,14 @@ export default function PartnerSurveysPanel({ isOpen, panelWidth, panelTranslate
                         {q.options.map((opt) => {
                           const selected = (answers[q.id]?.choice_ids ?? []).includes(opt.id);
                           return (
-                            <Pressable
+                            <KISButton
                               key={opt.id}
+                              variant={selected ? 'primary' : 'outline'}
+                              size="sm"
                               onPress={() => toggleMultiChoice(q.id, opt.id)}
-                              style={{ paddingVertical: 8, paddingHorizontal: 12, borderRadius: 8, borderWidth: 1, borderColor: selected ? palette.primary : palette.borderMuted }}
-                            >
-                              <Text style={{ color: selected ? palette.primary : palette.text, fontSize: 13 }}>{selected ? '☑' : '☐'} {opt.label}</Text>
-                            </Pressable>
+                              title={`${selected ? '☑' : '☐'} ${opt.label}`}
+                              style={{ alignSelf: 'flex-start' }}
+                            />
                           );
                         })}
                       </View>

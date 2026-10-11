@@ -34,6 +34,8 @@ import { useStatusBarStyle } from '../../theme/useStatusBarStyle';
 import { useResponsiveLayout } from '../../theme/responsive';
 import { ChatsTab } from '@/Module/ChatRoom/componets/MessageTabs';
 import { KISIcon } from '@/constants/kisIcons';
+import KISFab from '@/components/KISFab';
+import KISButton from '@/constants/KISButton';
 import AddContactsPage from '@/Module/AddContacts/AddContactsPage';
 import ChatRoomPage, { type AttachmentFilePayload } from '@/Module/ChatRoom/ChatRoomPage';
 import { CameraCaptureModal } from '@/Module/ChatRoom/componets/main/CameraCaptureModal';
@@ -1799,14 +1801,14 @@ const handleSelectAllChats = useCallback(() => {
   });
 
   // Custom pill-style bar instead of MaterialTopTabBar's default underline
-  // indicator + plain label — the active tab gets the same gold-gradient
-  // fill used for every other "selected" affordance in this app (Calls'
-  // join button, Communities' Feed/Groups segmented control), so this bar
-  // reads as one consistent design language instead of a bare stock tab
-  // strip. tabBarIcon still comes from each Tab.Screen's own options, same
+  // indicator + plain label — each tab is a real KISButton (primary variant
+  // when selected, outline when not), the app's one standard button style
+  // used for both states of any selection control, per the app-wide button
+  // consistency pass. Icon-only (no label) to fit four tabs comfortably;
+  // route name is still exposed via accessibilityLabel for screen readers.
+  // tabBarIcon still comes from each Tab.Screen's own options, same
   // signature MaterialTopTabBar would have called it with, so no changes
   // needed there.
-  const topTabLabelSize = responsive.isWatch ? 9 : responsive.isCompactPhone ? 10 : 11;
   const AnimatedTopBar = (tabProps: any) => {
     const { state, descriptors, navigation } = tabProps;
     const nextTab = state?.routes?.[state.index]?.name;
@@ -1841,59 +1843,34 @@ const handleSelectAllChats = useCallback(() => {
           {state.routes.map((route: { key: string; name: string }, index: number) => {
             const { options } = descriptors[route.key];
             const isFocused = state.index === index;
-            // messageGoldGradient runs from bright gold to notably dark
-            // (see its shade() stops in theme/constants.ts) across this
-            // bar's full width, so no single flat tint reads well against
-            // every tab's position in it — a dark tint (this used to be
-            // rgba(23,17,31,0.62)) disappears wherever a tab happens to
-            // fall over the gradient's brighter end. White text plus a
-            // dark text shadow (below) reads correctly regardless of which
-            // part of the gradient sits behind it; the active tab's own
-            // opaque dark pill makes this moot for it specifically, but
-            // using the same scheme for both keeps one consistent rule.
-            const tintColor = isFocused ? palette.onGold : 'rgba(255,255,255,0.82)';
+            // Unselected tabs need a tint readable against the gold header
+            // gradient behind them (white, with a dark text shadow below);
+            // the selected tab's own opaque KISButton primary fill makes
+            // this moot for it specifically - its icon/text color is
+            // whatever createButtonStyles' primary variant defines.
+            const tintColor = 'rgba(255,255,255,0.82)';
             const onPress = () => {
               const event = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
               if (!isFocused && !event.defaultPrevented) {
                 navigation.navigate(route.name);
               }
             };
+            const label = typeof options.tabBarLabel === 'string' ? options.tabBarLabel : route.name;
             return (
-              <Pressable
+              <KISButton
                 key={route.key}
                 onPress={onPress}
-                style={({ pressed }) => [
-                  {
-                    flex: 1,
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: 5,
-                    minHeight: 34,
-                    borderRadius: 999,
-                    overflow: 'hidden',
-                  },
-                  pressed && !isFocused && { backgroundColor: 'rgba(255,255,255,0.10)' },
-                ]}
+                variant={isFocused ? 'primary' : 'outline'}
+                size="xs"
+                style={{ flex: 1 }}
+                accessibilityLabel={label}
               >
-                {isFocused ? (
-                  <View style={[StyleSheet.absoluteFill, { backgroundColor: palette.royalInk }]} />
-                ) : null}
-                {options.tabBarIcon?.({ focused: isFocused, color: tintColor, size: 15 })}
-                <Text
-                  numberOfLines={1}
-                  style={{
-                    color: tintColor,
-                    fontWeight: '700',
-                    fontSize: topTabLabelSize,
-                    textShadowColor: 'rgba(0,0,0,0.45)',
-                    textShadowOffset: { width: 0, height: 1 },
-                    textShadowRadius: 2,
-                  }}
-                >
-                  {typeof options.tabBarLabel === 'string' ? options.tabBarLabel : route.name}
-                </Text>
-              </Pressable>
+                {options.tabBarIcon?.({
+                  focused: isFocused,
+                  color: isFocused ? palette.onGold : tintColor,
+                  size: 20,
+                })}
+              </KISButton>
             );
           })}
         </View>
@@ -2729,51 +2706,19 @@ const handleOpenChatFromAddContacts = useCallback((chat: Chat) => {
           />
         </Tab.Navigator>
 
-        {/* 🔵 Suspended "Add" button (FAB) */}
+        {/* Suspended "Add" button - the app's reference KISFab design */}
         {activeTopTab === 'Chats' ? (
-          <Pressable
+          <KISFab
+            icon="add"
             onPress={() => openAddContacts('list')}
-            style={({ pressed }) => [
-              {
-                position: 'absolute',
-                right: responsive.pageGutter,
-                bottom: (responsive.isWatch ? 10 : 16) + 64, // 64-ish to sit above bottom tab bar
-                width: messageFabSize,
-                height: messageFabSize,
-                borderRadius: messageFabSize / 2,
-                alignItems: 'center',
-                justifyContent: 'center',
-                backgroundColor: palette.goldDeep,
-                shadowColor: palette.goldDeep,
-                shadowOpacity: 0.34,
-                shadowRadius: 10,
-                shadowOffset: { width: 0, height: 5 },
-                elevation: 7,
-                overflow: 'hidden',
-              },
-              pressed && { opacity: KIS_TOKENS.opacity.pressed },
-            ]}
-          >
-            <LinearGradient
-              colors={messageGoldGradient as string[]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={StyleSheet.absoluteFillObject}
-            />
-            <View
-              pointerEvents="none"
-              style={{
-                position: 'absolute',
-                top: -8,
-                bottom: -8,
-                left: 6,
-                width: 16,
-                backgroundColor: 'rgba(255,255,255,0.18)',
-                transform: [{ rotate: '-18deg' }],
-              }}
-            />
-            <KISIcon name="add" size={24} color={palette.ivory} />
-          </Pressable>
+            size={messageFabSize}
+            accessibilityLabel={translateString('Add contact')}
+            style={{
+              position: 'absolute',
+              right: responsive.pageGutter,
+              bottom: (responsive.isWatch ? 10 : 16) + 64, // 64-ish to sit above bottom tab bar
+            }}
+          />
         ) : null}
       </View>
 

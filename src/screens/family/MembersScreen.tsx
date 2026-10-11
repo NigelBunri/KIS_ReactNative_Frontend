@@ -19,6 +19,7 @@ import { getRequest } from '@/network/get';
 import { postRequest } from '@/network/post';
 import ROUTES from '@/network';
 import { KISIcon } from '@/constants/kisIcons';
+import KISFab from '@/components/KISFab';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'FamilyMembers'>;
 
@@ -152,13 +153,7 @@ export default function MembersScreen({ navigation }: Props) {
       />
 
       {/* FAB */}
-      <TouchableOpacity
-        style={[styles.fab, { backgroundColor: palette.gold }]}
-        onPress={handleAddMember}
-        activeOpacity={0.85}
-      >
-        <KISIcon name="person-add-outline" size={24} color={palette.bg} />
-      </TouchableOpacity>
+      <KISFab icon="person-add-outline" iconSize={24} onPress={handleAddMember} style={styles.fab} />
     </SafeAreaView>
   );
 }
@@ -210,15 +205,5 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: 28,
     right: 24,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    alignItems: 'center',
-    justifyContent: 'center',
-    elevation: 6,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.2,
-    shadowRadius: 6,
   },
 });

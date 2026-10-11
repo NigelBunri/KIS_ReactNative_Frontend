@@ -1005,14 +1005,13 @@ export function FeedManagementModal(props: FeedManagementModalProps) {
                     ).toUpperCase()}
                   </Text>
                 </View>
-                <Pressable
+                <KISButton
+                  variant="ghost"
                   onPress={() =>
                     setPanelFeedExistingAttachments(prev =>
                       prev.filter((_, idx) => idx !== index),
                     )
                   }
-                  hitSlop={8}
-                  style={{ minHeight: 44, justifyContent: 'center' }}
                 >
                   <Text
                     style={[
@@ -1022,7 +1021,7 @@ export function FeedManagementModal(props: FeedManagementModalProps) {
                   >
                     Remove
                   </Text>
-                </Pressable>
+                </KISButton>
               </View>
             ))}
           </View>
@@ -1067,11 +1066,7 @@ export function FeedManagementModal(props: FeedManagementModalProps) {
                     {asset.type ?? 'file'}
                   </Text>
                 </View>
-                <Pressable
-                  onPress={() => removeTemporaryFeedAsset(index)}
-                  hitSlop={8}
-                  style={{ minHeight: 44, justifyContent: 'center' }}
-                >
+                <KISButton variant="ghost" onPress={() => removeTemporaryFeedAsset(index)}>
                   <Text
                     style={[
                       modalStyles.attachmentRemoveText,
@@ -1080,7 +1075,7 @@ export function FeedManagementModal(props: FeedManagementModalProps) {
                   >
                     Remove
                   </Text>
-                </Pressable>
+                </KISButton>
               </View>
             ))}
           </View>
@@ -1097,28 +1092,13 @@ export function FeedManagementModal(props: FeedManagementModalProps) {
           {FEED_MEDIA_TYPES.map(type => {
             const selected = panelFeedMediaType === type;
             return (
-              <Pressable
+              <KISButton
                 key={type}
+                title={type}
+                size="xs"
+                variant={selected ? 'primary' : 'outline'}
                 onPress={() => setPanelFeedMediaType(type)}
-                style={[
-                  modalStyles.mediaTypePill,
-                  {
-                    backgroundColor: selected
-                      ? palette.primarySoft
-                      : palette.surface,
-                    borderColor: selected ? palette.primary : palette.divider,
-                  },
-                ]}
-              >
-                <Text
-                  style={{
-                    color: selected ? palette.primaryStrong : palette.subtext,
-                    fontWeight: '800',
-                  }}
-                >
-                  {type}
-                </Text>
-              </Pressable>
+              />
             );
           })}
         </ScrollView>
@@ -1622,26 +1602,8 @@ const StyleChip: React.FC<{
   active: boolean;
   onPress: () => void;
   palette: KISPalette;
-}> = ({ label, active, onPress, palette }) => (
-  <Pressable
-    onPress={onPress}
-    style={[
-      modalStyles.styleChip,
-      {
-        backgroundColor: active ? palette.primarySoft : palette.surface,
-        borderColor: active ? palette.primary : palette.divider,
-      },
-    ]}
-  >
-    <Text
-      style={{
-        color: active ? palette.primaryStrong : palette.subtext,
-        fontWeight: '600',
-      }}
-    >
-      {label}
-    </Text>
-  </Pressable>
+}> = ({ label, active, onPress }) => (
+  <KISButton title={label} size="xs" variant={active ? 'primary' : 'outline'} onPress={onPress} />
 );
 
 const ColorDot: React.FC<{
@@ -2001,16 +1963,6 @@ const modalStyles = StyleSheet.create({
   mediaTypeScroll: {
     marginTop: 2,
   },
-  mediaTypePill: {
-    borderWidth: 1,
-    borderRadius: 999,
-    paddingHorizontal: 15,
-    paddingVertical: 8,
-    marginRight: 8,
-    minHeight: 44,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
   formActions: {
     marginTop: 10,
     gap: 8,
@@ -2066,15 +2018,6 @@ const modalStyles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: 8,
     marginTop: 6,
-  },
-  styleChip: {
-    borderWidth: 1,
-    borderRadius: 999,
-    paddingHorizontal: 13,
-    paddingVertical: 7,
-    minHeight: 44,
-    justifyContent: 'center',
-    alignItems: 'center',
   },
   colorRow: {
     flexDirection: 'row',

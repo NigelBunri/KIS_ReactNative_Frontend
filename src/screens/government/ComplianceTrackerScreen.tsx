@@ -23,6 +23,7 @@ import { postRequest } from '@/network/post';
 import ROUTES from '@/network';
 import { KISIcon } from '@/constants/kisIcons';
 import KISButton from '@/constants/KISButton';
+import KISFab from '@/components/KISFab';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ComplianceTracker'>;
 
@@ -269,14 +270,7 @@ export default function ComplianceTrackerScreen(_props: Props) {
         )}
       </ScrollView>
 
-      {/* FAB */}
-      <TouchableOpacity
-        activeOpacity={0.85}
-        style={[styles.fab, { backgroundColor: palette.primary }]}
-        onPress={() => setShowAddModal(true)}
-      >
-        <KISIcon name="add" size={28} color={palette.ivory} />
-      </TouchableOpacity>
+      <KISFab icon="add" onPress={() => setShowAddModal(true)} style={styles.fab} />
 
       {/* Add Deadline Modal */}
       <Modal
@@ -441,16 +435,6 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: 28,
     right: 20,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    alignItems: 'center',
-    justifyContent: 'center',
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOpacity: 0.2,
-    shadowOffset: { width: 0, height: 2 },
-    shadowRadius: 4,
   },
   modalHeader: {
     flexDirection: 'row',

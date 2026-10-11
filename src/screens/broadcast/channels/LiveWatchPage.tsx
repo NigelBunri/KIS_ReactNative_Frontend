@@ -34,6 +34,7 @@ import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { KISIcon } from '@/constants/kisIcons';
+import KISButton from '@/constants/KISButton';
 import { resolveBackendAssetUrl } from '@/network';
 import type { RootStackParamList } from '@/navigation/types';
 import { useKISTheme } from '@/theme/useTheme';
@@ -564,30 +565,27 @@ export default function LiveWatchPage() {
               { key: 'chat',  label: 'Chat',  icon: 'comment'  },
               { key: 'polls', label: 'Polls', icon: 'list'     },
               { key: 'qa',    label: 'Q&A',   icon: 'audio'    },
-            ] as const).map(tab => (
-              <Pressable
-                key={tab.key}
-                onPress={() => { setActivePanel(tab.key); setChatOpen(true); }}
-                style={[
-                  styles.panelTab,
-                  activePanel === tab.key && styles.panelTabActive,
-                ]}
-              >
-                <KISIcon
-                  name={tab.icon}
-                  size={13}
-                  color={activePanel === tab.key ? palette.primaryStrong : palette.divider}
+            ] as const).map(tab => {
+              const active = activePanel === tab.key;
+              return (
+                <KISButton
+                  key={tab.key}
+                  variant={active ? 'primary' : 'outline'}
+                  size="xs"
+                  onPress={() => { setActivePanel(tab.key); setChatOpen(true); }}
+                  style={{ flex: 1, borderRadius: 0, paddingHorizontal: 4 }}
+                  left={
+                    <KISIcon
+                      name={tab.icon}
+                      size={13}
+                      color={active ? palette.onGold : palette.divider}
+                    />
+                  }
+                  textStyle={!active ? { color: palette.divider } : undefined}
+                  title={tab.label}
                 />
-                <Text
-                  style={[
-                    styles.panelTabLabel,
-                    { color: activePanel === tab.key ? palette.primaryStrong : palette.divider },
-                  ]}
-                >
-                  {tab.label}
-                </Text>
-              </Pressable>
-            ))}
+              );
+            })}
           </View>
 
           {/* Active panel content */}

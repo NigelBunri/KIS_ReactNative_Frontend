@@ -34,6 +34,7 @@ import { Chat } from '@/Module/ChatRoom/messagesUtils';
 import Skeleton from '@/components/common/Skeleton';
 import KISText from '@/components/common/KISText';
 import KISButton from '@/constants/KISButton';
+import KISFab from '@/components/KISFab';
 import { launchImageLibrary } from 'react-native-image-picker';
 import { uploadStatusMedia, type StatusMediaPurpose } from '@/services/uploadStatusMedia';
 import {
@@ -1983,18 +1984,13 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
       </ScrollView>
 
       {/* Floating create channel button */}
-      <Pressable
+      <KISFab
+        icon="add"
+        iconSize={18}
+        size={responsive.isWatch ? 46 : 52}
         onPress={() => setShowCreateChannel(true)}
-        style={[styles.fab, KIS_TOKENS.elevation.popover, { right: responsive.pageGutter, width: responsive.isWatch ? 46 : 52, height: responsive.isWatch ? 46 : 52, borderRadius: responsive.isWatch ? 23 : 26, overflow: 'hidden' }]}
-      >
-        <LinearGradient
-          colors={gradients.tabSelected as unknown as string[]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={StyleSheet.absoluteFillObject}
-        />
-        <KISIcon name="add" size={18} color={palette.onGold} />
-      </Pressable>
+        style={[styles.fab, { right: responsive.pageGutter }]}
+      />
 
       {/* Channel preview + subscribe */}
       <Modal visible={channelPreviewOpen} transparent animationType="slide">
@@ -3655,11 +3651,6 @@ const styles = StyleSheet.create({
     position: 'absolute',
     right: 18,
     bottom: 24,
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   modalBackdrop: {
     flex: 1,

@@ -16,6 +16,7 @@ import { useKISTheme } from '@/theme/useTheme';
 import { useResponsiveLayout } from '@/theme/responsive';
 import { KISIcon } from '@/constants/kisIcons';
 import KISButton from '@/constants/KISButton';
+import KISFab from '@/components/KISFab';
 import { getRequest } from '@/network/get';
 import ROUTES from '@/network';
 import type { RootStackParamList } from '@/navigation/types';
@@ -154,16 +155,13 @@ export default function CrowdfundScreen({ navigation }: Props) {
             {CATEGORIES.map(cat => {
               const active = activeCategory === cat;
               return (
-                <Pressable
+                <KISButton
                   key={cat}
-                  style={[
-                    styles.filterChip,
-                    { backgroundColor: active ? palette.primary : palette.surface, borderColor: active ? palette.primary : palette.divider },
-                  ]}
+                  title={cat}
+                  size="xs"
+                  variant={active ? 'primary' : 'outline'}
                   onPress={() => setActiveCategory(cat)}
-                >
-                  <Text style={[styles.filterChipText, { color: active ? palette.ivory : palette.text }]}>{cat}</Text>
-                </Pressable>
+                />
               );
             })}
           </ScrollView>
@@ -180,12 +178,7 @@ export default function CrowdfundScreen({ navigation }: Props) {
         }
       />
 
-      <Pressable
-        style={[styles.fab, { backgroundColor: palette.primary }]}
-        onPress={() => navigation.navigate('CreateCampaign')}
-      >
-        <KISIcon name="add" size={28} color={palette.ivory} />
-      </Pressable>
+      <KISFab icon="add" onPress={() => navigation.navigate('CreateCampaign')} style={styles.fab} />
     </SafeAreaView>
   );
 }
@@ -206,16 +199,6 @@ function makeStyles(palette: any, layout: any) {
     navTitle: { flex: 1, textAlign: 'center', fontSize: 17, fontWeight: '700', color: palette.text },
     list: { paddingHorizontal: sp, paddingBottom: 100, paddingTop: 4 },
     filterRow: { gap: 8, paddingVertical: 12 },
-    filterChip: {
-      paddingHorizontal: 14,
-      paddingVertical: 8,
-      borderRadius: 20,
-      borderWidth: 1,
-      minHeight: 44,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    filterChipText: { fontSize: 13, fontWeight: '600' },
     card: {
       backgroundColor: palette.card,
       borderRadius: 14,
@@ -249,16 +232,6 @@ function makeStyles(palette: any, layout: any) {
       position: 'absolute',
       bottom: 24,
       right: 24,
-      width: 56,
-      height: 56,
-      borderRadius: 28,
-      alignItems: 'center',
-      justifyContent: 'center',
-      elevation: 6,
-      shadowColor: palette.shadow,
-      shadowOffset: { width: 0, height: 3 },
-      shadowOpacity: 0.3,
-      shadowRadius: 6,
     },
   });
 }

@@ -18,6 +18,7 @@ import LinearGradient from 'react-native-linear-gradient';
 import { useKISTheme } from '@/theme/useTheme';
 import { useResponsiveLayout } from '@/theme/responsive';
 import KISButton from '@/constants/KISButton';
+import KISFab from '@/components/KISFab';
 import { KISIcon } from '@/constants/kisIcons';
 import { getRequest } from '@/network/get';
 import { postRequest } from '@/network/post';
@@ -153,14 +154,7 @@ export default function MoodJournalScreen({ navigation }: Props) {
         />
       )}
 
-      {/* FAB */}
-      <TouchableOpacity
-        style={styles.fab}
-        onPress={() => setShowForm(true)}
-        hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
-      >
-        <KISIcon name="add" size={28} color={palette.ivory} focused />
-      </TouchableOpacity>
+      <KISFab icon="add" onPress={() => setShowForm(true)} style={styles.fab} />
 
       {/* New Entry Modal */}
       <Modal visible={showForm} animationType="slide" presentationStyle="pageSheet">
@@ -279,17 +273,6 @@ function makeStyles(palette: any, sp: number) {
       position: 'absolute',
       bottom: 28,
       right: sp,
-      width: 56,
-      height: 56,
-      borderRadius: 28,
-      backgroundColor: palette.primary,
-      justifyContent: 'center',
-      alignItems: 'center',
-      elevation: 6,
-      shadowColor: palette.primary,
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 0.4,
-      shadowRadius: 8,
     },
     modalSafe: { flex: 1, backgroundColor: palette.bg, paddingTop: 40 },
     modalHeader: {

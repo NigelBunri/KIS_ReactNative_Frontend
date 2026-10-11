@@ -551,9 +551,9 @@ export default function WebsiteBuilderScreen({ navigation, route }: Props) {
                 <KISButton title="Cancel" size="sm" variant="outline" onPress={() => setIsRenamingSite(false)} />
               </View>
             ) : (
-              <TouchableOpacity onPress={handleStartRenameSite} accessibilityLabel="Rename website">
+              <KISButton variant="ghost" onPress={handleStartRenameSite}>
                 <Text style={{ ...typography.h2, color: palette.text }}>{website.name || ownerLabel} ✎</Text>
-              </TouchableOpacity>
+              </KISButton>
             )}
             <Text style={{ ...typography.caption, color: palette.subtext, marginTop: 2 }}>
               {website.status === 'published' ? 'Published' : website.status === 'unpublished' ? 'Unpublished' : 'Draft — not yet published'}
@@ -604,12 +604,7 @@ export default function WebsiteBuilderScreen({ navigation, route }: Props) {
             />
           )}
           ListFooterComponent={
-            <TouchableOpacity
-              onPress={() => setIsAddingPage((prev) => !prev)}
-              style={{ borderRadius: 999, borderWidth: 1, borderStyle: 'dashed', borderColor: palette.divider, paddingVertical: spacing.xs, paddingHorizontal: spacing.sm }}
-            >
-              <Text style={{ ...typography.label, color: palette.accentPrimary }}>+ Add Page</Text>
-            </TouchableOpacity>
+            <KISButton variant="outline" size="sm" title="+ Add Page" onPress={() => setIsAddingPage((prev) => !prev)} />
           }
         />
 
@@ -677,23 +672,13 @@ export default function WebsiteBuilderScreen({ navigation, route }: Props) {
         />
 
         <Text style={{ ...typography.h3, color: palette.text, marginTop: spacing.lg }}>+ Add Section</Text>
-        <TouchableOpacity
+        <KISButton
+          variant="outline"
           onPress={() => setIsSectionTypePickerOpen((prev) => !prev)}
-          style={{
-            marginTop: spacing.sm,
-            borderWidth: 1,
-            borderColor: palette.divider,
-            borderRadius: spacing.md,
-            backgroundColor: palette.card,
-            padding: spacing.sm,
-            flexDirection: 'row',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-          }}
-        >
-          <Text style={{ ...typography.label, color: palette.text }}>{selectedSectionTypeLabel}</Text>
-          <KISIcon name="chevron-down" size={16} color={palette.subtext} />
-        </TouchableOpacity>
+          style={{ marginTop: spacing.sm, justifyContent: 'space-between' }}
+          title={selectedSectionTypeLabel}
+          right={<KISIcon name="chevron-down" size={16} color={palette.subtext} />}
+        />
 
         {isSectionTypePickerOpen ? (
           <SectionTypeSelector value={selectedType} onChange={(t) => { setSelectedType(t); setIsSectionTypePickerOpen(false); }} palette={palette} typography={typography} spacing={spacing} />
@@ -704,19 +689,11 @@ export default function WebsiteBuilderScreen({ navigation, route }: Props) {
         ) : null}
 
         {selectedType && getSectionVariants(selectedType) ? (
-          <TouchableOpacity
+          <KISButton
+            variant="outline"
             onPress={() => setIsDesignPickerOpen(true)}
-            style={{
-              marginTop: spacing.sm,
-              borderWidth: 1,
-              borderColor: palette.divider,
-              borderRadius: spacing.md,
-              backgroundColor: palette.card,
-              padding: spacing.sm,
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-            }}
+            style={{ marginTop: spacing.sm, justifyContent: 'space-between' }}
+            right={<KISIcon name="chevron-right" size={16} color={palette.subtext} />}
           >
             <View>
               <Text style={{ ...typography.label, color: palette.text }}>Design</Text>
@@ -724,8 +701,7 @@ export default function WebsiteBuilderScreen({ navigation, route }: Props) {
                 {resolveSectionVariant(selectedType, sectionDraftVariant).label}
               </Text>
             </View>
-            <KISIcon name="chevron-right" size={16} color={palette.subtext} />
-          </TouchableOpacity>
+          </KISButton>
         ) : null}
 
         <LiveSectionPreview

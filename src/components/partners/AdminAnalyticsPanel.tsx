@@ -2,13 +2,13 @@ import React from 'react';
 import {
   ActivityIndicator,
   Animated,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
 import { useKISTheme } from '@/theme/useTheme';
+import KISButton from '@/constants/KISButton';
 import type { RevenueStats, EngagementStats, AnalyticsDashboard, AnalyticsPeriod } from '@/screens/tabs/partners/useAdminAnalyticsPanel';
 
 const PERIODS: { key: AnalyticsPeriod; label: string }[] = [
@@ -57,12 +57,10 @@ export default function AdminAnalyticsPanel({
           <Text style={[styles.headerSub, { color: palette.subtext }]}>Platform-wide revenue and engagement</Text>
         </View>
         <View style={styles.headerActions}>
-          <Pressable onPress={onRefresh} style={[styles.refreshBtn, { borderColor: palette.border }]}>
-            <Text style={{ color: palette.primaryStrong ?? palette.primary, fontWeight: '700', fontSize: 12 }}>Refresh</Text>
-          </Pressable>
-          <Pressable onPress={onClose} style={styles.closeBtn}>
+          <KISButton title="Refresh" variant="outline" size="xs" onPress={onRefresh} />
+          <KISButton variant="ghost" onPress={onClose}>
             <Text style={{ color: palette.subtext, fontSize: 20, lineHeight: 22 }}>✕</Text>
-          </Pressable>
+          </KISButton>
         </View>
       </View>
 
@@ -71,18 +69,13 @@ export default function AdminAnalyticsPanel({
         {PERIODS.map(p => {
           const active = period === p.key;
           return (
-            <Pressable
+            <KISButton
               key={p.key}
+              title={p.label}
+              size="xs"
+              variant={active ? 'primary' : 'outline'}
               onPress={() => onChangePeriod(p.key)}
-              style={[styles.periodChip, {
-                backgroundColor: active ? palette.primary + '22' : 'transparent',
-                borderColor: active ? palette.primary : palette.border,
-              }]}
-            >
-              <Text style={[styles.periodChipText, { color: active ? palette.primary : palette.subtext }]}>
-                {p.label}
-              </Text>
-            </Pressable>
+            />
           );
         })}
       </View>
@@ -228,11 +221,7 @@ const styles = StyleSheet.create({
   headerTitle: { fontSize: 17, fontWeight: '900' },
   headerSub: { fontSize: 12, marginTop: 2 },
   headerActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  refreshBtn: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, borderWidth: 1 },
-  closeBtn: { paddingHorizontal: 8, paddingVertical: 4 },
   periodRow: { flexDirection: 'row', padding: 12, gap: 8, borderBottomWidth: 1 },
-  periodChip: { borderRadius: 20, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 6 },
-  periodChipText: { fontSize: 12, fontWeight: '700' },
   scroll: { flex: 1 },
   scrollContent: { padding: 16, paddingBottom: 40 },
   centered: { alignItems: 'center', paddingVertical: 40 },

@@ -11,6 +11,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View, Pressable, ScrollView } from 'react-native';
 import { useKISTheme } from '@/theme/useTheme';
+import KISButton from '@/constants/KISButton';
 import GameShell from './GameShell';
 import { AnswerFeedback, StageComplete } from './GameFeedback';
 import { extractCapitalizedWords, getVerseText, tokenizeVerse } from '../../../screens/tabs/bible/games/verseText';
@@ -194,9 +195,7 @@ export default function NamePlaceMatchGame({ gameKey, stageIndex, isReplay, onEx
             <Text style={[styles.fallbackText, { color: palette.text }]}>
               This stage doesn't contain any names or places to match.
             </Text>
-            <Pressable onPress={onExit} style={[styles.actionBtn, { backgroundColor: palette.goldReadable }]}>
-              <Text style={[styles.actionBtnText, { color: palette.onGold }]}>Back to Journey</Text>
-            </Pressable>
+            <KISButton onPress={onExit} variant="outline" title="Back to Journey" />
           </View>
         </View>
       </GameShell>
@@ -272,19 +271,18 @@ export default function NamePlaceMatchGame({ gameKey, stageIndex, isReplay, onEx
 
       <View style={styles.footer}>
         {submitted ? (
-          <Pressable onPress={handleNext} style={[styles.actionBtn, { backgroundColor: palette.goldReadable }]}>
-            <Text style={[styles.actionBtnText, { color: palette.onGold }]}>
-              {roundIndex + 1 >= ROUND_LENGTH ? 'See Results' : 'Next Verse'}
-            </Text>
-          </Pressable>
+          <KISButton
+            onPress={handleNext}
+            variant="outline"
+            title={roundIndex + 1 >= ROUND_LENGTH ? 'See Results' : 'Next Verse'}
+          />
         ) : (
-          <Pressable
+          <KISButton
             onPress={handleSubmit}
             disabled={!selected}
-            style={[styles.actionBtn, { backgroundColor: selected ? palette.goldReadable : palette.selectedBg }]}
-          >
-            <Text style={[styles.actionBtnText, { color: selected ? palette.onGold : palette.subtext }]}>Check Answer</Text>
-          </Pressable>
+            variant="outline"
+            title="Check Answer"
+          />
         )}
       </View>
     </GameShell>
@@ -306,6 +304,4 @@ const styles = StyleSheet.create({
   choiceRow: { borderWidth: 1.5, borderRadius: 14, paddingHorizontal: 16, paddingVertical: 14 },
   choiceText: { fontSize: 15, fontWeight: '800' },
   footer: { paddingVertical: 14 },
-  actionBtn: { borderRadius: 999, paddingVertical: 15, alignItems: 'center' },
-  actionBtnText: { fontSize: 15, fontWeight: '900' },
 });

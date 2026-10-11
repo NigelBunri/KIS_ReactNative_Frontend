@@ -1547,36 +1547,14 @@ export default function ProductDetailsPage() {
                     const selected = size === selectedSize;
 
                     return (
-                      <Pressable
+                      <KISButton
                         key={`size-${size}`}
-                        onPress={() => {
-                          if (disabled) return;
-                          handleSelectSize(size);
-                        }}
-                        style={[
-                          styles.optionChip,
-                          {
-                            borderColor: selected
-                              ? palette.primaryStrong
-                              : palette.divider,
-                            backgroundColor: selected
-                              ? palette.inputBg
-                              : palette.surface,
-                            opacity: disabled ? 0.4 : 1,
-                          },
-                        ]}
-                      >
-                        <Text
-                          style={{
-                            color: selected
-                              ? palette.primaryStrong
-                              : palette.text,
-                            fontWeight: selected ? '700' : '600',
-                          }}
-                        >
-                          {size}
-                        </Text>
-                      </Pressable>
+                        variant={selected ? 'primary' : 'outline'}
+                        size="sm"
+                        disabled={disabled}
+                        onPress={() => handleSelectSize(size)}
+                        title={size}
+                      />
                     );
                   })}
                 </View>
@@ -1597,36 +1575,14 @@ export default function ProductDetailsPage() {
                     const selected = color === selectedColor;
 
                     return (
-                      <Pressable
+                      <KISButton
                         key={`color-${color}`}
-                        onPress={() => {
-                          if (disabled) return;
-                          handleSelectColor(color);
-                        }}
-                        style={[
-                          styles.optionChip,
-                          {
-                            borderColor: selected
-                              ? palette.primaryStrong
-                              : palette.divider,
-                            backgroundColor: selected
-                              ? palette.inputBg
-                              : palette.surface,
-                            opacity: disabled ? 0.4 : 1,
-                          },
-                        ]}
-                      >
-                        <Text
-                          style={{
-                            color: selected
-                              ? palette.primaryStrong
-                              : palette.text,
-                            fontWeight: selected ? '700' : '600',
-                          }}
-                        >
-                          {color}
-                        </Text>
-                      </Pressable>
+                        variant={selected ? 'primary' : 'outline'}
+                        size="sm"
+                        disabled={disabled}
+                        onPress={() => handleSelectColor(color)}
+                        title={color}
+                      />
                     );
                   })}
                 </View>
@@ -1877,36 +1833,15 @@ export default function ProductDetailsPage() {
                     {attribute.options.map(option => {
                       const selected = selection.includes(option);
                       return (
-                        <Pressable
+                        <KISButton
                           key={`${attribute.key}-${option}`}
+                          variant={selected ? 'primary' : 'outline'}
+                          size="sm"
                           onPress={() =>
                             toggleAttributeOption(attribute.key, option)
                           }
-                          style={[
-                            styles.attributeOptionChip,
-                            {
-                              borderColor: selected
-                                ? palette.primaryStrong
-                                : palette.divider,
-                              backgroundColor: selected
-                                ? palette.inputBg
-                                : palette.surface,
-                            },
-                          ]}
-                        >
-                          <Text
-                            style={[
-                              styles.attributeOptionText,
-                              {
-                                color: selected
-                                  ? palette.primaryStrong
-                                  : palette.text,
-                              },
-                            ]}
-                          >
-                            {option}
-                          </Text>
-                        </Pressable>
+                          title={option}
+                        />
                       );
                     })}
                   </View>

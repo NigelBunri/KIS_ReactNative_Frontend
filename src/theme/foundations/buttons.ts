@@ -30,7 +30,16 @@ export const createButtonStyles = (
   const baseContainer: ViewStyle = {
     minHeight: KIS_COMPONENT_TOKENS.button.minHeight,
     paddingHorizontal: KIS_COMPONENT_TOKENS.button.horizontalPadding,
-    borderRadius: KIS_COMPONENT_TOKENS.button.radius,
+    // Every "selected"/button affordance in this app (Calls' join button,
+    // Communities' Feed/Groups segmented control, the pre-existing
+    // MessagesScreen tab bar) was fully pill-shaped — never the smaller
+    // rounded-rectangle radius this used to read from KIS_COMPONENT_TOKENS.
+    // button.radius. That mismatch is exactly what made the app-wide
+    // button-consistency pass (which made KISButton ubiquitous) visibly
+    // regress every tab bar/segmented control it touched to square-ish
+    // corners. pillRadius already existed as a token for this; it just
+    // wasn't wired in.
+    borderRadius: KIS_COMPONENT_TOKENS.button.pillRadius,
     alignItems: 'center',
     justifyContent: 'center',
     flexDirection: 'row',
@@ -80,16 +89,18 @@ export const createButtonStyles = (
       },
       text: { ...textBase, color: palette.onPrimary },
     },
+    // No per-size borderRadius overrides — every size stays pill-shaped via
+    // baseContainer's radius above, same as the app's original design
+    // language (a tab bar and a big CTA both read as "pill", just taller
+    // or shorter).
     sizes: {
       xs: {
         minHeight: tokens.controlHeights.xs,
         paddingHorizontal: 10,
-        borderRadius: tokens.radius.sm,
       },
       sm: {
         minHeight: tokens.controlHeights.sm,
         paddingHorizontal: 12,
-        borderRadius: tokens.radius.md,
       },
       md: {
         minHeight: tokens.controlHeights.md,
@@ -97,7 +108,6 @@ export const createButtonStyles = (
       lg: {
         minHeight: tokens.controlHeights.lg,
         paddingHorizontal: 20,
-        borderRadius: tokens.radius.xl,
       },
     },
   };

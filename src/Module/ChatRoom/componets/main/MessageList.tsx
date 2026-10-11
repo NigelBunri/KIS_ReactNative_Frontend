@@ -9,13 +9,13 @@ import {
   View,
   Text,
   FlatList,
-  Pressable,
   Animated,
   ActivityIndicator,
   NativeSyntheticEvent,
   NativeScrollEvent,
 } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
+import KISFab from '@/components/KISFab';
 
 import { chatRoomStyles as styles } from '@/Module/ChatRoom/chatRoomStyles';
 import { ChatMessage } from '../../chatTypes';
@@ -798,27 +798,8 @@ export const MessageList: React.FC<MessageListProps> = ({
           pointerEvents: showJumpToLatest ? 'auto' : 'none',
         }}
       >
-        <Pressable
-          onPress={jumpToLatest}
-          style={{
-            width: 44,
-            height: 44,
-            borderRadius: 22,
-            backgroundColor: palette.surface,
-            alignItems: 'center',
-            justifyContent: 'center',
-            shadowColor: '#000',
-            shadowOpacity: 0.18,
-            shadowRadius: 8,
-            shadowOffset: { width: 0, height: 2 },
-            elevation: 6,
-          }}
-        >
-          <Ionicons
-            name="chevron-down"
-            size={22}
-            color={palette.primaryStrong ?? palette.primary}
-          />
+        <View>
+          <KISFab icon="chevron-down" iconSize={22} size={44} onPress={jumpToLatest} />
           {unreadCount > 0 && (
             <View
               style={{
@@ -839,7 +820,7 @@ export const MessageList: React.FC<MessageListProps> = ({
               </Text>
             </View>
           )}
-        </Pressable>
+        </View>
       </Animated.View>
     </View>
   );

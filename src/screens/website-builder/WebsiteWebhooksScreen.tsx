@@ -115,7 +115,7 @@ export default function WebsiteWebhooksScreen({ route }: Props) {
             <KISButton
               key={option.value}
               title={option.label}
-              size="sm"
+              size="xs"
               variant={eventType === option.value ? 'primary' : 'outline'}
               onPress={() => setEventType(option.value)}
             />

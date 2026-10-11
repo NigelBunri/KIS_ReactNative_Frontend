@@ -22,6 +22,8 @@ import { patchRequest } from '@/network/patch';
 import { deleteRequest } from '@/network/delete';
 import { useKISTheme } from '@/theme/useTheme';
 import type { RootStackParamList } from '@/navigation/types';
+import KISButton from '@/constants/KISButton';
+import KISFab from '@/components/KISFab';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -83,13 +85,13 @@ function SelectRow({ label, value, options, onChange, palette }: SelectRowProps)
   return (
     <View style={{ gap: 6 }}>
       <Text style={[mStyles.fieldLabel, { color: palette.subtext }]}>{label}</Text>
-      <Pressable
+      <KISButton
+        variant="outline"
+        title={selected}
+        right={<Text style={{ color: palette.subtext }}>▾</Text>}
         onPress={() => setOpen(true)}
-        style={[mStyles.selectBtn, { borderColor: palette.divider, backgroundColor: palette.surface }]}
-      >
-        <Text style={{ color: value ? palette.text : palette.subtext }}>{selected}</Text>
-        <Text style={{ color: palette.subtext }}>▾</Text>
-      </Pressable>
+        style={mStyles.selectBtn}
+      />
       <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
         <Pressable style={mStyles.modalBackdrop} onPress={() => setOpen(false)}>
           <View style={[mStyles.dropdownSheet, { backgroundColor: palette.card, borderColor: palette.divider }]}>
@@ -229,9 +231,7 @@ function AccountsTab({ palette }: { palette: ReturnType<typeof useKISTheme>['pal
     return (
       <View style={styles.center}>
         <Text style={{ color: palette.danger, textAlign: 'center' }}>{error}</Text>
-        <Pressable onPress={() => load()} style={[styles.retryBtn, { backgroundColor: palette.primaryStrong }]}>
-          <Text style={{ color: palette.onPrimary, fontWeight: '700' }}>Retry</Text>
-        </Pressable>
+        <KISButton title="Retry" onPress={() => load()} />
       </View>
     );
   }
@@ -277,30 +277,15 @@ function AccountsTab({ palette }: { palette: ReturnType<typeof useKISTheme>['pal
               </Text>
             ) : null}
             <View style={styles.cardActions}>
-              <Pressable
-                onPress={() => handleSync(item)}
-                style={[styles.actionBtn, { borderColor: palette.primaryStrong }]}
-              >
-                <Text style={[styles.actionBtnText, { color: palette.primaryStrong }]}>Sync</Text>
-              </Pressable>
-              <Pressable
-                onPress={() => handleDisconnect(item)}
-                style={[styles.actionBtn, { borderColor: palette.danger }]}
-              >
-                <Text style={[styles.actionBtnText, { color: palette.danger }]}>Disconnect</Text>
-              </Pressable>
+              <KISButton title="Sync" size="sm" variant="outline" onPress={() => handleSync(item)} />
+              <KISButton title="Disconnect" size="sm" variant="danger" onPress={() => handleDisconnect(item)} />
             </View>
           </View>
         )}
       />
 
       {/* FAB */}
-      <Pressable
-        onPress={() => setShowModal(true)}
-        style={[styles.fab, { backgroundColor: palette.primaryStrong, shadowColor: palette.royalInk }]}
-      >
-        <Text style={[styles.fabText, { color: palette.onPrimary }]}>+ Connect Account</Text>
-      </Pressable>
+      <KISFab icon="add" onPress={() => setShowModal(true)} style={styles.fab} />
 
       {/* Connect Modal */}
       <Modal visible={showModal} transparent animationType="slide" onRequestClose={() => setShowModal(false)}>
@@ -310,15 +295,13 @@ function AccountsTab({ palette }: { palette: ReturnType<typeof useKISTheme>['pal
 
             {/* Platform selector */}
             <Text style={[mStyles.fieldLabel, { color: palette.subtext }]}>Platform</Text>
-            <Pressable
+            <KISButton
+              variant="outline"
+              title={platform || 'Select platform…'}
+              right={<Text style={{ color: palette.subtext }}>▾</Text>}
               onPress={() => setPlatformPickerOpen(true)}
-              style={[mStyles.selectBtn, { borderColor: palette.divider, backgroundColor: palette.surface }]}
-            >
-              <Text style={{ color: platform ? palette.text : palette.subtext }}>
-                {platform || 'Select platform…'}
-              </Text>
-              <Text style={{ color: palette.subtext }}>▾</Text>
-            </Pressable>
+              style={mStyles.selectBtn}
+            />
 
             <Modal
               visible={platformPickerOpen}
@@ -356,21 +339,19 @@ function AccountsTab({ palette }: { palette: ReturnType<typeof useKISTheme>['pal
             />
 
             <View style={mStyles.sheetActions}>
-              <Pressable
+              <KISButton
+                title="Cancel"
+                variant="outline"
                 onPress={() => { setShowModal(false); setPlatform(''); setToken(''); }}
-                style={[mStyles.cancelBtn, { borderColor: palette.divider }]}
-              >
-                <Text style={{ color: palette.subtext, fontWeight: '600' }}>Cancel</Text>
-              </Pressable>
-              <Pressable
+                style={{ flex: 1 }}
+              />
+              <KISButton
+                title="Connect"
                 onPress={handleConnect}
                 disabled={saving}
-                style={[mStyles.saveBtn, { backgroundColor: palette.primaryStrong, opacity: saving ? 0.6 : 1 }]}
-              >
-                {saving
-                  ? <ActivityIndicator color={palette.onPrimary} size="small" />
-                  : <Text style={{ color: palette.onPrimary, fontWeight: '700' }}>Connect</Text>}
-              </Pressable>
+                loading={saving}
+                style={{ flex: 1 }}
+              />
             </View>
           </View>
         </View>
@@ -514,9 +495,7 @@ function AutomationsTab({ palette }: { palette: ReturnType<typeof useKISTheme>['
     return (
       <View style={styles.center}>
         <Text style={{ color: palette.danger, textAlign: 'center' }}>{error}</Text>
-        <Pressable onPress={() => load()} style={[styles.retryBtn, { backgroundColor: palette.primaryStrong }]}>
-          <Text style={{ color: palette.onPrimary, fontWeight: '700' }}>Retry</Text>
-        </Pressable>
+        <KISButton title="Retry" onPress={() => load()} />
       </View>
     );
   }
@@ -562,24 +541,14 @@ function AutomationsTab({ palette }: { palette: ReturnType<typeof useKISTheme>['
               <Text style={[styles.cardMeta, { color: palette.subtext }]}>Target: {item.target}</Text>
             ) : null}
             <View style={styles.cardActions}>
-              <Pressable
-                onPress={() => handleDelete(item)}
-                style={[styles.actionBtn, { borderColor: palette.danger }]}
-              >
-                <Text style={[styles.actionBtnText, { color: palette.danger }]}>Delete</Text>
-              </Pressable>
+              <KISButton title="Delete" size="sm" variant="danger" onPress={() => handleDelete(item)} />
             </View>
           </View>
         )}
       />
 
       {/* Create button */}
-      <Pressable
-        onPress={() => setShowModal(true)}
-        style={[styles.fab, { backgroundColor: palette.primaryStrong, shadowColor: palette.royalInk }]}
-      >
-        <Text style={[styles.fabText, { color: palette.onPrimary }]}>+ Create Automation</Text>
-      </Pressable>
+      <KISFab icon="add" onPress={() => setShowModal(true)} style={styles.fab} />
 
       {/* Create Modal */}
       <Modal visible={showModal} transparent animationType="slide" onRequestClose={() => { setShowModal(false); resetForm(); }}>
@@ -631,21 +600,19 @@ function AutomationsTab({ palette }: { palette: ReturnType<typeof useKISTheme>['
               />
 
               <View style={mStyles.sheetActions}>
-                <Pressable
+                <KISButton
+                  title="Cancel"
+                  variant="outline"
                   onPress={() => { setShowModal(false); resetForm(); }}
-                  style={[mStyles.cancelBtn, { borderColor: palette.divider }]}
-                >
-                  <Text style={{ color: palette.subtext, fontWeight: '600' }}>Cancel</Text>
-                </Pressable>
-                <Pressable
+                  style={{ flex: 1 }}
+                />
+                <KISButton
+                  title="Save"
                   onPress={handleSave}
                   disabled={saving}
-                  style={[mStyles.saveBtn, { backgroundColor: palette.primaryStrong, opacity: saving ? 0.6 : 1 }]}
-                >
-                  {saving
-                    ? <ActivityIndicator color={palette.onPrimary} size="small" />
-                    : <Text style={{ color: palette.onPrimary, fontWeight: '700' }}>Save</Text>}
-                </Pressable>
+                  loading={saving}
+                  style={{ flex: 1 }}
+                />
               </View>
             </View>
           </ScrollView>
@@ -700,9 +667,7 @@ function MessagesTab({ palette }: { palette: ReturnType<typeof useKISTheme>['pal
     return (
       <View style={styles.center}>
         <Text style={{ color: palette.danger, textAlign: 'center' }}>{error}</Text>
-        <Pressable onPress={() => load()} style={[styles.retryBtn, { backgroundColor: palette.primaryStrong }]}>
-          <Text style={{ color: palette.onPrimary, fontWeight: '700' }}>Retry</Text>
-        </Pressable>
+        <KISButton title="Retry" onPress={() => load()} />
       </View>
     );
   }
@@ -784,32 +749,20 @@ export default function BridgeManagementScreen({ navigation }: Props) {
     <SafeAreaView style={[styles.container, { backgroundColor: palette.bg, }]} edges={['top']}>
       {/* Header */}
       <View style={[styles.header, { borderBottomColor: palette.divider }]}>
-        <Pressable onPress={() => navigation.goBack()} style={styles.backBtn}>
-          <Text style={[styles.backText, { color: palette.primaryStrong }]}>← Back</Text>
-        </Pressable>
+        <KISButton title="← Back" variant="ghost" onPress={() => navigation.goBack()} style={styles.backBtn} />
         <Text style={[styles.title, { color: palette.text }]}>Bridge Management</Text>
       </View>
 
       {/* Tab bar */}
       <View style={[styles.tabBar, { borderBottomColor: palette.divider, backgroundColor: palette.surface }]}>
         {TABS.map(tab => (
-          <Pressable
+          <KISButton
             key={tab.key}
+            title={tab.label}
+            size="xs"
+            variant={activeTab === tab.key ? 'primary' : 'outline'}
             onPress={() => setActiveTab(tab.key)}
-            style={[
-              styles.tabItem,
-              activeTab === tab.key && [styles.tabItemActive, { borderBottomColor: palette.primaryStrong }],
-            ]}
-          >
-            <Text
-              style={[
-                styles.tabLabel,
-                { color: activeTab === tab.key ? palette.primaryStrong : palette.subtext },
-              ]}
-            >
-              {tab.label}
-            </Text>
-          </Pressable>
+          />
         ))}
       </View>
 
@@ -836,23 +789,12 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
   backBtn: { paddingVertical: 10, minHeight: 44, justifyContent: 'center' },
-  backText: { fontSize: 15, fontWeight: '600' },
   title: { fontSize: 20, fontWeight: '800', flex: 1 },
   tabBar: {
     flexDirection: 'row',
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  tabItem: {
-    flex: 1,
-    alignItems: 'center',
-    paddingVertical: 12,
-    borderBottomWidth: 2,
-    borderBottomColor: 'transparent',
-  },
-  tabItemActive: { borderBottomWidth: 2 },
-  tabLabel: { fontSize: 13, fontWeight: '600' },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, gap: 12 },
-  retryBtn: { paddingHorizontal: 20, paddingVertical: 10, borderRadius: 10 },
   list: { padding: 16, gap: 12 },
   emptyBox: { alignItems: 'center', paddingTop: 48 },
   card: { borderRadius: 14, borderWidth: 1, padding: 16, gap: 8 },
@@ -861,23 +803,13 @@ const styles = StyleSheet.create({
   cardRow: { flexDirection: 'row', gap: 16, flexWrap: 'wrap' },
   cardMeta: { fontSize: 12 },
   cardActions: { flexDirection: 'row', gap: 10, marginTop: 4 },
-  actionBtn: { borderWidth: 1, borderRadius: 8, paddingHorizontal: 14, paddingVertical: 10, minHeight: 44, justifyContent: 'center', alignItems: 'center' },
-  actionBtnText: { fontSize: 13, fontWeight: '600' },
   statusBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20 },
   statusText: { fontSize: 11, fontWeight: '700' },
   fab: {
     position: 'absolute',
     bottom: 24,
     right: 20,
-    paddingHorizontal: 18,
-    paddingVertical: 13,
-    borderRadius: 30,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.18,
-    shadowRadius: 6,
-    elevation: 5,
   },
-  fabText: { fontSize: 14, fontWeight: '700' },
 });
 
 const mStyles = StyleSheet.create({
@@ -915,19 +847,6 @@ const mStyles = StyleSheet.create({
     flexDirection: 'row',
     gap: 12,
     marginTop: 22,
-  },
-  cancelBtn: {
-    flex: 1,
-    alignItems: 'center',
-    paddingVertical: 13,
-    borderRadius: 12,
-    borderWidth: 1,
-  },
-  saveBtn: {
-    flex: 1,
-    alignItems: 'center',
-    paddingVertical: 13,
-    borderRadius: 12,
   },
   // dropdown
   modalBackdrop: {

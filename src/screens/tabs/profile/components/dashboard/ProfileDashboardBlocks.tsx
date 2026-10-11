@@ -1021,7 +1021,14 @@ export const LanguageSelectorCard = ({
               <Text
                 style={[
                   dashboardTheme.content.badge,
-                  { color: selected ? undefined : dashboardTheme.content.body.color },
+                  // selected used to pass color: undefined here, which in RN's
+                  // style-array flattening unsets badge's own color rather than
+                  // preserving it — leaving the selected chip's text with no
+                  // explicit color (defaults to black) against this chip's
+                  // tinted/dark-mode background, unreadable. badge's own color
+                  // is already theme-correct (white in dark, palette.text in
+                  // light) for both states.
+                  !selected && { color: dashboardTheme.content.body.color },
                 ]}
               >
                 {entry.nativeName ?? entry.label}

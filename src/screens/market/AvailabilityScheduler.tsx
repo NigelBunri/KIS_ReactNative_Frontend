@@ -9,6 +9,7 @@ import {
 } from "react-native";
 import { useKISTheme } from "@/theme/useTheme";
 import KISTextInput from "@/constants/KISTextInput";
+import KISButton from "@/constants/KISButton";
 import {
   DayAvailability,
   formatDateKey,
@@ -305,8 +306,12 @@ const AvailabilityScheduler = ({
           {MONTH_LABELS.map((label, index) => {
             const isActive = index === activeMonthIndex;
             return (
-              <Pressable
+              <KISButton
                 key={label}
+                title={label.slice(0, 3)}
+                variant={isActive ? 'primary' : 'outline'}
+                size="sm"
+                style={{ width: "23%" }}
                 onPress={() => {
                   const updated = new Date(referenceDate);
                   updated.setMonth(index);
@@ -316,18 +321,7 @@ const AvailabilityScheduler = ({
                   setMonthRange(updated);
                   setViewMode("month");
                 }}
-                style={{
-                  width: "23%",
-                  borderRadius: 12,
-                  padding: 10,
-                  borderWidth: 1,
-                  borderColor: isActive ? palette.primary : palette.divider,
-                  alignItems: "center",
-                  backgroundColor: isActive ? `${palette.primary}22` : palette.surface,
-                }}
-              >
-                <Text style={{ color: palette.text }}>{label.slice(0, 3)}</Text>
-              </Pressable>
+              />
             );
           })}
         </View>
@@ -373,20 +367,13 @@ const AvailabilityScheduler = ({
           {VIEW_MODES.map((mode) => {
             const active = viewMode === mode;
             return (
-              <Pressable
+              <KISButton
                 key={mode}
+                title={mode.toUpperCase()}
+                variant={active ? 'primary' : 'outline'}
+                size="sm"
                 onPress={() => setViewMode(mode)}
-                style={{
-                  paddingVertical: 6,
-                  paddingHorizontal: 14,
-                  borderRadius: 12,
-                  borderWidth: 1,
-                  borderColor: active ? palette.primary : palette.divider,
-                  backgroundColor: active ? `${palette.primary}22` : palette.surface,
-                }}
-              >
-                <Text style={{ color: active ? palette.primaryStrong : palette.text, fontSize: 13 }}>{mode.toUpperCase()}</Text>
-              </Pressable>
+              />
             );
           })}
         </View>
@@ -444,20 +431,13 @@ const AvailabilityScheduler = ({
               const isAllDay = option === "All Day";
               const active = isAllDay ? selectedEntry.all_day : !selectedEntry.all_day;
               return (
-                <Pressable
+                <KISButton
                   key={option}
+                  title={option}
+                  variant={active ? 'primary' : 'outline'}
+                  size="sm"
                   onPress={() => updateDateAvailability(selectedDate, { all_day: isAllDay })}
-                  style={{
-                    paddingVertical: 6,
-                    paddingHorizontal: 12,
-                    borderRadius: 999,
-                    borderWidth: 1,
-                    borderColor: active ? palette.primary : palette.divider,
-                    backgroundColor: active ? `${palette.primary}22` : palette.surface,
-                  }}
-                >
-                  <Text style={{ color: active ? palette.primaryStrong : palette.text }}>{option}</Text>
-                </Pressable>
+                />
               );
             })}
           </View>
@@ -495,17 +475,7 @@ const AvailabilityScheduler = ({
                   keyboardType="numeric"
                   style={{ flex: 1 }}
                 />
-                <Pressable
-                  onPress={handleAddTime}
-                  style={{
-                    paddingHorizontal: 16,
-                    paddingVertical: 10,
-                    borderRadius: 14,
-                    backgroundColor: palette.primary,
-                  }}
-                >
-                  <Text style={{ color: palette.onPrimary }}>Add</Text>
-                </Pressable>
+                <KISButton title="Add" variant="outline" size="sm" onPress={handleAddTime} />
               </View>
             </View>
           )}

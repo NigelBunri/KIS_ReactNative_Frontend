@@ -4,6 +4,7 @@ import { ActivityIndicator, Alert, Modal, Pressable, StyleSheet, Text, View } fr
 import { useKISTheme } from '@/theme/useTheme';
 import { useResponsiveLayout } from '@/theme/responsive';
 import { useLanguage, useTranslation } from './index';
+import KISButton from '@/constants/KISButton';
 
 type Props = {
   /** Controlled visibility — pass to drive the modal from a parent button */
@@ -84,11 +85,7 @@ export default function LanguageSwitcher({ visible: controlledVisible, onClose }
             );
           })}
 
-          <Pressable onPress={close} style={styles.closeButton}>
-            <Text style={[styles.closeLabel, { color: palette.primaryStrong }]}>
-              {t('Close')}
-            </Text>
-          </Pressable>
+          <KISButton title={t('Close')} variant="ghost" onPress={close} style={{ alignSelf: 'flex-end' }} />
         </Pressable>
       </Pressable>
     </Modal>
@@ -146,14 +143,6 @@ const styles = StyleSheet.create({
   },
   optionCode: {
     fontSize: 12,
-    fontWeight: '700',
-  },
-  closeButton: {
-    alignSelf: 'flex-end',
-    paddingTop: 8,
-  },
-  closeLabel: {
-    fontSize: 14,
     fontWeight: '700',
   },
 });

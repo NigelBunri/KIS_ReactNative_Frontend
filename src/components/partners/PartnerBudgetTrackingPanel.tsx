@@ -9,6 +9,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Animated, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import styles from '@/components/partners/partnersStyles';
 import { useKISTheme } from '@/theme/useTheme';
+import KISButton from '@/constants/KISButton';
 import ROUTES from '@/network';
 import { getRequest } from '@/network/get';
 import { postRequest } from '@/network/post';
@@ -302,23 +303,24 @@ export default function PartnerBudgetTrackingPanel({ isOpen, panelWidth, panelTr
                     {departments.map((dep) => {
                       const selected = newDepartmentId === String(dep.id);
                       return (
-                        <Pressable
+                        <KISButton
                           key={dep.id}
+                          variant={selected ? 'primary' : 'outline'}
+                          size="xs"
                           onPress={() => setNewDepartmentId(selected ? null : String(dep.id))}
-                          style={{ paddingVertical: 5, paddingHorizontal: 10, borderRadius: 8, borderWidth: 1, borderColor: selected ? palette.primary : palette.borderMuted }}
-                        >
-                          <Text style={{ color: selected ? palette.primary : palette.text, fontSize: 12 }}>{dep.name}</Text>
-                        </Pressable>
+                          title={dep.name}
+                        />
                       );
                     })}
                   </View>
-                  <Pressable
+                  <KISButton
+                    variant="outline"
                     onPress={createBudget}
                     disabled={saving}
-                    style={({ pressed }) => [{ marginTop: 12, paddingVertical: 10, borderRadius: 10, backgroundColor: palette.royalInk, alignItems: 'center', opacity: pressed || saving ? 0.7 : 1 }]}
-                  >
-                    <Text style={{ color: palette.ivory, fontWeight: '700' }}>{saving ? 'Creating…' : 'Create budget'}</Text>
-                  </Pressable>
+                    loading={saving}
+                    title={saving ? 'Creating…' : 'Create budget'}
+                    style={{ marginTop: 12 }}
+                  />
                 </View>
               ) : null}
 

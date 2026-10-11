@@ -13,6 +13,8 @@ import Animated from 'react-native-reanimated';
 import { useRawTopInset } from '@/hooks/useSafeTopInset';
 
 import { useKISTheme } from '@/theme/useTheme';
+import KISFab from '@/components/KISFab';
+import KISButton from '@/constants/KISButton';
 import { useGoldenSectionContent } from '@/contexts/GoldenSectionContext';
 import { useSearchOverlay } from '@/contexts/SearchOverlayContext';
 import { useContextPanelContent, TabletCard } from '@/components/shell';
@@ -409,20 +411,13 @@ export default function BroadcastScreen() {
           {FEED_CATEGORIES.map((cat) => {
             const active = feedCategory === cat.id;
             return (
-              <Pressable
+              <KISButton
                 key={cat.id}
+                title={cat.label}
+                size="xs"
+                variant={active ? 'primary' : 'outline'}
                 onPress={() => setFeedCategory(cat.id)}
-                style={{
-                  paddingVertical: 8,
-                  paddingHorizontal: 14,
-                  borderRadius: 999,
-                  backgroundColor: active ? palette.selectedBg : palette.surfaceElevated,
-                }}
-              >
-                <Text style={{ fontSize: 12, fontWeight: '800', color: active ? palette.selectedText : palette.subtext }}>
-                  {cat.label}
-                </Text>
-              </Pressable>
+              />
             );
           })}
         </View>
@@ -437,9 +432,7 @@ export default function BroadcastScreen() {
           <Text style={{ fontSize: 13, fontWeight: '600', color: palette.subtext, marginTop: 6 }}>
             {totalCartItems} {totalCartItems === 1 ? 'item' : 'items'} waiting for checkout
           </Text>
-          <Pressable onPress={openCartList} style={{ marginTop: 10 }}>
-            <Text style={{ fontSize: 13, fontWeight: '800', color: palette.goldReadable }}>View cart ›</Text>
-          </Pressable>
+          <KISButton title="View cart ›" variant="ghost" onPress={openCartList} style={{ marginTop: 10, alignSelf: 'flex-start' }} />
         </TabletCard>
       ) : null}
     </>,
@@ -502,7 +495,7 @@ export default function BroadcastScreen() {
               />
             </View>
 
-            <Pressable
+            <KISButton
               onPress={() => (navigation as any).navigate('TestimonyHub')}
               style={[styles.miniPill, {
                 width: compactBroadcast ? 34 : 40,
@@ -510,13 +503,12 @@ export default function BroadcastScreen() {
                 borderRadius: compactBroadcast ? 17 : 20,
                 backgroundColor: palette.primaryStrong,
               }]}
-              accessibilityLabel="Testimony Network"
-              hitSlop={8}
             >
               <Text style={{ fontSize: compactBroadcast ? 14 : 16 }}>🤝</Text>
-            </Pressable>
+            </KISButton>
 
-            <Pressable
+            <KISButton
+              variant="outline"
               onPress={() => setVisionVisible(true)}
               style={[styles.miniPill, {
                 width: compactBroadcast ? 34 : 40,
@@ -524,13 +516,10 @@ export default function BroadcastScreen() {
                 borderRadius: compactBroadcast ? 17 : 20,
                 backgroundColor: `${palette.royalInk}70`,
                 borderColor: palette.goldBorder,
-                borderWidth: 1,
               }]}
-              accessibilityLabel="Our Vision"
-              hitSlop={8}
             >
               <KISIcon name="sparkles" size={compactBroadcast ? 14 : 16} color={palette.onGold} />
-            </Pressable>
+            </KISButton>
           </View>
 
           {/* Filter panel — fixed height regardless of tab/content, so it
@@ -550,54 +539,49 @@ export default function BroadcastScreen() {
                   <Text style={styles.filterSectionLabel}>Quick access</Text>
                   <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap', paddingBottom: 12 }}>
                     {([{ label: 'Playlists', icon: 'list' as const, route: 'PlaylistList' }, { label: 'History', icon: 'play' as const, route: 'WatchHistory' }, { label: 'Shorts', icon: 'play' as const, route: 'ShortsScreen' }]).map(item => (
-                      <Pressable key={item.label} onPress={() => { setFilterVisible(false); (navigation as any).navigate(item.route); }}
-                        style={[styles.filterOption, { paddingHorizontal: 12, paddingVertical: 8, borderColor: palette.inputBorder, backgroundColor: palette.card }]}>
-                        <KISIcon name={item.icon} size={14} color={palette.primaryStrong} />
-                        <Text style={[styles.filterOptionLabel, { color: palette.text }]}>{item.label}</Text>
-                      </Pressable>
+                      <KISButton
+                        key={item.label}
+                        variant="outline"
+                        size="sm"
+                        title={item.label}
+                        left={<KISIcon name={item.icon} size={14} color={palette.primaryStrong} />}
+                        onPress={() => { setFilterVisible(false); (navigation as any).navigate(item.route); }}
+                      />
                     ))}
                   </View>
                   <Text style={styles.filterSectionLabel}>Category</Text>
                   <Animated.ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 7, paddingBottom: 12 }}>
                     {FEED_CATEGORIES.map(cat => { const a = feedCategory === cat.id; return (
-                      <Pressable key={cat.id} onPress={() => setFeedCategory(cat.id)}
-                        style={[styles.filterOption, { paddingHorizontal: 14, paddingVertical: 8, borderColor: a ? palette.primaryStrong : palette.inputBorder, backgroundColor: a ? palette.primaryStrong : palette.card }]}>
-                        <Text style={[styles.filterOptionLabel, { color: a ? palette.onPrimary : palette.text }]}>{cat.label}</Text>
-                      </Pressable>
+                      <KISButton key={cat.id} title={cat.label} size="xs" variant={a ? 'primary' : 'outline'} onPress={() => setFeedCategory(cat.id)} />
                     ); })}
                   </Animated.ScrollView>
                   <Text style={[styles.filterSectionLabel, { marginTop: 4 }]}>Sort by</Text>
                   <View style={{ flexDirection: 'row', gap: 7, flexWrap: 'wrap', paddingBottom: 12 }}>
                     {([{ id: 'new' as const, label: 'Newest' }, { id: 'top' as const, label: 'Top' }, { id: 'oldest' as const, label: 'Oldest' }]).map(opt => { const a = feedSort === opt.id; return (
-                      <Pressable key={opt.id} onPress={() => setFeedSort(opt.id)}
-                        style={[styles.filterOption, { paddingHorizontal: 14, paddingVertical: 8, borderColor: a ? palette.primaryStrong : palette.inputBorder, backgroundColor: a ? palette.primaryStrong : palette.card }]}>
-                        <Text style={[styles.filterOptionLabel, { color: a ? palette.onPrimary : palette.text }]}>{opt.label}</Text>
-                      </Pressable>
+                      <KISButton key={opt.id} title={opt.label} size="xs" variant={a ? 'primary' : 'outline'} onPress={() => setFeedSort(opt.id)} />
                     ); })}
                   </View>
                   <Text style={[styles.filterSectionLabel, { marginTop: 4 }]}>Date range</Text>
                   <View style={{ flexDirection: 'row', gap: 7, flexWrap: 'wrap', paddingBottom: 12 }}>
                     {([{ id: 'today' as const, label: 'Today' }, { id: 'week' as const, label: 'This week' }, { id: 'month' as const, label: 'This month' }, { id: 'all' as const, label: 'All time' }]).map(opt => { const a = feedDatePreset === opt.id; return (
-                      <Pressable key={opt.id} onPress={() => setFeedDatePreset(opt.id)}
-                        style={[styles.filterOption, { paddingHorizontal: 14, paddingVertical: 8, borderColor: a ? palette.primaryStrong : palette.inputBorder, backgroundColor: a ? palette.primaryStrong : palette.card }]}>
-                        <Text style={[styles.filterOptionLabel, { color: a ? palette.onPrimary : palette.text }]}>{opt.label}</Text>
-                      </Pressable>
+                      <KISButton key={opt.id} title={opt.label} size="xs" variant={a ? 'primary' : 'outline'} onPress={() => setFeedDatePreset(opt.id)} />
                     ); })}
                   </View>
                   <Text style={[styles.filterSectionLabel, { marginTop: 4 }]}>Duration</Text>
                   <View style={{ flexDirection: 'row', gap: 7, flexWrap: 'wrap', paddingBottom: 8 }}>
                     {([{ id: 'short' as const, label: 'Short (<4m)' }, { id: 'medium' as const, label: 'Medium (4–20m)' }, { id: 'long' as const, label: 'Long (>20m)' }, { id: 'any' as const, label: 'Any length' }]).map(opt => { const a = feedDuration === opt.id; return (
-                      <Pressable key={opt.id} onPress={() => setFeedDuration(opt.id)}
-                        style={[styles.filterOption, { paddingHorizontal: 14, paddingVertical: 8, borderColor: a ? palette.primaryStrong : palette.inputBorder, backgroundColor: a ? palette.primaryStrong : palette.card }]}>
-                        <Text style={[styles.filterOptionLabel, { color: a ? palette.onPrimary : palette.text }]}>{opt.label}</Text>
-                      </Pressable>
+                      <KISButton key={opt.id} title={opt.label} size="xs" variant={a ? 'primary' : 'outline'} onPress={() => setFeedDuration(opt.id)} />
                     ); })}
                   </View>
                   {feedFiltersActive && (
-                    <Pressable onPress={() => { setFeedCategory('for_you'); setFeedSort('new'); setFeedDatePreset('all'); setFeedDuration('any'); }}
-                      style={{ alignSelf: 'flex-start', marginTop: 4, marginBottom: 4 }}>
-                      <Text style={{ color: palette.danger, fontSize: 12, fontWeight: '700', textDecorationLine: 'underline' }}>Reset all filters</Text>
-                    </Pressable>
+                    <KISButton
+                      title="Reset all filters"
+                      variant="ghost"
+                      size="xs"
+                      onPress={() => { setFeedCategory('for_you'); setFeedSort('new'); setFeedDatePreset('all'); setFeedDuration('any'); }}
+                      style={{ alignSelf: 'flex-start', marginTop: 4, marginBottom: 4 }}
+                      textStyle={{ color: palette.danger, textDecorationLine: 'underline' }}
+                    />
                   )}
                 </Animated.ScrollView>
               ) : (
@@ -685,17 +669,13 @@ export default function BroadcastScreen() {
       {/* Cart FAB (market tab only) */}
       {activeMainTab === 'market' && (
         <View pointerEvents="box-none" style={styles.cartOverlay}>
-          <Pressable
-            onPress={openCartList}
-            style={[styles.cartButton, {
-              backgroundColor: palette.primarySoft,
-              borderColor: palette.primary,
-              width: compactBroadcast ? 48 : 56,
-              height: compactBroadcast ? 48 : 56,
-              shadowColor: palette.shadow,
-            }]}
-          >
-            <KISIcon name="cart" size={22} color={palette.primaryStrong} />
+          <View>
+            <KISFab
+              icon="cart"
+              iconSize={22}
+              onPress={openCartList}
+              size={compactBroadcast ? 48 : 56}
+            />
             {totalCartItems > 0 && (
               <View style={[styles.cartBadge, { backgroundColor: palette.primaryStrong }]}>
                 <Text style={{ color: palette.surface, fontWeight: '800', fontSize: 11 }}>
@@ -703,7 +683,7 @@ export default function BroadcastScreen() {
                 </Text>
               </View>
             )}
-          </Pressable>
+          </View>
         </View>
       )}
 
@@ -805,18 +785,6 @@ const makeStyles = (palette: ReturnType<typeof useKISTheme>['palette']) =>
       paddingBottom: 24,
       zIndex: 100,
       elevation: 100,
-    },
-    cartButton: {
-      borderWidth: 1,
-      borderRadius: 999,
-      width: 56,
-      height: 56,
-      alignItems: 'center',
-      justifyContent: 'center',
-      elevation: 8,
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 0.18,
-      shadowRadius: 6,
     },
     cartBadge: {
       minWidth: 24,

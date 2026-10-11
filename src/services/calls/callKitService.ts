@@ -33,6 +33,7 @@
 
 import { Platform, PermissionsAndroid } from 'react-native';
 import type { CallType } from './callTypes';
+import { logCallDiagnostic } from './callDiagnostics';
 
 const CALLKIT_ENABLED = Platform.OS === 'android' ? true : !__DEV__;
 
@@ -93,11 +94,42 @@ type CallKeepCallbacks = {
 
 let _callbacks: CallKeepCallbacks | null = null;
 
-export function setupCallKit(callbacks: CallKeepCallbacks): void {
-  if (!RNCallKeep) return;
-  _callbacks = callbacks;
+// Guards RNCallKeep.setup() so it only ever runs once per JS process.
+// Critically, this must be reachable from TWO separate entry points that
+// never run together:
+//   1. SocketProvider's mount-time useEffect (app foreground/backgrounded,
+//      React tree alive) — via setupCallKit() below.
+//   2. handleBackgroundPushMessage in push/notifications.ts, invoked by
+//      Android as a HEADLESS JS task when the app is fully KILLED and an
+//      incoming-call FCM data message arrives. No React tree ever mounts
+//      in that execution context, so SocketProvider's effect never runs —
+//      which meant displayIncomingCall() was being called natively before
+//      RNCallKeep.setup() had EVER run in that process. setup() is what
+//      registers the Android PhoneAccount + notification channel that
+//      displayIncomingCall()'s native ConnectionService call depends on;
+//      without it, the call silently never rings while regular message/
+//      missed-call pushes (OS-rendered from the `notification` block,
+//      no JS required at all) kept working — exactly this app's reported
+//      symptom. ensureCallKeepSetup() closes that gap by making setup()
+//      safe (and necessary) to call from both places.
+let _setupPromise: Promise<void> | null = null;
+
+// Returns a promise that resolves once RNCallKeep.setup() has completed (or
+// resolves immediately if setup already ran/is running). Callers that need
+// setup to have genuinely finished before touching the native call APIs —
+// displayIncomingCall() in particular — must await this, not just invoke it
+// fire-and-forget, otherwise the native PhoneAccount registration setup()
+// performs may not have landed yet by the time displayIncomingCall() fires.
+export function ensureCallKeepSetup(): Promise<void> {
+  if (!RNCallKeep) return Promise.resolve();
+  if (_setupPromise) return _setupPromise;
 
   // On Android, READ_PHONE_STATE must be requested at runtime before setup().
+  // PermissionsAndroid.request() needs a foreground Activity to show its
+  // dialog — in the headless background-handler entry point there is none,
+  // so this reliably no-ops there (resolves with whatever state already
+  // existed) rather than throwing; the normal foreground call to
+  // setupCallKit() is what actually prompts the user the first time.
   if (Platform.OS === 'android') {
     PermissionsAndroid.request(
       PermissionsAndroid.PERMISSIONS.READ_PHONE_STATE,
@@ -137,34 +169,49 @@ export function setupCallKit(callbacks: CallKeepCallbacks): void {
     ]).catch((e) => logCallKitError('proactive mic/camera permission request', e));
   }
 
-  try {
-    RNCallKeep.setup({
-      ios: {
-        appName: APP_NAME,
-        supportsVideo: true,
-        maximumCallGroups: '1',
-        maximumCallsPerCallGroup: '1',
-        includesCallsInRecents: true,
+  const setupPromise: Promise<void> = RNCallKeep.setup({
+    ios: {
+      appName: APP_NAME,
+      supportsVideo: true,
+      maximumCallGroups: '1',
+      maximumCallsPerCallGroup: '1',
+      includesCallsInRecents: true,
+    },
+    android: {
+      alertTitle: 'Allow KIS to manage calls',
+      alertDescription:
+        'KIS needs permission to show incoming call screens on your lock screen and manage call audio.',
+      cancelButton: 'Not now',
+      okButton: 'Allow',
+      imageName: 'ic_launcher',
+      additionalPermissions: [
+        PermissionsAndroid.PERMISSIONS.READ_PHONE_STATE,
+        PermissionsAndroid.PERMISSIONS.CALL_PHONE,
+      ],
+      foregroundService: {
+        channelId: 'com.kis.calls',
+        channelName: 'KIS calls',
+        notificationTitle: 'KIS call in progress',
       },
-      android: {
-        alertTitle: 'Allow KIS to manage calls',
-        alertDescription:
-          'KIS needs permission to show incoming call screens on your lock screen and manage call audio.',
-        cancelButton: 'Not now',
-        okButton: 'Allow',
-        imageName: 'ic_launcher',
-        additionalPermissions: [
-          PermissionsAndroid.PERMISSIONS.READ_PHONE_STATE,
-          PermissionsAndroid.PERMISSIONS.CALL_PHONE,
-        ],
-        foregroundService: {
-          channelId: 'com.kis.calls',
-          channelName: 'KIS calls',
-          notificationTitle: 'KIS call in progress',
-        },
-      },
-    }).catch((e: any) => logCallKitError('setup', e));
+    },
+  }).then(() => undefined).catch((e: any) => {
+    // A failed setup() must be retried on the next call attempt rather than
+    // permanently abandoned — otherwise one transient failure (e.g. a race
+    // during a headless invocation) would silently disable ringing for the
+    // rest of the process's lifetime.
+    _setupPromise = null;
+    logCallKitError('setup', e);
+  });
+  _setupPromise = setupPromise;
+  return setupPromise;
+}
 
+export function setupCallKit(callbacks: CallKeepCallbacks): void {
+  if (!RNCallKeep) return;
+  _callbacks = callbacks;
+  ensureCallKeepSetup();
+
+  try {
     RNCallKeep.addEventListener('answerCall', ({ callUUID }: { callUUID: string }) => {
       _callbacks?.onAnswerCall(callUUID);
     });
@@ -202,15 +249,40 @@ export function teardownCallKit(): void {
 
 /** Returns whether the native call actually got shown, so callers (the
  * push/socket call.offer handlers) can tell "we tried to ring and it
- * failed" apart from "everything worked" instead of assuming success. */
-export function displayIncomingCall(params: {
+ * failed" apart from "everything worked" instead of assuming success.
+ *
+ * Async (not sync) specifically so the setup-before-display ordering below
+ * is a genuine await, not a fire-and-forget race — see ensureCallKeepSetup's
+ * doc comment for why that race was the actual root cause of calls never
+ * ringing from a killed app. */
+export async function displayIncomingCall(params: {
   callUUID: string;
   callerName: string;
   callType: CallType;
-}): boolean {
+}): Promise<boolean> {
   if (!RNCallKeep) {
     console.warn(`[CallKit] displayIncomingCall skipped for callId=${params.callUUID}: RNCallKeep unavailable — no native ring UI will show.`);
     return false;
+  }
+  // Must-complete-first: see ensureCallKeepSetup()'s doc comment. This is
+  // the only call in the headless (killed-app) background-push entry point
+  // — SocketProvider's setupCallKit() never mounts there — so without
+  // awaiting this, RNCallKeep.setup() may not have finished registering the
+  // Android PhoneAccount/notification channel yet when displayIncomingCall()
+  // fires, and the native call below silently fails to ring. Resolves
+  // immediately (no real delay) once setup has already completed in this
+  // process — e.g. every call after the first in a long-lived app session.
+  await ensureCallKeepSetup();
+  if (!(await isPhoneAccountEnabled())) {
+    void logCallDiagnostic({
+      stage: 'CALLKEEP_PHONE_ACCOUNT_DISABLED',
+      callId: params.callUUID,
+      callType: params.callType,
+    });
+    console.warn(`[CallKit] phone account not enabled for callId=${params.callUUID} — attempting to ring anyway, but Android will likely refuse it. The user needs to enable KIS under Settings > Apps > Calling accounts.`);
+    // Fall through and attempt it anyway — isPhoneAccountEnabled() fails
+    // open on its own errors, and a stale read is possible; better to try
+    // and fail than to skip a call that might actually have worked.
   }
   try {
     const hasVideo =
@@ -226,6 +298,51 @@ export function displayIncomingCall(params: {
   } catch (e) {
     logCallKitError(`displayIncomingCall callId=${params.callUUID}`, e);
     return false;
+  }
+}
+
+/**
+ * Android only. KIS registers its ConnectionService as a REGULAR (non
+ * self-managed) phone account — see AndroidManifest.xml's VoiceConnectionService
+ * — which Android requires the USER to explicitly enable, once, via a system
+ * settings screen (the react-native-callkeep setup() call's
+ * alertTitle/alertDescription/cancelButton/okButton prompt THIS screen to
+ * open). If the user dismisses that one-time prompt ("Not now") or it never
+ * successfully surfaces, the phone account stays permanently disabled and
+ * every subsequent RNCallKeep.displayIncomingCall() silently fails to ring —
+ * forever, with no further native prompt — while every OTHER push type
+ * keeps working normally since they don't depend on this at all. This is
+ * indistinguishable from the outside from "the push/socket never arrived",
+ * which is exactly what made it look like a delivery bug rather than a
+ * one-time Android settings toggle the user never completed.
+ *
+ * Resolves true on iOS (CallKit has no equivalent "enable this account"
+ * step) and when RNCallKeep itself isn't available, so callers can treat
+ * "not applicable" and "genuinely enabled" the same way.
+ */
+export async function isPhoneAccountEnabled(): Promise<boolean> {
+  if (Platform.OS !== 'android' || !RNCallKeep) return true;
+  try {
+    return await RNCallKeep.checkPhoneAccountEnabled();
+  } catch (e) {
+    logCallKitError('checkPhoneAccountEnabled', e);
+    // Fail open rather than nagging the user over a check that itself
+    // errored — displayIncomingCall's own try/catch is the real backstop
+    // if the account truly isn't enabled.
+    return true;
+  }
+}
+
+/** Opens Android's native "Calling accounts" settings screen (same
+ * destination the one-time setup() prompt would have opened), so the user
+ * can manually enable KIS's phone account after having missed/dismissed
+ * that prompt the first time. No-op on iOS or if RNCallKeep is unavailable. */
+export function openPhoneAccountSettings(): void {
+  if (Platform.OS !== 'android' || !RNCallKeep) return;
+  try {
+    RNCallKeep.openPhoneAccountSettings();
+  } catch (e) {
+    logCallKitError('openPhoneAccountSettings', e);
   }
 }
 

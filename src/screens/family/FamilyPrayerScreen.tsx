@@ -21,6 +21,7 @@ import { postRequest } from '@/network/post';
 import { patchRequest } from '@/network/patch';
 import ROUTES from '@/network';
 import { KISIcon } from '@/constants/kisIcons';
+import KISFab from '@/components/KISFab';
 import KISButton from '@/constants/KISButton';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'FamilyPrayer'>;
@@ -185,13 +186,7 @@ export default function FamilyPrayerScreen({ navigation: _navigation }: Props) {
       />
 
       {/* FAB */}
-      <TouchableOpacity
-        style={[styles.fab, { backgroundColor: palette.gold }]}
-        onPress={() => setShowForm(true)}
-        activeOpacity={0.85}
-      >
-        <KISIcon name="add" size={28} color={palette.bg} />
-      </TouchableOpacity>
+      <KISFab icon="add" onPress={() => setShowForm(true)} style={styles.fab} />
 
       {/* Add Prayer Modal */}
       <Modal visible={showForm} animationType="slide" transparent onRequestClose={() => setShowForm(false)}>
@@ -251,16 +246,6 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: 28,
     right: 24,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    alignItems: 'center',
-    justifyContent: 'center',
-    elevation: 6,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.2,
-    shadowRadius: 6,
   },
   modalOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.45)' },
   modalSheet: { borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 24, gap: 12 },

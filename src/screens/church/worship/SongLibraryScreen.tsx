@@ -4,7 +4,6 @@ import {
   Alert,
   FlatList,
   Modal,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -18,6 +17,8 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useKISTheme } from '@/theme/useTheme';
 import { useResponsiveLayout } from '@/theme/responsive';
 import { KISIcon } from '@/constants/kisIcons';
+import KISButton from '@/constants/KISButton';
+import KISFab from '@/components/KISFab';
 import { getRequest } from '@/network/get';
 import { postRequest } from '@/network/post';
 import ROUTES from '@/network';
@@ -197,13 +198,7 @@ export default function SongLibraryScreen({ navigation }: Props) {
         />
       )}
 
-      <TouchableOpacity
-        style={[styles.fab, { backgroundColor: palette.primary }]}
-        onPress={() => setAddVisible(true)}
-        activeOpacity={0.85}
-      >
-        <KISIcon name="add" size={24} color={palette.onPrimary ?? palette.ivory} />
-      </TouchableOpacity>
+      <KISFab icon="add" iconSize={24} onPress={() => setAddVisible(true)} style={styles.fab} />
 
       <Modal visible={addVisible} animationType="slide" transparent onRequestClose={() => setAddVisible(false)}>
         <View style={styles.modalOverlay}>
@@ -241,20 +236,14 @@ export default function SongLibraryScreen({ navigation }: Props) {
               />
             </ScrollView>
             <View style={styles.modalActions}>
-              <Pressable style={styles.modalCancelBtn} onPress={() => setAddVisible(false)} disabled={saving}>
-                <Text style={styles.modalCancelText}>Cancel</Text>
-              </Pressable>
-              <Pressable
-                style={[styles.modalSaveBtn, { backgroundColor: palette.primary }]}
+              <KISButton title="Cancel" variant="outline" onPress={() => setAddVisible(false)} disabled={saving} style={{ flex: 1 }} />
+              <KISButton
+                title="Save"
                 onPress={handleAddSong}
                 disabled={saving}
-              >
-                {saving ? (
-                  <ActivityIndicator size="small" color={palette.onPrimary ?? '#fff'} />
-                ) : (
-                  <Text style={styles.modalSaveText}>Save</Text>
-                )}
-              </Pressable>
+                loading={saving}
+                style={{ flex: 1 }}
+              />
             </View>
           </View>
         </View>
@@ -335,16 +324,6 @@ function makeStyles(palette: any, layout: any) {
       position: 'absolute',
       right: 20,
       bottom: 28,
-      width: 52,
-      height: 52,
-      borderRadius: 26,
-      alignItems: 'center',
-      justifyContent: 'center',
-      elevation: 4,
-      shadowColor: '#000',
-      shadowOpacity: 0.2,
-      shadowRadius: 6,
-      shadowOffset: { width: 0, height: 3 },
     },
     modalOverlay: {
       flex: 1,
@@ -370,9 +349,5 @@ function makeStyles(palette: any, layout: any) {
     },
     modalTextarea: { minHeight: 90, textAlignVertical: 'top' },
     modalActions: { flexDirection: 'row', gap: 10, marginTop: 4 },
-    modalCancelBtn: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 12, borderRadius: 10, borderWidth: StyleSheet.hairlineWidth, borderColor: palette.divider },
-    modalCancelText: { color: palette.text, fontWeight: '700' },
-    modalSaveBtn: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 12, borderRadius: 10 },
-    modalSaveText: { color: '#fff', fontWeight: '700' },
   });
 }

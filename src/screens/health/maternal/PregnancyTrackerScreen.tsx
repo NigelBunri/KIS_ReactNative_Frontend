@@ -193,22 +193,13 @@ export default function PregnancyTrackerScreen({ navigation }: Props) {
               <Text style={styles.cardTitle}>Log Symptoms</Text>
               <View style={styles.symptomsRow}>
                 {SYMPTOM_CHIPS.map((s) => (
-                  <TouchableOpacity
+                  <KISButton
                     key={s}
-                    style={[
-                      styles.symptomChip,
-                      selectedSymptoms.includes(s) && styles.symptomChipActive,
-                    ]}
+                    title={s.charAt(0).toUpperCase() + s.slice(1)}
+                    size="xs"
+                    variant={selectedSymptoms.includes(s) ? 'primary' : 'outline'}
                     onPress={() => toggleSymptom(s)}
-                    hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-                  >
-                    <Text style={[
-                      styles.symptomText,
-                      selectedSymptoms.includes(s) && styles.symptomTextActive,
-                    ]}>
-                      {s.charAt(0).toUpperCase() + s.slice(1)}
-                    </Text>
-                  </TouchableOpacity>
+                  />
                 ))}
               </View>
               <KISButton
@@ -309,21 +300,5 @@ function makeStyles(palette: any, sp: number) {
     appointmentDoctor: { fontSize: 13, color: palette.text, marginTop: 2 },
     appointmentDate: { fontSize: 12, color: palette.subtext, marginTop: 2 },
     symptomsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-    symptomChip: {
-      paddingHorizontal: 14,
-      paddingVertical: 8,
-      borderRadius: 20,
-      backgroundColor: palette.surface,
-      borderWidth: 1,
-      borderColor: palette.divider,
-      minHeight: 36,
-      justifyContent: 'center',
-    },
-    symptomChipActive: {
-      backgroundColor: palette.primarySoft,
-      borderColor: palette.primary,
-    },
-    symptomText: { fontSize: 13, color: palette.subtext },
-    symptomTextActive: { color: palette.primary, fontWeight: '600' },
   });
 }

@@ -16,6 +16,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { KISIcon } from '@/constants/kisIcons';
+import KISButton from '@/constants/KISButton';
 import { resolveBackendAssetUrl } from '@/network';
 import type { RootStackParamList } from '@/navigation/types';
 import { useKISTheme } from '@/theme/useTheme';
@@ -358,9 +359,13 @@ export default function ChannelHomePage() {
           {TABS.map(tab => {
             const active = activeTab === tab.id;
             return (
-              <Pressable key={tab.id} onPress={() => setActiveTab(tab.id)} style={[styles.tabPill, { backgroundColor: active ? palette.primarySoft : palette.surface, borderColor: active ? palette.primary : palette.border }]}> 
-                <Text style={{ color: active ? palette.primaryStrong : palette.text, fontWeight: '900', fontSize: 12 }}>{tab.label}</Text>
-              </Pressable>
+              <KISButton
+                key={tab.id}
+                title={tab.label}
+                variant={active ? 'primary' : 'outline'}
+                size="sm"
+                onPress={() => setActiveTab(tab.id)}
+              />
             );
           })}
         </ScrollView>

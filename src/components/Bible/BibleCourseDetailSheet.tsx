@@ -1165,21 +1165,13 @@ export default function BibleCourseDetailSheet({
             <View style={styles.actionRow}>
               <Text style={{ color: palette.subtext }}>Speed</Text>
               {[0.75, 1, 1.25, 1.5, 2].map((rate) => (
-                <Pressable
+                <KISButton
                   key={rate}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Playback speed ${rate}x`}
                   onPress={() => setPlaybackRate(rate)}
-                  style={[
-                    styles.speedChip,
-                    {
-                      borderColor: playbackRate === rate ? palette.primary : palette.divider,
-                      backgroundColor: playbackRate === rate ? palette.primarySoft : palette.surface,
-                    },
-                  ]}
-                >
-                  <Text style={{ color: palette.text }}>{rate}x</Text>
-                </Pressable>
+                  variant={playbackRate === rate ? 'primary' : 'outline'}
+                  size="xs"
+                  title={`${rate}x`}
+                />
               ))}
             </View>
 
@@ -1514,7 +1506,6 @@ const styles = StyleSheet.create({
   videoPlayer: { width: '100%', height: 220, borderRadius: 12, backgroundColor: '#000' },
   audioPlayer: { width: '100%', height: 60, borderRadius: 12, backgroundColor: '#000' },
   pdfViewer: { flex: 1, width: '100%' },
-  speedChip: { borderWidth: 2, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 6 },
   quizChoice: { borderWidth: 2, borderRadius: 10, padding: 10 },
   badgeRow: { flexDirection: 'row', gap: 6, flexWrap: 'wrap', marginTop: 6 },
   badge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 999, fontSize: 11 },

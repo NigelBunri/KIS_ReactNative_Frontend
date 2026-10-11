@@ -21,6 +21,7 @@ import RNFS from 'react-native-fs';
 import ImageResizer from 'react-native-image-resizer';
 
 import { KISIcon } from '@/constants/kisIcons';
+import KISButton from '@/constants/KISButton';
 import { StickerBackgroundRemovalScreen } from './StickerBackgroundRemovalScreen';
 import { useSafeTopInset } from '@/hooks/useSafeTopInset';
 import {
@@ -384,30 +385,21 @@ export const StickerEditor: React.FC<StickerEditorProps> = ({
           Create Sticker
         </Text>
 
-        <Pressable
+        <KISButton
+          variant="outline"
+          size="sm"
           onPress={handleOpenPackStore}
-          style={{ paddingHorizontal: 8, paddingVertical: 6 }}
-        >
-          <Text style={{ color: palette.primary, fontSize: 13 }}>Browse</Text>
-        </Pressable>
+          title="Browse"
+        />
 
-        <Pressable
+        <KISButton
+          variant="outline"
+          size="sm"
+          style={{ marginLeft: 8 }}
           onPress={handleSave}
           disabled={!canSave}
-          style={{
-            paddingHorizontal: 12,
-            paddingVertical: 6,
-            borderRadius: 16,
-            backgroundColor: canSave
-              ? palette.primary
-              : 'rgba(255,255,255,0.25)',
-            opacity: canSave ? 1 : 0.5,
-          }}
-        >
-          <Text style={{ color: palette.onPrimary, fontWeight: '600' }}>
-            {saving ? 'Saving…' : 'Save'}
-          </Text>
-        </Pressable>
+          title={saving ? 'Saving…' : 'Save'}
+        />
       </View>
 
       {/* BODY */}
@@ -497,37 +489,20 @@ export const StickerEditor: React.FC<StickerEditorProps> = ({
               alignItems: 'center',
             }}
           >
-            <Pressable
+            <KISButton
+              variant="outline"
+              size="sm"
               onPress={handlePickImage}
-              style={{
-                paddingHorizontal: 12,
-                paddingVertical: 8,
-                borderRadius: 20,
-                backgroundColor: palette.card,
-              }}
-            >
-              <Text style={{ color: palette.text }}>Choose Image</Text>
-            </Pressable>
+              title="Choose Image"
+            />
 
-            <Pressable
+            <KISButton
+              variant="outline"
+              size="sm"
               onPress={handleOpenBgRemoval}
               disabled={!imageUri || showBgRemoval}
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                paddingHorizontal: 12,
-                paddingVertical: 8,
-                borderRadius: 20,
-                backgroundColor:
-                  imageUri && !showBgRemoval
-                    ? palette.card
-                    : 'rgba(255,255,255,0.2)',
-              }}
-            >
-              <Text style={{ color: palette.text }}>
-                {bgRemoved ? 'BG Removed ✓' : 'Remove BG'}
-              </Text>
-            </Pressable>
+              title={bgRemoved ? 'BG Removed ✓' : 'Remove BG'}
+            />
           </View>
 
           {/* Text Input */}
@@ -583,30 +558,16 @@ export const StickerEditor: React.FC<StickerEditorProps> = ({
           <Text style={{ color: palette.subtext, marginTop: 12 }}>
             Text size
           </Text>
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
-            {FONT_SIZES.map((s) => {
-              const selected = s === fontSize;
-              return (
-                <Pressable
-                  key={s}
-                  onPress={() => setFontSize(s)}
-                  style={{
-                    paddingHorizontal: 10,
-                    paddingVertical: 6,
-                    borderRadius: 16,
-                    borderWidth: 2,
-                    borderColor: selected ? palette.primary : '#666',
-                    backgroundColor: selected
-                      ? palette.primary + '33'
-                      : 'transparent',
-                    marginRight: 8,
-                    marginBottom: 8,
-                  }}
-                >
-                  <Text style={{ color: palette.text }}>{s}</Text>
-                </Pressable>
-              );
-            })}
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+            {FONT_SIZES.map((s) => (
+              <KISButton
+                key={s}
+                variant={s === fontSize ? 'primary' : 'outline'}
+                size="xs"
+                onPress={() => setFontSize(s)}
+                title={String(s)}
+              />
+            ))}
           </View>
         </View>
       </View>
@@ -679,7 +640,9 @@ export const StickerEditor: React.FC<StickerEditorProps> = ({
                         <Text style={{ color: palette.text, fontWeight: '600', fontSize: 15 }}>{pack.name}</Text>
                         <Text style={{ color: palette.subtext, fontSize: 12 }}>{pack.stickers.length} stickers</Text>
                       </View>
-                      <Pressable
+                      <KISButton
+                        variant="outline"
+                        size="sm"
                         onPress={async () => {
                           if (isInstalled) {
                             await uninstallPack(pack.id);
@@ -689,17 +652,8 @@ export const StickerEditor: React.FC<StickerEditorProps> = ({
                             setInstalledPackIds(prev => [...prev, pack.id]);
                           }
                         }}
-                        style={{
-                          paddingHorizontal: 14,
-                          paddingVertical: 7,
-                          borderRadius: 14,
-                          backgroundColor: isInstalled ? palette.surface : palette.primary,
-                        }}
-                      >
-                        <Text style={{ color: isInstalled ? palette.subtext : palette.onPrimary, fontSize: 13, fontWeight: '600' }}>
-                          {isInstalled ? 'Remove' : 'Add'}
-                        </Text>
-                      </Pressable>
+                        title={isInstalled ? 'Remove' : 'Add'}
+                      />
                     </View>
                   );
                 }}

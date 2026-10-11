@@ -21,6 +21,7 @@ import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useKISTheme } from '@/theme/useTheme';
 import { KISIcon } from '@/constants/kisIcons';
+import KISButton from '@/constants/KISButton';
 import { KISVideo } from '@/Module/vieo';
 import type { RootStackParamList } from '@/navigation/types';
 import { isVideoAttachment } from '@/components/broadcast/attachmentPreview';
@@ -352,11 +353,7 @@ export default function PlaylistDetailScreen() {
           <Text style={[styles.notFoundText, { color: palette.subtext }]}>
             Playlist not found.
           </Text>
-          <Pressable onPress={() => navigation.goBack()} style={styles.backLink}>
-            <Text style={[styles.backLinkText, { color: palette.primaryStrong }]}>
-              Go back
-            </Text>
-          </Pressable>
+          <KISButton title="Go back" variant="ghost" onPress={() => navigation.goBack()} style={styles.backLink} />
         </View>
       </SafeAreaView>
     );
@@ -366,9 +363,9 @@ export default function PlaylistDetailScreen() {
     <SafeAreaView style={[styles.root, { backgroundColor: palette.bg, }]} edges={['top', 'bottom']}>
       {/* ── Header ── */}
       <View style={[styles.header, { borderBottomColor: palette.divider }]}>
-        <Pressable onPress={() => navigation.goBack()} hitSlop={12} style={styles.headerBack}>
+        <KISButton variant="ghost" onPress={() => navigation.goBack()} style={styles.headerBack}>
           <KISIcon name="chevron-left" size={22} color={palette.text} />
-        </Pressable>
+        </KISButton>
 
         {editingName ? (
           <TextInput
@@ -382,17 +379,17 @@ export default function PlaylistDetailScreen() {
             maxLength={60}
           />
         ) : (
-          <Pressable style={styles.nameRow} onPress={startRename}>
+          <KISButton variant="ghost" style={styles.nameRow} onPress={startRename}>
             <Text style={[styles.headerTitle, { color: palette.text }]} numberOfLines={1}>
               {playlist.name}
             </Text>
             <KISIcon name="add" size={15} color={palette.subtext} />
-          </Pressable>
+          </KISButton>
         )}
 
-        <Pressable onPress={handleDelete} hitSlop={12} style={styles.headerDelete}>
+        <KISButton variant="ghost" onPress={handleDelete} style={styles.headerDelete}>
           <KISIcon name="trash" size={18} color={palette.subtext} />
-        </Pressable>
+        </KISButton>
       </View>
 
       <ScrollView
@@ -445,60 +442,31 @@ export default function PlaylistDetailScreen() {
           {/* Playback controls */}
           {items.length > 0 && (
             <View style={styles.controls}>
-              <Pressable
-                onPress={handlePrev}
-                disabled={currentIndex < 0}
-                hitSlop={10}
-                style={[
-                  styles.controlBtn,
-                  { backgroundColor: palette.surface, borderColor: palette.divider },
-                  currentIndex < 0 && styles.controlDisabled,
-                ]}
-              >
+              <KISButton variant="outline" disabled={currentIndex < 0} onPress={handlePrev}>
                 <KISIcon
                   name="arrow-left"
                   size={18}
                   color={currentIndex >= 0 ? palette.text : palette.subtext}
                 />
-              </Pressable>
+              </KISButton>
 
-              <Pressable
+              <KISButton
+                title="Play All"
                 onPress={handlePlayAll}
-                style={[styles.playAllBtn, { backgroundColor: palette.primaryStrong }]}
-              >
-                <KISIcon name="play" size={18} color={palette.surface} />
-                <Text style={[styles.playAllText, { color: palette.surface }]}>
-                  Play All
-                </Text>
-              </Pressable>
+                left={<KISIcon name="play" size={18} color={palette.onPrimary} />}
+              />
 
-              <Pressable
-                onPress={handleShuffle}
-                hitSlop={10}
-                style={[
-                  styles.controlBtn,
-                  { backgroundColor: isShuffled ? palette.primaryStrong : palette.surface, borderColor: isShuffled ? palette.primaryStrong : palette.divider },
-                ]}
-              >
-                <KISIcon name="refresh" size={18} color={isShuffled ? palette.surface : palette.text} />
-              </Pressable>
+              <KISButton variant={isShuffled ? 'primary' : 'outline'} onPress={handleShuffle}>
+                <KISIcon name="refresh" size={18} color={isShuffled ? palette.onPrimary : palette.text} />
+              </KISButton>
 
-              <Pressable
-                onPress={handleNext}
-                disabled={currentIndex < 0}
-                hitSlop={10}
-                style={[
-                  styles.controlBtn,
-                  { backgroundColor: palette.surface, borderColor: palette.divider },
-                  currentIndex < 0 && styles.controlDisabled,
-                ]}
-              >
+              <KISButton variant="outline" disabled={currentIndex < 0} onPress={handleNext}>
                 <KISIcon
                   name="chevron-right"
                   size={18}
                   color={currentIndex >= 0 ? palette.text : palette.subtext}
                 />
-              </Pressable>
+              </KISButton>
             </View>
           )}
 
@@ -517,26 +485,13 @@ export default function PlaylistDetailScreen() {
             {LOOP_MODES.map(mode => {
               const active = loopMode === mode.id;
               return (
-                <Pressable
+                <KISButton
                   key={mode.id}
+                  title={mode.label}
+                  size="xs"
+                  variant={active ? 'primary' : 'outline'}
                   onPress={() => handleLoopModeChange(mode.id)}
-                  style={[
-                    styles.loopBtn,
-                    {
-                      backgroundColor: active ? palette.primaryStrong : palette.surface,
-                      borderColor: active ? palette.primaryStrong : palette.divider,
-                    },
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.loopBtnText,
-                      { color: active ? palette.surface : palette.text },
-                    ]}
-                  >
-                    {mode.label}
-                  </Text>
-                </Pressable>
+                />
               );
             })}
           </View>
@@ -557,23 +512,21 @@ export default function PlaylistDetailScreen() {
               {items.length} {items.length === 1 ? 'Item' : 'Items'}
             </Text>
             <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
-              <Pressable
+              <KISButton
+                variant="outline"
+                size="xs"
+                title={visibility.charAt(0).toUpperCase() + visibility.slice(1)}
+                left={<KISIcon name="lock" size={12} color={palette.subtext} />}
                 onPress={handleChangeVisibility}
-                style={[styles.visibilityPill, { borderColor: palette.divider, backgroundColor: palette.surface }]}
-              >
-                <KISIcon name="lock" size={12} color={palette.subtext} />
-                <Text style={[styles.visibilityLabel, { color: palette.subtext }]}>
-                  {visibility.charAt(0).toUpperCase() + visibility.slice(1)}
-                </Text>
-              </Pressable>
+              />
               {items.length > 0 && (
-                <Pressable
+                <KISButton
+                  variant="outline"
+                  size="xs"
+                  title="Watch Later"
+                  left={<KISIcon name="bookmark" size={12} color={palette.primaryStrong} />}
                   onPress={handleSaveToWatchLater}
-                  style={[styles.visibilityPill, { borderColor: palette.divider, backgroundColor: palette.surface }]}
-                >
-                  <KISIcon name="bookmark" size={12} color={palette.primaryStrong} />
-                  <Text style={[styles.visibilityLabel, { color: palette.primaryStrong }]}>Watch Later</Text>
-                </Pressable>
+                />
               )}
             </View>
           </View>
@@ -689,32 +642,28 @@ export default function PlaylistDetailScreen() {
 
                 {/* Reorder buttons */}
                 <View style={styles.reorderBtns}>
-                  <Pressable
-                    onPress={() => handleMoveItem(idx, 'up')}
+                  <KISButton
+                    variant="ghost"
                     disabled={idx === 0}
-                    hitSlop={8}
-                    style={[styles.reorderBtn, { opacity: idx === 0 ? 0.25 : 1 }]}
+                    onPress={() => handleMoveItem(idx, 'up')}
+                    style={styles.reorderBtn}
                   >
                     <Text style={[styles.reorderArrow, { color: palette.subtext }]}>↑</Text>
-                  </Pressable>
-                  <Pressable
-                    onPress={() => handleMoveItem(idx, 'down')}
+                  </KISButton>
+                  <KISButton
+                    variant="ghost"
                     disabled={idx === items.length - 1}
-                    hitSlop={8}
-                    style={[styles.reorderBtn, { opacity: idx === items.length - 1 ? 0.25 : 1 }]}
+                    onPress={() => handleMoveItem(idx, 'down')}
+                    style={styles.reorderBtn}
                   >
                     <Text style={[styles.reorderArrow, { color: palette.subtext }]}>↓</Text>
-                  </Pressable>
+                  </KISButton>
                 </View>
 
                 {/* Remove button */}
-                <Pressable
-                  onPress={() => handleRemoveItem(it.id, idx)}
-                  hitSlop={10}
-                  style={styles.removeBtn}
-                >
+                <KISButton variant="ghost" onPress={() => handleRemoveItem(it.id, idx)} style={styles.removeBtn}>
                   <KISIcon name="close" size={16} color={palette.subtext} />
-                </Pressable>
+                </KISButton>
               </Pressable>
             );
           })}
@@ -808,29 +757,6 @@ const styles = StyleSheet.create({
     paddingTop: 14,
     paddingBottom: 4,
   },
-  controlBtn: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  controlDisabled: {
-    opacity: 0.35,
-  },
-  playAllBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 24,
-  },
-  playAllText: {
-    fontSize: 15,
-    fontWeight: '800',
-  },
   nowPlayingLabel: {
     fontSize: 12,
     fontWeight: '500',
@@ -857,16 +783,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
-  },
-  loopBtn: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 20,
-    borderWidth: 1.5,
-  },
-  loopBtnText: {
-    fontSize: 13,
-    fontWeight: '700',
   },
   loopHint: {
     fontSize: 12,
@@ -971,20 +887,6 @@ const styles = StyleSheet.create({
     flexShrink: 0,
   },
 
-  visibilityPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    borderWidth: 1,
-    borderRadius: 12,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-  },
-  visibilityLabel: {
-    fontSize: 11,
-    fontWeight: '700',
-  },
-
   // ─── Not found ────────────────────────────────
   notFound: {
     flex: 1,
@@ -996,8 +898,4 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   backLink: { padding: 8 },
-  backLinkText: {
-    fontSize: 15,
-    fontWeight: '700',
-  },
 });

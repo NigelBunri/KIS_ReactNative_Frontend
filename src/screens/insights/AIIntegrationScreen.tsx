@@ -19,6 +19,8 @@ import { postRequest } from '@/network/post';
 import { patchRequest } from '@/network/patch';
 import { useKISTheme } from '@/theme/useTheme';
 import { useResponsiveLayout } from '@/theme/responsive';
+import KISButton from '@/constants/KISButton';
+import KISFab from '@/components/KISFab';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -122,9 +124,7 @@ function ModelsTab({ palette }: { palette: any }) {
     return (
       <View style={styles.center}>
         <Text style={{ color: palette.danger, textAlign: 'center' }}>{error}</Text>
-        <Pressable onPress={load} style={[styles.retryBtn, { backgroundColor: palette.primaryStrong }]}>
-          <Text style={{ color: palette.onPrimary, fontWeight: '700' }}>Retry</Text>
-        </Pressable>
+        <KISButton title="Retry" onPress={load} />
       </View>
     );
   }
@@ -159,19 +159,14 @@ function ModelsTab({ palette }: { palette: any }) {
                   <Text style={[styles.cardChip, { color: palette.subtext }]}>{item.type}</Text>
                 ) : null}
               </View>
-              <Pressable
-                onPress={() => toggleStatus(item)}
+              <KISButton
+                title={isActive ? 'Active' : 'Inactive'}
+                size="xs"
+                variant={isActive ? 'primary' : 'outline'}
+                loading={toggling === item.id}
                 disabled={toggling === item.id}
-                style={[
-                  styles.statusToggle,
-                  { backgroundColor: isActive ? palette.success : palette.divider },
-                ]}
-              >
-                {toggling === item.id
-                  ? <ActivityIndicator size="small" color={palette.onPrimary} />
-                  : <Text style={[styles.statusToggleText, { color: palette.onPrimary }]}>{isActive ? 'Active' : 'Inactive'}</Text>
-                }
-              </Pressable>
+                onPress={() => toggleStatus(item)}
+              />
             </View>
             {item.description ? (
               <Text style={[styles.cardDesc, { color: palette.subtext }]} numberOfLines={3}>
@@ -234,9 +229,7 @@ function JobsTab({ palette }: { palette: any }) {
     return (
       <View style={styles.center}>
         <Text style={{ color: palette.danger, textAlign: 'center' }}>{error}</Text>
-        <Pressable onPress={() => load()} style={[styles.retryBtn, { backgroundColor: palette.primaryStrong }]}>
-          <Text style={{ color: palette.onPrimary, fontWeight: '700' }}>Retry</Text>
-        </Pressable>
+        <KISButton title="Retry" onPress={() => load()} />
       </View>
     );
   }
@@ -314,9 +307,7 @@ function JobsTab({ palette }: { palette: any }) {
             <Text style={[styles.modalTitle, { color: palette.text }]} numberOfLines={1}>
               {selected?.name ?? `Job ${selected?.id}`}
             </Text>
-            <Pressable onPress={() => setSelected(null)} style={styles.modalClose}>
-              <Text style={{ color: palette.primaryStrong, fontWeight: '700', fontSize: 16 }}>Done</Text>
-            </Pressable>
+            <KISButton title="Done" variant="ghost" onPress={() => setSelected(null)} style={styles.modalClose} />
           </View>
           <ScrollView contentContainerStyle={styles.modalContent}>
             {selected ? (
@@ -410,9 +401,7 @@ function QnASessionsTab({ palette }: { palette: any }) {
     return (
       <View style={styles.center}>
         <Text style={{ color: palette.danger, textAlign: 'center' }}>{error}</Text>
-        <Pressable onPress={load} style={[styles.retryBtn, { backgroundColor: palette.primaryStrong }]}>
-          <Text style={{ color: palette.onPrimary, fontWeight: '700' }}>Retry</Text>
-        </Pressable>
+        <KISButton title="Retry" onPress={load} />
       </View>
     );
   }
@@ -465,12 +454,7 @@ function QnASessionsTab({ palette }: { palette: any }) {
       />
 
       {/* FAB – New Session */}
-      <Pressable
-        onPress={() => setShowNew(true)}
-        style={[styles.fab, { backgroundColor: palette.primaryStrong, shadowColor: palette.royalInk }]}
-      >
-        <Text style={[styles.fabText, { color: palette.onPrimary }]}>+ New Session</Text>
-      </Pressable>
+      <KISFab icon="add" onPress={() => setShowNew(true)} style={styles.fab} />
 
       {/* New Session Modal */}
       <Modal
@@ -482,9 +466,7 @@ function QnASessionsTab({ palette }: { palette: any }) {
         <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg, paddingTop: 40 }}>
           <View style={[styles.modalHeader, { borderBottomColor: palette.divider }]}>
             <Text style={[styles.modalTitle, { color: palette.text }]}>New QnA Session</Text>
-            <Pressable onPress={() => setShowNew(false)} style={styles.modalClose}>
-              <Text style={{ color: palette.primaryStrong, fontWeight: '700', fontSize: 16 }}>Cancel</Text>
-            </Pressable>
+            <KISButton title="Cancel" variant="ghost" onPress={() => setShowNew(false)} style={styles.modalClose} />
           </View>
           <View style={styles.modalContent}>
             <Text style={[styles.fieldLabel, { color: palette.subtext }]}>Your question</Text>
@@ -498,19 +480,12 @@ function QnASessionsTab({ palette }: { palette: any }) {
               onChangeText={setNewQuestion}
               textAlignVertical="top"
             />
-            <Pressable
+            <KISButton
+              title="Start Session"
               onPress={submitNewSession}
               disabled={submitting || !newQuestion.trim()}
-              style={[
-                styles.submitBtn,
-                { backgroundColor: newQuestion.trim() ? palette.primaryStrong : palette.divider },
-              ]}
-            >
-              {submitting
-                ? <ActivityIndicator color={palette.onPrimary} />
-                : <Text style={[styles.submitBtnText, { color: palette.onPrimary }]}>Start Session</Text>
-              }
-            </Pressable>
+              loading={submitting}
+            />
           </View>
         </SafeAreaView>
       </Modal>
@@ -525,9 +500,7 @@ function QnASessionsTab({ palette }: { palette: any }) {
         <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg, paddingTop: 40 }}>
           <View style={[styles.modalHeader, { borderBottomColor: palette.divider }]}>
             <Text style={[styles.modalTitle, { color: palette.text }]}>Session Detail</Text>
-            <Pressable onPress={() => setSelected(null)} style={styles.modalClose}>
-              <Text style={{ color: palette.primaryStrong, fontWeight: '700', fontSize: 16 }}>Done</Text>
-            </Pressable>
+            <KISButton title="Done" variant="ghost" onPress={() => setSelected(null)} style={styles.modalClose} />
           </View>
           <ScrollView contentContainerStyle={styles.modalContent}>
             {selected ? (
@@ -654,9 +627,7 @@ function SchedulesTab({ palette }: { palette: any }) {
     return (
       <View style={styles.center}>
         <Text style={{ color: palette.danger }}>{error}</Text>
-        <Pressable onPress={() => load()} style={[styles.retryBtn, { backgroundColor: palette.primaryStrong }]}>
-          <Text style={{ color: palette.onPrimary, fontWeight: '600' }}>Retry</Text>
-        </Pressable>
+        <KISButton title="Retry" onPress={() => load()} />
       </View>
     );
   }
@@ -674,17 +645,18 @@ function SchedulesTab({ palette }: { palette: any }) {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(true); }} />}
         ListEmptyComponent={<View style={styles.center}><Text style={{ color: palette.subtext }}>No schedules yet.</Text></View>}
         ListFooterComponent={
-          <Pressable onPress={() => setShowModal(true)} style={[styles.card, { backgroundColor: palette.primaryWeak, borderColor: palette.primaryStrong, alignItems: 'center' }]}>
-            <Text style={{ color: palette.primaryStrong, fontWeight: '700', fontSize: 14 }}>+ New Schedule</Text>
-          </Pressable>
+          <KISButton title="+ New Schedule" variant="outline" onPress={() => setShowModal(true)} />
         }
         renderItem={({ item }) => (
           <View style={[styles.card, { backgroundColor: palette.card, borderColor: palette.divider }]}>
             <View style={styles.cardHeader}>
               <Text style={[styles.cardTitle, { color: palette.text, flex: 1 }]}>{item.name ?? item.id}</Text>
-              <Pressable onPress={() => handleToggle(item)} style={[styles.statusToggle, { backgroundColor: item.status === 'active' ? palette.success + '22' : palette.divider }]}>
-                <Text style={[styles.cardChip, { color: item.status === 'active' ? palette.success : palette.subtext }]}>{item.status ?? 'inactive'}</Text>
-              </Pressable>
+              <KISButton
+                title={item.status ?? 'inactive'}
+                size="xs"
+                variant={item.status === 'active' ? 'primary' : 'outline'}
+                onPress={() => handleToggle(item)}
+              />
             </View>
             {!!item.cron && <Text style={[styles.cardMeta, { color: palette.subtext }]}>Cron: {item.cron}</Text>}
             {!!item.next_run && <Text style={[styles.cardMeta, { color: palette.subtext }]}>Next: {item.next_run}</Text>}
@@ -700,12 +672,8 @@ function SchedulesTab({ palette }: { palette: any }) {
             <TextInput placeholder="Cron (e.g. 0 9 * * 1)" placeholderTextColor={palette.subtext} value={newCron} onChangeText={setNewCron} style={{ borderWidth: 1, borderColor: palette.divider, borderRadius: 10, padding: 12, color: palette.text, backgroundColor: palette.inputBg }} />
             <TextInput placeholder="Model ID (optional)" placeholderTextColor={palette.subtext} value={newModelId} onChangeText={setNewModelId} style={{ borderWidth: 1, borderColor: palette.divider, borderRadius: 10, padding: 12, color: palette.text, backgroundColor: palette.inputBg }} />
             <View style={{ flexDirection: 'row', gap: 12 }}>
-              <Pressable onPress={() => setShowModal(false)} style={[styles.retryBtn, { flex: 1, backgroundColor: palette.divider, alignItems: 'center' }]}>
-                <Text style={{ color: palette.text, fontWeight: '600' }}>Cancel</Text>
-              </Pressable>
-              <Pressable onPress={handleCreate} disabled={saving} style={[styles.retryBtn, { flex: 1, backgroundColor: palette.primaryStrong, alignItems: 'center' }]}>
-                <Text style={{ color: palette.onPrimary, fontWeight: '600' }}>{saving ? 'Saving…' : 'Create'}</Text>
-              </Pressable>
+              <KISButton title="Cancel" variant="outline" onPress={() => setShowModal(false)} style={{ flex: 1 }} />
+              <KISButton title={saving ? 'Saving…' : 'Create'} onPress={handleCreate} disabled={saving} loading={saving} style={{ flex: 1 }} />
             </View>
           </View>
         </View>
@@ -780,9 +748,7 @@ function PipelinesTab({ palette }: { palette: any }) {
     return (
       <View style={styles.center}>
         <Text style={{ color: palette.danger }}>{error}</Text>
-        <Pressable onPress={() => load()} style={[styles.retryBtn, { backgroundColor: palette.primaryStrong }]}>
-          <Text style={{ color: palette.onPrimary, fontWeight: '600' }}>Retry</Text>
-        </Pressable>
+        <KISButton title="Retry" onPress={() => load()} />
       </View>
     );
   }
@@ -800,9 +766,7 @@ function PipelinesTab({ palette }: { palette: any }) {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(true); }} />}
         ListEmptyComponent={<View style={styles.center}><Text style={{ color: palette.subtext }}>No pipelines yet.</Text></View>}
         ListFooterComponent={
-          <Pressable onPress={() => setShowModal(true)} style={[styles.card, { backgroundColor: palette.primaryWeak, borderColor: palette.primaryStrong, alignItems: 'center' }]}>
-            <Text style={{ color: palette.primaryStrong, fontWeight: '700', fontSize: 14 }}>+ New Pipeline</Text>
-          </Pressable>
+          <KISButton title="+ New Pipeline" variant="outline" onPress={() => setShowModal(true)} />
         }
         renderItem={({ item }) => (
           <View style={[styles.card, { backgroundColor: palette.card, borderColor: palette.divider }]}>
@@ -828,12 +792,8 @@ function PipelinesTab({ palette }: { palette: any }) {
             <TextInput placeholder="Name" placeholderTextColor={palette.subtext} value={newName} onChangeText={setNewName} style={{ borderWidth: 1, borderColor: palette.divider, borderRadius: 10, padding: 12, color: palette.text, backgroundColor: palette.inputBg }} />
             <TextInput placeholder="Description (optional)" placeholderTextColor={palette.subtext} value={newDesc} onChangeText={setNewDesc} multiline numberOfLines={3} style={{ borderWidth: 1, borderColor: palette.divider, borderRadius: 10, padding: 12, color: palette.text, backgroundColor: palette.inputBg, height: 80 }} />
             <View style={{ flexDirection: 'row', gap: 12 }}>
-              <Pressable onPress={() => setShowModal(false)} style={[styles.retryBtn, { flex: 1, backgroundColor: palette.divider, alignItems: 'center' }]}>
-                <Text style={{ color: palette.text, fontWeight: '600' }}>Cancel</Text>
-              </Pressable>
-              <Pressable onPress={handleCreate} disabled={saving} style={[styles.retryBtn, { flex: 1, backgroundColor: palette.primaryStrong, alignItems: 'center' }]}>
-                <Text style={{ color: palette.onPrimary, fontWeight: '600' }}>{saving ? 'Saving…' : 'Create'}</Text>
-              </Pressable>
+              <KISButton title="Cancel" variant="outline" onPress={() => setShowModal(false)} style={{ flex: 1 }} />
+              <KISButton title={saving ? 'Saving…' : 'Create'} onPress={handleCreate} disabled={saving} loading={saving} style={{ flex: 1 }} />
             </View>
           </View>
         </View>
@@ -873,23 +833,13 @@ export default function AIIntegrationScreen() {
       {/* Tab bar */}
       <View style={[styles.tabBar, { borderBottomColor: palette.divider }]}>
         {TABS.map(tab => (
-          <Pressable
+          <KISButton
             key={tab}
+            title={tab}
+            size="xs"
+            variant={activeTab === tab ? 'primary' : 'outline'}
             onPress={() => setActiveTab(tab)}
-            style={[
-              styles.tabItem,
-              activeTab === tab && [styles.tabItemActive, { borderBottomColor: palette.primaryStrong }],
-            ]}
-          >
-            <Text
-              style={[
-                styles.tabLabel,
-                { color: activeTab === tab ? palette.primaryStrong : palette.subtext },
-              ]}
-            >
-              {tab}
-            </Text>
-          </Pressable>
+          />
         ))}
       </View>
 
@@ -921,19 +871,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  tabItem: {
-    flex: 1,
-    paddingVertical: 12,
-    alignItems: 'center',
-    borderBottomWidth: 2,
-    borderBottomColor: 'transparent',
-  },
-  tabItemActive: {},
-  tabLabel: { fontSize: 13, fontWeight: '600' },
-
   listContent: { padding: 16, gap: 12, paddingBottom: 100 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, gap: 12 },
-  retryBtn: { paddingHorizontal: 20, paddingVertical: 10, borderRadius: 10 },
 
   card: { borderRadius: 14, borderWidth: 1, padding: 14, gap: 8 },
   cardHeader: { flexDirection: 'row', alignItems: 'center', gap: 10 },
@@ -942,17 +881,6 @@ const styles = StyleSheet.create({
   cardDesc: { fontSize: 13, lineHeight: 18 },
   cardMeta: { fontSize: 12 },
   cardFooter: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
-
-  statusToggle: {
-    paddingHorizontal: 10,
-    paddingVertical: 10,
-    borderRadius: 20,
-    minWidth: 72,
-    minHeight: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  statusToggleText: { fontSize: 12, fontWeight: '700' },
 
   statusBadge: {
     paddingHorizontal: 8,
@@ -975,15 +903,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: 24,
     right: 20,
-    paddingHorizontal: 18,
-    paddingVertical: 12,
-    borderRadius: 28,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.18,
-    shadowRadius: 6,
-    elevation: 4,
   },
-  fabText: { fontWeight: '700', fontSize: 14 },
 
   // Modal
   modalHeader: {
@@ -1036,11 +956,4 @@ const styles = StyleSheet.create({
     fontSize: 15,
     minHeight: 120,
   },
-  submitBtn: {
-    paddingVertical: 14,
-    borderRadius: 12,
-    alignItems: 'center',
-    marginTop: 8,
-  },
-  submitBtnText: { fontWeight: '700', fontSize: 15 },
 });

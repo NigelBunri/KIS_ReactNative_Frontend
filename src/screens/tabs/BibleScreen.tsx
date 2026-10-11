@@ -8,12 +8,10 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TouchableOpacity,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRawTopInset } from '@/hooks/useSafeTopInset';
-import LinearGradient from 'react-native-linear-gradient';
 import { useKISTheme } from '../../theme/useTheme';
 import { useStatusBarStyle } from '../../theme/useStatusBarStyle';
 import { useResponsiveLayout } from '../../theme/responsive';
@@ -32,6 +30,8 @@ import BibleBooksPanel from '../../components/Bible/BibleBooksPanel';
 import BibleMessagesPanel from '../../components/Bible/BibleMessagesPanel';
 import BibleGamesPanel from '../../components/Bible/BibleGamesPanel';
 import { KISIcon } from '../../constants/kisIcons';
+import KISButton from '@/constants/KISButton';
+import KISFab from '@/components/KISFab';
 import { markMainTabNotificationSourceRead } from '@/services/mainTabNotificationBadges';
 import ConsumerSpiritualRevenuePreviewCard from '@/components/profitability/ConsumerSpiritualRevenuePreviewCard';
 import NotificationRetentionPreviewCard from '@/components/profitability/NotificationRetentionPreviewCard';
@@ -72,7 +72,6 @@ export default function BibleScreen() {
   const responsive = useResponsiveLayout();
   const compactBible = responsive.isWatch || responsive.isCompactPhone;
   const tinyBible = responsive.isWatch;
-  const metallicGoldGradient = [palette.royalInk, palette.goldDeep, palette.gold, palette.goldDeep];
   // The same header gradient used across Messages and Broadcast screens
   const bibleGoldGradient = [...gradients.header];
   const [activeTab, setActiveTab] = useState('read');
@@ -352,43 +351,25 @@ export default function BibleScreen() {
             {tabs.map((tab) => {
               const isActive = tab.key === activeTab;
               return (
-                <TouchableOpacity
+                <KISButton
                   key={tab.key}
                   onPress={() => setActiveTab(tab.key)}
-                  style={[
-                    styles.tabChip,
-                    {
-                      backgroundColor: isActive ? 'rgba(255,244,184,0.22)' : 'rgba(23,17,31,0.30)',
-                      borderColor: isActive ? 'rgba(255,244,184,0.60)' : 'rgba(255,244,184,0.18)',
-                      paddingHorizontal: compactBible ? 10 : 14,
-                      paddingVertical: compactBible ? 7 : 8,
-                      minHeight: tinyBible ? 30 : 34,
-                    },
-                  ]}
-                >
-                  {isActive ? (
-                    <LinearGradient
-                      colors={metallicGoldGradient}
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 1 }}
-                      style={StyleSheet.absoluteFillObject}
-                    />
-                  ) : null}
-                  {isActive ? <View pointerEvents="none" style={styles.goldSheen} /> : null}
-                  <View style={styles.tabLabel}>
+                  variant={isActive ? 'primary' : 'outline'}
+                  size="sm"
+                  style={{
+                    minHeight: tinyBible ? 30 : 34,
+                    paddingHorizontal: compactBible ? 10 : 14,
+                  }}
+                  textStyle={{ fontSize: compactBible ? 11 : 13 }}
+                  left={
                     <KISIcon
                       name={tab.icon as any}
                       size={14}
                       color={isActive ? palette.ivory : 'rgba(255,244,184,0.65)'}
                     />
-                    <Text
-                      numberOfLines={1}
-                      style={{ color: isActive ? palette.ivory : 'rgba(255,244,184,0.80)', fontWeight: '800', fontSize: compactBible ? 11 : 13 }}
-                    >
-                      {tabLabelForDevice(tab.label, tab.key)}
-                    </Text>
-                  </View>
-                </TouchableOpacity>
+                  }
+                  title={tabLabelForDevice(tab.label, tab.key)}
+                />
               );
             })}
           </ScrollView>
@@ -452,23 +433,18 @@ export default function BibleScreen() {
           header so it's always within thumb reach while scrolling a chapter,
           instead of stuck up top out of easy reach. */}
       {activeTab === 'read' && openReadFilters ? (
-        <Pressable
+        <KISFab
+          icon="filter"
           onPress={openReadFilters}
-          style={[
-            styles.filterFab,
-            {
-              right: responsive.pageGutter,
-              bottom: (compactBible ? 20 : 24) + insets.bottom,
-              backgroundColor: palette.goldReadable,
-              shadowColor: palette.royalInk,
-            },
-          ]}
-          hitSlop={6}
+          size={52}
+          iconSize={20}
           accessibilityLabel="Filters"
-          accessibilityRole="button"
-        >
-          <KISIcon name="filter" size={20} color={palette.onGold} />
-        </Pressable>
+          style={{
+            position: 'absolute',
+            right: responsive.pageGutter,
+            bottom: (compactBible ? 20 : 24) + insets.bottom,
+          }}
+        />
       ) : null}
     </View>
   );
@@ -537,37 +513,10 @@ const styles = StyleSheet.create({
   // ── Tab row (inside gradient) ──────────────────────────────────────────────
   stickyTabsOuter: { paddingBottom: 12 },
   tabRow: { alignItems: 'center' },
-  tabChip: {
-    borderRadius: 999,
-    borderWidth: 1.5,
-    minHeight: 34,
-    justifyContent: 'center',
-    overflow: 'hidden',
-  },
-  tabLabel: { flexDirection: 'row', alignItems: 'center', gap: 6 },
 
   // ── Content area ───────────────────────────────────────────────────────────
   contentWrap: { flex: 1, minHeight: 0 },
   readContent: { flex: 1, minHeight: 0 },
   contentScroll: { flex: 1 },
   content: { paddingVertical: 16, gap: 16, paddingBottom: 40 },
-  goldSheen: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(255,255,255,0.16)',
-    transform: [{ translateX: -14 }, { rotate: '-18deg' }, { scaleX: 0.42 }],
-  },
-
-  // ── Floating passage-filter button (Read tab) ──────────────────────────────
-  filterFab: {
-    position: 'absolute',
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowOpacity: 0.28,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 6,
-  },
 });

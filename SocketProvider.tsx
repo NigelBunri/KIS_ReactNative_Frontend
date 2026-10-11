@@ -49,6 +49,9 @@ import {
   reportCallAnswered,
   reportCallEnded,
   setMuted as callKitSetMuted,
+  ensureCallKeepSetup,
+  isPhoneAccountEnabled,
+  openPhoneAccountSettings,
 } from '@/services/calls/callKitService';
 import { sfuService, sfuAvailable } from '@/services/calls/sfuService';
 import { setCallPiPActive } from '@/services/calls/callPiPService';
@@ -1682,6 +1685,33 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       },
       onToggleHold: () => { /* hold not implemented */ },
     });
+
+    // Android only — a non-self-managed CallKeep phone account (KIS's
+    // config) requires the user to approve a one-time system prompt before
+    // displayIncomingCall() can actually ring. Without this, a declined or
+    // never-completed prompt makes every incoming call silently fail to
+    // ring (foreground, background, and killed alike) with no on-device
+    // signal other than this diagnostic log — so check once per app
+    // session, after setup has genuinely finished, and guide the user to
+    // the fix instead of leaving them to report "it just doesn't ring."
+    if (Platform.OS === 'android') {
+      void (async () => {
+        await ensureCallKeepSetup();
+        const enabled = await isPhoneAccountEnabled();
+        if (!enabled) {
+          void logCallDiagnostic({ stage: 'CALLKEEP_PHONE_ACCOUNT_DISABLED' });
+          Alert.alert(
+            'Enable Calling for KIS',
+            'To see an incoming call screen and ring when the app is in the background, Android needs your permission for KIS to manage calls. Enable it now?',
+            [
+              { text: 'Not Now', style: 'cancel' },
+              { text: 'Enable', onPress: () => openPhoneAccountSettings() },
+            ],
+          );
+        }
+      })();
+    }
+
     return () => teardownCallKit();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -1891,7 +1921,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       /* ── CALL EVENTS ── */
 
       // Incoming call
-      s.on('call.offer', (payload: any) => {
+      s.on('call.offer', async (payload: any) => {
         const conversationId = String(payload?.conversationId ?? '');
         const callId = String(payload?.callId ?? '');
         const fromUserId = payload?.fromUserId ? String(payload.fromUserId) : null;
@@ -1982,7 +2012,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         void logCallDiagnostic({ stage: 'SOCKET_OFFER_RECEIVED', callId, callType });
         // Show OS lock-screen call UI (CallKit on iOS, ConnectionService on Android)
         void logCallDiagnostic({ stage: 'CALLKEEP_REQUESTED', callId, callType });
-        const displayed = displayIncomingCall({
+        const displayed = await displayIncomingCall({
           callUUID: callId,
           callerName: safeDisplayName(payload?.title ?? payload?.callerName, 'Incoming call'),
           callType: callType,

@@ -21,6 +21,7 @@ import Video from 'react-native-video';
 import Clipboard from '@react-native-clipboard/clipboard';
 
 import { useKISTheme } from '@/theme/useTheme';
+import KISFab from '@/components/KISFab';
 import ROUTES, {
   buildMediaSource,
   resolveBackendAssetUrl,
@@ -1427,15 +1428,8 @@ export default function FeedScreen<T extends FeedPost>({
         />
       )}
 
-      {/* FAB: colorful circle + plus like mock */}
-      <Pressable
-        onPress={() => setComposerVisible(true)}
-        style={({ pressed }) => [styles.fabNew, { transform: [{ scale: pressed ? 0.98 : 1 }], backgroundColor: palette.primary }]}
-      >
-        <View style={styles.fabGradient}>
-          <Text style={[styles.fabPlus, { color: palette.onPrimary }]}>＋</Text>
-        </View>
-      </Pressable>
+      {/* FAB */}
+      <KISFab icon="add" iconSize={30} size={66} onPress={() => setComposerVisible(true)} style={styles.fabNew} />
 
       {/* VIDEO MODAL (full-screen experience like broadcasts) */}
       <Modal
@@ -1821,32 +1815,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
 
-  // FAB like mock (colorful)
   fabNew: {
     position: 'absolute',
     right: 18,
     bottom: 22,
-    width: 66,
-    height: 66,
-    borderRadius: 33,
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOpacity: 0.18,
-        shadowRadius: 16,
-        shadowOffset: { width: 0, height: 10 },
-      },
-      android: { elevation: 7 },
-      default: {},
-    }),
   },
-  fabGradient: {
-    flex: 1,
-    borderRadius: 33,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  fabPlus: { fontSize: 34, fontWeight: '900', marginTop: -2 },
 
   videoModal: {
     flex: 1,

@@ -50,22 +50,16 @@ function LessonChipPicker({
       {chips.map(chip => {
         const selected = selectedId === chip.id;
         return (
-          <Pressable
+          <KISButton
             key={chip.id ?? 'none'}
+            size="xs"
+            variant={selected ? 'primary' : 'outline'}
             onPress={() => onSelect(chip.id)}
-            style={{
-              paddingHorizontal: 10,
-              paddingVertical: 6,
-              borderRadius: 999,
-              borderWidth: 1,
-              borderColor: selected ? palette.primary : palette.border,
-              backgroundColor: selected ? palette.primarySoft : 'transparent',
-            }}
           >
-            <Text numberOfLines={1} style={{ fontSize: 12, fontWeight: '700', color: selected ? palette.primaryStrong : palette.subtext, maxWidth: 160 }}>
+            <Text numberOfLines={1} style={{ fontSize: 12, fontWeight: '700', color: selected ? palette.onPrimary : palette.subtext, maxWidth: 160 }}>
               {chip.title}
             </Text>
-          </Pressable>
+          </KISButton>
         );
       })}
     </View>
@@ -320,9 +314,9 @@ export default function ContentEditor({ institutionId, courseId }: Props) {
               >
                 <KISIcon name="book" size={16} color={palette.primary} />
                 <Text style={{ color: palette.text, fontWeight: '700', flex: 1 }} numberOfLines={1}>{lesson.title}</Text>
-                <Pressable onPress={() => deleteLesson(lesson)} hitSlop={8}>
+                <KISButton variant="ghost" onPress={() => deleteLesson(lesson)}>
                   <KISIcon name="trash" size={15} color={palette.danger} />
-                </Pressable>
+                </KISButton>
                 <KISIcon name={expanded ? 'chevron-down' : 'chevron-right'} size={16} color={palette.subtext} />
               </Pressable>
               {expanded ? (
@@ -371,22 +365,22 @@ export default function ContentEditor({ institutionId, courseId }: Props) {
                 <KISIcon name="file" size={16} color={palette.primary} />
                 <Text style={{ color: palette.text, fontWeight: '700', flex: 1 }} numberOfLines={1}>{material.title}</Text>
                 <Text style={{ fontSize: 11, color: palette.subtext, textTransform: 'capitalize' }}>{material.kind}</Text>
-                <Pressable onPress={() => deleteMaterial(material)} hitSlop={8}>
+                <KISButton variant="ghost" onPress={() => deleteMaterial(material)}>
                   <KISIcon name="trash" size={15} color={palette.danger} />
-                </Pressable>
+                </KISButton>
               </View>
               <View style={{ flexDirection: 'row', gap: 14 }}>
-                <Pressable onPress={() => setAttachingMaterialId(attaching ? null : material.id)}>
+                <KISButton variant="ghost" size="xs" onPress={() => setAttachingMaterialId(attaching ? null : material.id)}>
                   <Text style={{ fontSize: 12, color: palette.primary, fontWeight: '700' }}>
                     {connectedLesson ? `Lesson: ${connectedLesson.title}` : 'Not connected to a lesson'} · {attaching ? 'Close' : 'Change'}
                   </Text>
-                </Pressable>
+                </KISButton>
                 {material.resource_url || material.safe_resource_url ? (
-                  <Pressable onPress={() => setPreviewMaterialId(previewing ? null : material.id)}>
+                  <KISButton variant="ghost" size="xs" onPress={() => setPreviewMaterialId(previewing ? null : material.id)}>
                     <Text style={{ fontSize: 12, color: palette.primary, fontWeight: '700' }}>
                       {previewing ? 'Hide preview' : 'Preview'}
                     </Text>
-                  </Pressable>
+                  </KISButton>
                 ) : null}
               </View>
               {attaching ? (

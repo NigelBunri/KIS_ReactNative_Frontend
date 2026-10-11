@@ -14,6 +14,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useKISTheme } from '@/theme/useTheme';
 import { useResponsiveLayout } from '@/theme/responsive';
 import { KISIcon } from '@/constants/kisIcons';
+import KISFab from '@/components/KISFab';
 import { getRequest } from '@/network/get';
 import { postRequest } from '@/network/post';
 import ROUTES from '@/network';
@@ -166,13 +167,7 @@ export default function PrayerWallScreen({ navigation }: Props) {
         />
       )}
 
-      <TouchableOpacity
-        style={styles.fab}
-        onPress={() => navigation.navigate('NewPrayerRequest')}
-        hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
-      >
-        <KISIcon name="add" size={28} color={palette.ivory} />
-      </TouchableOpacity>
+      <KISFab icon="add" onPress={() => navigation.navigate('NewPrayerRequest')} style={styles.fab} />
     </SafeAreaView>
   );
 }
@@ -247,16 +242,6 @@ function makeStyles(palette: any, layout: any) {
       position: 'absolute',
       bottom: 24,
       right: 24,
-      width: 56,
-      height: 56,
-      borderRadius: 28,
-      backgroundColor: palette.primary,
-      alignItems: 'center',
-      justifyContent: 'center',
-      shadowColor: palette.primary,
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 0.35,
-      shadowRadius: 8,
       elevation: 8,
     },
   });

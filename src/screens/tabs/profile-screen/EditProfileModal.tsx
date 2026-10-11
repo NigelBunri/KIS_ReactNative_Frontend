@@ -455,22 +455,13 @@ export function EditProfileModal(props: EditProfileModalProps) {
           {popularLanguages.map((language) => {
             const selected = selectedLanguages.includes(language);
             return (
-              <Pressable
+              <KISButton
                 key={language}
+                size="xs"
+                variant={selected ? 'primary' : 'outline'}
+                title={language}
                 onPress={() => toggleLanguage(language)}
-                style={[
-                  styles.chip,
-                  {
-                    borderWidth: 1,
-                    borderColor: selected ? palette.primary : palette.divider,
-                    backgroundColor: selected ? `${palette.primary}22` : palette.card,
-                  },
-                ]}
-              >
-                <Text style={{ color: selected ? palette.primaryStrong : palette.text, fontSize: responsive.labelFontSize, fontWeight: '700' }}>
-                  {language}
-                </Text>
-              </Pressable>
+              />
             );
           })}
         </View>
@@ -488,23 +479,14 @@ export function EditProfileModal(props: EditProfileModalProps) {
       >
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
           <Text style={[styles.title, { color: palette.text, fontSize: responsive.bodyFontSize }]}>Portfolio Slideshow</Text>
-          <Pressable
-            onPress={() => onAddGalleryMedia?.()}
+          <KISButton
+            size="xs"
+            variant="outline"
+            title={addingGalleryMedia ? 'Adding...' : 'Add media'}
             disabled={addingGalleryMedia}
-            style={[
-              styles.chip,
-              {
-                borderWidth: 1,
-                borderColor: palette.primary,
-                backgroundColor: `${palette.primary}18`,
-                opacity: addingGalleryMedia ? 0.65 : 1,
-              },
-            ]}
-          >
-            <Text style={{ color: palette.primaryStrong, fontSize: responsive.labelFontSize, fontWeight: '700' }}>
-              {addingGalleryMedia ? 'Adding...' : 'Add media'}
-            </Text>
-          </Pressable>
+            loading={addingGalleryMedia}
+            onPress={() => onAddGalleryMedia?.()}
+          />
         </View>
         <Text style={[styles.subtext, { color: palette.subtext }]}>
           Tap any slide for fullscreen. Tap left/right to move. Pull down to close.
@@ -590,23 +572,14 @@ export function EditProfileModal(props: EditProfileModalProps) {
                       <Image source={{ uri: item.uri }} style={{ width: '100%', height: '100%' }} />
                     )}
                     {item.deletable && item.itemId ? (
-                      <Pressable
-                        onPress={() => onDeleteGalleryItem?.(item)}
+                      <KISButton
+                        variant="danger"
+                        size="xs"
+                        title={deletingGalleryItemId === item.itemId ? '...' : 'Delete'}
                         disabled={deletingGalleryItemId === item.itemId}
-                        style={{
-                          position: 'absolute',
-                          top: 10,
-                          left: 10,
-                          borderRadius: 999,
-                          backgroundColor: `${palette.royalInk}87`,
-                          paddingHorizontal: 10,
-                          paddingVertical: 6,
-                        }}
-                      >
-                        <Text style={{ color: palette.ivory, fontSize: responsive.labelFontSize - 1, fontWeight: '700' }}>
-                          {deletingGalleryItemId === item.itemId ? '...' : 'Delete'}
-                        </Text>
-                      </Pressable>
+                        onPress={() => onDeleteGalleryItem?.(item)}
+                        style={{ position: 'absolute', top: 10, left: 10 }}
+                      />
                     ) : null}
                     <View
                       style={{
@@ -738,38 +711,18 @@ export function EditProfileModal(props: EditProfileModalProps) {
               {gallery[lightboxIndex]?.title || gallery[lightboxIndex]?.section || 'Gallery preview'}
             </Text>
             {gallery[lightboxIndex]?.deletable && gallery[lightboxIndex]?.itemId ? (
-              <Pressable
-                onPress={() => onDeleteGalleryItem?.(gallery[lightboxIndex])}
+              <KISButton
+                variant="ghost"
+                title={deletingGalleryItemId === gallery[lightboxIndex]?.itemId ? '...' : 'Delete'}
                 disabled={deletingGalleryItemId === gallery[lightboxIndex]?.itemId}
-                style={{
-                  borderRadius: 999,
-                  backgroundColor: `${palette.ivory}21`,
-                  minWidth: 56,
-                  height: responsive.minTouchTarget,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  marginRight: 8,
-                  paddingHorizontal: 10,
-                }}
-              >
-                <Text style={{ color: palette.ivory, fontSize: responsive.labelFontSize, fontWeight: '700' }}>
-                  {deletingGalleryItemId === gallery[lightboxIndex]?.itemId ? '...' : 'Delete'}
-                </Text>
-              </Pressable>
+                onPress={() => onDeleteGalleryItem?.(gallery[lightboxIndex])}
+                textStyle={{ color: palette.ivory }}
+                style={{ marginRight: 8 }}
+              />
             ) : null}
-            <Pressable
-              onPress={closeLightbox}
-              style={{
-                borderRadius: 999,
-                backgroundColor: `${palette.ivory}21`,
-                width: responsive.minTouchTarget,
-                height: responsive.minTouchTarget,
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
+            <KISButton variant="ghost" onPress={closeLightbox}>
               <KISIcon name="close" size={20} color={palette.ivory} />
-            </Pressable>
+            </KISButton>
           </View>
 
           <View

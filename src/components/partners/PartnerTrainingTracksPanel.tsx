@@ -9,6 +9,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Animated, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import styles from '@/components/partners/partnersStyles';
 import { useKISTheme } from '@/theme/useTheme';
+import KISButton from '@/constants/KISButton';
 import ROUTES from '@/network';
 import { getRequest } from '@/network/get';
 import { postRequest } from '@/network/post';
@@ -334,15 +335,14 @@ export default function PartnerTrainingTracksPanel({ isOpen, panelWidth, panelTr
                   <Text style={{ color: palette.subtext, fontSize: 11, marginTop: 8, marginBottom: 6 }}>Add a course</Text>
                   <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingBottom: 16 }}>
                     {availableCourses.map((course) => (
-                      <Pressable
+                      <KISButton
                         key={course.id}
+                        variant="outline"
+                        size="sm"
                         onPress={() => addCourseToTrack(course.id)}
-                        style={{ borderWidth: 1, borderColor: palette.divider, backgroundColor: palette.surface, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 8 }}
-                      >
-                        <Text numberOfLines={1} style={{ color: palette.text, fontWeight: '700', maxWidth: 180 }}>
-                          + {course.title}
-                        </Text>
-                      </Pressable>
+                        title={`+ ${course.title}`}
+                        textStyle={{ maxWidth: 180 }}
+                      />
                     ))}
                   </ScrollView>
                 </>
@@ -359,13 +359,13 @@ export default function PartnerTrainingTracksPanel({ isOpen, panelWidth, panelTr
                   departments.map((dep) => {
                     const selected = assignDeptId === String(dep.id);
                     return (
-                      <Pressable
+                      <KISButton
                         key={dep.id}
+                        variant={selected ? 'primary' : 'outline'}
+                        size="xs"
                         onPress={() => setAssignDeptId(selected ? null : String(dep.id))}
-                        style={{ paddingVertical: 5, paddingHorizontal: 10, borderRadius: 8, borderWidth: 1, borderColor: selected ? palette.primary : palette.borderMuted }}
-                      >
-                        <Text style={{ color: selected ? palette.primary : palette.text, fontSize: 12 }}>{dep.name}</Text>
-                      </Pressable>
+                        title={dep.name}
+                      />
                     );
                   })
                 )}
@@ -375,23 +375,24 @@ export default function PartnerTrainingTracksPanel({ isOpen, panelWidth, panelTr
                 {members.map((m) => {
                   const selected = assignUserIds.includes(m.user_id);
                   return (
-                    <Pressable
+                    <KISButton
                       key={m.user_id}
+                      variant={selected ? 'primary' : 'outline'}
+                      size="xs"
                       onPress={() => toggleAssignUser(m.user_id)}
-                      style={{ paddingVertical: 5, paddingHorizontal: 10, borderRadius: 8, borderWidth: 1, borderColor: selected ? palette.primary : palette.borderMuted }}
-                    >
-                      <Text style={{ color: selected ? palette.primary : palette.text, fontSize: 12 }}>{memberName(m)}</Text>
-                    </Pressable>
+                      title={memberName(m)}
+                    />
                   );
                 })}
               </View>
-              <Pressable
+              <KISButton
+                variant="outline"
                 onPress={assignTrack}
                 disabled={saving}
-                style={({ pressed }) => [{ paddingVertical: 10, borderRadius: 10, backgroundColor: palette.royalInk, alignItems: 'center', opacity: pressed || saving ? 0.7 : 1, marginBottom: 20 }]}
-              >
-                <Text style={{ color: palette.ivory, fontWeight: '700' }}>{saving ? 'Assigning…' : 'Assign track'}</Text>
-              </Pressable>
+                loading={saving}
+                title={saving ? 'Assigning…' : 'Assign track'}
+                style={{ marginBottom: 20 }}
+              />
 
               <Text style={{ color: palette.text, fontSize: 14, fontWeight: '800', marginBottom: 8 }}>
                 Roster ({roster.length})
@@ -429,13 +430,14 @@ export default function PartnerTrainingTracksPanel({ isOpen, panelWidth, panelTr
                 <View style={{ marginBottom: 16 }}>
                   <TextInput value={newTitle} onChangeText={setNewTitle} placeholder="Track title" placeholderTextColor={palette.subtext} style={[inputStyle(palette), { marginTop: 0 }]} />
                   <TextInput value={newDescription} onChangeText={setNewDescription} placeholder="Description (optional)" placeholderTextColor={palette.subtext} multiline style={[inputStyle(palette), { minHeight: 50, textAlignVertical: 'top' }]} />
-                  <Pressable
+                  <KISButton
+                    variant="outline"
                     onPress={createTrack}
                     disabled={saving}
-                    style={({ pressed }) => [{ marginTop: 10, paddingVertical: 10, borderRadius: 10, backgroundColor: palette.royalInk, alignItems: 'center', opacity: pressed || saving ? 0.7 : 1 }]}
-                  >
-                    <Text style={{ color: palette.ivory, fontWeight: '700' }}>{saving ? 'Creating…' : 'Create track'}</Text>
-                  </Pressable>
+                    loading={saving}
+                    title={saving ? 'Creating…' : 'Create track'}
+                    style={{ marginTop: 10 }}
+                  />
                 </View>
               ) : null}
 

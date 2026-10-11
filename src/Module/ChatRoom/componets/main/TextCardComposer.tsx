@@ -14,6 +14,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { KISIcon } from '@/constants/kisIcons';
 import { useSafeTopInset } from '@/hooks/useSafeTopInset';
+import KISButton from '@/constants/KISButton';
 
 export type TextCardPayload = {
   text: string;
@@ -338,28 +339,13 @@ export const TextCardComposer: React.FC<TextCardComposerProps> = ({
             />
           </View>
 
-          <Pressable
+          <KISButton
+            variant="outline"
+            style={{ alignSelf: 'flex-end', marginBottom: insets.bottom || 8 }}
             onPress={handleSend}
-            style={{
-              alignSelf: 'flex-end',
-              paddingHorizontal: 20,
-              paddingVertical: 10,
-              borderRadius: 20,
-              backgroundColor: 'rgba(0,0,0,0.35)',
-              opacity: text.trim() ? 1 : 0.6,
-              marginBottom: insets.bottom || 8,
-            }}
             disabled={!text.trim()}
-          >
-            <Text
-              style={{
-                color: '#fff',
-                fontWeight: '600',
-              }}
-            >
-              Send
-            </Text>
-          </Pressable>
+            title="Send"
+          />
         </View>
       </View>
       </KeyboardAvoidingView>

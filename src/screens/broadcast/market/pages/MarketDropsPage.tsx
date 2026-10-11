@@ -3,6 +3,7 @@ import { Alert, Animated, DeviceEventEmitter, Image, Pressable, ScrollView, Text
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useKISTheme } from '@/theme/useTheme';
 import { KISIcon } from '@/constants/kisIcons';
+import KISButton from '@/constants/KISButton';
 import useMarketData from '@/screens/broadcast/market/hooks/useMarketData';
 import { MarketDrop } from '@/screens/broadcast/market/api/market.types';
 
@@ -197,27 +198,11 @@ function DropCard({ drop, onJoin }: { drop: MarketDrop; onJoin?: () => void }) {
           </Text>
         )}
 
-        <Pressable
+        <KISButton
+          title={drop.is_live ? 'Watch live drop' : 'Set reminder'}
+          variant={drop.is_live ? 'danger' : 'outline'}
           onPress={onJoin}
-          style={{
-            borderWidth: 1.5,
-            borderColor: drop.is_live ? palette.danger : palette.primary,
-            backgroundColor: drop.is_live ? `${palette.danger}15` : palette.primarySoft,
-            borderRadius: 12,
-            paddingVertical: 10,
-            alignItems: 'center',
-          }}
-        >
-          <Text
-            style={{
-              color: drop.is_live ? palette.danger : palette.primaryStrong,
-              fontWeight: '900',
-              fontSize: 14,
-            }}
-          >
-            {drop.is_live ? 'Watch live drop' : 'Set reminder'}
-          </Text>
-        </Pressable>
+        />
       </View>
     </View>
   );
@@ -292,21 +277,12 @@ export default function MarketDropsPage({ ownerId = null, searchTerm = '' }: Pro
               Live sales · Limited stock · USD checkout
             </Text>
           </View>
-          <Pressable
+          <KISButton
+            title={loadingHome ? 'Loading…' : 'Refresh'}
+            variant="outline"
+            size="sm"
             onPress={reloadAll}
-            style={{
-              borderWidth: 1.5,
-              borderColor: palette.divider,
-              backgroundColor: palette.surface,
-              borderRadius: 12,
-              paddingHorizontal: 12,
-              paddingVertical: 8,
-            }}
-          >
-            <Text style={{ color: loadingHome ? palette.subtext : palette.text, fontWeight: '900', fontSize: 12 }}>
-              {loadingHome ? 'Loading…' : 'Refresh'}
-            </Text>
-          </Pressable>
+          />
         </View>
 
         {/* Live drops */}

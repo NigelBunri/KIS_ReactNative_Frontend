@@ -30,6 +30,7 @@ import { deleteRequest } from '@/network/delete';
 import { patchRequest } from '@/network/patch';
 import ROUTES from '@/network';
 import { KISIcon } from '@/constants/kisIcons';
+import KISButton from '@/constants/KISButton';
 import { useAuth } from '../../App';
 import { isTierAtLeast } from '@/services/tierAccess';
 import { useSafeTopInset } from '@/hooks/useSafeTopInset';
@@ -204,32 +205,27 @@ function DateField({ label, value, onChange, palette, minimumDate }: DateFieldPr
   return (
     <View style={{ marginBottom: 12 }}>
       <Text style={{ color: palette.subtext, fontSize: 12, marginBottom: 4 }}>{label}</Text>
-      <Pressable
+      <KISButton
+        variant="outline"
         onPress={() => { Keyboard.dismiss(); setShowDate(true); }}
-        style={[
-          dtStyles.dateButton,
-          {
-            borderColor: palette.inputBorder,
-            backgroundColor: palette.surface,
-          },
-        ]}
-      >
-        <KISIcon name="calendar" size={15} color={palette.primary} />
-        <Text style={{ color: value ? palette.text : palette.subtext, fontSize: 14, marginLeft: 8, flex: 1 }}>
-          {displayText}
-        </Text>
-        {value && (
-          <Pressable
-            hitSlop={12}
+        style={dtStyles.dateButton}
+        left={<KISIcon name="calendar" size={15} color={palette.primary} />}
+        right={value ? (
+          <KISButton
+            variant="ghost"
             onPress={() => {
               // clear — handled at parent
               onChange(new Date(0));
             }}
           >
             <KISIcon name="close" size={14} color={palette.subtext} />
-          </Pressable>
-        )}
-      </Pressable>
+          </KISButton>
+        ) : undefined}
+      >
+        <Text style={{ color: value ? palette.text : palette.subtext, fontSize: 14, marginLeft: 8, flex: 1 }}>
+          {displayText}
+        </Text>
+      </KISButton>
 
       {showDate && (
         <DateTimePicker
@@ -254,22 +250,12 @@ function DateField({ label, value, onChange, palette, minimumDate }: DateFieldPr
       {/* iOS: show both pickers inline using a confirm button approach */}
       {Platform.OS === 'ios' && showDate && (
         <View style={{ alignItems: 'flex-end', marginTop: 4 }}>
-          <Pressable
-            onPress={() => { setShowDate(false); setShowTime(true); }}
-            style={[dtStyles.iosNext, { backgroundColor: palette.primary }]}
-          >
-            <Text style={{ color: palette.onPrimary, fontSize: 13, fontWeight: '600' }}>Next: Time</Text>
-          </Pressable>
+          <KISButton title="Next: Time" size="sm" onPress={() => { setShowDate(false); setShowTime(true); }} />
         </View>
       )}
       {Platform.OS === 'ios' && showTime && !showDate && (
         <View style={{ alignItems: 'flex-end', marginTop: 4 }}>
-          <Pressable
-            onPress={() => { setShowTime(false); onChange(working.current); }}
-            style={[dtStyles.iosNext, { backgroundColor: palette.primary }]}
-          >
-            <Text style={{ color: palette.onPrimary, fontSize: 13, fontWeight: '600' }}>Done</Text>
-          </Pressable>
+          <KISButton title="Done" size="sm" onPress={() => { setShowTime(false); onChange(working.current); }} />
         </View>
       )}
     </View>
@@ -284,11 +270,6 @@ const dtStyles = StyleSheet.create({
     borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 10,
-  },
-  iosNext: {
-    paddingHorizontal: 16,
-    paddingVertical: 7,
-    borderRadius: 8,
   },
 });
 
@@ -788,30 +769,24 @@ export default function EventsScreen() {
       <View style={[styles.headerRow, { borderBottomColor: palette.border }]}>
         <Text style={[styles.title, { color: palette.text }]}>Events</Text>
         {canCreateEvents ? (
-          <Pressable
+          <KISButton
+            title="Create"
+            size="sm"
             onPress={openCreate}
-            style={[styles.addBtn, { backgroundColor: palette.primary }]}
-          >
-            <KISIcon name="add" size={16} color={palette.onPrimary} />
-            <Text style={{ color: palette.onPrimary, fontSize: 13, fontWeight: '600' }}>Create</Text>
-          </Pressable>
+            left={<KISIcon name="add" size={16} color={palette.onPrimary} />}
+          />
         ) : (
-          <Pressable
+          <KISButton
+            title="Partner+"
+            size="sm"
+            variant="outline"
             onPress={() =>
               setHeaderError(
                 'Creating events requires a Partner plan or above. Upgrade to unlock this feature.',
               )
             }
-            style={[
-              styles.addBtn,
-              { backgroundColor: palette.surface, borderWidth: 1, borderColor: palette.border },
-            ]}
-          >
-            <KISIcon name="lock" size={16} color={palette.subtext} />
-            <Text style={{ color: palette.subtext, fontSize: 13, fontWeight: '600' }}>
-              Partner+
-            </Text>
-          </Pressable>
+            left={<KISIcon name="lock" size={16} color={palette.subtext} />}
+          />
         )}
       </View>
 
@@ -821,9 +796,9 @@ export default function EventsScreen() {
           style={[styles.infoBanner, { backgroundColor: palette.surface, borderColor: palette.border }]}
         >
           <Text style={{ color: palette.subtext, fontSize: 13, flex: 1 }}>{headerError}</Text>
-          <Pressable onPress={() => setHeaderError('')} hitSlop={12}>
+          <KISButton variant="ghost" onPress={() => setHeaderError('')}>
             <KISIcon name="close" size={15} color={palette.subtext} />
-          </Pressable>
+          </KISButton>
         </View>
       )}
 
@@ -849,27 +824,13 @@ export default function EventsScreen() {
         contentContainerStyle={styles.filterRow}
       >
         {FILTER_TABS.map(({ key, label }) => (
-          <Pressable
+          <KISButton
             key={key}
+            title={label}
+            size="xs"
+            variant={filter === key ? 'primary' : 'outline'}
             onPress={() => setFilter(key)}
-            style={[
-              styles.filterChip,
-              {
-                backgroundColor: filter === key ? palette.primary : palette.surface,
-                borderColor: filter === key ? palette.primary : palette.border,
-              },
-            ]}
-          >
-            <Text
-              style={{
-                color: filter === key ? (palette.onPrimary) : palette.subtext,
-                fontSize: 13,
-                fontWeight: filter === key ? '600' : '400',
-              }}
-            >
-              {label}
-            </Text>
-          </Pressable>
+          />
         ))}
       </ScrollView>
 
@@ -930,17 +891,13 @@ export default function EventsScreen() {
                 <View style={styles.footer}>
                   {/* Attendee count — tappable */}
                   {(item.attendance_count ?? 0) > 0 ? (
-                    <Pressable
-                      onPress={(e) => {
-                        e.stopPropagation?.();
-                        openAttendees(item);
-                      }}
-                      hitSlop={8}
-                    >
-                      <Text style={{ color: palette.primary, fontSize: 12, fontWeight: '500' }}>
-                        {item.attendance_count} going
-                      </Text>
-                    </Pressable>
+                    <KISButton
+                      variant="ghost"
+                      size="xs"
+                      title={`${item.attendance_count} going`}
+                      textStyle={{ fontWeight: '500' }}
+                      onPress={() => openAttendees(item)}
+                    />
                   ) : (
                     <View />
                   )}
@@ -948,34 +905,24 @@ export default function EventsScreen() {
                   {/* RSVP / Cancel */}
                   {status !== 'past' && status !== 'cancelled' ? (
                     isGoing ? (
-                      <Pressable
-                        onPress={(e) => {
-                          e.stopPropagation?.();
+                      <KISButton
+                        variant="outline"
+                        size="sm"
+                        title="Going"
+                        left={<KISIcon name="check" size={13} color={palette.primary} />}
+                        onPress={() => {
                           Alert.alert('Cancel RSVP', 'Remove yourself from this event?', [
                             { text: 'No', style: 'cancel' },
                             { text: 'Yes', style: 'destructive', onPress: () => cancelRSVP(item) },
                           ]);
                         }}
-                        style={[
-                          styles.rsvpBtn,
-                          { backgroundColor: palette.surface, borderColor: palette.primary },
-                        ]}
-                      >
-                        <KISIcon name="check" size={13} color={palette.primary} />
-                        <Text style={{ color: palette.primary, fontSize: 13, fontWeight: '600', marginLeft: 4 }}>
-                          Going
-                        </Text>
-                      </Pressable>
+                      />
                     ) : (
-                      <Pressable
-                        onPress={(e) => {
-                          e.stopPropagation?.();
-                          rsvp(item);
-                        }}
-                        style={[styles.rsvpBtn, { backgroundColor: palette.primary, borderColor: palette.primary }]}
-                      >
-                        <Text style={{ color: palette.onPrimary, fontSize: 13, fontWeight: '600' }}>RSVP</Text>
-                      </Pressable>
+                      <KISButton
+                        size="sm"
+                        title="RSVP"
+                        onPress={() => rsvp(item)}
+                      />
                     )
                   ) : (
                     <View />
@@ -1089,25 +1036,17 @@ export default function EventsScreen() {
             </ScrollView>
 
             <View style={styles.modalRow}>
-              <Pressable
+              <KISButton
+                title="Cancel"
+                variant="outline"
                 onPress={() => { setCreateVisible(false); setFormError(''); }}
-                style={styles.btnSecondary}
-              >
-                <Text style={{ color: palette.text }}>Cancel</Text>
-              </Pressable>
-              <Pressable
+              />
+              <KISButton
+                title={editingEvent ? 'Save' : 'Create'}
                 onPress={submitForm}
                 disabled={saving}
-                style={[styles.btnPrimary, { backgroundColor: palette.primary }]}
-              >
-                {saving ? (
-                  <ActivityIndicator size="small" color={palette.onPrimary} />
-                ) : (
-                  <Text style={{ color: palette.onPrimary, fontWeight: '600' }}>
-                    {editingEvent ? 'Save' : 'Create'}
-                  </Text>
-                )}
-              </Pressable>
+                loading={saving}
+              />
             </View>
           </View>
         </KeyboardAvoidingView>
@@ -1134,9 +1073,9 @@ export default function EventsScreen() {
               <Text style={[styles.modalTitle, { color: palette.text, flex: 1 }]} numberOfLines={2}>
                 {detailEvent?.title}
               </Text>
-              <Pressable onPress={() => setDetailVisible(false)} hitSlop={12}>
+              <KISButton variant="ghost" onPress={() => setDetailVisible(false)}>
                 <KISIcon name="close" size={20} color={palette.subtext} />
-              </Pressable>
+              </KISButton>
             </View>
 
             <ScrollView showsVerticalScrollIndicator={false}>
@@ -1188,15 +1127,16 @@ export default function EventsScreen() {
 
               {/* Attendee count */}
               {(detailEvent?.attendance_count ?? 0) > 0 && (
-                <Pressable
+                <KISButton
+                  variant="ghost"
                   onPress={() => { if (detailEvent) openAttendees(detailEvent); }}
                   style={[styles.metaRow, { marginBottom: 8 }]}
+                  left={<KISIcon name="people" size={15} color={palette.primary} />}
                 >
-                  <KISIcon name="people" size={15} color={palette.primary} />
-                  <Text style={{ color: palette.primary, fontSize: 14, marginLeft: 8, fontWeight: '500' }}>
+                  <Text style={{ color: palette.primary, fontSize: 14, fontWeight: '500' }}>
                     {detailEvent?.attendance_count} going — tap to see list
                   </Text>
-                </Pressable>
+                </KISButton>
               )}
 
               {/* Tickets section */}
@@ -1217,7 +1157,11 @@ export default function EventsScreen() {
                     {detailEvent!.ticket_count} ticket{detailEvent!.ticket_count !== 1 ? 's' : ''} available
                   </Text>
                   {detailEvent && isOwner(detailEvent) ? (
-                    <Pressable
+                    <KISButton
+                      variant="outline"
+                      size="sm"
+                      title="Manage Tickets"
+                      left={<KISIcon name="settings" size={14} color={palette.primary} />}
                       onPress={() =>
                         Alert.alert(
                           'Manage Tickets',
@@ -1225,15 +1169,12 @@ export default function EventsScreen() {
                           [{ text: 'Got it', style: 'default' }],
                         )
                       }
-                      style={[styles.manageTicketsBtn, { borderColor: palette.primary }]}
-                    >
-                      <KISIcon name="settings" size={14} color={palette.primary} />
-                      <Text style={{ color: palette.primary, fontSize: 13, fontWeight: '600', marginLeft: 6 }}>
-                        Manage Tickets
-                      </Text>
-                    </Pressable>
+                    />
                   ) : detailEvent ? (
-                    <Pressable
+                    <KISButton
+                      size="sm"
+                      title="Buy Ticket"
+                      left={<KISIcon name="card" size={14} color={palette.onPrimary} />}
                       onPress={() => {
                         Alert.alert(
                           'Buy Tickets',
@@ -1273,13 +1214,7 @@ export default function EventsScreen() {
                           ],
                         );
                       }}
-                      style={[styles.manageTicketsBtn, { borderColor: palette.success, backgroundColor: palette.successSoft }]}
-                    >
-                      <KISIcon name="card" size={14} color={palette.success} />
-                      <Text style={{ color: palette.success, fontSize: 13, fontWeight: '600', marginLeft: 6 }}>
-                        Buy Ticket
-                      </Text>
-                    </Pressable>
+                    />
                   ) : null}
                 </View>
               )}
@@ -1301,7 +1236,11 @@ export default function EventsScreen() {
                   <Text style={{ color: palette.subtext, fontSize: 13, marginTop: 6, marginBottom: 8 }}>
                     No tickets configured for this event yet.
                   </Text>
-                  <Pressable
+                  <KISButton
+                    variant="outline"
+                    size="sm"
+                    title="Manage Tickets"
+                    left={<KISIcon name="settings" size={14} color={palette.primary} />}
                     onPress={() =>
                       Alert.alert(
                         'Manage Tickets',
@@ -1309,13 +1248,7 @@ export default function EventsScreen() {
                         [{ text: 'Got it', style: 'default' }],
                       )
                     }
-                    style={[styles.manageTicketsBtn, { borderColor: palette.primary }]}
-                  >
-                    <KISIcon name="settings" size={14} color={palette.primary} />
-                    <Text style={{ color: palette.primary, fontSize: 13, fontWeight: '600', marginLeft: 6 }}>
-                      Manage Tickets
-                    </Text>
-                  </Pressable>
+                  />
                 </View>
               )}
             </ScrollView>
@@ -1325,24 +1258,20 @@ export default function EventsScreen() {
               {/* Share + Add to Calendar row */}
               {detailEvent && (
                 <View style={styles.secondaryActionsRow}>
-                  <Pressable
+                  <KISButton
+                    variant="outline"
+                    size="sm"
+                    title="Share"
+                    left={<KISIcon name="share" size={14} color={palette.text} />}
                     onPress={() => shareEvent(detailEvent)}
-                    style={[styles.secondaryActionBtn, { backgroundColor: palette.surface, borderColor: palette.border }]}
-                  >
-                    <KISIcon name="share" size={14} color={palette.text} />
-                    <Text style={{ color: palette.text, fontSize: 13, fontWeight: '500', marginLeft: 6 }}>
-                      Share
-                    </Text>
-                  </Pressable>
-                  <Pressable
+                  />
+                  <KISButton
+                    variant="outline"
+                    size="sm"
+                    title="Add to Calendar"
+                    left={<KISIcon name="calendar" size={14} color={palette.text} />}
                     onPress={() => addToCalendar(detailEvent)}
-                    style={[styles.secondaryActionBtn, { backgroundColor: palette.surface, borderColor: palette.border }]}
-                  >
-                    <KISIcon name="calendar" size={14} color={palette.text} />
-                    <Text style={{ color: palette.text, fontSize: 13, fontWeight: '500', marginLeft: 6 }}>
-                      Add to Calendar
-                    </Text>
-                  </Pressable>
+                  />
                 </View>
               )}
 
@@ -1351,26 +1280,25 @@ export default function EventsScreen() {
                 attending.has(detailEvent.id) &&
                 getEventStatus(detailEvent) !== 'past' &&
                 getEventStatus(detailEvent) !== 'cancelled' && (
-                  <Pressable
-                    onPress={() => openReminderModal(detailEvent)}
-                    style={[
-                      styles.detailRsvpBtn,
-                      { backgroundColor: palette.surface, borderColor: palette.border },
-                    ]}
-                  >
-                    <KISIcon name="bell" size={14} color={palette.primary} />
-                    <Text style={{ color: palette.primary, fontWeight: '600', marginLeft: 6 }}>
-                      {savedReminders[detailEvent.id] != null
+                  <KISButton
+                    variant="outline"
+                    title={
+                      savedReminders[detailEvent.id] != null
                         ? `Reminder: ${REMINDER_OPTIONS.find((o) => o.offsetMinutes === savedReminders[detailEvent.id])?.label ?? 'Set'}`
-                        : 'Set Reminder'}
-                    </Text>
-                  </Pressable>
+                        : 'Set Reminder'
+                    }
+                    left={<KISIcon name="bell" size={14} color={palette.primary} />}
+                    onPress={() => openReminderModal(detailEvent)}
+                  />
                 )}
 
               {/* RSVP / Cancel RSVP */}
               {detailEvent && getEventStatus(detailEvent) !== 'past' && getEventStatus(detailEvent) !== 'cancelled' && (
                 attending.has(detailEvent.id) ? (
-                  <Pressable
+                  <KISButton
+                    variant="outline"
+                    title="Going — Cancel RSVP"
+                    left={<KISIcon name="check" size={14} color={palette.primary} />}
                     onPress={() =>
                       Alert.alert('Cancel RSVP', 'Remove yourself from this event?', [
                         { text: 'No', style: 'cancel' },
@@ -1388,15 +1316,10 @@ export default function EventsScreen() {
                         },
                       ])
                     }
-                    style={[styles.detailRsvpBtn, { backgroundColor: palette.surface, borderColor: palette.primary }]}
-                  >
-                    <KISIcon name="check" size={14} color={palette.primary} />
-                    <Text style={{ color: palette.primary, fontWeight: '600', marginLeft: 6 }}>
-                      Going — Cancel RSVP
-                    </Text>
-                  </Pressable>
+                  />
                 ) : (
-                  <Pressable
+                  <KISButton
+                    title="RSVP to this event"
                     onPress={() => {
                       rsvp(detailEvent);
                       setDetailEvent((prev) =>
@@ -1405,37 +1328,27 @@ export default function EventsScreen() {
                           : prev,
                       );
                     }}
-                    style={[styles.detailRsvpBtn, { backgroundColor: palette.primary, borderColor: palette.primary }]}
-                  >
-                    <Text style={{ color: palette.onPrimary, fontWeight: '600' }}>RSVP to this event</Text>
-                  </Pressable>
+                  />
                 )
               )}
 
               {/* Owner: Edit + Delete */}
               {detailEvent && isOwner(detailEvent) && (
                 <View style={styles.ownerActions}>
-                  <Pressable
+                  <KISButton
+                    variant="outline"
+                    size="sm"
+                    title="Edit"
+                    left={<KISIcon name="edit" size={14} color={palette.text} />}
                     onPress={() => openEdit(detailEvent)}
-                    style={[styles.ownerBtn, { backgroundColor: palette.surface, borderColor: palette.border }]}
-                  >
-                    <KISIcon name="edit" size={14} color={palette.text} />
-                    <Text style={{ color: palette.text, fontSize: 13, fontWeight: '500', marginLeft: 6 }}>
-                      Edit
-                    </Text>
-                  </Pressable>
-                  <Pressable
+                  />
+                  <KISButton
+                    variant="danger"
+                    size="sm"
+                    title="Delete"
+                    left={<KISIcon name="trash" size={14} color={palette.onPrimary} />}
                     onPress={() => confirmDelete(detailEvent)}
-                    style={[
-                      styles.ownerBtn,
-                      { backgroundColor: (palette.danger) + '15', borderColor: palette.danger },
-                    ]}
-                  >
-                    <KISIcon name="trash" size={14} color={palette.danger} />
-                    <Text style={{ color: palette.danger, fontSize: 13, fontWeight: '500', marginLeft: 6 }}>
-                      Delete
-                    </Text>
-                  </Pressable>
+                  />
                 </View>
               )}
             </View>
@@ -1458,9 +1371,9 @@ export default function EventsScreen() {
               <Text style={[styles.modalTitle, { color: palette.text, flex: 1 }]}>
                 Set Reminder
               </Text>
-              <Pressable onPress={() => setReminderModalVisible(false)} hitSlop={12}>
+              <KISButton variant="ghost" onPress={() => setReminderModalVisible(false)}>
                 <KISIcon name="close" size={20} color={palette.subtext} />
-              </Pressable>
+              </KISButton>
             </View>
             <Text style={{ color: palette.subtext, fontSize: 13, marginBottom: 16 }}>
               You'll be notified when the app is open near the event time.
@@ -1515,9 +1428,9 @@ export default function EventsScreen() {
               <Text style={[styles.modalTitle, { color: palette.text, flex: 1 }]}>
                 Attendees
               </Text>
-              <Pressable onPress={() => setAttendeeModalVisible(false)} hitSlop={12}>
+              <KISButton variant="ghost" onPress={() => setAttendeeModalVisible(false)}>
                 <KISIcon name="close" size={20} color={palette.subtext} />
-              </Pressable>
+              </KISButton>
             </View>
 
             {attendeesLoading ? (
@@ -1576,15 +1489,6 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
   title: { fontSize: 20, fontWeight: '700' },
-  addBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: 8,
-    minHeight: 44,
-  },
   infoBanner: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1612,14 +1516,6 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     gap: 8,
   },
-  filterChip: {
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-    borderRadius: 20,
-    borderWidth: 1,
-    minHeight: 44,
-    justifyContent: 'center',
-  },
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 },
   card: { borderRadius: 12, borderWidth: 1, padding: 14, marginBottom: 10 },
   cardTitleRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, marginBottom: 2 },
@@ -1630,15 +1526,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     marginTop: 12,
-  },
-  rsvpBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 7,
-    borderRadius: 8,
-    borderWidth: 1,
-    minHeight: 44,
   },
   modalOverlay: { flex: 1, justifyContent: 'flex-end' },
   modalCard: {
@@ -1658,42 +1545,13 @@ const styles = StyleSheet.create({
   fieldLabel: { fontSize: 12, marginBottom: 4 },
   input: { borderWidth: 1, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8, fontSize: 14 },
   modalRow: { flexDirection: 'row', justifyContent: 'flex-end', gap: 10, marginTop: 12 },
-  btnSecondary: { paddingHorizontal: 16, paddingVertical: 9, borderRadius: 8 },
-  btnPrimary: { paddingHorizontal: 20, paddingVertical: 9, borderRadius: 8 },
   detailActions: { marginTop: 16, gap: 10 },
-  detailRsvpBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 12,
-    borderRadius: 10,
-    borderWidth: 1,
-  },
   ownerActions: { flexDirection: 'row', gap: 10 },
-  ownerBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 10,
-    borderRadius: 10,
-    borderWidth: 1,
-  },
   ticketSection: {
     marginTop: 16,
     padding: 14,
     borderRadius: 12,
     borderWidth: 1,
-  },
-  manageTicketsBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 8,
-    borderWidth: 1,
-    alignSelf: 'flex-start',
   },
   attendeeRow: {
     flexDirection: 'row',
@@ -1712,15 +1570,6 @@ const styles = StyleSheet.create({
   secondaryActionsRow: {
     flexDirection: 'row',
     gap: 10,
-  },
-  secondaryActionBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 10,
-    borderRadius: 10,
-    borderWidth: 1,
   },
   reminderOption: {
     flexDirection: 'row',

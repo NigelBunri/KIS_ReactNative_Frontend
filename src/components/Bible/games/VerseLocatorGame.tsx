@@ -9,6 +9,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View, Pressable, ScrollView } from 'react-native';
 import { useKISTheme } from '@/theme/useTheme';
+import KISButton from '@/constants/KISButton';
 import GameShell from './GameShell';
 import { AnswerFeedback, StageComplete } from './GameFeedback';
 import { getVerseText } from '../../../screens/tabs/bible/games/verseText';
@@ -171,15 +172,12 @@ export default function VerseLocatorGame({ gameKey, stageIndex, isReplay, onExit
       </ScrollView>
 
       <View style={styles.footer}>
-        <Pressable
+        <KISButton
           onPress={handleNext}
           disabled={!selected}
-          style={[styles.actionBtn, { backgroundColor: selected ? palette.goldReadable : palette.selectedBg }]}
-        >
-          <Text style={[styles.actionBtnText, { color: selected ? palette.onGold : palette.subtext }]}>
-            {index + 1 >= round.length ? 'Finish Stage' : 'Next Question'}
-          </Text>
-        </Pressable>
+          variant="outline"
+          title={index + 1 >= round.length ? 'Finish Stage' : 'Next Question'}
+        />
       </View>
     </GameShell>
   );
@@ -193,6 +191,4 @@ const styles = StyleSheet.create({
   choiceCard: { borderWidth: 1.5, borderRadius: 14, paddingHorizontal: 16, paddingVertical: 14 },
   choiceText: { fontSize: 14, fontWeight: '600', lineHeight: 20, fontStyle: 'italic' },
   footer: { paddingVertical: 14 },
-  actionBtn: { borderRadius: 999, paddingVertical: 15, alignItems: 'center' },
-  actionBtnText: { fontSize: 15, fontWeight: '900' },
 });

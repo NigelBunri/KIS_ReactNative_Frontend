@@ -447,7 +447,7 @@ const TypeSpecificFields = ({
             <KISButton
               key={p.value}
               title={p.label}
-              size="sm"
+              size="xs"
               variant={data.provider === p.value ? 'primary' : 'outline'}
               onPress={() => onChange(update(data, 'provider', p.value))}
             />
@@ -625,7 +625,7 @@ const TypeSpecificFields = ({
           <KISButton
             key={option.value}
             title={option.label}
-            size="sm"
+            size="xs"
             variant={data.target_type === option.value ? 'primary' : 'outline'}
             onPress={() => onChange(update(data, 'target_type', option.value))}
           />
@@ -664,7 +664,7 @@ const TypeSpecificFields = ({
           <KISButton
             key={mode}
             title={mode.charAt(0).toUpperCase() + mode.slice(1)}
-            size="sm"
+            size="xs"
             variant={data.presentation?.display_mode === mode ? 'primary' : 'outline'}
             onPress={() => onChange(update(data, 'presentation', { ...data.presentation, display_mode: mode }))}
           />
@@ -687,7 +687,7 @@ const TypeSpecificFields = ({
           <KISButton
             key={option.value}
             title={option.label}
-            size="sm"
+            size="xs"
             variant={(data.filter?.ordering || 'recent') === option.value ? 'primary' : 'outline'}
             onPress={() => onChange(update(data, 'filter', { ...data.filter, ordering: option.value }))}
           />

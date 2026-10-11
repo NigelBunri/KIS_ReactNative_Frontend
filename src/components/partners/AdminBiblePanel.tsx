@@ -12,6 +12,7 @@ import {
   View,
 } from 'react-native';
 import { useKISTheme } from '@/theme/useTheme';
+import KISButton from '@/constants/KISButton';
 import { getRequest } from '@/network/get';
 import { postRequest } from '@/network/post';
 import { patchRequest } from '@/network/patch';
@@ -267,28 +268,20 @@ function FieldInput({
 }
 
 function Chips({
-  options, selected, onSelect, palette,
+  options, selected, onSelect, palette: _palette,
 }: {
   options: { key: string; label: string }[]; selected: string; onSelect: (v: string) => void; palette: any;
 }) {
   return (
     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, paddingVertical: 4 }}>
       {options.map(opt => (
-        <Pressable
+        <KISButton
           key={opt.key}
+          title={opt.label}
+          size="xs"
+          variant={selected === opt.key ? 'primary' : 'outline'}
           onPress={() => onSelect(opt.key)}
-          style={[
-            styles.chip,
-            {
-              backgroundColor: selected === opt.key ? palette.primary + '22' : 'transparent',
-              borderColor: selected === opt.key ? palette.primary : palette.divider,
-            },
-          ]}
-        >
-          <Text style={{ color: selected === opt.key ? palette.primary : palette.subtext, fontSize: 11, fontWeight: '700' }}>
-            {opt.label}
-          </Text>
-        </Pressable>
+        />
       ))}
     </ScrollView>
   );

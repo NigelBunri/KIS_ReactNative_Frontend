@@ -687,14 +687,14 @@ export default function HealthInstitutionMembersScreen({ route, navigation }: Pr
             <View style={{ marginTop: spacing.sm, flexDirection: 'row', gap: spacing.xs }}>
               <KISButton
                 title="Open"
-                size="sm"
+                size="xs"
                 variant={membershipOpen ? 'primary' : 'outline'}
                 onPress={() => setMembershipOpen(true)}
                 disabled={!canManageMembers}
               />
               <KISButton
                 title="Closed"
-                size="sm"
+                size="xs"
                 variant={!membershipOpen ? 'primary' : 'outline'}
                 onPress={() => setMembershipOpen(false)}
                 disabled={!canManageMembers}

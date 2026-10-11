@@ -5,7 +5,6 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TouchableOpacity,
   View,
 } from 'react-native';
 import { SafeAreaView } from '@/components/common/SafeAreaViewWithTopPadding';
@@ -19,6 +18,7 @@ import { postRequest } from '@/network/post';
 import ROUTES from '@/network';
 import { KISIcon } from '@/constants/kisIcons';
 import KISButton from '@/constants/KISButton';
+import KISFab from '@/components/KISFab';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Petitions'>;
 
@@ -109,33 +109,13 @@ export default function PetitionsScreen({ navigation }: Props) {
         contentContainerStyle={{ paddingHorizontal: gutter, paddingVertical: 10 }}
       >
         {CATEGORIES.map((cat) => (
-          <TouchableOpacity
+          <KISButton
             key={cat}
-            activeOpacity={0.75}
-            hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
-            style={[
-              styles.chip,
-              {
-                backgroundColor:
-                  activeCategory === cat ? palette.primary : palette.surface,
-                borderColor:
-                  activeCategory === cat ? palette.primary : palette.divider,
-              },
-            ]}
+            title={cat}
+            size="xs"
+            variant={activeCategory === cat ? 'primary' : 'outline'}
             onPress={() => setActiveCategory(cat)}
-          >
-            <Text
-              style={[
-                styles.chipText,
-                {
-                  color:
-                    activeCategory === cat ? palette.ivory : palette.subtext,
-                },
-              ]}
-            >
-              {cat}
-            </Text>
-          </TouchableOpacity>
+          />
         ))}
       </ScrollView>
 
@@ -240,47 +220,24 @@ export default function PetitionsScreen({ navigation }: Props) {
                 </Text>
 
                 <View style={styles.cardActions}>
-                  <TouchableOpacity
-                    activeOpacity={0.75}
-                    hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
-                    style={[
-                      styles.inlineBtn,
-                      {
-                        backgroundColor: palette.primarySoft,
-                        borderColor: palette.primary,
-                      },
-                    ]}
+                  <KISButton
+                    size="sm"
+                    variant={petition.user_signed ? 'secondary' : 'primary'}
+                    title={signing === petition.id ? 'Signing…' : petition.user_signed ? '✓ Signed' : 'Sign'}
                     onPress={() => handleSign(petition.id)}
                     disabled={signing === petition.id || petition.user_signed}
-                  >
-                    <Text
-                      style={[styles.inlineBtnText, { color: petition.user_signed ? palette.success : palette.primary }]}
-                    >
-                      {signing === petition.id ? 'Signing…' : petition.user_signed ? '✓ Signed' : 'Sign'}
-                    </Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    activeOpacity={0.75}
-                    hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
-                    style={[
-                      styles.inlineBtn,
-                      {
-                        backgroundColor: palette.surface,
-                        borderColor: palette.divider,
-                      },
-                    ]}
+                    loading={signing === petition.id}
+                  />
+                  <KISButton
+                    size="sm"
+                    variant="outline"
+                    title="View"
                     onPress={() =>
                       navigation.navigate('PetitionDetail', {
                         petitionId: petition.id,
                       })
                     }
-                  >
-                    <Text
-                      style={[styles.inlineBtnText, { color: palette.subtext }]}
-                    >
-                      View
-                    </Text>
-                  </TouchableOpacity>
+                  />
                 </View>
               </View>
             );
@@ -288,14 +245,11 @@ export default function PetitionsScreen({ navigation }: Props) {
         )}
       </ScrollView>
 
-      {/* FAB */}
-      <TouchableOpacity
-        activeOpacity={0.85}
-        style={[styles.fab, { backgroundColor: palette.primary }]}
+      <KISFab
+        icon="add"
         onPress={() => navigation.navigate('CreatePetition')}
-      >
-        <KISIcon name="add" size={28} color={palette.ivory} />
-      </TouchableOpacity>
+        style={styles.fab}
+      />
     </SafeAreaView>
   );
 }
@@ -304,19 +258,6 @@ const styles = StyleSheet.create({
   flex: { flex: 1 },
   filterRow: {
     borderBottomWidth: 1,
-  },
-  chip: {
-    borderRadius: 20,
-    borderWidth: 1,
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-    marginRight: 8,
-    minHeight: 36,
-    justifyContent: 'center',
-  },
-  chipText: {
-    fontSize: 13,
-    fontWeight: '600',
   },
   card: {
     borderRadius: 14,
@@ -367,19 +308,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 10,
   },
-  inlineBtn: {
-    borderRadius: 8,
-    borderWidth: 1,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    minHeight: 36,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  inlineBtnText: {
-    fontSize: 13,
-    fontWeight: '600',
-  },
   emptyState: {
     alignItems: 'center',
     paddingTop: 60,
@@ -392,15 +320,5 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: 28,
     right: 20,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    alignItems: 'center',
-    justifyContent: 'center',
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOpacity: 0.2,
-    shadowOffset: { width: 0, height: 2 },
-    shadowRadius: 4,
   },
 });

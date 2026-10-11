@@ -14,6 +14,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/navigation/types';
 import { useKISTheme } from '@/theme/useTheme';
 import { KISIcon } from '@/constants/kisIcons';
+import KISButton from '@/constants/KISButton';
 import OfflineDataBadge from '@/components/offline/OfflineDataBadge';
 
 import useMarketData from '@/screens/broadcast/market/hooks/useMarketData';
@@ -333,28 +334,13 @@ export default function MarketHomePage({ ownerId = null, searchTerm = '', onSeeA
           {CATEGORIES.map((cat) => {
             const isActive = activeCategory === cat.id;
             return (
-              <Pressable
+              <KISButton
                 key={cat.id}
+                title={cat.label}
+                variant={isActive ? 'primary' : 'outline'}
+                size="sm"
                 onPress={() => setActiveCategory(cat.id)}
-                style={{
-                  borderWidth: 1.5,
-                  borderColor: isActive ? palette.primary : palette.divider,
-                  backgroundColor: isActive ? palette.primarySoft : palette.surface,
-                  borderRadius: 999,
-                  paddingHorizontal: 16,
-                  paddingVertical: 8,
-                }}
-              >
-                <Text
-                  style={{
-                    color: isActive ? palette.primaryStrong : palette.subtext,
-                    fontWeight: '800',
-                    fontSize: 13,
-                  }}
-                >
-                  {cat.label}
-                </Text>
-              </Pressable>
+              />
             );
           })}
         </ScrollView>

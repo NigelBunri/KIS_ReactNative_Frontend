@@ -3142,35 +3142,13 @@ export default function ShopDashboardScreen({ route, navigation }: Props) {
 
         <View style={[styles.tabBar, { backgroundColor: palette.surface }]}>
           {TAB_DEFINITIONS.map(tab => (
-            <Pressable
+            <KISButton
               key={tab.key}
+              title={tab.label}
+              variant={activeTab === tab.key ? 'primary' : 'outline'}
+              size="sm"
               onPress={() => setActiveTab(tab.key)}
-              style={[
-                styles.tabButton,
-                { minHeight: responsive.minTouchTarget, justifyContent: 'center' },
-              ]}
-              hitSlop={8}
-            >
-              <Text
-                style={{
-                  color:
-                    activeTab === tab.key
-                      ? palette.primaryStrong
-                      : palette.subtext,
-                  fontWeight: activeTab === tab.key ? '700' : '500',
-                }}
-              >
-                {tab.label}
-              </Text>
-              {activeTab === tab.key && (
-                <View
-                  style={[
-                    styles.tabUnderline,
-                    { backgroundColor: palette.primaryStrong },
-                  ]}
-                />
-              )}
-            </Pressable>
+            />
           ))}
         </View>
 

@@ -30,6 +30,7 @@ type Props = {
   textStyle?: StyleProp<TextStyle>;
   disabled?: boolean;
   loading?: boolean;
+  accessibilityLabel?: string;
 };
 
 export default function KISButton({
@@ -44,6 +45,7 @@ export default function KISButton({
   textStyle,
   disabled,
   loading = false,
+  accessibilityLabel,
 }: Props) {
   const { tone, palette, tokens, accentId } = useKISTheme();
   const bs = createButtonStyles(tone, palette, tokens);
@@ -77,6 +79,8 @@ export default function KISButton({
     <Pressable
       onPress={onPress}
       disabled={isDisabled}
+      accessibilityLabel={accessibilityLabel ?? (typeof title === 'string' ? title : undefined)}
+      accessibilityRole="button"
       style={({ pressed }) => [
         containerStyles,
         pressed && { opacity: tokens.opacity.pressed },

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Alert, DeviceEventEmitter, Image, Pressable, Text, View } from 'react-native';
+import { Alert, DeviceEventEmitter, Image, Text, View } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useKISTheme } from '@/theme/useTheme';
 import KISButton from '@/constants/KISButton';
@@ -642,26 +642,14 @@ export default function MarketStudioSection({
       {MARKET_TABS.map((tab) => {
         const active = activeMarketTab === tab.id;
         return (
-          <Pressable
+          <KISButton
             key={tab.id}
+            size="xs"
+            variant={active ? 'primary' : 'outline'}
+            title={tab.label}
+            left={<KISIcon name={tab.icon as any} size={14} color={active ? palette.onPrimary : palette.subtext} />}
             onPress={() => setActiveMarketTab(tab.id)}
-            style={{
-              paddingVertical: 8,
-              paddingHorizontal: 14,
-              borderRadius: 999,
-              borderWidth: 2,
-              borderColor: active ? palette.primary : palette.divider,
-              backgroundColor: active ? palette.primarySoft : palette.surface,
-              flexDirection: 'row',
-              alignItems: 'center',
-              gap: 8,
-            }}
-          >
-            <KISIcon name={tab.icon as any} size={14} color={active ? palette.primaryStrong : palette.subtext} />
-            <Text style={{ color: active ? palette.primaryStrong : palette.text, fontWeight: '900' }}>
-              {tab.label}
-            </Text>
-          </Pressable>
+          />
         );
       })}
     </View>
@@ -681,36 +669,16 @@ export default function MarketStudioSection({
       </Text>
 
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 10 }}>
-        <Pressable
+        <KISButton
+          title="Refresh"
+          variant="outline"
           onPress={() => {
             loadMarket();
             loadMarketplaceFeed();
           }}
-          style={{
-            borderWidth: 2,
-            borderColor: palette.divider,
-            backgroundColor: palette.surface,
-            paddingHorizontal: 14,
-            paddingVertical: 10,
-            borderRadius: 999,
-          }}
-        >
-          <Text style={{ color: palette.text, fontWeight: '900' }}>Refresh</Text>
-        </Pressable>
+        />
 
-        <Pressable
-          onPress={handleGoLiveDrop}
-          style={{
-            borderWidth: 2,
-            borderColor: palette.primary,
-            backgroundColor: palette.primarySoft,
-            paddingHorizontal: 14,
-            paddingVertical: 10,
-            borderRadius: 999,
-          }}
-        >
-          <Text style={{ color: palette.primaryStrong, fontWeight: '900' }}>Go Live Drop</Text>
-        </Pressable>
+        <KISButton title="Go Live Drop" onPress={handleGoLiveDrop} />
       </View>
 
       {loading ? (
@@ -834,33 +802,8 @@ export default function MarketStudioSection({
       </Text>
 
       <View style={{ flexDirection: 'row', gap: 10, flexWrap: 'wrap', marginTop: 10 }}>
-        <Pressable
-          onPress={handleGoLiveDrop}
-          style={{
-            borderWidth: 2,
-            borderColor: palette.primary,
-            backgroundColor: palette.primarySoft,
-            paddingHorizontal: 14,
-            paddingVertical: 10,
-            borderRadius: 999,
-          }}
-        >
-          <Text style={{ color: palette.primaryStrong, fontWeight: '900' }}>Go Live Drop</Text>
-        </Pressable>
-
-        <Pressable
-          onPress={() => handleScheduleDrop()}
-          style={{
-            borderWidth: 2,
-            borderColor: palette.divider,
-            backgroundColor: palette.surface,
-            paddingHorizontal: 14,
-            paddingVertical: 10,
-            borderRadius: 999,
-          }}
-        >
-          <Text style={{ color: palette.text, fontWeight: '900' }}>Schedule Drop</Text>
-        </Pressable>
+        <KISButton title="Go Live Drop" onPress={handleGoLiveDrop} />
+        <KISButton title="Schedule Drop" variant="outline" onPress={() => handleScheduleDrop()} />
       </View>
 
       <View style={{ marginTop: 10, gap: 6 }}>
@@ -1185,7 +1128,8 @@ export default function MarketStudioSection({
       </View>
 
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 12 }}>
-        <Pressable
+        <KISButton
+          title="Create Lesson"
           onPress={async () => {
             const shopId = activeShop?.id;
             if (!shopId) {
@@ -1208,12 +1152,11 @@ export default function MarketStudioSection({
               Alert.alert('Create lesson', res?.message ?? 'Unable to create lesson. Check your shop is active.');
             }
           }}
-          style={{ borderWidth: 2, borderColor: palette.primary, backgroundColor: palette.primarySoft, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 10 }}
-        >
-          <Text style={{ color: palette.primaryStrong, fontWeight: '900' }}>Create Lesson</Text>
-        </Pressable>
+        />
 
-        <Pressable
+        <KISButton
+          title="Attach Kit"
+          variant="outline"
           onPress={() => {
             if (productsForActiveShop.length === 0) {
               Alert.alert('Attach kit', 'Add products to your shop first, then bundle them into a kit here.');
@@ -1222,10 +1165,7 @@ export default function MarketStudioSection({
             setActiveMarketTab('products');
             Alert.alert('Kit bundling', 'Select products from your list and use "Broadcast" to feature them together as a kit drop.');
           }}
-          style={{ borderWidth: 2, borderColor: palette.divider, backgroundColor: palette.surface, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 10 }}
-        >
-          <Text style={{ color: palette.text, fontWeight: '900' }}>Attach Kit</Text>
-        </Pressable>
+        />
       </View>
     </Card>
   );

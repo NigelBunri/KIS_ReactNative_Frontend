@@ -20,6 +20,7 @@ import { patchRequest } from '@/network/patch';
 import ROUTES from '@/network';
 import type { RootStackParamList } from '@/navigation/types';
 import { useProfileController } from '@/screens/tabs/profile/useProfileController';
+import KISButton from '@/constants/KISButton';
 import { useAuth } from '../../../App';
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -262,22 +263,18 @@ export default function TestimonyReachInboxScreen() {
         <Text style={[styles.headerTitle, { color: palette.text }]}>Reach-out Inbox</Text>
       </View>
 
-      <View style={[styles.tabs, { borderBottomColor: palette.divider }]}>
+      <View style={[styles.tabs, { borderBottomColor: palette.divider, gap: 6 }]}>
         {(['for_you', 'sent'] as TabId[]).map(tab => {
           const isActive = activeTab === tab;
           return (
-            <Pressable
+            <KISButton
               key={tab}
+              variant={isActive ? 'primary' : 'outline'}
+              size="sm"
               onPress={() => setActiveTab(tab)}
-              style={[
-                styles.tab,
-                { borderBottomColor: isActive ? palette.primary : palette.bg, borderBottomWidth: 2 },
-              ]}
-            >
-              <Text style={[styles.tabText, { color: isActive ? palette.primary : palette.subtext }]}>
-                {tab === 'for_you' ? 'For You' : 'Sent'}
-              </Text>
-            </Pressable>
+              title={tab === 'for_you' ? 'For You' : 'Sent'}
+              style={{ flex: 1 }}
+            />
           );
         })}
       </View>

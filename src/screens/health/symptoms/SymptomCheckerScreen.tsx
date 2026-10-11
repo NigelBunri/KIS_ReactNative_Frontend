@@ -6,7 +6,6 @@ import {
   StyleSheet,
   Text,
   TextInput,
-  TouchableOpacity,
   View,
 } from 'react-native';
 import { SafeAreaView } from '@/components/common/SafeAreaViewWithTopPadding';
@@ -105,13 +104,9 @@ export default function SymptomCheckerScreen({ navigation }: Props) {
         end={{ x: 1, y: 1 }}
         style={styles.header}
       >
-        <TouchableOpacity
-          onPress={() => navigation.goBack()}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          style={styles.backBtn}
-        >
+        <KISButton variant="ghost" onPress={() => navigation.goBack()} style={styles.backBtn}>
           <KISIcon name="arrow-left" size={22} color={palette.ivory} />
-        </TouchableOpacity>
+        </KISButton>
         <View style={styles.headerText}>
           <Text style={styles.headerTitle}>AI Symptom Checker (Beta)</Text>
           <Text style={styles.headerSub}>Not a substitute for professional medical advice</Text>
@@ -138,21 +133,20 @@ export default function SymptomCheckerScreen({ navigation }: Props) {
             {COMMON_SYMPTOMS.map((s) => {
               const selected = selectedSymptoms.includes(s.key);
               return (
-                <TouchableOpacity
+                <KISButton
                   key={s.key}
-                  style={[styles.symptomChip, selected && styles.symptomChipActive]}
+                  size="xs"
+                  variant={selected ? 'primary' : 'outline'}
+                  title={s.label}
+                  left={
+                    <KISIcon
+                      name={s.icon as any}
+                      size={14}
+                      color={selected ? palette.onPrimary : palette.subtext}
+                    />
+                  }
                   onPress={() => toggleSymptom(s.key)}
-                  hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
-                >
-                  <KISIcon
-                    name={s.icon as any}
-                    size={14}
-                    color={selected ? palette.primary : palette.subtext}
-                  />
-                  <Text style={[styles.symptomText, selected && styles.symptomTextActive]}>
-                    {s.label}
-                  </Text>
-                </TouchableOpacity>
+                />
               );
             })}
           </View>
@@ -307,24 +301,6 @@ function makeStyles(palette: any, sp: number) {
       flexWrap: 'wrap',
       gap: 10,
     },
-    symptomChip: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 6,
-      paddingHorizontal: 12,
-      paddingVertical: 10,
-      borderRadius: 24,
-      backgroundColor: palette.card,
-      borderWidth: 1,
-      borderColor: palette.divider,
-      minHeight: 44,
-    },
-    symptomChipActive: {
-      backgroundColor: palette.primarySoft,
-      borderColor: palette.primary,
-    },
-    symptomText: { fontSize: 13, color: palette.subtext },
-    symptomTextActive: { color: palette.primary, fontWeight: '600' },
     input: {
       backgroundColor: palette.card,
       borderRadius: 10,

@@ -4,7 +4,6 @@ import {
   Animated,
   Linking,
   Text,
-  TouchableOpacity,
   View,
   Image,
 } from 'react-native';
@@ -383,14 +382,11 @@ export default function AccountCreditsCard({
       </View>
 
       <View style={{ marginTop: 10, gap: 8 }}>
-        <TouchableOpacity
-          onPress={() => setShowHistory(prev => !prev)}
-          style={{ minHeight: 44, justifyContent: 'center' }}
-        >
+        <KISButton variant="ghost" onPress={() => setShowHistory(prev => !prev)} style={{ alignSelf: 'flex-start' }}>
           <Text style={[styles.title, { color: palette.text, fontSize: 16 }]}>
             Transaction History {showHistory ? '▲' : '▼'}
           </Text>
-        </TouchableOpacity>
+        </KISButton>
         {!showHistory ? null : walletLedger.length === 0 ? (
           <Text style={[styles.subtext, { color: palette.subtext }]}>
             No recent promotional-credit or billing activity.

@@ -398,7 +398,7 @@ export default function RevenueEvidenceAdminPanel() {
           <KISButton
             key={area}
             title={cleanLabel(area)}
-            size="sm"
+            size="xs"
             variant={index === areaIndex ? 'primary' : 'outline'}
             onPress={() => setAreaIndex(index)}
           />

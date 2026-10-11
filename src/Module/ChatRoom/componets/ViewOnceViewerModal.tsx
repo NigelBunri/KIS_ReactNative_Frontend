@@ -14,6 +14,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Video from 'react-native-video';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { resolveBackendAssetUrl } from '@/network';
+import KISButton from '@/constants/KISButton';
 
 export type ViewOnceAttachmentSnapshot = {
   url?: string | null;
@@ -76,12 +77,12 @@ export const ViewOnceViewerModal: React.FC<Props> = ({ visible, content, palette
         {item.originalName || 'Document'}
       </Text>
       {!!uri && (
-        <Pressable
+        <KISButton
+          variant="outline"
+          style={{ marginTop: 18 }}
           onPress={() => { Linking.openURL(uri).catch(() => {}); }}
-          style={{ marginTop: 18, paddingHorizontal: 22, paddingVertical: 11, borderRadius: 22, backgroundColor: primaryColor }}
-        >
-          <Text style={{ color: '#fff', fontWeight: '700', fontSize: 13 }}>Open</Text>
-        </Pressable>
+          title="Open"
+        />
       )}
     </View>
   );

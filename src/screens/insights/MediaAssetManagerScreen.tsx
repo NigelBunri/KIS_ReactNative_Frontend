@@ -18,6 +18,8 @@ import ROUTES from '@/network';
 import { getRequest } from '@/network/get';
 import { deleteRequest } from '@/network/delete';
 import { useKISTheme } from '@/theme/useTheme';
+import KISButton from '@/constants/KISButton';
+import KISFab from '@/components/KISFab';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -288,9 +290,7 @@ export default function MediaAssetManagerScreen() {
         </View>
         <View style={styles.center}>
           <Text style={{ color: palette.danger, textAlign: 'center' }}>{error}</Text>
-          <Pressable onPress={() => load()} style={[styles.retryBtn, { backgroundColor: palette.primaryStrong }]}>
-            <Text style={{ color: palette.onPrimary, fontWeight: '700' }}>Retry</Text>
-          </Pressable>
+          <KISButton title="Retry" onPress={() => load()} />
         </View>
       </SafeAreaView>
     );
@@ -316,26 +316,13 @@ export default function MediaAssetManagerScreen() {
         {FILTERS.map(f => {
           const active = filter === f;
           return (
-            <Pressable
+            <KISButton
               key={f}
+              title={f}
+              size="xs"
+              variant={active ? 'primary' : 'outline'}
               onPress={() => setFilter(f)}
-              style={[
-                styles.filterChip,
-                {
-                  backgroundColor: active ? palette.primaryStrong : palette.surface,
-                  borderColor: active ? palette.primaryStrong : palette.divider,
-                },
-              ]}
-            >
-              <Text
-                style={[
-                  styles.filterChipText,
-                  { color: active ? palette.onPrimary : palette.subtext },
-                ]}
-              >
-                {f}
-              </Text>
-            </Pressable>
+            />
           );
         })}
       </ScrollView>
@@ -414,13 +401,13 @@ export default function MediaAssetManagerScreen() {
                     {item.created_at ? ` • ${new Date(item.created_at).toLocaleDateString()}` : ''}
                   </Text>
                 </View>
-                <Pressable
+                <KISButton
+                  variant="ghost"
                   onPress={() => confirmDelete(item)}
-                  hitSlop={8}
                   style={styles.deleteIcon}
                 >
                   <Text style={{ color: palette.danger, fontSize: 18 }}>×</Text>
-                </Pressable>
+                </KISButton>
               </Pressable>
             );
           }}
@@ -428,16 +415,7 @@ export default function MediaAssetManagerScreen() {
       )}
 
       {/* FAB – Upload */}
-      <Pressable
-        onPress={handleUpload}
-        disabled={uploading}
-        style={[styles.fab, { backgroundColor: palette.primaryStrong, shadowColor: palette.royalInk }]}
-      >
-        {uploading
-          ? <ActivityIndicator color={palette.onPrimary} />
-          : <Text style={[styles.fabText, { color: palette.onPrimary }]}>Upload</Text>
-        }
-      </Pressable>
+      <KISFab icon="cloud-upload-outline" onPress={() => { if (!uploading) handleUpload(); }} style={styles.fab} />
 
       {/* Asset Detail Modal */}
       <Modal
@@ -452,15 +430,13 @@ export default function MediaAssetManagerScreen() {
               {selected?.name ?? `Asset ${selected?.id}`}
             </Text>
             <View style={{ flexDirection: 'row', gap: 12 }}>
-              <Pressable
+              <KISButton
+                title="Delete"
+                variant="ghost"
                 onPress={() => { setSelected(null); if (selected) confirmDelete(selected); }}
-                hitSlop={8}
-              >
-                <Text style={{ color: palette.danger, fontWeight: '700', fontSize: 15 }}>Delete</Text>
-              </Pressable>
-              <Pressable onPress={() => setSelected(null)}>
-                <Text style={{ color: palette.primaryStrong, fontWeight: '700', fontSize: 16 }}>Done</Text>
-              </Pressable>
+                textStyle={{ color: palette.danger }}
+              />
+              <KISButton title="Done" variant="ghost" onPress={() => setSelected(null)} />
             </View>
           </View>
           <ScrollView contentContainerStyle={styles.modalContent}>
@@ -589,16 +565,7 @@ const styles = StyleSheet.create({
     gap: 8,
     flexDirection: 'row',
   },
-  filterChip: {
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-    borderRadius: 20,
-    borderWidth: 1,
-  },
-  filterChipText: { fontSize: 13, fontWeight: '600' },
-
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, gap: 12 },
-  retryBtn: { paddingHorizontal: 20, paddingVertical: 10, borderRadius: 10 },
 
   // Grid
   gridContent: { padding: 12, paddingBottom: 100 },
@@ -633,17 +600,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: 24,
     right: 20,
-    paddingHorizontal: 20,
-    paddingVertical: 14,
-    borderRadius: 28,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.18,
-    shadowRadius: 6,
-    elevation: 4,
-    minWidth: 90,
-    alignItems: 'center',
   },
-  fabText: { fontWeight: '700', fontSize: 14 },
 
   // Modal
   modalHeader: {

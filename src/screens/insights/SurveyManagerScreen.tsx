@@ -20,6 +20,8 @@ import { patchRequest } from '@/network/patch';
 import { deleteRequest } from '@/network/delete';
 import { useKISTheme } from '@/theme/useTheme';
 import { useResponsiveLayout } from '@/theme/responsive';
+import KISButton from '@/constants/KISButton';
+import KISFab from '@/components/KISFab';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -148,15 +150,8 @@ function CreateSurveyModal({
         <View style={[styles.modalHeader, { borderBottomColor: palette.divider }]}>
           <Text style={[styles.modalTitle, { color: palette.text }]}>Create Survey</Text>
           <View style={{ flexDirection: 'row', gap: 16 }}>
-            <Pressable onPress={() => { reset(); onClose(); }}>
-              <Text style={{ color: palette.subtext, fontSize: 16 }}>Cancel</Text>
-            </Pressable>
-            <Pressable onPress={save} disabled={saving}>
-              {saving
-                ? <ActivityIndicator size="small" color={palette.primaryStrong} />
-                : <Text style={{ color: palette.primaryStrong, fontWeight: '700', fontSize: 16 }}>Save</Text>
-              }
-            </Pressable>
+            <KISButton title="Cancel" variant="ghost" onPress={() => { reset(); onClose(); }} />
+            <KISButton title="Save" variant="ghost" onPress={save} disabled={saving} loading={saving} />
           </View>
         </View>
 
@@ -192,9 +187,9 @@ function CreateSurveyModal({
                 <Text style={{ color: palette.text, fontSize: 14, fontWeight: '600' }}>{q.text}</Text>
                 <Text style={{ color: palette.subtext, fontSize: 12, marginTop: 2 }}>{q.type}</Text>
               </View>
-              <Pressable onPress={() => removeQuestion(i)} hitSlop={8}>
+              <KISButton variant="ghost" onPress={() => removeQuestion(i)}>
                 <Text style={{ color: palette.danger, fontSize: 20 }}>×</Text>
-              </Pressable>
+              </KISButton>
             </View>
           ))}
 
@@ -211,45 +206,31 @@ function CreateSurveyModal({
               <Text style={[styles.fieldLabelSm, { color: palette.subtext }]}>Type</Text>
               <View style={styles.typesRow}>
                 {QUESTION_TYPES.map(t => (
-                  <Pressable
+                  <KISButton
                     key={t.value}
+                    title={t.label}
+                    size="xs"
+                    variant={qType_ === t.value ? 'primary' : 'outline'}
                     onPress={() => setQType(t.value)}
-                    style={[
-                      styles.typeChip,
-                      {
-                        backgroundColor: qType_ === t.value ? palette.primaryStrong : palette.bg,
-                        borderColor: qType_ === t.value ? palette.primaryStrong : palette.divider,
-                      },
-                    ]}
-                  >
-                    <Text style={{ color: qType_ === t.value ? palette.onPrimary : palette.subtext, fontSize: 12, fontWeight: '600' }}>
-                      {t.label}
-                    </Text>
-                  </Pressable>
+                  />
                 ))}
               </View>
               <View style={{ flexDirection: 'row', gap: 10, marginTop: 8 }}>
-                <Pressable
+                <KISButton
+                  title="Cancel"
+                  variant="outline"
                   onPress={() => { setAddingQ(false); setQText(''); setQType('text'); }}
-                  style={[styles.halfBtn, { borderColor: palette.divider, backgroundColor: palette.bg, }]}
-                >
-                  <Text style={{ color: palette.subtext, fontWeight: '600' }}>Cancel</Text>
-                </Pressable>
-                <Pressable
-                  onPress={addQuestion}
-                  style={[styles.halfBtn, { backgroundColor: palette.primaryStrong }]}
-                >
-                  <Text style={{ color: palette.onPrimary, fontWeight: '700' }}>Add</Text>
-                </Pressable>
+                  style={{ flex: 1 }}
+                />
+                <KISButton title="Add" onPress={addQuestion} style={{ flex: 1 }} />
               </View>
             </View>
           ) : (
-            <Pressable
+            <KISButton
+              title="+ Add Question"
+              variant="outline"
               onPress={() => setAddingQ(true)}
-              style={[styles.addQBtn, { borderColor: palette.divider, backgroundColor: palette.surface }]}
-            >
-              <Text style={{ color: palette.primaryStrong, fontWeight: '700' }}>+ Add Question</Text>
-            </Pressable>
+            />
           )}
         </ScrollView>
       </SafeAreaView>
@@ -418,15 +399,8 @@ function SurveyDetailSheet({
             <>
               <Text style={[styles.modalTitle, { color: palette.text }]}>Edit Survey</Text>
               <View style={{ flexDirection: 'row', gap: 14 }}>
-                <Pressable onPress={() => setEditing(false)}>
-                  <Text style={{ color: palette.subtext, fontSize: 15 }}>Cancel</Text>
-                </Pressable>
-                <Pressable onPress={saveEdits} disabled={saving}>
-                  {saving
-                    ? <ActivityIndicator size="small" color={palette.primaryStrong} />
-                    : <Text style={{ color: palette.primaryStrong, fontWeight: '700', fontSize: 15 }}>Save</Text>
-                  }
-                </Pressable>
+                <KISButton title="Cancel" variant="ghost" onPress={() => setEditing(false)} />
+                <KISButton title="Save" variant="ghost" onPress={saveEdits} disabled={saving} loading={saving} />
               </View>
             </>
           ) : (
@@ -435,15 +409,9 @@ function SurveyDetailSheet({
                 {survey.title ?? 'Survey'}
               </Text>
               <View style={{ flexDirection: 'row', gap: 14 }}>
-                <Pressable onPress={() => setEditing(true)}>
-                  <Text style={{ color: palette.primaryStrong, fontSize: 15 }}>Edit</Text>
-                </Pressable>
-                <Pressable onPress={deleteSurvey}>
-                  <Text style={{ color: palette.danger, fontSize: 15 }}>Delete</Text>
-                </Pressable>
-                <Pressable onPress={onClose}>
-                  <Text style={{ color: palette.subtext, fontSize: 15 }}>Close</Text>
-                </Pressable>
+                <KISButton title="Edit" variant="ghost" onPress={() => setEditing(true)} />
+                <KISButton title="Delete" variant="ghost" onPress={deleteSurvey} textStyle={{ color: palette.danger }} />
+                <KISButton title="Close" variant="ghost" onPress={onClose} />
               </View>
             </>
           )}
@@ -488,18 +456,13 @@ function SurveyDetailSheet({
             {/* Section tabs */}
             <View style={[styles.sectionTabRow, { borderBottomColor: palette.divider }]}>
               {(['questions', 'responses'] as const).map(sec => (
-                <Pressable
+                <KISButton
                   key={sec}
+                  title={sec === 'questions' ? 'Questions' : 'Responses'}
+                  size="xs"
+                  variant={activeSection === sec ? 'primary' : 'outline'}
                   onPress={() => setActiveSection(sec)}
-                  style={[
-                    styles.sectionTab,
-                    activeSection === sec && [styles.sectionTabActive, { borderBottomColor: palette.primaryStrong }],
-                  ]}
-                >
-                  <Text style={[styles.sectionTabLabel, { color: activeSection === sec ? palette.primaryStrong : palette.subtext }]}>
-                    {sec === 'questions' ? 'Questions' : 'Responses'}
-                  </Text>
-                </Pressable>
+                />
               ))}
             </View>
 
@@ -518,9 +481,9 @@ function SurveyDetailSheet({
                         <Text style={{ color: palette.text, fontSize: 14, fontWeight: '600' }}>{qText(q)}</Text>
                         <Text style={{ color: palette.subtext, fontSize: 12, marginTop: 2 }}>{qType(q)}</Text>
                       </View>
-                      <Pressable onPress={() => deleteQuestion(q)} hitSlop={8}>
+                      <KISButton variant="ghost" onPress={() => deleteQuestion(q)}>
                         <Text style={{ color: palette.danger, fontSize: 20 }}>×</Text>
-                      </Pressable>
+                      </KISButton>
                     </View>
                   ))
                 )}
@@ -538,49 +501,37 @@ function SurveyDetailSheet({
                     <Text style={[styles.fieldLabelSm, { color: palette.subtext }]}>Type</Text>
                     <View style={styles.typesRow}>
                       {QUESTION_TYPES.map(t => (
-                        <Pressable
+                        <KISButton
                           key={t.value}
+                          title={t.label}
+                          size="xs"
+                          variant={qTypeNew === t.value ? 'primary' : 'outline'}
                           onPress={() => setQTypeNew(t.value)}
-                          style={[
-                            styles.typeChip,
-                            {
-                              backgroundColor: qTypeNew === t.value ? palette.primaryStrong : palette.bg,
-                              borderColor: qTypeNew === t.value ? palette.primaryStrong : palette.divider,
-                            },
-                          ]}
-                        >
-                          <Text style={{ color: qTypeNew === t.value ? palette.onPrimary : palette.subtext, fontSize: 12, fontWeight: '600' }}>
-                            {t.label}
-                          </Text>
-                        </Pressable>
+                        />
                       ))}
                     </View>
                     <View style={{ flexDirection: 'row', gap: 10, marginTop: 8 }}>
-                      <Pressable
+                      <KISButton
+                        title="Cancel"
+                        variant="outline"
                         onPress={() => { setAddingQ(false); setQTextNew(''); setQTypeNew('text'); }}
-                        style={[styles.halfBtn, { borderColor: palette.divider, backgroundColor: palette.bg, }]}
-                      >
-                        <Text style={{ color: palette.subtext, fontWeight: '600' }}>Cancel</Text>
-                      </Pressable>
-                      <Pressable
+                        style={{ flex: 1 }}
+                      />
+                      <KISButton
+                        title="Add"
                         onPress={addQuestion}
                         disabled={addingQBusy || !qTextNew.trim()}
-                        style={[styles.halfBtn, { backgroundColor: palette.primaryStrong }]}
-                      >
-                        {addingQBusy
-                          ? <ActivityIndicator size="small" color={palette.onPrimary} />
-                          : <Text style={{ color: palette.onPrimary, fontWeight: '700' }}>Add</Text>
-                        }
-                      </Pressable>
+                        loading={addingQBusy}
+                        style={{ flex: 1 }}
+                      />
                     </View>
                   </View>
                 ) : (
-                  <Pressable
+                  <KISButton
+                    title="+ Add Question"
+                    variant="outline"
                     onPress={() => setAddingQ(true)}
-                    style={[styles.addQBtn, { borderColor: palette.divider, backgroundColor: palette.surface }]}
-                  >
-                    <Text style={{ color: palette.primaryStrong, fontWeight: '700' }}>+ Add Question</Text>
-                  </Pressable>
+                  />
                 )}
               </ScrollView>
             ) : (
@@ -668,9 +619,7 @@ export default function SurveyManagerScreen() {
       ) : error ? (
         <View style={styles.center}>
           <Text style={{ color: palette.danger, textAlign: 'center' }}>{error}</Text>
-          <Pressable onPress={() => load()} style={[styles.retryBtn, { backgroundColor: palette.primaryStrong }]}>
-            <Text style={{ color: palette.onPrimary, fontWeight: '700' }}>Retry</Text>
-          </Pressable>
+          <KISButton title="Retry" onPress={() => load()} />
         </View>
       ) : (
         <FlatList
@@ -726,12 +675,7 @@ export default function SurveyManagerScreen() {
       )}
 
       {/* FAB – Create */}
-      <Pressable
-        onPress={() => setShowCreate(true)}
-        style={[styles.fab, { backgroundColor: palette.primaryStrong, shadowColor: palette.royalInk }]}
-      >
-        <Text style={[styles.fabText, { color: palette.onPrimary }]}>+ Create Survey</Text>
-      </Pressable>
+      <KISFab icon="add" onPress={() => setShowCreate(true)} style={styles.fab} />
 
       {/* Create Modal */}
       <CreateSurveyModal
@@ -766,7 +710,6 @@ const styles = StyleSheet.create({
   screenSubtitle: { fontSize: 13 },
 
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, gap: 12 },
-  retryBtn: { paddingHorizontal: 20, paddingVertical: 10, borderRadius: 10 },
 
   listContent: { padding: 16, gap: 12, paddingBottom: 100 },
   card: { borderRadius: 14, borderWidth: 1, padding: 14, gap: 8 },
@@ -779,15 +722,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: 24,
     right: 20,
-    paddingHorizontal: 18,
-    paddingVertical: 12,
-    borderRadius: 28,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.18,
-    shadowRadius: 6,
-    elevation: 4,
   },
-  fabText: { fontWeight: '700', fontSize: 14 },
 
   // Modal
   modalHeader: {
@@ -813,15 +748,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  sectionTab: {
-    flex: 1,
-    paddingVertical: 12,
-    alignItems: 'center',
-    borderBottomWidth: 2,
-    borderBottomColor: 'transparent',
-  },
-  sectionTabActive: {},
-  sectionTabLabel: { fontSize: 13, fontWeight: '600' },
 
   sectionLabel: { fontSize: 15, fontWeight: '700' },
 
@@ -857,28 +783,8 @@ const styles = StyleSheet.create({
     padding: 12,
     gap: 8,
   },
-  addQBtn: {
-    borderRadius: 10,
-    borderWidth: 1,
-    paddingVertical: 12,
-    alignItems: 'center',
-  },
 
   typesRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  typeChip: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 20,
-    borderWidth: 1,
-  },
-
-  halfBtn: {
-    flex: 1,
-    paddingVertical: 10,
-    borderRadius: 10,
-    alignItems: 'center',
-    borderWidth: 1,
-  },
 
   capChip: { borderRadius: 6, borderWidth: 1, paddingHorizontal: 8, paddingVertical: 2 },
 });

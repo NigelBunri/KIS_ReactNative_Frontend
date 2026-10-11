@@ -10,6 +10,7 @@ import {
   View,
 } from 'react-native';
 import { useKISTheme } from '@/theme/useTheme';
+import KISButton from '@/constants/KISButton';
 import type { AuditEntry } from '@/screens/tabs/partners/useAdminAuditTrailPanel';
 
 const SEVERITY_COLORS: Record<string, string> = {
@@ -69,24 +70,15 @@ export default function AdminAuditTrailPanel({
 
       {/* Severity filter chips */}
       <View style={[styles.filterRow, { borderBottomColor: palette.border }]}>
-        {SEVERITY_FILTERS.map(sev => {
-          const active = severityFilter === sev;
-          const color = sev ? SEVERITY_COLORS[sev] ?? palette.primary : palette.primary;
-          return (
-            <Pressable
-              key={sev || 'all'}
-              onPress={() => onFilterSeverity(sev)}
-              style={[styles.chip, {
-                backgroundColor: active ? color + '22' : 'transparent',
-                borderColor: active ? color : palette.border,
-              }]}
-            >
-              <Text style={[styles.chipText, { color: active ? color : palette.subtext }]}>
-                {sev || 'All'}
-              </Text>
-            </Pressable>
-          );
-        })}
+        {SEVERITY_FILTERS.map(sev => (
+          <KISButton
+            key={sev || 'all'}
+            title={sev || 'All'}
+            size="xs"
+            variant={severityFilter === sev ? 'primary' : 'outline'}
+            onPress={() => onFilterSeverity(sev)}
+          />
+        ))}
       </View>
 
       {/* Action type filter input */}
@@ -187,8 +179,6 @@ const styles = StyleSheet.create({
   filterRow: { flexDirection: 'row', padding: 12, gap: 6, borderBottomWidth: 1, flexWrap: 'wrap' },
   actionFilterRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 8, borderBottomWidth: 1, gap: 8 },
   actionFilterInput: { flex: 1, height: 36, borderRadius: 8, borderWidth: 1, paddingHorizontal: 10, fontSize: 12 },
-  chip: { borderRadius: 20, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 5 },
-  chipText: { fontSize: 12, fontWeight: '600' },
   centered: { padding: 40, alignItems: 'center' },
   errorBox: { borderRadius: 8, borderWidth: 1, padding: 12, margin: 16 },
   errorText: { fontSize: 13, fontWeight: '600' },

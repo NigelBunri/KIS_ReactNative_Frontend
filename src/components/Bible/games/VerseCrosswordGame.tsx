@@ -19,6 +19,7 @@ import { ActivityIndicator, StyleSheet, Text, View, Pressable, ScrollView } from
 import { useKISTheme } from '@/theme/useTheme';
 import { useResponsiveLayout } from '@/theme/responsive';
 import { KISIcon } from '@/constants/kisIcons';
+import KISButton from '@/constants/KISButton';
 import GameShell from './GameShell';
 import { StageComplete } from './GameFeedback';
 import { getVerseText, normalizeWord, tokenizeVerse } from '../../../screens/tabs/bible/games/verseText';
@@ -249,9 +250,7 @@ export default function VerseCrosswordGame({ gameKey, stageIndex, isReplay, onEx
             <Text style={[styles.emptyBody, { color: palette.subtext }]}>
               This stage's passage didn't have enough word variety to build a crossword. Try another stage.
             </Text>
-            <Pressable onPress={onExit} style={[styles.emptyBtn, { backgroundColor: palette.goldReadable }]}>
-              <Text style={[styles.emptyBtnText, { color: palette.onGold }]}>Back to Journey</Text>
-            </Pressable>
+            <KISButton title="Back to Journey" onPress={onExit} style={{ alignSelf: 'stretch', marginTop: 8 }} />
           </View>
         </View>
       </GameShell>
@@ -386,6 +385,4 @@ const styles = StyleSheet.create({
   emptyCard: { borderRadius: 20, padding: 24, alignItems: 'center', gap: 8, maxWidth: 320 },
   emptyTitle: { fontSize: 17, fontWeight: '900', textAlign: 'center' },
   emptyBody: { fontSize: 13, fontWeight: '600', textAlign: 'center' },
-  emptyBtn: { alignSelf: 'stretch', borderRadius: 999, paddingVertical: 14, alignItems: 'center', marginTop: 8 },
-  emptyBtnText: { fontSize: 15, fontWeight: '900' },
 });

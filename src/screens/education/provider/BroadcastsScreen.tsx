@@ -16,13 +16,14 @@
 // history, BROADCAST_KIND_OPTIONS / BROADCAST_STATUS_OPTIONS and the
 // broadcasts case in its save handler) — same backend contract, new UI.
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, RefreshControl, ScrollView, Text, View } from 'react-native';
 import { useNavigation, useRoute, useFocusEffect, type RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { SafeAreaView } from '@/components/common/SafeAreaViewWithTopPadding';
 import { useKISTheme } from '@/theme/useTheme';
 import { useResponsiveLayout } from '@/theme/responsive';
 import KISTextInput from '@/constants/KISTextInput';
+import KISButton from '@/constants/KISButton';
 import ROUTES from '@/network';
 import { getRequest } from '@/network/get';
 import { postRequest } from '@/network/post';
@@ -232,22 +233,13 @@ export default function BroadcastsScreen() {
         >
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 14 }}>
             {STATUS_FILTERS.map(f => (
-              <Pressable
+              <KISButton
                 key={f.key}
+                title={f.label}
+                size="xs"
+                variant={statusFilter === f.key ? 'primary' : 'outline'}
                 onPress={() => setStatusFilter(f.key)}
-                style={{
-                  paddingHorizontal: 14,
-                  paddingVertical: 7,
-                  borderRadius: 999,
-                  borderWidth: 1,
-                  borderColor: statusFilter === f.key ? palette.primary : palette.border,
-                  backgroundColor: statusFilter === f.key ? palette.primarySoft : 'transparent',
-                }}
-              >
-                <Text style={{ fontWeight: '700', fontSize: 13, color: statusFilter === f.key ? palette.primaryStrong : palette.subtext }}>
-                  {f.label}
-                </Text>
-              </Pressable>
+              />
             ))}
           </View>
 
@@ -276,22 +268,13 @@ export default function BroadcastsScreen() {
                 <Text style={{ fontSize: 12, fontWeight: '700', color: palette.subtext }}>Kind</Text>
                 <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
                   {BROADCAST_KIND_OPTIONS.map(kind => (
-                    <Pressable
+                    <KISButton
                       key={kind.value}
+                      title={kind.label}
+                      size="xs"
+                      variant={form.broadcast_kind === kind.value ? 'primary' : 'outline'}
                       onPress={() => setForm(prev => ({ ...prev, broadcast_kind: kind.value }))}
-                      style={{
-                        paddingHorizontal: 12,
-                        paddingVertical: 7,
-                        borderRadius: 999,
-                        borderWidth: 1,
-                        borderColor: form.broadcast_kind === kind.value ? palette.primary : palette.border,
-                        backgroundColor: form.broadcast_kind === kind.value ? palette.primarySoft : 'transparent',
-                      }}
-                    >
-                      <Text style={{ fontSize: 12, fontWeight: '700', color: form.broadcast_kind === kind.value ? palette.primaryStrong : palette.subtext }}>
-                        {kind.label}
-                      </Text>
-                    </Pressable>
+                    />
                   ))}
                 </View>
 
@@ -305,22 +288,16 @@ export default function BroadcastsScreen() {
                         const field = selectedKindOption.lookupKey === 'courses' ? 'course_id' : 'event_id';
                         const selected = (form as any)[field] === row.id;
                         return (
-                          <Pressable
+                          <KISButton
                             key={row.id}
+                            size="xs"
+                            variant={selected ? 'primary' : 'outline'}
                             onPress={() => setForm(prev => ({ ...prev, [field]: row.id } as any))}
-                            style={{
-                              paddingHorizontal: 12,
-                              paddingVertical: 7,
-                              borderRadius: 999,
-                              borderWidth: 1,
-                              borderColor: selected ? palette.primary : palette.border,
-                              backgroundColor: selected ? palette.primarySoft : 'transparent',
-                            }}
                           >
-                            <Text numberOfLines={1} style={{ fontSize: 12, fontWeight: '700', color: selected ? palette.primaryStrong : palette.subtext, maxWidth: 160 }}>
+                            <Text numberOfLines={1} style={{ fontSize: 12, fontWeight: '700', color: selected ? palette.onPrimary : palette.subtext, maxWidth: 160 }}>
                               {row.title}
                             </Text>
-                          </Pressable>
+                          </KISButton>
                         );
                       })}
                     </ScrollView>
@@ -330,22 +307,13 @@ export default function BroadcastsScreen() {
                 <Text style={{ fontSize: 12, fontWeight: '700', color: palette.subtext }}>Status</Text>
                 <View style={{ flexDirection: 'row', gap: 8 }}>
                   {(['draft', 'published'] as const).map(s => (
-                    <Pressable
+                    <KISButton
                       key={s}
+                      title={s.charAt(0).toUpperCase() + s.slice(1)}
+                      size="xs"
+                      variant={form.status === s ? 'primary' : 'outline'}
                       onPress={() => setForm(prev => ({ ...prev, status: s }))}
-                      style={{
-                        paddingHorizontal: 14,
-                        paddingVertical: 7,
-                        borderRadius: 999,
-                        borderWidth: 1,
-                        borderColor: form.status === s ? palette.primary : palette.border,
-                        backgroundColor: form.status === s ? palette.primarySoft : 'transparent',
-                      }}
-                    >
-                      <Text style={{ fontWeight: '700', fontSize: 13, textTransform: 'capitalize', color: form.status === s ? palette.primaryStrong : palette.subtext }}>
-                        {s}
-                      </Text>
-                    </Pressable>
+                    />
                   ))}
                 </View>
 

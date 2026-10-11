@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { KISIcon } from '@/constants/kisIcons';
+import KISButton from '@/constants/KISButton';
 import { useKISTheme } from '@/theme/useTheme';
 import type { BreakoutRoom, CallParticipant } from '@/services/calls/callTypes';
 import { useSafeTopInset } from '@/hooks/useSafeTopInset';
@@ -95,9 +96,7 @@ export default function BreakoutRoomsSheet({
             <Text style={[styles.myRoomText, { color: palette.gold }]}>
               You're in {breakoutRooms.find(r => r.roomId === myBreakoutRoomId)?.name ?? 'a breakout room'}
             </Text>
-            <Pressable onPress={onReturnToMain} style={[styles.returnBtn, { backgroundColor: palette.gold }]}>
-              <Text style={[styles.returnText, { color: palette.royalInk }]}>Return to main</Text>
-            </Pressable>
+            <KISButton title="Return to main" size="xs" onPress={onReturnToMain} />
           </View>
         )}
 
@@ -121,9 +120,7 @@ export default function BreakoutRoomsSheet({
               );
             })}
             {isHost && (
-              <Pressable onPress={onCloseRooms} style={[styles.closeAllBtn, { borderColor: palette.danger }]}>
-                <Text style={[styles.closeAllText, { color: palette.danger }]}>Close all rooms</Text>
-              </Pressable>
+              <KISButton title="Close all rooms" variant="danger" size="sm" onPress={onCloseRooms} />
             )}
           </>
         )}
@@ -136,13 +133,21 @@ export default function BreakoutRoomsSheet({
             <View style={styles.numRow}>
               <Text style={[styles.numLabel, { color: palette.ivory }]}>Number of rooms</Text>
               <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
-                <Pressable onPress={() => setNumRooms(n => Math.max(2, n - 1))} style={[styles.numBtn, { borderColor: palette.inputBorder }]}>
-                  <Text style={[styles.numBtnText, { color: palette.ivory }]}>−</Text>
-                </Pressable>
+                <KISButton
+                  title="−"
+                  variant="outline"
+                  size="xs"
+                  style={styles.numBtn}
+                  onPress={() => setNumRooms(n => Math.max(2, n - 1))}
+                />
                 <Text style={[styles.numValue, { color: palette.gold }]}>{numRooms}</Text>
-                <Pressable onPress={() => setNumRooms(n => Math.min(8, n + 1))} style={[styles.numBtn, { borderColor: palette.inputBorder }]}>
-                  <Text style={[styles.numBtnText, { color: palette.ivory }]}>+</Text>
-                </Pressable>
+                <KISButton
+                  title="+"
+                  variant="outline"
+                  size="xs"
+                  style={styles.numBtn}
+                  onPress={() => setNumRooms(n => Math.min(8, n + 1))}
+                />
               </View>
             </View>
 
@@ -155,13 +160,13 @@ export default function BreakoutRoomsSheet({
                     {draft.map(r => {
                       const selected = assignments[p.userId] === r.roomId;
                       return (
-                        <Pressable
+                        <KISButton
                           key={r.roomId}
+                          title={r.name}
+                          size="xs"
+                          variant={selected ? 'primary' : 'outline'}
                           onPress={() => assignParticipant(p.userId, r.roomId)}
-                          style={[styles.roomPill, { backgroundColor: selected ? `${palette.gold}26` : 'transparent', borderColor: selected ? palette.gold : palette.inputBorder }]}
-                        >
-                          <Text style={[styles.roomPillText, { color: selected ? palette.gold : palette.subtext }]}>{r.name}</Text>
-                        </Pressable>
+                        />
                       );
                     })}
                   </View>
@@ -169,9 +174,7 @@ export default function BreakoutRoomsSheet({
               </View>
             ))}
 
-            <Pressable onPress={handleCreate} style={[styles.openBtn, { backgroundColor: palette.gold }]}>
-              <Text style={[styles.openText, { color: palette.royalInk }]}>Open rooms</Text>
-            </Pressable>
+            <KISButton title="Open rooms" onPress={handleCreate} />
           </>
         )}
       </ScrollView>
@@ -190,24 +193,15 @@ const styles = StyleSheet.create({
   sectionLabel: { fontSize: 11, fontWeight: '800', letterSpacing: 0.4, textTransform: 'uppercase' },
   myRoomBanner: { borderWidth: 1, borderRadius: 14, padding: 14, flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
   myRoomText: { flex: 1, fontSize: 14, fontWeight: '700' },
-  returnBtn: { borderRadius: 14, paddingHorizontal: 12, paddingVertical: 7 },
-  returnText: { fontSize: 12, fontWeight: '900' },
   roomCard: { borderWidth: 1, borderRadius: 14, padding: 12, gap: 6 },
   roomHeader: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   roomName: { flex: 1, fontSize: 14, fontWeight: '800' },
   roomCount: { fontSize: 12 },
   roomMembers: { fontSize: 12 },
-  closeAllBtn: { borderWidth: 1, borderRadius: 18, alignItems: 'center', paddingVertical: 12 },
-  closeAllText: { fontSize: 14, fontWeight: '800' },
   numRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   numLabel: { fontSize: 15, fontWeight: '600' },
-  numBtn: { width: 36, height: 36, borderWidth: 1, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
-  numBtnText: { fontSize: 18, fontWeight: '700' },
+  numBtn: { width: 36, height: 36, paddingHorizontal: 0 },
   numValue: { fontSize: 18, fontWeight: '900', minWidth: 24, textAlign: 'center' },
   assignRow: { flexDirection: 'row', alignItems: 'center', gap: 10, borderBottomWidth: StyleSheet.hairlineWidth, paddingVertical: 10 },
   participantName: { width: 100, fontSize: 13, fontWeight: '600' },
-  roomPill: { borderWidth: 1, borderRadius: 12, paddingHorizontal: 10, paddingVertical: 5 },
-  roomPillText: { fontSize: 12, fontWeight: '700' },
-  openBtn: { borderRadius: 28, alignItems: 'center', paddingVertical: 14, marginTop: 8 },
-  openText: { fontSize: 15, fontWeight: '900' },
 });

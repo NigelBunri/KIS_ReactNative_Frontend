@@ -319,28 +319,20 @@ export default function BibleLessonsPanel() {
         <BibleSectionCard>
           <Text style={[styles.sectionTitle, { color: palette.text }]}>Modules</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.optionRow}>
-            <TouchableOpacity
+            <KISButton
               onPress={() => setSelectedModuleId('all')}
-              style={[
-                styles.optionChip,
-                { borderColor: palette.divider, backgroundColor: selectedModuleId === 'all' ? palette.primarySoft : palette.surface },
-              ]}
-            >
-              <Text style={{ color: selectedModuleId === 'all' ? palette.primaryStrong : palette.text, fontWeight: '800' }}>All</Text>
-            </TouchableOpacity>
+              variant={selectedModuleId === 'all' ? 'primary' : 'outline'}
+              size="sm"
+              title="All"
+            />
             {modules.map((module) => (
-              <TouchableOpacity
+              <KISButton
                 key={module.id}
                 onPress={() => setSelectedModuleId(String(module.id))}
-                style={[
-                  styles.optionChip,
-                  { borderColor: palette.divider, backgroundColor: selectedModuleId === String(module.id) ? palette.primarySoft : palette.surface },
-                ]}
-              >
-                <Text style={{ color: selectedModuleId === String(module.id) ? palette.primaryStrong : palette.text, fontWeight: '800' }}>
-                  {module.title}
-                </Text>
-              </TouchableOpacity>
+                variant={selectedModuleId === String(module.id) ? 'primary' : 'outline'}
+                size="sm"
+                title={module.title}
+              />
             ))}
           </ScrollView>
 
@@ -537,7 +529,6 @@ const styles = StyleSheet.create({
   progressFill: { height: 7, borderRadius: 999 },
   stateBox: { minHeight: 150, alignItems: 'center', justifyContent: 'center', gap: 10 },
   optionRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  optionChip: { borderWidth: 2, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 8 },
   lessonRow: { borderWidth: 2, borderRadius: 12, padding: 10, flexDirection: 'row', alignItems: 'center', gap: 10 },
   mediaBox: { borderWidth: 2, borderRadius: 12, minHeight: 150, alignItems: 'center', justifyContent: 'center', gap: 8 },
   callout: { borderWidth: 2, borderRadius: 12, padding: 12 },

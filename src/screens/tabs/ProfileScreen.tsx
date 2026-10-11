@@ -278,7 +278,6 @@ export default function ProfileScreen() {
     },
   );
   const compactProfile = responsive.isWatch || responsive.isCompactPhone;
-  const tinyProfile = responsive.isWatch;
   const dashboardTheme = useMemo(
     () => createProfileDashboardTheme(palette, tone),
     [palette, tone],
@@ -287,6 +286,14 @@ export default function ProfileScreen() {
   const { themeMode, setThemeMode } = useThemeMode();
   const { accentId, setAccentId } = useAccentTheme();
   const [accentPickerExpanded, setAccentPickerExpanded] = useState(false);
+  // Profile screen tab system — groups the screen's many features (29+
+  // navigation destinations, a dozen+ inline cards) into findable sections
+  // instead of one long flat scroll, per the "app too complex, can't find
+  // features" complaint. 'admin' is only ever shown/selectable when
+  // canOpenVerificationStaffConsole is true (same gate the admin-only
+  // content below already used before this tab system existed).
+  type ProfileTabKey = 'overview' | 'account' | 'business' | 'wallet' | 'admin';
+  const [activeProfileTab, setActiveProfileTab] = useState<ProfileTabKey>('overview');
   const { setAgeMode: setGlobalAgeMode } = useAgeMode();
   const { setAuth, setPhone, callingCode, hasPin, setHasPin, user: authUser } = useAuth();
   const c = useProfileController({
@@ -1829,7 +1836,12 @@ export default function ProfileScreen() {
     [c, openWalletSheet, rootNavigation, setWalletForm],
   );
 
-  const quickActionItems = useMemo(
+  // Split by which new Profile tab each quick action belongs in (Business /
+  // Wallet & Orders / Overview) - a single "Quick actions" grid dumping all
+  // of these together was exactly the kind of flat, everything-in-one-place
+  // layout the tabs restructure exists to fix. Item definitions themselves
+  // are unchanged from the single array this replaces, just redistributed.
+  const businessQuickActionItems = useMemo(
     () => [
       {
         key: 'create-partner',
@@ -1870,6 +1882,12 @@ export default function ProfileScreen() {
         tone: 'info' as const,
         onPress: openShopEditorForCreate,
       },
+    ],
+    [c.openCreatePartner, canCreatePartner, openManagementPanel, openShopEditorForCreate, rootNavigation],
+  );
+
+  const walletQuickActionItems = useMemo(
+    () => [
       {
         key: 'wishlist',
         title: 'Wishlist',
@@ -1910,6 +1928,12 @@ export default function ProfileScreen() {
         tone: 'primary' as const,
         onPress: () => rootNavigation?.navigate('ReturnsManagement'),
       },
+    ],
+    [rootNavigation],
+  );
+
+  const overviewQuickActionItems = useMemo(
+    () => [
       {
         key: 'view-events',
         title: 'Community Events',
@@ -1937,6 +1961,12 @@ export default function ProfileScreen() {
         tone: 'success' as const,
         onPress: () => rootNavigation?.navigate('Connections', {}),
       },
+    ],
+    [c.profile?.profile?.connection_count, rootNavigation],
+  );
+
+  const accountQuickActionItems = useMemo(
+    () => [
       {
         key: 'contact-share-link',
         title: 'My Contact Link',
@@ -1946,14 +1976,7 @@ export default function ProfileScreen() {
         onPress: () => rootNavigation?.navigate('ContactShareLink'),
       },
     ],
-    [
-      c.openCreatePartner,
-      c.profile?.profile?.connection_count,
-      canCreatePartner,
-      openManagementPanel,
-      openShopEditorForCreate,
-      rootNavigation,
-    ],
+    [rootNavigation],
   );
 
   const recentActivityItems = useMemo(
@@ -2486,10 +2509,40 @@ export default function ProfileScreen() {
           <>
             <View
               style={{
+                flexDirection: 'row',
+                flexWrap: 'wrap',
+                gap: 8,
+                paddingHorizontal: compactProfile ? 12 : 18,
+                marginTop: 4,
+              }}
+            >
+              {(
+                [
+                  { key: 'overview', label: 'Overview' },
+                  { key: 'account', label: 'Account' },
+                  { key: 'business', label: 'Business' },
+                  { key: 'wallet', label: 'Wallet & Orders' },
+                  ...(canOpenVerificationStaffConsole ? [{ key: 'admin', label: 'Admin' } as const] : []),
+                ] as { key: ProfileTabKey; label: string }[]
+              ).map(tab => (
+                <KISButton
+                  key={tab.key}
+                  title={tab.label}
+                  size="xs"
+                  variant={activeProfileTab === tab.key ? 'primary' : 'outline'}
+                  onPress={() => setActiveProfileTab(tab.key)}
+                  style={{ flexGrow: 1, minWidth: 90 }}
+                />
+              ))}
+            </View>
+
+            <View
+              style={{
                 marginTop: 10,
                 paddingHorizontal: compactProfile ? 0 : 18,
                 paddingBottom: compactProfile ? 12 : 18,
                 gap: responsive.cardGap,
+                display: activeProfileTab === 'overview' ? 'flex' : 'none',
               }}
             >
               <View
@@ -2585,137 +2638,13 @@ export default function ProfileScreen() {
                       })
                     }
                   />
-                  <KISButton
-                    title="Complete Profile"
-                    onPress={c.openEditProfile}
-                   style={{ flexGrow: 1, flexBasis: '47%', minWidth: 120 }}
-                  />
-                  <KISButton
-                    title="Privacy"
-                    variant="outline"
-                    onPress={() => c.openSheet('privacy')}
-                    style={{ flexGrow: 1, flexBasis: '47%', minWidth: 120 }}
-                  />
-                  <KISButton
-                    title="KIS Principles"
-                    variant="outline"
-                    onPress={() => rootNavigation?.navigate('KISPrinciples')}
-                    style={{ flexGrow: 1, flexBasis: '47%', minWidth: 148 }}
-                  />
-                  {canOpenVerificationStaffConsole ? (
-                    <KISButton
-                      title="Verification review"
-                      variant="secondary"
-                      onPress={() => setVerificationStaffConsoleVisible(true)}
-                      style={{ flexGrow: 1, flexBasis: '47%', minWidth: 168 }}
-                    />
-                  ) : null}
-                  {canOpenVerificationStaffConsole ? (
-                    <KISButton
-                      title="Marketplace admin"
-                      variant="secondary"
-                      onPress={() => rootNavigation?.navigate('MarketAdmin')}
-                      style={{ flexGrow: 1, flexBasis: '47%', minWidth: 168 }}
-                    />
-                  ) : null}
                 </View>
-                <View
-                  style={{
-                    borderWidth: 1,
-                    borderColor: palette.goldBorder || palette.divider,
-                    borderRadius: 18,
-                    backgroundColor: palette.surface,
-                    marginTop: 15,
-                    padding: 14,
-                    gap: 10,
-                  }}
-                >
-                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 10 }}>
-                    <View
-                      style={{
-                        width: 42,
-                        height: 42,
-                        borderRadius: 14,
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        backgroundColor: palette.primarySoft,
-                      }}
-                    >
-                      <KISIcon name="shield" size={20} color={palette.primaryStrong} />
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={[styles.title, { color: palette.text, fontSize: 15 }]}>
-                        Family and accessibility mode
-                      </Text>
-                      <Text style={[styles.subtext, { color: palette.subtext }]}>
-                        {familyAccessibility?.preferences?.age_mode
-                          ? `${familyAccessibility.preferences.age_mode.replace('_', ' ')} mode · ${familyAccessibility.accessibility.min_touch_target}px tap targets`
-                          : 'Family-safe defaults, larger tap targets, and simpler journeys.'}
-                      </Text>
-                    </View>
-                  </View>
-                  <View style={[styles.actionRow, { gap: 8, flexWrap: 'wrap' }]}>
-                    {(['child', 'youth', 'adult', 'older_adult'] as KISAgeMode[]).map(mode => (
-                      <KISButton
-                        key={mode}
-                        title={mode === 'older_adult' ? 'Older adult' : mode.charAt(0).toUpperCase() + mode.slice(1)}
-                        size="sm"
-                        variant={familyAccessibility?.preferences?.age_mode === mode ? 'secondary' : 'outline'}
-                        disabled={familyAccessibilitySaving}
-                        onPress={() => applyAgeMode(mode)}
-                      />
-                    ))}
-                  </View>
-                  <Text style={[styles.subtext, { color: palette.subtext }]}>
-                    KIS keeps explicit content blocked, safe recommendations on, and child mode guided by default.
-                  </Text>
-                </View>
-                {canOpenVerificationStaffConsole ? (
-                  <>
-                    <KISButton
-                      title="Moderation console"
-                      variant="secondary"
-                      onPress={() => rootNavigation?.navigate('ModerationConsole')}
-                      style={{ marginBottom: 4 }}
-                    />
-                    <KISButton
-                      title="User Management"
-                      variant="secondary"
-                      onPress={() => rootNavigation?.navigate('AdminUserManagement')}
-                      style={{ marginBottom: 4 }}
-                    />
-                    <RevenueEvidenceAdminPanel />
-                    <MonetizationSafetyCard />
-                    <ProfitabilityCommandCenterCard />
-                    <ProfitabilityLaunchGateCard />
-                    <ProfitabilitySubscriptionLifecycleCard />
-                    <RevenueOpsEvidenceCard />
-                    <EvidenceWorkflowPlanCard />
-                    <SafetyCommandCenterCard />
-                    <SecurityLaunchGateCard />
-                    <LaunchOpsReadinessCard />
-                  </>
-                ) : null}
               </View>
 
-              <View style={{ gap: responsive.cardGap }}>
-                <WalletSummaryCard
-                  balanceLabel={kisWalletLabel}
-                  tierLabel={`${
-                    tierLabel || accountTier?.name || 'Free'
-                  } • ${points} pts`}
-                  actions={walletDashboardActions}
-                  onViewAll={() => c.openSheet('wallet')}
-                />
-                <QuickActionGrid
-                  title="Quick actions"
-                  items={quickActionItems}
-                />
-              </View>
-
-              {Number(accountTier?.tier_rank ?? 0) >= 3 ? (
-                <ControlPanelLinkCard />
-              ) : null}
+              <QuickActionGrid
+                title="Quick actions"
+                items={overviewQuickActionItems}
+              />
 
               <RecentActivityTimeline
                 items={recentActivityItems}
@@ -2724,46 +2653,13 @@ export default function ProfileScreen() {
                 }
               />
 
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: responsive.cardGap }}>
-                <View style={{ flex: 1, minWidth: tinyProfile ? 0 : compactProfile ? 220 : 280 }}>
-                  <ImpactSnapshotCard
-                    periodLabel="This month"
-                    stats={impactSnapshotStats}
-                    onViewAll={() =>
-                      rootNavigation?.navigate('ProfileImpactSnapshot')
-                    }
-                  />
-                </View>
-                <View style={{ flex: 1, minWidth: tinyProfile ? 0 : compactProfile ? 220 : 280 }}>
-                  {partnerProfiles.length === 0 ? (
-                    <PartnerOrganizationSummary
-                      summary="No organizations yet. Create your first partner organization and open its landing page."
-                      ctaTitle={
-                        canCreatePartner
-                          ? 'Create Organization'
-                          : 'Partner Limit Reached'
-                      }
-                      onPress={
-                        canCreatePartner ? c.openCreatePartner : undefined
-                      }
-                    />
-                  ) : (
-                    <PartnerProfilesSection
-                      palette={palette}
-                      partners={partnerProfiles}
-                      limitLabel={partnerProfilesLimitLabel}
-                      limitValue={partnerProfilesLimitValue}
-                      isUnlimited={partnerProfilesIsUnlimited}
-                      canCreate={canCreatePartner}
-                      actionLoadingId={c.partnerActionId}
-                      onDeactivate={c.deactivatePartnerProfile}
-                      onReactivate={c.reactivatePartnerProfile}
-                      onDelete={c.deletePartnerProfile}
-                      onOpenLandingBuilder={openPartnerLandingBuilder}
-                    />
-                  )}
-                </View>
-              </View>
+              <ImpactSnapshotCard
+                periodLabel="This month"
+                stats={impactSnapshotStats}
+                onViewAll={() =>
+                  rootNavigation?.navigate('ProfileImpactSnapshot')
+                }
+              />
 
               <AppointmentSummaryCard
                 summary={appointmentSummaryStats}
@@ -2784,6 +2680,76 @@ export default function ProfileScreen() {
                   {appointmentsError}
                 </Text>
               ) : null}
+            </View>
+
+            {/* ── Business tab ──────────────────────────────────────────── */}
+            <View
+              style={{
+                marginTop: 10,
+                paddingHorizontal: compactProfile ? 0 : 18,
+                paddingBottom: compactProfile ? 12 : 18,
+                gap: responsive.cardGap,
+                display: activeProfileTab === 'business' ? 'flex' : 'none',
+              }}
+            >
+              {partnerProfiles.length === 0 ? (
+                <PartnerOrganizationSummary
+                  summary="No organizations yet. Create your first partner organization and open its landing page."
+                  ctaTitle={
+                    canCreatePartner
+                      ? 'Create Organization'
+                      : 'Partner Limit Reached'
+                  }
+                  onPress={
+                    canCreatePartner ? c.openCreatePartner : undefined
+                  }
+                />
+              ) : (
+                <PartnerProfilesSection
+                  palette={palette}
+                  partners={partnerProfiles}
+                  limitLabel={partnerProfilesLimitLabel}
+                  limitValue={partnerProfilesLimitValue}
+                  isUnlimited={partnerProfilesIsUnlimited}
+                  canCreate={canCreatePartner}
+                  actionLoadingId={c.partnerActionId}
+                  onDeactivate={c.deactivatePartnerProfile}
+                  onReactivate={c.reactivatePartnerProfile}
+                  onDelete={c.deletePartnerProfile}
+                  onOpenLandingBuilder={openPartnerLandingBuilder}
+                />
+              )}
+
+              {Number(accountTier?.tier_rank ?? 0) >= 3 ? (
+                <ControlPanelLinkCard />
+              ) : null}
+
+              <WorkspaceLauncherSection items={workspaceLaunchers} />
+
+              <QuickActionGrid
+                title="Quick actions"
+                items={businessQuickActionItems}
+              />
+            </View>
+
+            {/* ── Wallet & Orders tab ───────────────────────────────────── */}
+            <View
+              style={{
+                marginTop: 10,
+                paddingHorizontal: compactProfile ? 0 : 18,
+                paddingBottom: compactProfile ? 12 : 18,
+                gap: responsive.cardGap,
+                display: activeProfileTab === 'wallet' ? 'flex' : 'none',
+              }}
+            >
+              <WalletSummaryCard
+                balanceLabel={kisWalletLabel}
+                tierLabel={`${
+                  tierLabel || accountTier?.name || 'Free'
+                } • ${points} pts`}
+                actions={walletDashboardActions}
+                onViewAll={() => c.openSheet('wallet')}
+              />
 
               <MarketplaceOrdersSummary
                 summary={marketplaceSummaryStats}
@@ -2807,8 +2773,6 @@ export default function ProfileScreen() {
                   {marketplaceOrdersError}
                 </Text>
               ) : null}
-
-              <WorkspaceLauncherSection items={workspaceLaunchers} />
 
               <View
                 style={[
@@ -2939,6 +2903,124 @@ export default function ProfileScreen() {
                 </Pressable>
               </View>
 
+              <QuickActionGrid
+                title="Quick actions"
+                items={walletQuickActionItems}
+              />
+            </View>
+
+            {/* ── Admin tab (staff/GO only - same gate as the tab button
+                itself) ──────────────────────────────────────────────────── */}
+            {canOpenVerificationStaffConsole ? (
+              <View
+                style={{
+                  marginTop: 10,
+                  paddingHorizontal: compactProfile ? 0 : 18,
+                  paddingBottom: compactProfile ? 12 : 18,
+                  gap: responsive.cardGap,
+                  display: activeProfileTab === 'admin' ? 'flex' : 'none',
+                }}
+              >
+                <View style={[styles.actionRow, { gap: 8, flexWrap: 'wrap' }]}>
+                  <KISButton
+                    title="Verification review"
+                    variant="secondary"
+                    onPress={() => setVerificationStaffConsoleVisible(true)}
+                    style={{ flexGrow: 1, flexBasis: '47%', minWidth: 168 }}
+                  />
+                  <KISButton
+                    title="Marketplace admin"
+                    variant="secondary"
+                    onPress={() => rootNavigation?.navigate('MarketAdmin')}
+                    style={{ flexGrow: 1, flexBasis: '47%', minWidth: 168 }}
+                  />
+                  <KISButton
+                    title="Moderation console"
+                    variant="secondary"
+                    onPress={() => rootNavigation?.navigate('ModerationConsole')}
+                    style={{ flexGrow: 1, flexBasis: '47%', minWidth: 168 }}
+                  />
+                  <KISButton
+                    title="User Management"
+                    variant="secondary"
+                    onPress={() => rootNavigation?.navigate('AdminUserManagement')}
+                    style={{ flexGrow: 1, flexBasis: '47%', minWidth: 168 }}
+                  />
+                </View>
+                <RevenueEvidenceAdminPanel />
+                <MonetizationSafetyCard />
+                <ProfitabilityCommandCenterCard />
+                <ProfitabilityLaunchGateCard />
+                <ProfitabilitySubscriptionLifecycleCard />
+                <RevenueOpsEvidenceCard />
+                <EvidenceWorkflowPlanCard />
+                <SafetyCommandCenterCard />
+                <SecurityLaunchGateCard />
+                <LaunchOpsReadinessCard />
+              </View>
+            ) : null}
+
+            {/* ── Account tab ────────────────────────────────────────────── */}
+            <View
+              style={{
+                marginTop: 10,
+                paddingHorizontal: compactProfile ? 0 : 18,
+                paddingBottom: compactProfile ? 12 : 18,
+                gap: responsive.cardGap,
+                display: activeProfileTab === 'account' ? 'flex' : 'none',
+              }}
+            >
+              <View
+                style={{
+                  borderWidth: 1,
+                  borderColor: palette.goldBorder || palette.divider,
+                  borderRadius: 18,
+                  backgroundColor: palette.surface,
+                  padding: 14,
+                  gap: 10,
+                }}
+              >
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 10 }}>
+                  <View
+                    style={{
+                      width: 42,
+                      height: 42,
+                      borderRadius: 14,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      backgroundColor: palette.primarySoft,
+                    }}
+                  >
+                    <KISIcon name="shield" size={20} color={palette.primaryStrong} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.title, { color: palette.text, fontSize: 15 }]}>
+                      Family and accessibility mode
+                    </Text>
+                    <Text style={[styles.subtext, { color: palette.subtext }]}>
+                      {familyAccessibility?.preferences?.age_mode
+                        ? `${familyAccessibility.preferences.age_mode.replace('_', ' ')} mode · ${familyAccessibility.accessibility.min_touch_target}px tap targets`
+                        : 'Family-safe defaults, larger tap targets, and simpler journeys.'}
+                    </Text>
+                  </View>
+                </View>
+                <View style={[styles.actionRow, { gap: 8, flexWrap: 'wrap' }]}>
+                  {(['child', 'youth', 'adult', 'older_adult'] as KISAgeMode[]).map(mode => (
+                    <KISButton
+                      key={mode}
+                      title={mode === 'older_adult' ? 'Older adult' : mode.charAt(0).toUpperCase() + mode.slice(1)}
+                      size="sm"
+                      variant={familyAccessibility?.preferences?.age_mode === mode ? 'secondary' : 'outline'}
+                      disabled={familyAccessibilitySaving}
+                      onPress={() => applyAgeMode(mode)}
+                    />
+                  ))}
+                </View>
+                <Text style={[styles.subtext, { color: palette.subtext }]}>
+                  KIS keeps explicit content blocked, safe recommendations on, and child mode guided by default.
+                </Text>
+              </View>
+
               <LanguageSelectorCard
                 currentLabel={currentLanguageLabel}
                 languages={languages}
@@ -2953,12 +3035,21 @@ export default function ProfileScreen() {
                   });
                 }}
               />
-            </View>
+
+              <KISButton
+                title="KIS Principles"
+                variant="outline"
+                onPress={() => rootNavigation?.navigate('KISPrinciples')}
+              />
+
+              <QuickActionGrid
+                title="Quick actions"
+                items={accountQuickActionItems}
+              />
 
             {/* ── Appearance ─────────────────────────────────────────────── */}
             <View
               style={{
-                marginHorizontal: 18,
                 borderRadius: 18,
                 borderWidth: 1,
                 borderColor: palette.divider,
@@ -3170,7 +3261,6 @@ export default function ProfileScreen() {
 
             <View
               style={{
-                marginHorizontal: 18,
                 borderRadius: 18,
                 borderWidth: 1,
                 borderColor: palette.divider,
@@ -3413,6 +3503,7 @@ export default function ProfileScreen() {
             </View>
 
             <LogoutSection palette={palette} onLogout={c.logout} loading={c.logoutLoading} />
+            </View>
           </>
         )}
       </ReanimatedScroll.ScrollView>

@@ -1,8 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { KISIcon } from '@/constants/kisIcons';
+import KISButton from '@/constants/KISButton';
 import { useKISTheme } from '@/theme/useTheme';
 import { useResponsiveLayout } from '@/theme/responsive';
 import type { RootStackParamList } from '@/navigation/types';
@@ -464,9 +465,9 @@ export default function ChannelStudioScreen({ legacyFeeds, liveCount, expiresAt,
           <Text style={[styles.successText, { color: palette.success, flex: 1 }]}>
             @{lastCreatedHandle} created! Fill in the form below to add another channel.
           </Text>
-          <Pressable onPress={() => { setCreateFormVisible(false); setLastCreatedHandle(null); }} style={styles.smallIconButton}>
+          <KISButton variant="ghost" onPress={() => { setCreateFormVisible(false); setLastCreatedHandle(null); }} style={styles.smallIconButton}>
             <KISIcon name="close" size={16} color={palette.subtext} />
-          </Pressable>
+          </KISButton>
         </View>
       ) : null}
       <View style={styles.formHeaderRow}>
@@ -475,9 +476,9 @@ export default function ChannelStudioScreen({ legacyFeeds, liveCount, expiresAt,
           <Text style={[styles.sectionText, { color: palette.subtext }]}>Feeds, videos, lives, playlists, and embeds will live under this channel.</Text>
         </View>
         {channels.length || lastCreatedHandle ? (
-          <Pressable onPress={() => { setCreateFormVisible(false); setLastCreatedHandle(null); }} style={styles.smallIconButton}>
+          <KISButton variant="ghost" onPress={() => { setCreateFormVisible(false); setLastCreatedHandle(null); }} style={styles.smallIconButton}>
             <KISIcon name="close" size={18} color={palette.subtext} />
-          </Pressable>
+          </KISButton>
         ) : null}
       </View>
       <Text style={[styles.sectionText, { color: palette.subtext, marginTop: 4 }]}>
@@ -485,28 +486,13 @@ export default function ChannelStudioScreen({ legacyFeeds, liveCount, expiresAt,
       </Text>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 6, marginBottom: 4 }}>
         {OWNER_TYPE_OPTIONS.map(option => (
-          <Pressable
+          <KISButton
             key={option.id}
+            title={option.label}
+            size="xs"
+            variant={channelForm.ownerType === option.id ? 'primary' : 'outline'}
             onPress={() => handleSelectOwnerType(option.id)}
-            style={{
-              paddingVertical: 6,
-              paddingHorizontal: 12,
-              borderRadius: 999,
-              borderWidth: 1,
-              borderColor: channelForm.ownerType === option.id ? palette.text : palette.border,
-              backgroundColor: channelForm.ownerType === option.id ? palette.text : palette.card,
-            }}
-          >
-            <Text
-              style={{
-                fontSize: 12,
-                fontWeight: '700',
-                color: channelForm.ownerType === option.id ? palette.surface : palette.text,
-              }}
-            >
-              {option.label}
-            </Text>
-          </Pressable>
+          />
         ))}
       </View>
       {channelForm.ownerType !== 'user' ? (
@@ -517,22 +503,13 @@ export default function ChannelStudioScreen({ legacyFeeds, liveCount, expiresAt,
         ) : ownerOptions.length ? (
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 8 }}>
             {ownerOptions.map(option => (
-              <Pressable
+              <KISButton
                 key={option.id}
+                title={option.name}
+                size="xs"
+                variant={channelForm.ownerId === option.id ? 'primary' : 'outline'}
                 onPress={() => setChannelForm(prev => ({ ...prev, ownerId: option.id }))}
-                style={{
-                  paddingVertical: 6,
-                  paddingHorizontal: 12,
-                  borderRadius: 999,
-                  borderWidth: 1,
-                  borderColor: channelForm.ownerId === option.id ? palette.primaryStrong : palette.border,
-                  backgroundColor: channelForm.ownerId === option.id ? palette.card : 'transparent',
-                }}
-              >
-                <Text style={{ fontSize: 12, fontWeight: '700', color: palette.text }}>
-                  {option.name}
-                </Text>
-              </Pressable>
+              />
             ))}
           </View>
         ) : (
@@ -572,10 +549,13 @@ export default function ChannelStudioScreen({ legacyFeeds, liveCount, expiresAt,
         style={[styles.input, { color: palette.text, borderColor: palette.border, backgroundColor: palette.card }]}
       />
       {channelError ? <Text style={[styles.errorText, { color: palette.danger }]}>{channelError}</Text> : null}
-      <Pressable onPress={handleCreateChannel} disabled={creatingChannel} style={[styles.primaryButton, { backgroundColor: palette.text, opacity: creatingChannel ? 0.72 : 1 }]}> 
-        {creatingChannel ? <ActivityIndicator color={palette.surface} /> : <KISIcon name="add" size={17} color={palette.surface} />}
-        <Text style={[styles.primaryText, { color: palette.surface }]}>{creatingChannel ? 'Creating...' : 'Create Channel'}</Text>
-      </Pressable>
+      <KISButton
+        title={creatingChannel ? 'Creating...' : 'Create Channel'}
+        onPress={handleCreateChannel}
+        disabled={creatingChannel}
+        loading={creatingChannel}
+        left={!creatingChannel ? <KISIcon name="add" size={17} color={palette.onPrimary} /> : undefined}
+      />
     </View>
   );
 
@@ -589,10 +569,11 @@ export default function ChannelStudioScreen({ legacyFeeds, liveCount, expiresAt,
           <Text style={[styles.sectionTitle, { color: palette.text }]}>Start with your first channel</Text>
           <Text style={[styles.sectionText, { color: palette.subtext }]}>Create a channel before publishing feed content. This keeps every post, video, live, playlist, and embed organized under a creator identity.</Text>
           {createFormVisible ? renderCreateChannelForm() : (
-            <Pressable onPress={() => setCreateFormVisible(true)} style={[styles.primaryButton, { backgroundColor: palette.text }]}> 
-              <KISIcon name="add" size={17} color={palette.surface} />
-              <Text style={[styles.primaryText, { color: palette.surface }]}>Create Channel</Text>
-            </Pressable>
+            <KISButton
+              title="Create Channel"
+              onPress={() => setCreateFormVisible(true)}
+              left={<KISIcon name="add" size={17} color={palette.onPrimary} />}
+            />
           )}
         </View>
       );
@@ -601,7 +582,8 @@ export default function ChannelStudioScreen({ legacyFeeds, liveCount, expiresAt,
       return (
         <>
           <ChannelBrandingEditor channel={selectedChannel} onUpdated={refresh} />
-          <Pressable
+          <KISButton
+            title="Manage landing page"
             onPress={() =>
               navigation.navigate('WebsiteBuilder', {
                 ownerType: 'broadcast_channel',
@@ -609,10 +591,7 @@ export default function ChannelStudioScreen({ legacyFeeds, liveCount, expiresAt,
                 ownerLabel: selectedChannel.display_name || 'Channel',
               })
             }
-            style={[styles.primaryButton, { backgroundColor: palette.text }]}
-          >
-            <Text style={[styles.primaryText, { color: palette.surface }]}>Manage landing page</Text>
-          </Pressable>
+          />
         </>
       );
     }
@@ -631,10 +610,11 @@ export default function ChannelStudioScreen({ legacyFeeds, liveCount, expiresAt,
         <View style={[styles.emptyChannel, { borderColor: palette.border, backgroundColor: palette.surface }]}> 
           <Text style={[styles.sectionTitle, { color: palette.text }]}>Create for @{selectedChannel.handle}</Text>
           <Text style={[styles.sectionText, { color: palette.subtext }]}>The advanced composer will save this feed inside the selected channel and still preserve the old profile feed queue for compatibility.</Text>
-          <Pressable onPress={() => onCreate(selectedChannel)} style={[styles.primaryButton, { backgroundColor: palette.text }]}> 
-            <KISIcon name="add" size={17} color={palette.surface} />
-            <Text style={[styles.primaryText, { color: palette.surface }]}>{createLabel}</Text>
-          </Pressable>
+          <KISButton
+            title={createLabel}
+            onPress={() => onCreate(selectedChannel)}
+            left={<KISIcon name="add" size={17} color={palette.onPrimary} />}
+          />
           {renderCreatorPremiumPreview('create')}
         </View>
       );
@@ -663,12 +643,11 @@ export default function ChannelStudioScreen({ legacyFeeds, liveCount, expiresAt,
                 data this screen doesn't have - rather than duplicate that
                 payment logic here, this hands off to the Profile tab where
                 the real, working "Upgrade" entry point already is. */}
-            <Pressable
+            <KISButton
+              title="Go to Profile to upgrade"
               onPress={() => navigation.navigate('MainTabs')}
-              style={[styles.primaryButton, { backgroundColor: palette.text, marginTop: 14 }]}
-            >
-              <Text style={[styles.primaryText, { color: palette.surface }]}>Go to Profile to upgrade</Text>
-            </Pressable>
+              style={{ marginTop: 14 }}
+            />
           </View>
         );
       }
@@ -745,27 +724,18 @@ export default function ChannelStudioScreen({ legacyFeeds, liveCount, expiresAt,
         </View>
         {selectedChannel ? (
           <View style={[styles.headerActions, compact && { width: '100%', justifyContent: 'flex-start' }]}>
-            <Pressable
+            <KISButton
+              title={compact ? (selectedChannel.is_broadcast ? 'Stop broadcast' : 'Broadcast') : (selectedChannel.is_broadcast ? 'Stop broadcasting channel' : 'Broadcast channel')}
+              variant={selectedChannel.is_broadcast ? 'danger' : 'outline'}
               onPress={handleToggleChannelBroadcast}
               disabled={channelBroadcasting}
-              style={[
-                styles.headerBroadcastButton,
-                {
-                  backgroundColor: tone === 'dark' ? palette.primarySoft : palette.surface,
-                  borderColor: selectedChannel.is_broadcast ? palette.danger : palette.primary,
-                  opacity: channelBroadcasting ? 0.72 : 1,
-                },
-              ]}
-            >
-              {channelBroadcasting ? <ActivityIndicator size="small" color={palette.primaryStrong} /> : null}
-              <Text style={[styles.broadcastText, { color: selectedChannel.is_broadcast ? palette.danger : palette.primaryStrong }]}>
-                {compact ? (selectedChannel.is_broadcast ? 'Stop broadcast' : 'Broadcast') : (selectedChannel.is_broadcast ? 'Stop broadcasting channel' : 'Broadcast channel')}
-              </Text>
-            </Pressable>
-            <Pressable onPress={() => onCreate(selectedChannel)} style={[styles.headerCreateButton, { backgroundColor: palette.text }]}> 
-              <KISIcon name="add" size={16} color={palette.surface} />
-              <Text style={[styles.primaryText, { color: palette.surface }]} numberOfLines={1}>{compact ? 'Create' : createLabel}</Text>
-            </Pressable>
+              loading={channelBroadcasting}
+            />
+            <KISButton
+              title={compact ? 'Create' : createLabel}
+              onPress={() => onCreate(selectedChannel)}
+              left={<KISIcon name="add" size={16} color={palette.onPrimary} />}
+            />
           </View>
         ) : null}
       </View>
@@ -790,14 +760,16 @@ export default function ChannelStudioScreen({ legacyFeeds, liveCount, expiresAt,
           {channels.map(channel => {
             const active = channel.id === selectedChannel?.id;
             return (
-              <Pressable key={channel.id} onPress={() => setSelectedChannelId(channel.id)} style={[styles.channelPill, { backgroundColor: active ? palette.primarySoft : palette.surface, borderColor: active ? palette.primary : palette.border, paddingHorizontal: compact ? 9 : 12 }]}> 
-                <Text style={{ color: active ? palette.primaryStrong : palette.text, fontWeight: '900', fontSize: 12 }}>@{channel.handle}{channel.is_broadcast ? ' · LIVE' : ''}</Text>
-              </Pressable>
+              <KISButton
+                key={channel.id}
+                title={`@${channel.handle}${channel.is_broadcast ? ' · LIVE' : ''}`}
+                size="xs"
+                variant={active ? 'primary' : 'outline'}
+                onPress={() => setSelectedChannelId(channel.id)}
+              />
             );
           })}
-          <Pressable onPress={() => setCreateFormVisible(true)} style={[styles.channelPill, { backgroundColor: palette.card, borderColor: palette.primary }]}> 
-            <Text style={{ color: palette.primaryStrong, fontWeight: '900', fontSize: 12 }}>+ New Channel</Text>
-          </Pressable>
+          <KISButton title="+ New Channel" size="sm" variant="outline" onPress={() => setCreateFormVisible(true)} />
         </ScrollView>
       ) : null}
       {createFormVisible && (selectedChannel || lastCreatedHandle) ? renderCreateChannelForm() : null}
@@ -805,16 +777,16 @@ export default function ChannelStudioScreen({ legacyFeeds, liveCount, expiresAt,
         {TAB_CATEGORIES.map(category => {
           const active = activeCategory === category.id;
           return (
-            <Pressable
+            <KISButton
               key={category.id}
+              title={category.label}
+              size="xs"
+              variant={active ? 'primary' : 'outline'}
               onPress={() => {
                 setActiveCategory(category.id);
                 setActiveTab(category.tabs[0]);
               }}
-              style={[styles.categoryTab, { backgroundColor: active ? palette.primary : palette.surface, borderColor: active ? palette.primary : palette.border }]}
-            >
-              <Text style={{ color: active ? palette.onPrimary ?? '#fff' : palette.text, fontWeight: '900', fontSize: 11 }}>{category.label}</Text>
-            </Pressable>
+            />
           );
         })}
       </ScrollView>
@@ -822,9 +794,13 @@ export default function ChannelStudioScreen({ legacyFeeds, liveCount, expiresAt,
         {TABS.filter(tab => activeCategory === categoryForTab(tab.id)).map(tab => {
           const active = activeTab === tab.id;
           return (
-            <Pressable key={tab.id} onPress={() => setActiveTab(tab.id)} style={[styles.tab, { backgroundColor: active ? palette.primarySoft : palette.surface, borderColor: active ? palette.primary : palette.border, paddingHorizontal: compact ? 9 : 12, paddingVertical: compact ? 7 : 9 }]}>
-              <Text style={{ color: active ? palette.primaryStrong : palette.text, fontWeight: '900', fontSize: 11 }}>{tab.label}</Text>
-            </Pressable>
+            <KISButton
+              key={tab.id}
+              title={tab.label}
+              size="xs"
+              variant={active ? 'primary' : 'outline'}
+              onPress={() => setActiveTab(tab.id)}
+            />
           );
         })}
       </ScrollView>
@@ -874,11 +850,8 @@ const styles = StyleSheet.create({
   lockedCopy: { fontSize: 10, lineHeight: 15, fontWeight: '800' },
   creditSafetyCopy: { fontSize: 10, lineHeight: 15, fontWeight: '800' },
   channelPills: { gap: 8, paddingTop: 14 },
-  channelPill: { borderWidth: 1, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8 },
   categoryTabs: { gap: 6 },
-  categoryTab: { borderWidth: 1, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6 },
   tabs: { gap: 8, paddingVertical: 14 },
-  tab: { borderWidth: 1, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 9 },
   loadingRow: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 12 },
   loadingText: { fontSize: 12, fontWeight: '700' },
   emptyChannel: { borderWidth: 1, borderRadius: 8, padding: 16, marginBottom: 12 },
@@ -892,12 +865,7 @@ const styles = StyleSheet.create({
   input: { minHeight: 44, borderWidth: 1, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10, fontSize: 13, fontWeight: '700' },
   textarea: { minHeight: 82, textAlignVertical: 'top' },
   errorText: { fontSize: 12, lineHeight: 17, fontWeight: '800' },
-  primaryButton: { alignSelf: 'flex-start', marginTop: 12, minHeight: 44, borderRadius: 8, paddingHorizontal: 13, flexDirection: 'row', alignItems: 'center', gap: 7 },
   headerActions: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' },
-  headerCreateButton: { minHeight: 44, borderRadius: 8, paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center', gap: 7 },
-  headerBroadcastButton: { minHeight: 44, borderWidth: 1, borderRadius: 8, paddingHorizontal: 11, flexDirection: 'row', alignItems: 'center', gap: 6 },
-  broadcastText: { fontSize: 11, fontWeight: '900' },
-  primaryText: { fontSize: 12, fontWeight: '900' },
   upgradePrompt: { borderWidth: 1, borderRadius: 8, padding: 24, marginBottom: 12, alignItems: 'center', gap: 12 },
   upgradeTitle: { fontSize: 18, fontWeight: '900', textAlign: 'center' },
   upgradeText: { fontSize: 13, lineHeight: 19, fontWeight: '700', textAlign: 'center' },

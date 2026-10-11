@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { KISIcon } from '@/constants/kisIcons';
+import KISButton from '@/constants/KISButton';
 import { useKISTheme } from '@/theme/useTheme';
 import type { CallType } from '@/services/calls/callTypes';
 import { useSafeTopInset } from '@/hooks/useSafeTopInset';
@@ -208,21 +209,13 @@ export default function ScheduleCallSheet({ visible, onClose, onStart, onCreate 
                   {SCHEDULE_PRESETS.map(preset => {
                     const selected = scheduledFor?.getTime() === preset.date.getTime();
                     return (
-                      <Pressable
+                      <KISButton
                         key={preset.label}
+                        title={preset.label}
+                        size="xs"
+                        variant={selected ? 'primary' : 'outline'}
                         onPress={() => setScheduledFor(preset.date)}
-                        style={[
-                          styles.presetBtn,
-                          {
-                            borderColor: selected ? palette.gold : palette.inputBorder,
-                            backgroundColor: selected ? `${palette.gold}1A` : palette.surface,
-                          },
-                        ]}
-                      >
-                        <Text style={[styles.presetText, { color: selected ? palette.gold : palette.text }]}>
-                          {preset.label}
-                        </Text>
-                      </Pressable>
+                      />
                     );
                   })}
                 </View>
@@ -343,13 +336,6 @@ const styles = StyleSheet.create({
   },
   scheduleToggleText: { flex: 1, fontSize: 15, fontWeight: '700' },
   presetRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
-  presetBtn: {
-    borderWidth: 1.5,
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-  },
-  presetText: { fontSize: 13, fontWeight: '700' },
   scheduleConfirm: { fontSize: 12, textAlign: 'center' },
   error: { fontSize: 13, textAlign: 'center' },
   actions: {

@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { useKISTheme } from '@/theme/useTheme';
@@ -7,6 +7,7 @@ import { useResponsiveLayout } from '@/theme/responsive';
 import ROUTES from '@/network';
 import { getRequest } from '@/network/get';
 import { useSafeTopInset } from '@/hooks/useSafeTopInset';
+import KISButton from '@/constants/KISButton';
 import {
   buildImpactSnapshotSections,
   buildImpactSnapshotStats,
@@ -80,23 +81,13 @@ export default function ProfileImpactSnapshotScreen() {
         {FILTERS.map((filter) => {
           const selected = filter.key === range;
           return (
-            <Pressable
+            <KISButton
               key={filter.key}
+              variant={selected ? 'primary' : 'outline'}
+              size="sm"
               onPress={() => setRange(filter.key)}
-              style={{
-                paddingHorizontal: 14,
-                minHeight: responsive.minTouchTarget,
-                justifyContent: 'center',
-                borderRadius: 999,
-                borderWidth: 1,
-                borderColor: selected ? palette.primaryStrong : palette.divider,
-                backgroundColor: selected ? palette.primarySoft : palette.surface,
-              }}
-            >
-              <Text style={{ color: selected ? palette.primaryStrong : palette.text, fontWeight: '700', fontSize: responsive.bodyFontSize }}>
-                {filter.label}
-              </Text>
-            </Pressable>
+              title={filter.label}
+            />
           );
         })}
       </View>
@@ -105,12 +96,12 @@ export default function ProfileImpactSnapshotScreen() {
       {error ? (
         <>
           <Text style={{ color: palette.danger }}>{error}</Text>
-          <Pressable
+          <KISButton
+            variant="outline"
             onPress={() => void loadProfile()}
-            style={{ marginTop: 12, paddingHorizontal: 20, minHeight: responsive.minTouchTarget, justifyContent: 'center', backgroundColor: palette.primary, borderRadius: 8, alignSelf: 'center' }}
-          >
-            <Text style={{ color: palette.onPrimary, fontWeight: '600' }}>Retry</Text>
-          </Pressable>
+            title="Retry"
+            style={{ marginTop: 12, alignSelf: 'center' }}
+          />
         </>
       ) : null}
 

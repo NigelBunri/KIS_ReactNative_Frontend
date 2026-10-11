@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useKISTheme } from '@/theme/useTheme';
+import KISFab from '@/components/KISFab';
 import ROUTES from '@/network';
 import { getRequest } from '@/network/get';
 import { loadMessages } from '@/Module/ChatRoom/Storage/chatStorage';
@@ -375,19 +376,7 @@ export default function CommunityRoomPage({
         </View>
       ) : null}
 
-      <Pressable
-        onPress={() => setShowGroupCreate(true)}
-        style={({ pressed }) => [
-          styles.fab,
-          {
-            backgroundColor: palette.primary,
-            opacity: pressed ? 0.85 : 1,
-            shadowColor: palette.primary,
-          },
-        ]}
-      >
-        <KISIcon name="people" size={22} color={palette.bg} />
-      </Pressable>
+      <KISFab icon="people" iconSize={22} onPress={() => setShowGroupCreate(true)} style={styles.fab} />
     </View>
   );
 }
@@ -436,14 +425,5 @@ const styles = StyleSheet.create({
     position: 'absolute',
     right: 16,
     bottom: 20,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowOpacity: 0.3,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 6,
   },
 });

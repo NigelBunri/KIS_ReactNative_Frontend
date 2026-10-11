@@ -23,6 +23,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { KISIcon } from '@/constants/kisIcons';
+import KISButton from '@/constants/KISButton';
 import ROUTES, { resolveBackendAssetUrl } from '@/network';
 import { isVideoAttachment } from '@/components/broadcast/attachmentPreview';
 import { getBroadcastFeedVideoSources } from '@/components/broadcast/feedVideoPlayback';
@@ -427,23 +428,16 @@ function VideoPlayerControls({
             </View>
           ) : null}
           <View style={{ flexDirection: 'row', gap: 12, marginTop: 20 }}>
-            <Pressable
-              onPress={() => setShowEndScreen(false)}
-              style={{ borderWidth: 1, borderColor: palette.ivory, borderRadius: 20, paddingHorizontal: 20, paddingVertical: 10 }}
-            >
-              <Text style={{ color: palette.ivory, fontWeight: '700' }}>Cancel</Text>
-            </Pressable>
+            <KISButton title="Cancel" variant="outline" onPress={() => setShowEndScreen(false)} />
             {(relatedContent ?? [])[0] ? (
-              <Pressable
+              <KISButton
+                title="Watch Now"
                 onPress={() => {
                   const next = (relatedContent ?? [])[0];
                   if (next) controlsNavigation.navigate('ChannelContentDetail', { contentId: next.id, item: next });
                   setShowEndScreen(false);
                 }}
-                style={{ backgroundColor: palette.primary, borderRadius: 20, paddingHorizontal: 20, paddingVertical: 10 }}
-              >
-                <Text style={{ color: palette.ivory, fontWeight: '900' }}>Watch Now</Text>
-              </Pressable>
+              />
             ) : null}
           </View>
         </View>
@@ -494,7 +488,7 @@ function MediaStage({ content, relatedContent }: { content: BroadcastChannelCont
           <KISIcon name="file" size={42} color={palette.primaryStrong} />
         </View>
         <Text style={[styles.mediaStageTitle, { color: palette.text }]}>{primary?.caption || content.title || 'Document'}</Text>
-        {primary?.url ? <Pressable onPress={() => Linking.openURL(resolveAssetUrl(primary) || primary.url || '')} style={[styles.openFileButton, { backgroundColor: palette.text }]}><Text style={{ color: palette.surface, fontWeight: '900' }}>Open file</Text></Pressable> : null}
+        {primary?.url ? <KISButton title="Open file" onPress={() => Linking.openURL(resolveAssetUrl(primary) || primary.url || '')} /> : null}
       </View>
     );
   }
@@ -895,7 +889,7 @@ export default function ChannelContentDetailPage() {
     return (
       <SafeAreaView style={[styles.centered, { backgroundColor: palette.bg, }]}>
         <Text style={{ color: palette.text, fontWeight: '900' }}>Content unavailable</Text>
-        <Pressable onPress={() => navigation.goBack()} style={[styles.retryButton, { borderColor: palette.border }]}><Text style={{ color: palette.primaryStrong, fontWeight: '900' }}>Go back</Text></Pressable>
+        <KISButton title="Go back" variant="outline" onPress={() => navigation.goBack()} />
       </SafeAreaView>
     );
   }
@@ -988,16 +982,14 @@ export default function ChannelContentDetailPage() {
           ) : null}
 
           {resumeSeconds !== null && (
-            <Pressable
-              style={[styles.resumeBanner, { backgroundColor: palette.primarySoft, borderColor: palette.primaryStrong }]}
+            <KISButton
+              variant="outline"
+              style={styles.resumeBanner}
+              title={`Resume from ${Math.floor(resumeSeconds / 60)}:${String(Math.floor(resumeSeconds % 60)).padStart(2, '0')}`}
+              left={<KISIcon name="play" size={14} color={palette.primaryStrong} />}
+              right={<KISIcon name="close" size={12} color={palette.primaryStrong} />}
               onPress={() => setResumeSeconds(null)}
-            >
-              <KISIcon name="play" size={14} color={palette.primaryStrong} />
-              <Text style={[styles.resumeText, { color: palette.primaryStrong }]}>
-                Resume from {Math.floor(resumeSeconds / 60)}:{String(Math.floor(resumeSeconds % 60)).padStart(2, '0')}
-              </Text>
-              <KISIcon name="close" size={12} color={palette.primaryStrong} />
-            </Pressable>
+            />
           )}
 
           <View style={[styles.actionGrid, { gap: compact ? 8 : 10 }]}>
@@ -1027,9 +1019,9 @@ export default function ChannelContentDetailPage() {
           <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg, }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: palette.divider }}>
               <Text style={{ flex: 1, fontSize: 17, fontWeight: '800', color: palette.text }}>Comments</Text>
-              <Pressable onPress={() => setCommentsModalVisible(false)} hitSlop={10}>
+              <KISButton variant="ghost" onPress={() => setCommentsModalVisible(false)}>
                 <KISIcon name="close" size={20} color={palette.subtext} />
-              </Pressable>
+              </KISButton>
             </View>
             <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 32 }}>
               <ChannelCommentsPanel
@@ -1095,18 +1087,16 @@ export default function ChannelContentDetailPage() {
         <View style={[styles.modalSheet, { backgroundColor: palette.surface }]}>
           <View style={[styles.modalHeader, { borderBottomColor: palette.border }]}>
             <Text style={[styles.modalTitle, { color: palette.text }]}>Add to playlist</Text>
-            <Pressable onPress={() => setPlaylistModalOpen(false)} hitSlop={12}>
+            <KISButton variant="ghost" onPress={() => setPlaylistModalOpen(false)}>
               <KISIcon name="close" size={20} color={palette.subtext} />
-            </Pressable>
+            </KISButton>
           </View>
           {playlistsLoading ? (
             <ActivityIndicator color={palette.primaryStrong} style={{ marginTop: 24 }} />
           ) : userPlaylists.length === 0 ? (
             <View style={{ padding: 24, alignItems: 'center', gap: 10 }}>
               <Text style={{ color: palette.subtext, fontWeight: '700' }}>No playlists yet.</Text>
-              <Pressable onPress={() => { setPlaylistModalOpen(false); navigation.navigate('PlaylistList'); }} style={[styles.modalBtn, { backgroundColor: palette.primaryStrong }]}>
-                <Text style={{ color: palette.onPrimary, fontWeight: '900' }}>Create a playlist</Text>
-              </Pressable>
+              <KISButton title="Create a playlist" onPress={() => { setPlaylistModalOpen(false); navigation.navigate('PlaylistList'); }} />
             </View>
           ) : (
             <ScrollView contentContainerStyle={{ padding: 16, gap: 8 }}>
@@ -1131,55 +1121,44 @@ export default function ChannelContentDetailPage() {
         <View style={[styles.modalSheet, { backgroundColor: palette.surface }]}>
           <View style={[styles.modalHeader, { borderBottomColor: palette.border }]}>
             <Text style={[styles.modalTitle, { color: palette.text }]}>Support this creator</Text>
-            <Pressable onPress={() => { setTipModal(false); setSelectedTipAmount(null); }} hitSlop={12}>
+            <KISButton variant="ghost" onPress={() => { setTipModal(false); setSelectedTipAmount(null); }}>
               <KISIcon name="close" size={20} color={palette.subtext} />
-            </Pressable>
+            </KISButton>
           </View>
           <View style={{ padding: 16, gap: 14 }}>
             <Text style={{ color: palette.subtext, fontWeight: '700', fontSize: 13 }}>Choose an amount</Text>
             <View style={{ flexDirection: 'row', gap: 10 }}>
               {[{ label: '💛 $1', cents: 100 }, { label: '🧡 $2', cents: 200 }, { label: '❤️ $5', cents: 500 }, { label: '💎 $10', cents: 1000 }].map(opt => (
-                <Pressable
+                <KISButton
                   key={opt.cents}
+                  title={opt.label}
+                  variant={selectedTipAmount === opt.cents ? 'primary' : 'outline'}
                   onPress={() => setSelectedTipAmount(opt.cents)}
-                  style={[
-                    { flex: 1, paddingVertical: 12, borderRadius: 10, borderWidth: 1.5, alignItems: 'center' },
-                    {
-                      backgroundColor: selectedTipAmount === opt.cents ? palette.primarySoft : palette.bg,
-                      borderColor: selectedTipAmount === opt.cents ? palette.primaryStrong : palette.border,
-                    },
-                  ]}
-                >
-                  <Text style={{ fontWeight: '800', fontSize: 13, color: selectedTipAmount === opt.cents ? palette.primaryStrong : palette.text }}>
-                    {opt.label}
-                  </Text>
-                </Pressable>
+                  style={{ flex: 1 }}
+                />
               ))}
             </View>
             {selectedTipAmount !== null && (
               <View style={{ gap: 10 }}>
-                <Pressable
+                <KISButton
+                  title={tipping ? 'Processing…' : 'Pay with Flutterwave'}
+                  disabled={tipping}
+                  loading={tipping}
                   onPress={() => !tipping && processTip(selectedTipAmount, 'flutterwave')}
-                  style={[styles.modalBtn, { backgroundColor: tipping ? palette.border : palette.gold }]}
+                />
+                <KISButton
+                  title={tipping ? 'Processing…' : 'Pay with Stripe (card)'}
                   disabled={tipping}
-                >
-                  <Text style={{ color: palette.onPrimary, fontWeight: '900' }}>{tipping ? 'Processing…' : 'Pay with Flutterwave'}</Text>
-                </Pressable>
-                <Pressable
+                  loading={tipping}
                   onPress={() => !tipping && processTip(selectedTipAmount, 'stripe')}
-                  style={[styles.modalBtn, { backgroundColor: tipping ? palette.border : palette.primaryStrong }]}
-                  disabled={tipping}
-                >
-                  <Text style={{ color: palette.onPrimary, fontWeight: '900' }}>{tipping ? 'Processing…' : 'Pay with Stripe (card)'}</Text>
-                </Pressable>
+                />
               </View>
             )}
-            <Pressable
+            <KISButton
+              title="Cancel"
+              variant="outline"
               onPress={() => { setTipModal(false); setSelectedTipAmount(null); }}
-              style={[styles.modalBtn, { backgroundColor: palette.surface, borderWidth: 1, borderColor: palette.border }]}
-            >
-              <Text style={{ color: palette.subtext, fontWeight: '700' }}>Cancel</Text>
-            </Pressable>
+            />
           </View>
         </View>
       </Modal>
@@ -1190,9 +1169,9 @@ export default function ChannelContentDetailPage() {
         <View style={[styles.modalSheet, { backgroundColor: palette.surface }]}>
           <View style={[styles.modalHeader, { borderBottomColor: palette.border }]}>
             <Text style={[styles.modalTitle, { color: palette.text }]}>Create a Clip</Text>
-            <Pressable onPress={() => setClipModalOpen(false)} hitSlop={12}>
+            <KISButton variant="ghost" onPress={() => setClipModalOpen(false)}>
               <KISIcon name="close" size={20} color={palette.subtext} />
-            </Pressable>
+            </KISButton>
           </View>
           <View style={{ padding: 16, gap: 14 }}>
             <View>
@@ -1226,9 +1205,12 @@ export default function ChannelContentDetailPage() {
               </View>
             </View>
             <Text style={{ color: palette.subtext, fontSize: 11, fontWeight: '600' }}>Max 60 seconds per clip.</Text>
-            <Pressable onPress={handleCreateClip} style={[styles.modalBtn, { backgroundColor: clipping ? palette.border : palette.primaryStrong }]}>
-              <Text style={{ color: palette.onPrimary, fontWeight: '900' }}>{clipping ? 'Creating…' : 'Create clip'}</Text>
-            </Pressable>
+            <KISButton
+              title={clipping ? 'Creating…' : 'Create clip'}
+              disabled={clipping}
+              loading={clipping}
+              onPress={handleCreateClip}
+            />
           </View>
         </View>
       </Modal>
@@ -1266,7 +1248,6 @@ const styles = StyleSheet.create({
   playBubble: { width: 72, height: 72, borderRadius: 36, backgroundColor: 'rgba(0,0,0,0.42)', alignItems: 'center', justifyContent: 'center' },
   largeIconBubble: { width: 94, height: 94, borderRadius: 47, alignItems: 'center', justifyContent: 'center' },
   mediaStageTitle: { marginTop: 18, fontSize: 18, fontWeight: '900' },
-  openFileButton: { marginTop: 14, borderRadius: 8, paddingHorizontal: 16, paddingVertical: 10 },
   liveBadge: { position: 'absolute', top: 78, left: 20, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 },
   liveBadgeText: { fontWeight: '900', fontSize: 11, textTransform: 'uppercase' },
   galleryCount: { position: 'absolute', right: 14, bottom: 14, backgroundColor: 'rgba(0,0,0,0.58)', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 },
@@ -1290,7 +1271,6 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     borderWidth: 1,
   },
-  resumeText: { flex: 1, fontSize: 13, fontWeight: '800' },
   actionGrid: { marginTop: 18, flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   actionButton: { width: '30.5%', minHeight: 76, borderWidth: 1, borderRadius: 8, alignItems: 'center', justifyContent: 'center', padding: 8 },
   actionLabel: { marginTop: 5, fontSize: 11, fontWeight: '900' },
@@ -1300,7 +1280,6 @@ const styles = StyleSheet.create({
   assetRow: { borderWidth: 1, borderRadius: 8, padding: 12, flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
   assetTitle: { fontSize: 13, fontWeight: '900' },
   assetMeta: { marginTop: 2, fontSize: 11, fontWeight: '700' },
-  retryButton: { marginTop: 14, borderWidth: 1, borderRadius: 8, paddingHorizontal: 16, paddingVertical: 10 },
   relatedCard: { width: 160, borderWidth: 1, borderRadius: 10, overflow: 'hidden' },
   relatedThumb: { height: 90, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
   relatedOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.2)' },
@@ -1311,7 +1290,6 @@ const styles = StyleSheet.create({
   modalSheet: { position: 'absolute', bottom: 0, left: 0, right: 0, borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: '70%', overflow: 'hidden' },
   modalHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 16, borderBottomWidth: 1 },
   modalTitle: { fontSize: 17, fontWeight: '900' },
-  modalBtn: { borderRadius: 999, paddingHorizontal: 20, paddingVertical: 12, alignItems: 'center' },
   playlistRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, borderBottomWidth: 1 },
   clipLabel: { fontSize: 12, fontWeight: '700', marginBottom: 6 },
   clipInput: { borderWidth: 1, borderRadius: 8, padding: 10, fontSize: 14 },

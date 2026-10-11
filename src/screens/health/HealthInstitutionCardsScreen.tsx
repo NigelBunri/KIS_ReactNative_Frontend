@@ -2002,14 +2002,14 @@ export default function HealthInstitutionCardsScreen({
               >
                 <KISButton
                   title="Open"
-                  size="sm"
+                  size="xs"
                   variant={membershipOpen ? 'primary' : 'outline'}
                   onPress={() => setMembershipOpen(true)}
                   disabled={!canManageMembership || saving}
                 />
                 <KISButton
                   title="Closed"
-                  size="sm"
+                  size="xs"
                   variant={!membershipOpen ? 'primary' : 'outline'}
                   onPress={() => setMembershipOpen(false)}
                   disabled={!canManageMembership || saving}
@@ -2124,7 +2124,7 @@ export default function HealthInstitutionCardsScreen({
                   <KISButton
                     key={filterKey}
                     title={filterKey[0].toUpperCase() + filterKey.slice(1)}
-                    size="sm"
+                    size="xs"
                     variant={cardFilter === filterKey ? 'primary' : 'outline'}
                     onPress={() => setCardFilter(filterKey)}
                   />

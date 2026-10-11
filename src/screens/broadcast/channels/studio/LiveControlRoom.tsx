@@ -35,6 +35,7 @@ import {
   View,
 } from 'react-native';
 import { KISIcon } from '@/constants/kisIcons';
+import KISButton from '@/constants/KISButton';
 import KISTextInput from '@/constants/KISTextInput';
 import KISDateTimeInput from '@/constants/KISDateTimeInput';
 import { useKISTheme } from '@/theme/useTheme';
@@ -167,17 +168,17 @@ function CredRow({
       </View>
       <View style={styles.credActions}>
         {mask && (
-          <Pressable onPress={() => setRevealed(r => !r)} style={styles.credBtn} hitSlop={8}>
+          <KISButton variant="ghost" onPress={() => setRevealed(r => !r)} style={styles.credBtn}>
             <KISIcon name={revealed ? 'eye-off' : 'eye'} size={15} color={palette.subtext} />
-          </Pressable>
+          </KISButton>
         )}
-        <Pressable
+        <KISButton
+          variant="ghost"
           onPress={() => { Clipboard.setString(value); Alert.alert('Copied to clipboard'); }}
           style={styles.credBtn}
-          hitSlop={8}
         >
           <KISIcon name="copy" size={15} color={palette.subtext} />
-        </Pressable>
+        </KISButton>
       </View>
     </View>
   );
@@ -273,9 +274,9 @@ function RecordingsPanel({
         <Text style={[recStyles.title, { color: palette.text }]}>Recordings</Text>
         {loading
           ? <ActivityIndicator size="small" color={palette.primaryStrong} />
-          : <Pressable onPress={load} hitSlop={8}>
+          : <KISButton variant="ghost" onPress={load}>
               <KISIcon name="refresh" size={14} color={palette.subtext} />
-            </Pressable>
+            </KISButton>
         }
       </View>
 
@@ -297,26 +298,22 @@ function RecordingsPanel({
             </Text>
           </View>
           <View style={recStyles.actions}>
-            <Pressable
+            <KISButton
+              size="xs"
+              variant="outline"
+              title="Share"
+              left={<KISIcon name="share" size={14} color={palette.primaryStrong} />}
               onPress={() => handleShare(rec)}
-              style={[recStyles.actionBtn, { borderColor: palette.border }]}
-              hitSlop={6}
-            >
-              <KISIcon name="share" size={14} color={palette.primaryStrong} />
-              <Text style={[recStyles.actionText, { color: palette.primaryStrong }]}>Share</Text>
-            </Pressable>
-            <Pressable
-              onPress={() => handleDelete(rec)}
+            />
+            <KISButton
+              size="xs"
+              variant="danger"
+              title="Delete"
+              loading={deletingId === rec.id}
               disabled={deletingId === rec.id}
-              style={[recStyles.actionBtn, { borderColor: `${palette.danger}66` }]}
-              hitSlop={6}
-            >
-              {deletingId === rec.id
-                ? <ActivityIndicator size="small" color={palette.danger} />
-                : <KISIcon name="trash" size={14} color={palette.danger} />
-              }
-              <Text style={[recStyles.actionText, { color: palette.danger }]}>Delete</Text>
-            </Pressable>
+              left={deletingId === rec.id ? undefined : <KISIcon name="trash" size={14} color={palette.onPrimary} />}
+              onPress={() => handleDelete(rec)}
+            />
           </View>
         </View>
       ))}
@@ -352,16 +349,6 @@ const recStyles = StyleSheet.create({
   recTitle: { fontSize: 12, fontWeight: '800' },
   recMeta: { fontSize: 10, fontWeight: '600', marginTop: 2 },
   actions: { flexDirection: 'row', gap: 6 },
-  actionBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 8,
-    paddingVertical: 6,
-  },
-  actionText: { fontSize: 11, fontWeight: '900' },
 });
 
 // ── Broadcaster control panel ─────────────────────────────────────────────────
@@ -587,9 +574,9 @@ function BroadcasterPanel({
           >
             {connectionErrorMessage}
           </Text>
-          <Pressable onPress={() => setConnectionErrorMessage(null)} hitSlop={8}>
+          <KISButton variant="ghost" onPress={() => setConnectionErrorMessage(null)}>
             <Text style={{ color: palette?.warningStrong ?? '#f5a623', fontWeight: '900' }}>×</Text>
-          </Pressable>
+          </KISButton>
         </View>
       )}
 
@@ -618,13 +605,12 @@ function BroadcasterPanel({
       {webRTCStreamingAvailable && (
         <View style={styles.deviceRow}>
           {!isDeviceLive && !isConnecting ? (
-            <Pressable
+            <KISButton
+              variant="danger"
+              title="Go Live from Device"
+              left={<KISIcon name="broadcast" size={16} color={palette.onPrimary} />}
               onPress={handleGoLive}
-              style={[styles.goLiveBtn, { backgroundColor: palette.danger }]}
-            >
-              <KISIcon name="broadcast" size={16} color={palette.onPrimary} />
-              <Text style={[styles.goLiveBtnText, { color: palette.onPrimary }]}>Go Live from Device</Text>
-            </Pressable>
+            />
           ) : (
             <>
               <View style={[styles.liveIndicator, { backgroundColor: `${palette.danger}22` }]}>
@@ -638,30 +624,29 @@ function BroadcasterPanel({
                 </Text>
               </View>
               {isDeviceLive && (
-                <Pressable onPress={handleFlipCamera} style={[styles.iconActionBtn, { borderColor: palette.border }]}>
+                <KISButton variant="outline" onPress={handleFlipCamera}>
                   <KISIcon name="refresh" size={16} color={palette.primaryStrong} />
-                </Pressable>
+                </KISButton>
               )}
-              <Pressable onPress={handleStop} style={[styles.stopBtn, { borderColor: palette.danger }]}>
-                <KISIcon name="square" size={14} color={palette.danger} />
-                <Text style={[styles.stopBtnText, { color: palette.danger }]}>Stop</Text>
-              </Pressable>
+              <KISButton
+                variant="danger"
+                title="Stop"
+                left={<KISIcon name="square" size={14} color={palette.onPrimary} />}
+                onPress={handleStop}
+              />
             </>
           )}
         </View>
       )}
 
       {/* Credentials / OBS section */}
-      <Pressable
+      <KISButton
+        variant="outline"
         onPress={fetchStreamKey}
-        style={[styles.credRevealBtn, { borderColor: palette.border }]}
-      >
-        <KISIcon name="key" size={14} color={palette.primaryStrong} />
-        <Text style={[styles.credRevealText, { color: palette.primaryStrong }]}>
-          {keyLoading ? 'Loading…' : streamKey ? 'Stream key loaded' : 'Load stream key for OBS'}
-        </Text>
-        {keyLoading && <ActivityIndicator size="small" color={palette.primaryStrong} />}
-      </Pressable>
+        title={keyLoading ? 'Loading…' : streamKey ? 'Stream key loaded' : 'Load stream key for OBS'}
+        left={<KISIcon name="key" size={14} color={palette.primaryStrong} />}
+        right={keyLoading ? <ActivityIndicator size="small" color={palette.primaryStrong} /> : undefined}
+      />
 
       {(ingestUrl || streamKey) && (
         <OBSGuide
@@ -685,21 +670,13 @@ function BroadcasterPanel({
           {LATENCY_OPTIONS.map(opt => {
             const active = latencyMode === opt.value;
             return (
-              <Pressable
+              <KISButton
                 key={opt.value}
+                title={opt.label}
+                size="xs"
+                variant={active ? 'primary' : 'outline'}
                 onPress={() => void handleLatencyChange(opt.value)}
-                style={[
-                  styles.settingsPill,
-                  {
-                    backgroundColor: active ? palette.primaryStrong : (palette.card ?? palette.surface),
-                    borderColor: active ? palette.primaryStrong : palette.border,
-                  },
-                ]}
-              >
-                <Text style={[styles.settingsPillText, { color: active ? palette.onPrimary : palette.text }]}>
-                  {opt.label}
-                </Text>
-              </Pressable>
+              />
             );
           })}
         </View>
@@ -721,21 +698,13 @@ function BroadcasterPanel({
             {DVR_WINDOW_OPTIONS.map(opt => {
               const active = dvrWindow === opt.value;
               return (
-                <Pressable
+                <KISButton
                   key={opt.value}
+                  title={opt.label}
+                  size="xs"
+                  variant={active ? 'primary' : 'outline'}
                   onPress={() => void handleDvrWindowChange(opt.value)}
-                  style={[
-                    styles.settingsPill,
-                    {
-                      backgroundColor: active ? palette.primaryStrong : (palette.card ?? palette.surface),
-                      borderColor: active ? palette.primaryStrong : palette.border,
-                    },
-                  ]}
-                >
-                  <Text style={[styles.settingsPillText, { color: active ? palette.onPrimary : palette.text }]}>
-                    {opt.label}
-                  </Text>
-                </Pressable>
+                />
               );
             })}
           </View>
@@ -834,9 +803,9 @@ export default function LiveControlRoom({ channel, onOpenWatch }: Props) {
         </View>
         {loading
           ? <ActivityIndicator color={palette.primaryStrong} />
-          : <Pressable onPress={load} hitSlop={8}>
+          : <KISButton variant="ghost" onPress={load}>
               <KISIcon name="refresh" size={20} color={palette.primaryStrong} />
-            </Pressable>
+            </KISButton>
         }
       </View>
 
@@ -858,19 +827,13 @@ export default function LiveControlRoom({ channel, onOpenWatch }: Props) {
           multiline
           style={{ minHeight: 64 }}
         />
-        <Pressable
+        <KISButton
           disabled={saving || !title.trim()}
+          loading={saving}
           onPress={handleSchedule}
-          style={[
-            styles.primaryButton,
-            { backgroundColor: title.trim() ? palette.text : palette.border },
-          ]}
-        >
-          <KISIcon name="calendar" size={15} color={palette.surface} />
-          <Text style={[styles.primaryButtonText, { color: palette.surface }]}>
-            {saving ? 'Scheduling…' : 'Schedule stream'}
-          </Text>
-        </Pressable>
+          title="Schedule stream"
+          left={<KISIcon name="calendar" size={15} color={palette.onPrimary} />}
+        />
       </View>
 
       {/* Stream list */}
@@ -916,51 +879,44 @@ export default function LiveControlRoom({ channel, onOpenWatch }: Props) {
 
               {/* Card actions */}
               <View style={styles.cardActions}>
-                <Pressable
+                <KISButton
+                  size="xs"
+                  variant={isActive ? 'primary' : 'outline'}
+                  title={isActive ? 'Collapse' : 'Manage'}
+                  left={<KISIcon name={isActive ? 'chevron-up' : 'settings'} size={13} color={isActive ? palette.onPrimary : palette.subtext} />}
                   onPress={() => setActiveId(isActive ? null : stream.id)}
-                  style={[styles.actionChip, { borderColor: isActive ? palette.primary : palette.border }]}
-                >
-                  <KISIcon
-                    name={isActive ? 'chevron-up' : 'settings'}
-                    size={13}
-                    color={isActive ? palette.primary : palette.subtext}
-                  />
-                  <Text style={[styles.actionChipText, { color: isActive ? palette.primary : palette.subtext }]}>
-                    {isActive ? 'Collapse' : 'Manage'}
-                  </Text>
-                </Pressable>
+                />
 
-                <Pressable
+                <KISButton
+                  size="xs"
+                  variant="outline"
+                  title="Preview"
+                  left={<KISIcon name="people" size={13} color={palette.subtext} />}
                   onPress={() => onOpenWatch?.(stream)}
-                  style={[styles.actionChip, { borderColor: palette.border }]}
-                >
-                  <KISIcon name="people" size={13} color={palette.subtext} />
-                  <Text style={[styles.actionChipText, { color: palette.subtext }]}>Preview</Text>
-                </Pressable>
+                />
 
                 {stream.status !== 'live' && (
-                  <Pressable
+                  <KISButton
+                    size="xs"
+                    title="Start"
+                    left={<KISIcon name="play" size={13} color={palette.onPrimary} />}
                     onPress={() => handleStart(stream)}
-                    style={[styles.actionChip, { borderColor: palette.success, backgroundColor: `${palette.success}18` }]}
-                  >
-                    <KISIcon name="play" size={13} color={palette.success} />
-                    <Text style={[styles.actionChipText, { color: palette.success }]}>Start</Text>
-                  </Pressable>
+                  />
                 )}
 
                 {stream.status === 'live' && (
-                  <Pressable
+                  <KISButton
+                    size="xs"
+                    variant="danger"
+                    title="End"
+                    left={<KISIcon name="square" size={13} color={palette.onPrimary} />}
                     onPress={() =>
                       Alert.alert('End stream?', `"${stream.title}" will end for all viewers.`, [
                         { text: 'Cancel', style: 'cancel' },
                         { text: 'End', style: 'destructive', onPress: () => endLiveStream(stream.id).then(updateStream) },
                       ])
                     }
-                    style={[styles.actionChip, { borderColor: palette.danger, backgroundColor: `${palette.danger}18` }]}
-                  >
-                    <KISIcon name="square" size={13} color={palette.danger} />
-                    <Text style={[styles.actionChipText, { color: palette.danger }]}>End</Text>
-                  </Pressable>
+                  />
                 )}
               </View>
             </View>
@@ -1036,19 +992,6 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     gap: 6,
   },
-  primaryButton: {
-    alignSelf: 'flex-start',
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 7,
-    borderRadius: 8,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    minHeight: 44,
-    marginTop: 4,
-  },
-  primaryButtonText: { fontSize: 12, fontWeight: '900' },
-
   emptyText: { fontSize: 12, fontWeight: '700', lineHeight: 18 },
 
   streamCard: {
@@ -1078,18 +1021,6 @@ const styles = StyleSheet.create({
     gap: 8,
     marginTop: 10,
   },
-  actionChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 7,
-    minHeight: 44,
-  },
-  actionChipText: { fontSize: 11, fontWeight: '900' },
-
   // Broadcaster panel
   deviceRow: {
     flexDirection: 'row',
@@ -1098,15 +1029,6 @@ const styles = StyleSheet.create({
     gap: 8,
     marginBottom: 10,
   },
-  goLiveBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 7,
-    borderRadius: 8,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-  },
-  goLiveBtnText: { fontSize: 13, fontWeight: '900' },
   liveIndicator: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1120,32 +1042,6 @@ const styles = StyleSheet.create({
     width: 8, height: 8, borderRadius: 4,
   },
   liveIndicatorText: { fontSize: 12, fontWeight: '900' },
-  iconActionBtn: {
-    width: 44, height: 44, borderRadius: 8, borderWidth: 1,
-    alignItems: 'center', justifyContent: 'center',
-  },
-  stopBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-  },
-  stopBtnText: { fontSize: 12, fontWeight: '900' },
-
-  credRevealBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    marginBottom: 10,
-  },
-  credRevealText: { flex: 1, fontSize: 12, fontWeight: '900' },
 
   // Cred row
   credRow: {
@@ -1219,13 +1115,6 @@ const styles = StyleSheet.create({
   settingsTitle: { flex: 1, fontSize: 13, fontWeight: '900' },
   settingsLabel: { fontSize: 11, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.6 },
   pillRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
-  settingsPill: {
-    borderWidth: 1,
-    borderRadius: 20,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-  },
-  settingsPillText: { fontSize: 12, fontWeight: '700' },
   dvrRow: {
     flexDirection: 'row',
     alignItems: 'center',

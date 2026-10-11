@@ -16,6 +16,7 @@ import {
   Alert,
 } from 'react-native';
 import { useKISTheme } from '@/theme/useTheme';
+import KISFab from '@/components/KISFab';
 import ROUTES from '@/network';
 import { getRequest } from '@/network/get';
 import { postRequest } from '@/network/post';
@@ -687,20 +688,7 @@ export default function CommunityFeedPage({
         />
       )}
 
-      <Pressable
-        onPress={() => {
-          setComposerVisible(true);
-        }}
-        style={({ pressed }) => [
-          styles.fab,
-          {
-            backgroundColor: palette.primary,
-            opacity: pressed ? 0.85 : 1,
-          },
-        ]}
-      >
-        <KISIcon name="add" size={20} color={palette.onPrimary} />
-      </Pressable>
+      <KISFab icon="add" iconSize={20} onPress={() => setComposerVisible(true)} style={styles.fab} />
 
       <FeedComposerSheet
         visible={composerVisible}
@@ -839,15 +827,5 @@ const styles = StyleSheet.create({
     position: 'absolute',
     right: 20,
     bottom: 24,
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    alignItems: 'center',
-    justifyContent: 'center',
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOpacity: 0.2,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 4 },
   },
 });

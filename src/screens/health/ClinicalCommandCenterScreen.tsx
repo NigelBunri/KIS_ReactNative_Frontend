@@ -3,7 +3,6 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
-  Pressable,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -27,6 +26,7 @@ import {
   HEALTH_THEME_TYPOGRAPHY,
 } from '@/theme/health';
 import { useKISTheme } from '@/theme/useTheme';
+import KISButton from '@/constants/KISButton';
 import type { KISPalette } from '@/theme/constants';
 import { HealthCard, StatTile, SectionHeader, HealthTabBar, EmptyState, StatusPill, HealthActionModal } from '@/components/health';
 import type { HealthTab } from '@/components/health';
@@ -680,26 +680,13 @@ export default function ClinicalCommandCenterScreen({ route, navigation }: Props
           {TASK_FILTERS.map((f) => {
             const active = taskFilter === f.id;
             return (
-              <TouchableOpacity
+              <KISButton
                 key={f.id}
+                title={f.label}
+                size="xs"
+                variant={active ? 'primary' : 'outline'}
                 onPress={() => setTaskFilter(f.id)}
-                style={[
-                  chipStyles.chip,
-                  {
-                    backgroundColor: active ? palette.accentPrimary : palette.card,
-                    borderColor: palette.divider,
-                  },
-                ]}
-              >
-                <Text
-                  style={[
-                    chipStyles.chipText,
-                    { color: active ? palette.bg : palette.subtext },
-                  ]}
-                >
-                  {f.label}
-                </Text>
-              </TouchableOpacity>
+              />
             );
           })}
         </ScrollView>
@@ -1038,22 +1025,13 @@ export default function ClinicalCommandCenterScreen({ route, navigation }: Props
             <Text style={{ color: kisPalette.subtext, fontWeight: '700', fontSize: 13 }}>Discharged</Text>
           </View>
         ) : nextPhaseMeta ? (
-          <TouchableOpacity
+          <KISButton
+            title={`Advance to ${nextPhaseMeta.label}`}
             onPress={() => handleAdvancePhase(sessionId, nextPhase!)}
             disabled={advancing}
-            style={[
-              workflowStyles.advanceButton,
-              { backgroundColor: nextPhaseMeta.color, marginTop: 10 },
-            ]}
-          >
-            {advancing ? (
-              <ActivityIndicator color={kisPalette.onPrimary} size="small" />
-            ) : (
-              <Text style={{ color: kisPalette.onPrimary, fontWeight: '700', fontSize: 13 }}>
-                Advance to {nextPhaseMeta.label}
-              </Text>
-            )}
-          </TouchableOpacity>
+            loading={advancing}
+            style={{ marginTop: 10 }}
+          />
         ) : null}
         {item.created_at ?? item.admitted_at ? (
           <Text style={[sharedStyles.meta, { color: palette.subtext, marginTop: 6 }]}>
@@ -1121,17 +1099,12 @@ export default function ClinicalCommandCenterScreen({ route, navigation }: Props
         onClose={() => setTaskModalVisible(false)}
         footer={
           !isComplete ? (
-            <TouchableOpacity
+            <KISButton
+              title="Mark Complete"
               onPress={handleMarkTaskComplete}
               disabled={taskUpdating}
-              style={[modalStyles.actionButton, { backgroundColor: palette.accentPrimary }]}
-            >
-              {taskUpdating ? (
-                <ActivityIndicator color={palette.bg} />
-              ) : (
-                <Text style={[modalStyles.actionButtonText, { color: palette.bg }]}>Mark Complete</Text>
-              )}
-            </TouchableOpacity>
+              loading={taskUpdating}
+            />
           ) : (
             <View
               style={[
@@ -1186,30 +1159,21 @@ export default function ClinicalCommandCenterScreen({ route, navigation }: Props
         footer={
           <>
             {!isAcknowledged && (
-              <TouchableOpacity
+              <KISButton
+                title="Acknowledge"
                 onPress={() => handleEscalationAction('acknowledged')}
                 disabled={escalationUpdating}
-                style={[modalStyles.actionButton, { backgroundColor: kisPalette.primary }]}
-              >
-                {escalationUpdating ? (
-                  <ActivityIndicator color={kisPalette.onPrimary} />
-                ) : (
-                  <Text style={[modalStyles.actionButtonText, { color: kisPalette.onPrimary }]}>Acknowledge</Text>
-                )}
-              </TouchableOpacity>
+                loading={escalationUpdating}
+              />
             )}
             {!isResolved && (
-              <TouchableOpacity
+              <KISButton
+                title="Resolve"
                 onPress={() => handleEscalationAction('resolved')}
                 disabled={escalationUpdating}
-                style={[modalStyles.actionButton, { backgroundColor: kisPalette.success, marginTop: !isAcknowledged ? 12 : 0 }]}
-              >
-                {escalationUpdating ? (
-                  <ActivityIndicator color={kisPalette.onPrimary} />
-                ) : (
-                  <Text style={[modalStyles.actionButtonText, { color: kisPalette.onPrimary }]}>Resolve</Text>
-                )}
-              </TouchableOpacity>
+                loading={escalationUpdating}
+                style={{ marginTop: !isAcknowledged ? 12 : 0 }}
+              />
             )}
             {isResolved && (
               <View
@@ -1265,7 +1229,10 @@ export default function ClinicalCommandCenterScreen({ route, navigation }: Props
         onClose={() => setTriageModalVisible(false)}
         footer={
           <View style={{ flexDirection: 'row', gap: 10 }}>
-            <TouchableOpacity
+            <KISButton
+              title="Update Level"
+              variant="outline"
+              style={{ flex: 1 }}
               onPress={() => {
                 if (!selectedTriage?.id) return;
                 Alert.alert(
@@ -1301,11 +1268,11 @@ export default function ClinicalCommandCenterScreen({ route, navigation }: Props
                   ],
                 );
               }}
-              style={{ flex: 1, backgroundColor: kisPalette.gold + '22', borderWidth: 1, borderColor: kisPalette.gold, borderRadius: 10, padding: 12, alignItems: 'center', minHeight: 44, justifyContent: 'center' }}
-            >
-              <Text style={[HEALTH_THEME_TYPOGRAPHY.label, { color: kisPalette.gold }]}>Update Level</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
+            />
+            <KISButton
+              title="Reassign"
+              variant="outline"
+              style={{ flex: 1 }}
               onPress={() => {
                 if (!selectedTriage?.id) return;
                 Alert.prompt(
@@ -1321,10 +1288,7 @@ export default function ClinicalCommandCenterScreen({ route, navigation }: Props
                   'plain-text',
                 );
               }}
-              style={{ flex: 1, backgroundColor: kisPalette.info + '22', borderWidth: 1, borderColor: kisPalette.info, borderRadius: 10, padding: 12, alignItems: 'center', minHeight: 44, justifyContent: 'center' }}
-            >
-              <Text style={[HEALTH_THEME_TYPOGRAPHY.label, { color: kisPalette.info }]}>Reassign</Text>
-            </TouchableOpacity>
+            />
           </View>
         }
       >
@@ -1371,7 +1335,9 @@ export default function ClinicalCommandCenterScreen({ route, navigation }: Props
         footer={
           isPending ? (
             <View style={{ flexDirection: 'row', gap: 10 }}>
-              <TouchableOpacity
+              <KISButton
+                title="Accept"
+                style={{ flex: 1 }}
                 onPress={async () => {
                   try {
                     await patchRequest(ROUTES.clinical.referral(String(selectedReferral.id)), { status: 'accepted' });
@@ -1384,11 +1350,11 @@ export default function ClinicalCommandCenterScreen({ route, navigation }: Props
                     Alert.alert('Accept referral', e?.message || 'Failed to accept referral. Please try again.');
                   }
                 }}
-                style={{ flex: 1, backgroundColor: kisPalette.success + '22', borderWidth: 1, borderColor: kisPalette.success, borderRadius: 10, padding: 12, alignItems: 'center', minHeight: 44, justifyContent: 'center' }}
-              >
-                <Text style={[HEALTH_THEME_TYPOGRAPHY.label, { color: kisPalette.success }]}>Accept</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
+              />
+              <KISButton
+                title="Decline"
+                variant="danger"
+                style={{ flex: 1 }}
                 onPress={async () => {
                   try {
                     await patchRequest(ROUTES.clinical.referral(String(selectedReferral.id)), { status: 'declined' });
@@ -1401,10 +1367,7 @@ export default function ClinicalCommandCenterScreen({ route, navigation }: Props
                     Alert.alert('Decline referral', e?.message || 'Failed to decline referral. Please try again.');
                   }
                 }}
-                style={{ flex: 1, backgroundColor: kisPalette.danger + '22', borderWidth: 1, borderColor: kisPalette.danger, borderRadius: 10, padding: 12, alignItems: 'center', minHeight: 44, justifyContent: 'center' }}
-              >
-                <Text style={[HEALTH_THEME_TYPOGRAPHY.label, { color: kisPalette.danger }]}>Decline</Text>
-              </TouchableOpacity>
+              />
             </View>
           ) : undefined
         }
@@ -1452,14 +1415,9 @@ export default function ClinicalCommandCenterScreen({ route, navigation }: Props
             { borderBottomColor: palette.divider },
           ]}
         >
-          <TouchableOpacity
-            onPress={() => navigation.goBack()}
-            style={headerStyles.backButton}
-            accessibilityLabel="Go back"
-            hitSlop={{ top: 14, bottom: 14, left: 14, right: 14 }}
-          >
+          <KISButton variant="ghost" onPress={() => navigation.goBack()} style={headerStyles.backButton}>
             <KISIcon name="arrow-left" size={22} color={palette.text} />
-          </TouchableOpacity>
+          </KISButton>
           <View style={{ flex: 1 }}>
             <Text style={[HEALTH_THEME_TYPOGRAPHY.h2, { color: palette.text }]} numberOfLines={1}>
               Clinical Command Center
@@ -1548,21 +1506,6 @@ const headerStyles = StyleSheet.create({
   },
   backButton: {
     padding: 4,
-  },
-});
-
-const chipStyles = StyleSheet.create({
-  chip: {
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-    minHeight: 44,
-    justifyContent: 'center',
-    borderRadius: 99,
-    borderWidth: 1,
-  },
-  chipText: {
-    fontSize: 13,
-    fontWeight: '600',
   },
 });
 

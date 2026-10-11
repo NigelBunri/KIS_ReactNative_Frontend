@@ -1660,20 +1660,13 @@ export default function AvailabilityManagementScreen({
           style={{ flex: 1, padding: spacing.lg }}
         >
           <View style={{ alignItems: 'flex-end' }}>
-            <TouchableOpacity
+            <KISButton
+              variant="outline"
+              size="xs"
               onPress={() => navigation.goBack()}
-              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-              style={{
-                borderWidth: 1,
-                borderColor: palette.divider,
-                borderRadius: 12,
-                padding: spacing.xs,
-                backgroundColor: palette.card,
-              }}
-              accessibilityLabel="Close availability"
             >
               <KISIcon name="close" size={18} color={palette.text} />
-            </TouchableOpacity>
+            </KISButton>
           </View>
           <View style={{ flex: 1, justifyContent: 'center' }}>
             <Text style={{ ...typography.h2, color: palette.text }}>
@@ -1736,20 +1729,13 @@ export default function AvailabilityManagementScreen({
             paddingTop: spacing.sm,
           }}
         >
-          <TouchableOpacity
+          <KISButton
+            variant="outline"
+            size="xs"
             onPress={() => navigation.goBack()}
-            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-            style={{
-              borderWidth: 1,
-              borderColor: palette.divider,
-              borderRadius: 12,
-              padding: spacing.xs,
-              backgroundColor: palette.card,
-            }}
-            accessibilityLabel="Close availability"
           >
             <KISIcon name="close" size={18} color={palette.text} />
-          </TouchableOpacity>
+          </KISButton>
         </View>
 
         <ScrollView
@@ -1788,30 +1774,13 @@ export default function AvailabilityManagementScreen({
               }}
             >
               {(['year', 'month', 'week'] as CalendarViewMode[]).map(mode => (
-                <TouchableOpacity
+                <KISButton
                   key={mode}
+                  title={mode.toUpperCase()}
+                  size="xs"
+                  variant={calendarMode === mode ? 'primary' : 'outline'}
                   onPress={() => setCalendarMode(mode)}
-                  style={{
-                    borderRadius: 999,
-                    borderWidth: 1,
-                    borderColor:
-                      calendarMode === mode
-                        ? palette.accentPrimary
-                        : palette.divider,
-                    backgroundColor:
-                      calendarMode === mode
-                        ? `${palette.accentPrimary}22`
-                        : palette.surface,
-                    paddingHorizontal: spacing.md,
-                    paddingVertical: spacing.xs,
-                    minHeight: 44,
-                    justifyContent: 'center',
-                  }}
-                >
-                  <Text style={{ ...typography.label, color: palette.text }}>
-                    {mode.toUpperCase()}
-                  </Text>
-                </TouchableOpacity>
+                />
               ))}
             </View>
 
@@ -1833,30 +1802,13 @@ export default function AvailabilityManagementScreen({
               }}
             >
               {SCHEDULE_APPLY_SCOPES.map(scope => (
-                <TouchableOpacity
+                <KISButton
                   key={`scope-${scope}`}
+                  title={scope.toUpperCase()}
+                  size="xs"
+                  variant={applyScope === scope ? 'primary' : 'outline'}
                   onPress={() => setApplyScope(scope)}
-                  style={{
-                    borderRadius: 999,
-                    borderWidth: 1,
-                    borderColor:
-                      applyScope === scope
-                        ? palette.accentPrimary
-                        : palette.divider,
-                    backgroundColor:
-                      applyScope === scope
-                        ? `${palette.accentPrimary}22`
-                        : palette.surface,
-                    paddingHorizontal: spacing.md,
-                    paddingVertical: spacing.xs,
-                    minHeight: 44,
-                    justifyContent: 'center',
-                  }}
-                >
-                  <Text style={{ ...typography.label, color: palette.text }}>
-                    {scope.toUpperCase()}
-                  </Text>
-                </TouchableOpacity>
+                />
               ))}
             </View>
             <Text
@@ -1888,26 +1840,20 @@ export default function AvailabilityManagementScreen({
                   justifyContent: 'space-between',
                 }}
               >
-                <TouchableOpacity
-                  onPress={goPrevious}
-                  style={{ padding: spacing.xs }}
-                >
+                <KISButton variant="ghost" size="xs" onPress={goPrevious}>
                   <KISIcon name="chevron-left" size={18} color={palette.text} />
-                </TouchableOpacity>
+                </KISButton>
                 <Text style={{ ...typography.label, color: palette.text }}>
                   {MONTH_LABELS[anchorDate.getMonth()]}{' '}
                   {anchorDate.getFullYear()}
                 </Text>
-                <TouchableOpacity
-                  onPress={goNext}
-                  style={{ padding: spacing.xs }}
-                >
+                <KISButton variant="ghost" size="xs" onPress={goNext}>
                   <KISIcon
                     name="chevron-right"
                     size={18}
                     color={palette.text}
                   />
-                </TouchableOpacity>
+                </KISButton>
               </View>
             ) : null}
 
@@ -2231,31 +2177,13 @@ export default function AvailabilityManagementScreen({
                         {timeOptions.map(option => {
                           const selected = activeDateTimes.includes(option);
                           return (
-                            <TouchableOpacity
+                            <KISButton
                               key={`${activeDateKey}-${option}`}
+                              title={option}
+                              size="xs"
+                              variant={selected ? 'primary' : 'outline'}
                               onPress={() => setActiveDayTime(option)}
-                              style={{
-                                borderRadius: 999,
-                                borderWidth: 1,
-                                borderColor: selected
-                                  ? palette.accentPrimary
-                                  : palette.divider,
-                                backgroundColor: selected
-                                  ? `${palette.accentPrimary}22`
-                                  : palette.card,
-                                paddingHorizontal: spacing.sm,
-                                paddingVertical: 6,
-                              }}
-                            >
-                              <Text
-                                style={{
-                                  ...typography.caption,
-                                  color: palette.text,
-                                }}
-                              >
-                                {option}
-                              </Text>
-                            </TouchableOpacity>
+                            />
                           );
                         })}
                       </View>

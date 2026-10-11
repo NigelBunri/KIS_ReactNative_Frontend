@@ -22,7 +22,6 @@ import {
 import NetInfo from '@react-native-community/netinfo';
 import { launchImageLibrary } from 'react-native-image-picker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import LinearGradient from 'react-native-linear-gradient';
 import { useKISTheme } from '@/theme/useTheme';
 import { useResponsiveLayout } from '@/theme/responsive';
 import { KIS_TOKENS } from '@/theme/constants';
@@ -130,29 +129,13 @@ function CreateCommunityPolicyPicker<T extends string>({
         {options.map((opt) => {
           const selected = value === opt.value;
           return (
-            <Pressable
+            <KISButton
               key={opt.value}
+              title={opt.label}
+              size="xs"
+              variant={selected ? 'primary' : 'outline'}
               onPress={() => onChange(opt.value)}
-              style={({ pressed }) => ({
-                borderRadius: 999,
-                paddingVertical: 8,
-                paddingHorizontal: 14,
-                borderWidth: 2,
-                borderColor: selected ? palette.primary : palette.inputBorder,
-                backgroundColor: selected ? palette.primary : palette.card,
-                opacity: pressed ? 0.7 : 1,
-              })}
-            >
-              <Text
-                style={{
-                  color: selected ? palette.onPrimary : palette.text,
-                  fontSize: 13,
-                  fontWeight: selected ? '700' : '500',
-                }}
-              >
-                {opt.label}
-              </Text>
-            </Pressable>
+            />
           );
         })}
       </View>
@@ -175,7 +158,7 @@ function formatPostTimestamp(iso: string): string {
 }
 
 const CommunitiesTab = forwardRef<ScrollableHandle, CommunitiesTabProps>(function CommunitiesTab({ onOpenChat, onScroll, onScrollSettle }: CommunitiesTabProps, ref) {
-  const { palette, gradients } = useKISTheme();
+  const { palette } = useKISTheme();
   const insets = useSafeAreaInsets();
   const topInset = useSafeTopInset();
   const { width } = useWindowDimensions();
@@ -773,23 +756,18 @@ const CommunitiesTab = forwardRef<ScrollableHandle, CommunitiesTabProps>(functio
         </View>
       ) : selected ? (
         <View style={{ flex: 1 }}>
-          <View style={[styles.segmentRow, { backgroundColor: palette.surfaceSoft ?? palette.surface }]}>
+          <View style={{ flexDirection: 'row', gap: 4, marginBottom: 12 }}>
             {(['feed', 'groups'] as const).map((key) => {
               const active = tab === key;
               return (
-                <Pressable key={key} onPress={() => setTab(key)} style={styles.segment}>
-                  {active && (
-                    <LinearGradient
-                      colors={gradients.tabSelected as unknown as string[]}
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 1 }}
-                      style={StyleSheet.absoluteFillObject}
-                    />
-                  )}
-                  <Text style={{ color: active ? palette.royalInk : palette.subtext, fontWeight: active ? '800' : '600' }}>
-                    {key === 'feed' ? 'Feed' : 'Groups'}
-                  </Text>
-                </Pressable>
+                <KISButton
+                  key={key}
+                  title={key === 'feed' ? 'Feed' : 'Groups'}
+                  size="xs"
+                  variant={active ? 'primary' : 'outline'}
+                  style={{ flex: 1 }}
+                  onPress={() => setTab(key)}
+                />
               );
             })}
           </View>
@@ -1126,47 +1104,23 @@ const CommunitiesTab = forwardRef<ScrollableHandle, CommunitiesTabProps>(functio
               </ScrollView>
 
               <View style={{ flexDirection: 'row', gap: 10, marginTop: 16 }}>
-                <Pressable
+                <KISButton
+                  title="Cancel"
+                  variant="outline"
+                  style={{ flex: 1 }}
                   onPress={() => {
                     setCreateVisible(false);
                     setCreateAvatarUri(null);
                   }}
-                  style={({ pressed }) => ({
-                    flex: 1,
-                    borderRadius: 999,
-                    paddingVertical: 12,
-                    alignItems: 'center',
-                    borderWidth: 2,
-                    borderColor: palette.inputBorder,
-                    opacity: pressed ? 0.7 : 1,
-                  })}
-                >
-                  <Text style={{ color: palette.text, fontSize: 14, fontWeight: '700' }}>Cancel</Text>
-                </Pressable>
-                <Pressable
-                  onPress={creatingCommunity ? undefined : createCommunity}
-                  style={({ pressed }) => ({
-                    flex: 2,
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    borderRadius: 999,
-                    paddingVertical: 12,
-                    backgroundColor: palette.primary,
-                    opacity: creatingCommunity || !createName.trim() ? 0.6 : pressed ? 0.85 : 1,
-                  })}
-                >
-                  {creatingCommunity ? (
-                    <ActivityIndicator color={palette.onPrimary} />
-                  ) : (
-                    <>
-                      <KISIcon name="megaphone" size={16} color={palette.onPrimary} />
-                      <Text style={{ color: palette.onPrimary, fontSize: 14, fontWeight: '700', marginLeft: 6 }}>
-                        Create community
-                      </Text>
-                    </>
-                  )}
-                </Pressable>
+                />
+                <KISButton
+                  title="Create community"
+                  left={<KISIcon name="megaphone" size={16} color={palette.onPrimary} />}
+                  loading={creatingCommunity}
+                  disabled={creatingCommunity || !createName.trim()}
+                  style={{ flex: 2 }}
+                  onPress={createCommunity}
+                />
               </View>
             </View>
           </KeyboardAvoidingView>
@@ -1228,13 +1182,9 @@ const CommunitiesTab = forwardRef<ScrollableHandle, CommunitiesTabProps>(functio
               <Text style={{ color: palette.danger, marginTop: 8 }}>{groupCreateError}</Text>
             )}
 
-            <View style={styles.modalRow}>
-              <Pressable onPress={() => setGroupCreateVisible(false)} style={styles.iconBtn}>
-                <Text style={{ color: palette.text }}>Cancel</Text>
-              </Pressable>
-              <Pressable onPress={createGroup} style={styles.iconBtn}>
-                <Text style={{ color: palette.primary }}>Create</Text>
-              </Pressable>
+            <View style={[styles.modalRow, { gap: 10 }]}>
+              <KISButton title="Cancel" variant="outline" style={{ flex: 1 }} onPress={() => setGroupCreateVisible(false)} />
+              <KISButton title="Create" style={{ flex: 1 }} onPress={createGroup} />
             </View>
             </KeyboardAvoidingView>
           </View>
@@ -1365,8 +1315,6 @@ const styles = StyleSheet.create({
   communityCard: { padding: 12, borderRadius: 14, borderWidth: 1, marginBottom: 10 },
   communityRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   iconBtn: { padding: 6, minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
-  segmentRow: { flexDirection: 'row', gap: 4, marginBottom: 12, borderRadius: 999, padding: 4 },
-  segment: { flex: 1, paddingVertical: 9, borderRadius: 999, alignItems: 'center', overflow: 'hidden' },
   composer: { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderRadius: 20, paddingHorizontal: 10, paddingVertical: 6, marginBottom: 12 },
   input: { flex: 1, paddingVertical: 8, paddingHorizontal: 4 },
   composerSend: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },

@@ -294,7 +294,7 @@ export default function BroadcastEducationPage({ searchTerm = '', searchContext 
                   <KISButton
                     key={tab.key}
                     title={tab.title}
-                    size="sm"
+                    size="xs"
                     variant={active ? 'primary' : 'outline'}
                     left={<KISIcon name={tab.icon} size={14} color={active ? palette.onPrimary : palette.text} />}
                     onPress={() => handleExploreTab(tab)}

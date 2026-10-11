@@ -40,6 +40,7 @@ import { getAccessToken } from '@/security/authStorage';
 import { refreshFromDeviceAndBackend, type KISContact } from '@/Module/AddContacts/contactsService';
 import { useSocket } from '../../../SocketProvider';
 import { useSafeTopInset } from '@/hooks/useSafeTopInset';
+import KISButton from '@/constants/KISButton';
 
 type ChatInfoPageProps = {
   chat: Chat;
@@ -1638,19 +1639,14 @@ export const ChatInfoPage: React.FC<ChatInfoPageProps> = ({
               {/* Tab pills */}
               <View style={{ flexDirection: 'row', gap: 8, marginBottom: 14 }}>
                 {(['Images', 'Files', 'Links'] as MediaTab[]).map((t) => (
-                  <Pressable
+                  <KISButton
                     key={t}
+                    variant={mediaTab === t ? 'primary' : 'outline'}
+                    size="sm"
+                    style={{ flex: 1 }}
                     onPress={() => setMediaTab(t)}
-                    style={{
-                      flex: 1, alignItems: 'center', paddingVertical: 8, borderRadius: 20,
-                      backgroundColor: mediaTab === t ? palette.primary : (palette.surface ?? palette.card),
-                    }}
-                  >
-                    <Text style={{ color: mediaTab === t ? (palette.onPrimary) : palette.text, fontWeight: '600', fontSize: 13 }}>
-                      {t}
-                      {!mediaLoading ? ` (${tabCount(t)})` : ''}
-                    </Text>
-                  </Pressable>
+                    title={`${t}${!mediaLoading ? ` (${tabCount(t)})` : ''}`}
+                  />
                 ))}
               </View>
 

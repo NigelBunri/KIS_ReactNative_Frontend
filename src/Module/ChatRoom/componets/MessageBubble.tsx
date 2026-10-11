@@ -14,6 +14,7 @@ import { chatRoomStyles as styles } from '../chatRoomStyles';
 import Pdf from 'react-native-pdf';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { KISIcon } from '@/constants/kisIcons';
+import KISButton from '@/constants/KISButton';
 import { ChatMessage } from '../chatTypes';
 import { EmojiPicker } from './EmojiPicker';
 import { useResponsiveLayout } from '@/theme/responsive';
@@ -2467,22 +2468,12 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
               {reactionEntries.map(([emoji, users]) => {
                 const isActive = emoji === activeEmoji;
                 return (
-                  <Pressable
+                  <KISButton
                     key={emoji}
+                    variant={isActive ? 'primary' : 'outline'}
+                    size="sm"
                     onPress={() => setReactionViewerEmoji(emoji)}
-                    style={{
-                      marginRight: 8,
-                      paddingHorizontal: 10,
-                      paddingVertical: 6,
-                      borderRadius: 12,
-                      backgroundColor: isActive
-                        ? palette.reactionActiveBg ?? '#00000022'
-                        : 'transparent',
-                      borderWidth: isActive ? 1 : 0,
-                      borderColor: isActive
-                        ? palette.reactionActiveBorder ?? palette.primary
-                        : 'transparent',
-                    }}
+                    style={{ marginRight: 8 }}
                   >
                     <Text style={{ fontSize: 14 }}>
                       {emoji}{' '}
@@ -2495,7 +2486,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
                         {Array.isArray(users) ? users.length : 0}
                       </Text>
                     </Text>
-                  </Pressable>
+                  </KISButton>
                 );
               })}
             </View>

@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import type { ViewStyle } from 'react-native';
 import type { KISPalette } from '@/theme/constants';
+import KISButton from '@/constants/KISButton';
 
 type EducationTone = 'default' | 'success' | 'warning' | 'danger' | 'accent' | 'muted';
 
@@ -376,51 +377,21 @@ export function EducationStatusBadge({
 }
 
 export function EducationActionButton({
-  palette,
   label,
   onPress,
   icon,
   variant = 'primary',
   disabled = false,
 }: EducationActionButtonProps) {
-  const isPrimary = variant === 'primary';
-  const isGhost = variant === 'ghost';
+  const kisVariant = variant === 'secondary' ? 'outline' : variant;
   return (
-    <Pressable
+    <KISButton
+      title={label}
+      variant={kisVariant}
       disabled={disabled}
       onPress={onPress}
-      style={({ pressed }) => [
-        styles.button,
-        isPrimary
-          ? {
-              backgroundColor: palette.primaryStrong,
-              borderColor: palette.primaryStrong,
-            }
-          : isGhost
-            ? {
-                backgroundColor: 'transparent',
-                borderColor: `${palette.divider}AA`,
-              }
-            : {
-                backgroundColor: `${palette.surfaceElevated ?? palette.card}CC`,
-                borderColor: `${palette.divider}AA`,
-              },
-        disabled && styles.buttonDisabled,
-        pressed && styles.pressed,
-      ]}
-    >
-      {icon ? <View style={styles.buttonIcon}>{icon}</View> : null}
-      <Text
-        style={[
-          styles.buttonLabel,
-          {
-            color: isPrimary ? palette.onPrimary : palette.text,
-          },
-        ]}
-      >
-        {label}
-      </Text>
-    </Pressable>
+      left={icon}
+    />
   );
 }
 
@@ -825,29 +796,6 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
-  },
-  button: {
-    minHeight: 44,
-    borderRadius: 16,
-    borderWidth: 1,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-  },
-  buttonDisabled: {
-    opacity: 0.5,
-  },
-  buttonIcon: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  buttonLabel: {
-    fontSize: 14,
-    fontWeight: '800',
-    letterSpacing: 0.2,
   },
   listCard: {
     borderRadius: 24,

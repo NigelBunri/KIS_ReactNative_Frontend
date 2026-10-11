@@ -7,7 +7,6 @@ import {
   StyleSheet,
   Text,
   TextInput,
-  TouchableOpacity,
   View,
 } from 'react-native';
 import { SafeAreaView } from '@/components/common/SafeAreaViewWithTopPadding';
@@ -21,6 +20,7 @@ import { postRequest } from '@/network/post';
 import ROUTES from '@/network';
 import { KISIcon } from '@/constants/kisIcons';
 import KISButton from '@/constants/KISButton';
+import KISFab from '@/components/KISFab';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ChurchPledge'>;
 
@@ -150,9 +150,7 @@ export default function ChurchPledgeScreen({ navigation: _navigation }: Props) {
         )}
       </ScrollView>
 
-      <TouchableOpacity style={styles.fab} onPress={() => setShowForm(true)} activeOpacity={0.85}>
-        <KISIcon name="add" size={28} color={palette.bg} />
-      </TouchableOpacity>
+      <KISFab icon="add" onPress={() => setShowForm(true)} style={styles.fab} />
 
       <Modal visible={showForm} animationType="slide" transparent onRequestClose={() => setShowForm(false)}>
         <View style={styles.modalOverlay}>
@@ -171,15 +169,13 @@ export default function ChurchPledgeScreen({ navigation: _navigation }: Props) {
 
               <View style={styles.periodRow}>
                 {PERIODS.map((opt) => (
-                  <TouchableOpacity
+                  <KISButton
                     key={opt.value}
-                    style={[styles.periodOption, formPeriod === opt.value && styles.periodOptionActive]}
+                    title={opt.label}
+                    variant={formPeriod === opt.value ? 'primary' : 'outline'}
                     onPress={() => setFormPeriod(opt.value)}
-                  >
-                    <Text style={[styles.periodOptionText, formPeriod === opt.value && styles.periodOptionTextActive]}>
-                      {opt.label}
-                    </Text>
-                  </TouchableOpacity>
+                    style={{ flex: 1 }}
+                  />
                 ))}
               </View>
 
@@ -241,17 +237,6 @@ function makeStyles(palette: any, layout: any) {
       position: 'absolute',
       bottom: 28,
       right: 24,
-      width: 56,
-      height: 56,
-      borderRadius: 28,
-      backgroundColor: palette.gold,
-      alignItems: 'center',
-      justifyContent: 'center',
-      elevation: 6,
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 3 },
-      shadowOpacity: 0.2,
-      shadowRadius: 6,
     },
     modalOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.45)' },
     modalSheet: { backgroundColor: palette.surface, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 24, gap: 12 },
@@ -268,17 +253,6 @@ function makeStyles(palette: any, layout: any) {
       minHeight: 48,
     },
     periodRow: { flexDirection: 'row', gap: 8 },
-    periodOption: {
-      flex: 1,
-      borderWidth: 1,
-      borderColor: palette.divider,
-      borderRadius: 10,
-      paddingVertical: 10,
-      alignItems: 'center',
-    },
-    periodOptionActive: { borderColor: palette.gold, backgroundColor: palette.primarySoft },
-    periodOptionText: { fontSize: 14, color: palette.subtext },
-    periodOptionTextActive: { color: palette.gold, fontWeight: '700' },
     modalActions: { flexDirection: 'row', gap: 12, marginTop: 4 },
   });
 }

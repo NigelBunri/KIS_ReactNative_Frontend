@@ -8,7 +8,6 @@ import {
   Switch,
   Text,
   TextInput,
-  TouchableOpacity,
   View,
 } from 'react-native';
 import { SafeAreaView } from '@/components/common/SafeAreaViewWithTopPadding';
@@ -22,6 +21,7 @@ import { postRequest } from '@/network/post';
 import ROUTES from '@/network';
 import { KISIcon } from '@/constants/kisIcons';
 import KISButton from '@/constants/KISButton';
+import KISFab from '@/components/KISFab';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'FamilyNoticeBoard'>;
 
@@ -140,13 +140,7 @@ export default function FamilyNoticeBoardScreen({ navigation }: Props) {
       </ScrollView>
 
       {/* Post Notice button */}
-      <TouchableOpacity
-        style={[styles.fab, { backgroundColor: palette.gold }]}
-        onPress={() => setShowForm(true)}
-        activeOpacity={0.85}
-      >
-        <KISIcon name="create-outline" size={24} color={palette.bg} />
-      </TouchableOpacity>
+      <KISFab icon="create-outline" iconSize={24} onPress={() => setShowForm(true)} style={styles.fab} />
 
       {/* Form Modal */}
       <Modal visible={showForm} animationType="slide" transparent onRequestClose={() => setShowForm(false)}>
@@ -261,16 +255,6 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: 28,
     right: 24,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    alignItems: 'center',
-    justifyContent: 'center',
-    elevation: 6,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.2,
-    shadowRadius: 6,
   },
   modalOverlay: {
     flex: 1,

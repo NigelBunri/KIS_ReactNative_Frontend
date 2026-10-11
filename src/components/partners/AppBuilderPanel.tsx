@@ -12,6 +12,7 @@ import {
   View,
 } from 'react-native';
 import { useKISTheme } from '@/theme/useTheme';
+import KISButton from '@/constants/KISButton';
 import useAppBuilder from '@/screens/tabs/partners/hooks/useAppBuilder';
 import type { PartnerOrganizationApp, PartnerOrganizationAppTab, PartnerOrganizationAppContentBlock } from '@/screens/tabs/partners/hooks/usePartnerOrganizationApps';
 
@@ -207,21 +208,13 @@ export default function AppBuilderPanel({ isOpen, panelWidth, panelTranslateX, p
   const renderChips = (options: readonly string[], selected: string, onSelect: (v: string) => void) => (
     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, paddingVertical: 4 }}>
       {options.map((opt) => (
-        <Pressable
+        <KISButton
           key={opt}
+          title={opt.replace('_', ' ')}
+          size="xs"
+          variant={selected === opt ? 'primary' : 'outline'}
           onPress={() => onSelect(opt)}
-          style={[
-            styles.chip,
-            {
-              backgroundColor: selected === opt ? palette.primary + '22' : 'transparent',
-              borderColor: selected === opt ? palette.primary : palette.border,
-            },
-          ]}
-        >
-          <Text style={{ color: selected === opt ? palette.primary : palette.subtext, fontSize: 11, fontWeight: '700' }}>
-            {opt.replace('_', ' ')}
-          </Text>
-        </Pressable>
+        />
       ))}
     </ScrollView>
   );
@@ -234,9 +227,9 @@ export default function AppBuilderPanel({ isOpen, panelWidth, panelTranslateX, p
         </Text>
         <Text style={[styles.small, { color: palette.subtext }]}>{block.status ?? 'draft'} · active: {block.is_active ? 'yes' : 'no'}</Text>
       </View>
-      <Pressable onPress={() => handleDeleteBlock(block)} style={styles.deleteBtn}>
+      <KISButton variant="ghost" onPress={() => handleDeleteBlock(block)}>
         <Text style={{ color: palette.danger, fontWeight: '700', fontSize: 12 }}>✕</Text>
-      </Pressable>
+      </KISButton>
     </View>
   );
 
@@ -256,33 +249,25 @@ export default function AppBuilderPanel({ isOpen, panelWidth, panelTranslateX, p
         </View>
         <View style={{ flexDirection: 'row', gap: 6, alignItems: 'center' }}>
           {isRichTemplate && (
-            <Pressable
+            <KISButton
+              variant="outline"
+              size="xs"
+              title="Configure"
               onPress={() => {
                 setSelectedTab(tab);
                 setView('template_manage');
               }}
-              style={[styles.manageTabBtn, { backgroundColor: palette.primary + '18', borderColor: palette.primary }]}
-            >
-              <Text style={{ color: palette.primary, fontWeight: '800', fontSize: 11 }}>
-                Configure
-              </Text>
-            </Pressable>
+            />
           )}
-          <Pressable
+          <KISButton
+            variant="outline"
+            size="xs"
+            title={blockCount === 0 ? '+ Blocks' : 'Blocks'}
             onPress={() => openTab(tab)}
-            style={[styles.manageTabBtn, { backgroundColor: palette.primary + '18', borderColor: palette.primary + '44' }]}
-          >
-            <Text style={{ color: palette.primary, fontWeight: '800', fontSize: 11 }}>
-              {blockCount === 0 ? '+ Blocks' : 'Blocks'}
-            </Text>
-          </Pressable>
-          <Pressable
-            onPress={() => handleDeleteTab(tab)}
-            style={{ padding: 6 }}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          >
+          />
+          <KISButton variant="ghost" onPress={() => handleDeleteTab(tab)}>
             <Text style={{ color: palette.danger, fontWeight: '700', fontSize: 13 }}>✕</Text>
-          </Pressable>
+          </KISButton>
         </View>
       </View>
     );
@@ -302,9 +287,9 @@ export default function AppBuilderPanel({ isOpen, panelWidth, panelTranslateX, p
       </View>
       <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
         <Text style={{ color: palette.primary, fontWeight: '700', fontSize: 12 }}>Edit →</Text>
-        <Pressable onPress={() => handleDeleteApp(app)}>
+        <KISButton variant="ghost" onPress={() => handleDeleteApp(app)}>
           <Text style={{ color: palette.danger, fontWeight: '700', fontSize: 13 }}>✕</Text>
-        </Pressable>
+        </KISButton>
       </View>
     </Pressable>
   );
@@ -315,9 +300,9 @@ export default function AppBuilderPanel({ isOpen, panelWidth, panelTranslateX, p
     <>
       <View style={[styles.header, { borderBottomColor: palette.border }]}>
         <Text style={[styles.title, { color: palette.text }]}>App Builder</Text>
-        <Pressable onPress={onClose}>
+        <KISButton variant="ghost" onPress={onClose}>
           <Text style={{ color: palette.subtext, fontSize: 20 }}>✕</Text>
-        </Pressable>
+        </KISButton>
       </View>
 
       {builder.loading ? (
@@ -325,9 +310,7 @@ export default function AppBuilderPanel({ isOpen, panelWidth, panelTranslateX, p
       ) : builder.error ? (
         <View style={styles.centered}>
           <Text style={{ color: palette.danger }}>{builder.error}</Text>
-          <Pressable onPress={builder.loadApps} style={{ marginTop: 12 }}>
-            <Text style={{ color: palette.primary, fontWeight: '700' }}>Retry</Text>
-          </Pressable>
+          <KISButton title="Retry" variant="ghost" onPress={builder.loadApps} style={{ marginTop: 12 }} />
         </View>
       ) : (
         <ScrollView contentContainerStyle={{ padding: 14, paddingBottom: 60 }}>
@@ -344,14 +327,11 @@ export default function AppBuilderPanel({ isOpen, panelWidth, panelTranslateX, p
           )}
 
           {/* Create app form */}
-          <Pressable
+          <KISButton
+            variant="outline"
+            title={showCreateApp ? '↑ Cancel' : '+ New app'}
             onPress={() => setShowCreateApp((s) => !s)}
-            style={[styles.addBtn, { borderColor: palette.primary }]}
-          >
-            <Text style={{ color: palette.primary, fontWeight: '800', fontSize: 13 }}>
-              {showCreateApp ? '↑ Cancel' : '+ New app'}
-            </Text>
-          </Pressable>
+          />
 
           {showCreateApp && (
             <View style={[styles.form, { borderColor: palette.border, backgroundColor: palette.card ?? palette.surface }]}>
@@ -363,17 +343,12 @@ export default function AppBuilderPanel({ isOpen, panelWidth, panelTranslateX, p
               {renderChips(LAYOUT_TYPES, appLayout, setAppLayout)}
               <Text style={[styles.fieldLabel, { color: palette.subtext, marginTop: 8 }]}>Status</Text>
               {renderChips(STATUS_OPTIONS, appStatus, setAppStatus)}
-              <Pressable
+              <KISButton
+                title="Create app"
                 onPress={handleCreateApp}
                 disabled={builder.saving}
-                style={[styles.saveBtn, { backgroundColor: palette.primary }]}
-              >
-                {builder.saving ? (
-                  <ActivityIndicator size="small" color="#fff" />
-                ) : (
-                  <Text style={{ color: '#fff', fontWeight: '800', fontSize: 13 }}>Create app</Text>
-                )}
-              </Pressable>
+                loading={builder.saving}
+              />
             </View>
           )}
         </ScrollView>
@@ -386,15 +361,15 @@ export default function AppBuilderPanel({ isOpen, panelWidth, panelTranslateX, p
     return (
       <>
         <View style={[styles.header, { borderBottomColor: palette.border }]}>
-          <Pressable onPress={() => { setView('apps'); setSelectedApp(null); setTabs([]); }}>
+          <KISButton variant="ghost" onPress={() => { setView('apps'); setSelectedApp(null); setTabs([]); }}>
             <Text style={{ color: palette.primary, fontWeight: '700', fontSize: 13 }}>← Apps</Text>
-          </Pressable>
+          </KISButton>
           <Text style={[styles.title, { color: palette.text, flex: 1, textAlign: 'center' }]} numberOfLines={1}>
             {selectedApp.icon ? `${selectedApp.icon} ` : ''}{selectedApp.name}
           </Text>
-          <Pressable onPress={onClose}>
+          <KISButton variant="ghost" onPress={onClose}>
             <Text style={{ color: palette.subtext, fontSize: 20 }}>✕</Text>
-          </Pressable>
+          </KISButton>
         </View>
 
         <ScrollView contentContainerStyle={{ padding: 14, paddingBottom: 60 }}>
@@ -420,14 +395,11 @@ export default function AppBuilderPanel({ isOpen, panelWidth, panelTranslateX, p
             tabs.map(renderTabRow)
           )}
 
-          <Pressable
+          <KISButton
+            variant="outline"
+            title={showCreateTab ? '↑ Cancel' : '+ New tab'}
             onPress={() => setShowCreateTab((s) => !s)}
-            style={[styles.addBtn, { borderColor: palette.primary }]}
-          >
-            <Text style={{ color: palette.primary, fontWeight: '800', fontSize: 13 }}>
-              {showCreateTab ? '↑ Cancel' : '+ New tab'}
-            </Text>
-          </Pressable>
+          />
 
           {showCreateTab && (
             <View style={[styles.form, { borderColor: palette.border, backgroundColor: palette.card ?? palette.surface }]}>
@@ -436,17 +408,12 @@ export default function AppBuilderPanel({ isOpen, panelWidth, panelTranslateX, p
               <FormField label="Icon (emoji)" value={tabIcon} onChange={setTabIcon} placeholder="🏠" palette={palette} />
               <Text style={[styles.fieldLabel, { color: palette.subtext, marginTop: 6 }]}>Page template</Text>
               {renderChips(TEMPLATES, tabTemplate, setTabTemplate)}
-              <Pressable
+              <KISButton
+                title="Create tab"
                 onPress={handleCreateTab}
                 disabled={builder.saving}
-                style={[styles.saveBtn, { backgroundColor: palette.primary }]}
-              >
-                {builder.saving ? (
-                  <ActivityIndicator size="small" color="#fff" />
-                ) : (
-                  <Text style={{ color: '#fff', fontWeight: '800', fontSize: 13 }}>Create tab</Text>
-                )}
-              </Pressable>
+                loading={builder.saving}
+              />
             </View>
           )}
         </ScrollView>
@@ -459,15 +426,15 @@ export default function AppBuilderPanel({ isOpen, panelWidth, panelTranslateX, p
     return (
       <>
         <View style={[styles.header, { borderBottomColor: palette.border }]}>
-          <Pressable onPress={() => { setView('app_detail'); setSelectedTab(null); setBlocks([]); }}>
+          <KISButton variant="ghost" onPress={() => { setView('app_detail'); setSelectedTab(null); setBlocks([]); }}>
             <Text style={{ color: palette.primary, fontWeight: '700', fontSize: 13 }}>← Tabs</Text>
-          </Pressable>
+          </KISButton>
           <Text style={[styles.title, { color: palette.text, flex: 1, textAlign: 'center' }]} numberOfLines={1}>
             {selectedTab.icon ? `${selectedTab.icon} ` : ''}{selectedTab.title}
           </Text>
-          <Pressable onPress={onClose}>
+          <KISButton variant="ghost" onPress={onClose}>
             <Text style={{ color: palette.subtext, fontSize: 20 }}>✕</Text>
-          </Pressable>
+          </KISButton>
         </View>
 
         <ScrollView contentContainerStyle={{ padding: 14, paddingBottom: 60 }}>
@@ -490,14 +457,11 @@ export default function AppBuilderPanel({ isOpen, panelWidth, panelTranslateX, p
             blocks.map(renderBlockPreview)
           )}
 
-          <Pressable
+          <KISButton
+            variant="outline"
+            title={showCreateBlock ? '↑ Cancel' : '+ Add content block'}
             onPress={() => setShowCreateBlock((s) => !s)}
-            style={[styles.addBtn, { borderColor: palette.primary }]}
-          >
-            <Text style={{ color: palette.primary, fontWeight: '800', fontSize: 13 }}>
-              {showCreateBlock ? '↑ Cancel' : '+ Add content block'}
-            </Text>
-          </Pressable>
+          />
 
           {showCreateBlock && (
             <View style={[styles.form, { borderColor: palette.border, backgroundColor: palette.card ?? palette.surface }]}>
@@ -509,17 +473,12 @@ export default function AppBuilderPanel({ isOpen, panelWidth, panelTranslateX, p
               {['image', 'video', 'file', 'link', 'embed'].includes(blockType) ? (
                 <FormField label="URL / link" value={blockUrl} onChange={setBlockUrl} placeholder="https://…" palette={palette} />
               ) : null}
-              <Pressable
+              <KISButton
+                title="Add block"
                 onPress={handleCreateBlock}
                 disabled={builder.saving}
-                style={[styles.saveBtn, { backgroundColor: palette.primary }]}
-              >
-                {builder.saving ? (
-                  <ActivityIndicator size="small" color="#fff" />
-                ) : (
-                  <Text style={{ color: '#fff', fontWeight: '800', fontSize: 13 }}>Add block</Text>
-                )}
-              </Pressable>
+                loading={builder.saving}
+              />
             </View>
           )}
         </ScrollView>
@@ -660,15 +619,6 @@ const styles = StyleSheet.create({
     marginBottom: 6,
     gap: 8,
   },
-  addBtn: {
-    borderWidth: 1.5,
-    borderRadius: 10,
-    borderStyle: 'dashed',
-    paddingVertical: 10,
-    alignItems: 'center',
-    marginTop: 8,
-    marginBottom: 8,
-  },
   form: {
     borderWidth: 1,
     borderRadius: 12,
@@ -684,27 +634,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 8,
     fontSize: 13,
-  },
-  chip: {
-    borderWidth: 1,
-    borderRadius: 20,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-  },
-  saveBtn: {
-    marginTop: 12,
-    borderRadius: 10,
-    paddingVertical: 11,
-    alignItems: 'center',
-  },
-  deleteBtn: {
-    padding: 6,
-  },
-  manageTabBtn: {
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
   },
   infoCard: {
     borderWidth: 1,

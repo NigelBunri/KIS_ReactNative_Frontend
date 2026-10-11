@@ -14,6 +14,7 @@ import { launchImageLibrary } from 'react-native-image-picker';
 
 import { KIS_TOKENS } from '../../../theme/constants';
 import { KISIcon } from '@/constants/kisIcons';
+import KISButton from '@/constants/KISButton';
 import ROUTES, { CHAT_BASE_URL } from '@/network';
 import { postRequest } from '@/network/post';
 import { uploadFileToBackend } from '@/Module/ChatRoom/uploadFileToBackend';
@@ -381,34 +382,15 @@ export const NewCommunityForm: React.FC<NewCommunityFormProps> = ({
           Who can see this community
         </Text>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-          {VISIBILITY_OPTIONS.map((opt) => {
-            const selected = visibility === opt.value;
-            return (
-              <Pressable
-                key={opt.value}
-                onPress={() => setVisibility(opt.value)}
-                style={({ pressed }) => ({
-                  borderRadius: 999,
-                  paddingVertical: 8,
-                  paddingHorizontal: 14,
-                  borderWidth: 2,
-                  borderColor: selected ? palette.primary : palette.inputBorder,
-                  backgroundColor: selected ? palette.primary : palette.card,
-                  opacity: pressed ? KIS_TOKENS.opacity.pressed : 1,
-                })}
-              >
-                <Text
-                  style={{
-                    color: selected ? palette.onPrimary : palette.text,
-                    fontSize: 13,
-                    fontWeight: selected ? '700' : '500',
-                  }}
-                >
-                  {opt.label}
-                </Text>
-              </Pressable>
-            );
-          })}
+          {VISIBILITY_OPTIONS.map((opt) => (
+            <KISButton
+              key={opt.value}
+              variant={visibility === opt.value ? 'primary' : 'outline'}
+              size="sm"
+              onPress={() => setVisibility(opt.value)}
+              title={opt.label}
+            />
+          ))}
         </View>
       </View>
 
@@ -418,34 +400,15 @@ export const NewCommunityForm: React.FC<NewCommunityFormProps> = ({
           How people can join
         </Text>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-          {JOIN_POLICY_OPTIONS.map((opt) => {
-            const selected = joinPolicy === opt.value;
-            return (
-              <Pressable
-                key={opt.value}
-                onPress={() => setJoinPolicy(opt.value)}
-                style={({ pressed }) => ({
-                  borderRadius: 999,
-                  paddingVertical: 8,
-                  paddingHorizontal: 14,
-                  borderWidth: 2,
-                  borderColor: selected ? palette.primary : palette.inputBorder,
-                  backgroundColor: selected ? palette.primary : palette.card,
-                  opacity: pressed ? KIS_TOKENS.opacity.pressed : 1,
-                })}
-              >
-                <Text
-                  style={{
-                    color: selected ? palette.onPrimary : palette.text,
-                    fontSize: 13,
-                    fontWeight: selected ? '700' : '500',
-                  }}
-                >
-                  {opt.label}
-                </Text>
-              </Pressable>
-            );
-          })}
+          {JOIN_POLICY_OPTIONS.map((opt) => (
+            <KISButton
+              key={opt.value}
+              variant={joinPolicy === opt.value ? 'primary' : 'outline'}
+              size="sm"
+              onPress={() => setJoinPolicy(opt.value)}
+              title={opt.label}
+            />
+          ))}
         </View>
       </View>
 
@@ -458,29 +421,13 @@ export const NewCommunityForm: React.FC<NewCommunityFormProps> = ({
           {POST_POLICY_OPTIONS.map((opt) => {
             const selected = postPolicy === opt.value;
             return (
-              <Pressable
+              <KISButton
                 key={opt.value}
+                variant={selected ? 'primary' : 'outline'}
+                size="sm"
                 onPress={() => setPostPolicy(opt.value)}
-                style={({ pressed }) => ({
-                  borderRadius: 999,
-                  paddingVertical: 8,
-                  paddingHorizontal: 14,
-                  borderWidth: 2,
-                  borderColor: selected ? palette.primary : palette.inputBorder,
-                  backgroundColor: selected ? palette.primary : palette.card,
-                  opacity: pressed ? KIS_TOKENS.opacity.pressed : 1,
-                })}
-              >
-                <Text
-                  style={{
-                    color: selected ? palette.onPrimary : palette.text,
-                    fontSize: 13,
-                    fontWeight: selected ? '700' : '500',
-                  }}
-                >
-                  {opt.label}
-                </Text>
-              </Pressable>
+                title={opt.label}
+              />
             );
           })}
         </View>
