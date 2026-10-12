@@ -86,6 +86,39 @@
 // over the moment it's up), never sustained-concurrent. See its own
 // comment for the reasoning on why this is safe even if the user
 // backgrounds the ringing call again afterward.
+//
+// ─── Notification actions (Answer / Decline) ────────────────────────────
+//
+// Notifee 9.1.8 (the latest published version — confirmed via `npm view`)
+// has no Android `Notification.CallStyle` support at all. Building that
+// natively from scratch (a custom Kotlin/Java notification path bypassing
+// Notifee) was deliberately NOT attempted: it is a substantial new native
+// surface with real correctness risk (Person objects, PendingIntents,
+// full-screen-intent interaction) that cannot be adequately verified
+// without a physical device, and risks the exact thing this file exists to
+// avoid — breaking reliable ringing for the sake of visual polish. Notifee's
+// existing `category: CALL` + color + distinct voice/video title and body
+// already carry most of the visual intent reliably.
+//
+// Decline is wired to work entirely in the background (no Activity launch,
+// no app foregrounding at all) via registerIncomingCallActionHandler()
+// below — the one interaction a notification action button must support
+// with zero further user interaction, since it's a pure state change (no
+// media/WebRTC to start).
+//
+// Answer deliberately does NOT attempt the equivalent one-tap, fully-
+// headless flow. Auto-answering would mean starting WebRTC/media negotiation
+// from inside a transient Notifee background-event handler, with no
+// mounted React tree, no guarantee the native audio/video modules have
+// initialized, and no way to verify the outcome without a physical device —
+// exactly the kind of fragile, unverifiable path this project has
+// repeatedly hit real bugs from assuming-rather-than-confirming. Instead,
+// Answer's `launchActivity: 'default'` reliably brings the app forward
+// (the same BAL-exempt full-screen-intent mechanism as above), landing the
+// user directly on the real, already-correct, already-tested
+// IncomingCallScreen — one tap on its own Answer button away, not "open
+// the app manually and find the call" the way a plain notification tap
+// would have left it.
 
 import type { CallType } from './callTypes';
 import { hasVideo } from './callTypes';
@@ -152,6 +185,7 @@ function ensureChannel(notifee: any): Promise<void> {
  */
 export async function showIncomingCallNotification(params: {
   callId: string;
+  conversationId: string;
   callerName: string;
   callType: CallType;
 }): Promise<boolean> {
@@ -171,6 +205,7 @@ export async function showIncomingCallNotification(params: {
       id: params.callId,
       title: params.callerName || fallbackTitle,
       body: isVideo ? 'Incoming video call' : 'Incoming voice call',
+      data: { callId: params.callId, conversationId: params.conversationId },
       android: {
         channelId: CHANNEL_ID,
         category: notifee.AndroidCategory?.CALL ?? 'call',
@@ -178,6 +213,20 @@ export async function showIncomingCallNotification(params: {
         color: BRAND_GOLD,
         ongoing: true,
         autoCancel: false,
+        // Decline works entirely in the background (no Activity launch at
+        // all) — see registerIncomingCallActionHandler() below, which
+        // authoritatively declines the call via a plain HTTP endpoint,
+        // same reasoning as the ringing-ack: no live socket exists in this
+        // headless context to emit call.end over. Answer only brings the
+        // app forward (launchActivity) — see this file's top-of-file
+        // comment for why a full one-tap headless answer (starting WebRTC/
+        // media from a background event with no mounted app) was not
+        // attempted; the user lands directly on the real, already-correct
+        // IncomingCallScreen and taps its own Answer button once.
+        actions: [
+          { title: 'Decline', pressAction: { id: 'decline' } },
+          { title: 'Answer', pressAction: { id: 'answer', launchActivity: 'default' } },
+        ],
         // The notification IS the ring — see this file's top-of-file
         // comment. Loops the channel's sound for as long as the
         // notification is showing; cancelIncomingCallNotification() (every

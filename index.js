@@ -12,6 +12,7 @@ import { name as appName } from './app.json';
 import { installLocalizationRuntime } from './src/languages/runtimePatch';
 import { registerAndroidEvents } from './src/services/calls/callKitService';
 import { registerBackgroundPushHandler } from './src/push/notifications';
+import { registerIncomingCallActionHandler } from './src/services/calls/incomingCallActions';
 
 // react-native-reorderable-list's documented nested-list pattern
 // (ScrollViewContainer + NestedReorderableList, scrollable={false} —
@@ -40,6 +41,13 @@ registerAndroidEvents();
 // while regular notification-block pushes (chat messages) kept working
 // since the OS displays those natively without any JS involved at all.
 registerBackgroundPushHandler();
+
+// Same reasoning as the two calls above — Android can invoke this from a
+// headless JS instance (the incoming-call notification's "Decline" action,
+// pressed while the app is backgrounded or fully killed) only if it was
+// already registered before the press, not whenever App.tsx happens to
+// mount.
+void registerIncomingCallActionHandler();
 
 if (!global.Buffer) {
   global.Buffer = Buffer;

@@ -58,6 +58,7 @@ describe('incomingCallNotification — showIncomingCallNotification', () => {
 
     const shown = await showIncomingCallNotification({
       callId: 'call-abc',
+      conversationId: 'conv-1',
       callerName: 'Jane Doe',
       callType: 'voice',
     });
@@ -67,10 +68,15 @@ describe('incomingCallNotification — showIncomingCallNotification', () => {
       expect.objectContaining({
         id: 'call-abc',
         title: 'Jane Doe',
+        data: { callId: 'call-abc', conversationId: 'conv-1' },
         android: expect.objectContaining({
           category: 'call',
           importance: 4,
           fullScreenAction: { id: 'default', launchActivity: 'default' },
+          actions: [
+            { title: 'Decline', pressAction: { id: 'decline' } },
+            { title: 'Answer', pressAction: { id: 'answer', launchActivity: 'default' } },
+          ],
         }),
       }),
     );
@@ -79,7 +85,7 @@ describe('incomingCallNotification — showIncomingCallNotification', () => {
   it('creates the notification channel before displaying, every time it is needed', async () => {
     const { showIncomingCallNotification } = loadModuleWithNotifeeAvailable();
 
-    await showIncomingCallNotification({ callId: 'call-1', callerName: 'A', callType: 'voice' });
+    await showIncomingCallNotification({ callId: 'call-1', conversationId: 'conv-1', callerName: 'A', callType: 'voice' });
 
     expect(mockNotifee.createChannel).toHaveBeenCalledWith(
       expect.objectContaining({ id: 'com.kis.calls.incoming.v2', importance: 4 }),
@@ -89,8 +95,8 @@ describe('incomingCallNotification — showIncomingCallNotification', () => {
   it('does not recreate the channel on a second call within the same process — createChannel is idempotent by design, not re-invoked needlessly', async () => {
     const { showIncomingCallNotification } = loadModuleWithNotifeeAvailable();
 
-    await showIncomingCallNotification({ callId: 'call-1', callerName: 'A', callType: 'voice' });
-    await showIncomingCallNotification({ callId: 'call-2', callerName: 'B', callType: 'voice' });
+    await showIncomingCallNotification({ callId: 'call-1', conversationId: 'conv-1', callerName: 'A', callType: 'voice' });
+    await showIncomingCallNotification({ callId: 'call-2', conversationId: 'conv-1', callerName: 'B', callType: 'voice' });
 
     expect(mockNotifee.createChannel).toHaveBeenCalledTimes(1);
     expect(mockNotifee.displayNotification).toHaveBeenCalledTimes(2);
@@ -99,7 +105,7 @@ describe('incomingCallNotification — showIncomingCallNotification', () => {
   it('labels a video call distinctly from a voice call', async () => {
     const { showIncomingCallNotification } = loadModuleWithNotifeeAvailable();
 
-    await showIncomingCallNotification({ callId: 'call-video', callerName: 'A', callType: 'video' });
+    await showIncomingCallNotification({ callId: 'call-video', conversationId: 'conv-1', callerName: 'A', callType: 'video' });
 
     expect(mockNotifee.displayNotification).toHaveBeenCalledWith(
       expect.objectContaining({ body: 'Incoming video call' }),
@@ -109,7 +115,7 @@ describe('incomingCallNotification — showIncomingCallNotification', () => {
   it('attaches a real sound and vibration to the channel — this notification is now the guaranteed ring source, not Telecom', async () => {
     const { showIncomingCallNotification } = loadModuleWithNotifeeAvailable();
 
-    await showIncomingCallNotification({ callId: 'call-1', callerName: 'A', callType: 'voice' });
+    await showIncomingCallNotification({ callId: 'call-1', conversationId: 'conv-1', callerName: 'A', callType: 'voice' });
 
     const channelArgs = mockNotifee.createChannel.mock.calls[0][0];
     expect(channelArgs.sound).toBe('default');
@@ -119,7 +125,7 @@ describe('incomingCallNotification — showIncomingCallNotification', () => {
   it('loops the sound and only alerts once per notification id — a duplicate FCM delivery for the same call must not restart or stack the ring', async () => {
     const { showIncomingCallNotification } = loadModuleWithNotifeeAvailable();
 
-    await showIncomingCallNotification({ callId: 'call-1', callerName: 'A', callType: 'voice' });
+    await showIncomingCallNotification({ callId: 'call-1', conversationId: 'conv-1', callerName: 'A', callType: 'voice' });
 
     expect(mockNotifee.displayNotification).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -131,7 +137,7 @@ describe('incomingCallNotification — showIncomingCallNotification', () => {
   it('falls back to a call-type-aware title (not a generic "Incoming call") when the caller name is unavailable', async () => {
     const { showIncomingCallNotification } = loadModuleWithNotifeeAvailable();
 
-    await showIncomingCallNotification({ callId: 'call-1', callerName: '', callType: 'video' });
+    await showIncomingCallNotification({ callId: 'call-1', conversationId: 'conv-1', callerName: '', callType: 'video' });
 
     expect(mockNotifee.displayNotification).toHaveBeenCalledWith(
       expect.objectContaining({ title: 'Incoming video call' }),
@@ -141,7 +147,7 @@ describe('incomingCallNotification — showIncomingCallNotification', () => {
   it('carries a timeoutAfter backstop matching the server-side ring-timeout margin, so a missed explicit cancel cannot leave it (and the UI it can relaunch) stuck forever', async () => {
     const { showIncomingCallNotification } = loadModuleWithNotifeeAvailable();
 
-    await showIncomingCallNotification({ callId: 'call-1', callerName: 'A', callType: 'voice' });
+    await showIncomingCallNotification({ callId: 'call-1', conversationId: 'conv-1', callerName: 'A', callType: 'voice' });
 
     expect(mockNotifee.displayNotification).toHaveBeenCalledWith(
       expect.objectContaining({ android: expect.objectContaining({ timeoutAfter: 95_000 }) }),
@@ -151,7 +157,7 @@ describe('incomingCallNotification — showIncomingCallNotification', () => {
   it('returns false without throwing when @notifee/react-native is unavailable', async () => {
     const { showIncomingCallNotification } = loadModuleWithNotifeeUnavailable();
 
-    const shown = await showIncomingCallNotification({ callId: 'call-1', callerName: 'A', callType: 'voice' });
+    const shown = await showIncomingCallNotification({ callId: 'call-1', conversationId: 'conv-1', callerName: 'A', callType: 'voice' });
 
     expect(shown).toBe(false);
   });
@@ -160,7 +166,7 @@ describe('incomingCallNotification — showIncomingCallNotification', () => {
     const { showIncomingCallNotification } = loadModuleWithNotifeeAvailable();
     mockNotifee.displayNotification.mockRejectedValueOnce(new Error('permission denied'));
 
-    const shown = await showIncomingCallNotification({ callId: 'call-1', callerName: 'A', callType: 'voice' });
+    const shown = await showIncomingCallNotification({ callId: 'call-1', conversationId: 'conv-1', callerName: 'A', callType: 'voice' });
 
     expect(shown).toBe(false);
   });

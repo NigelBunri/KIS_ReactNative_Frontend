@@ -233,6 +233,7 @@ export const handleBackgroundPushMessage = async (remoteMessage: any) => {
       // and answer the call.
       const shown = await showIncomingCallNotification({
         callId,
+        conversationId: String(conversationId ?? ''),
         callerName: String(data.callerName ?? data.fromDisplayName ?? title ?? 'Incoming call'),
         callType: callType as any,
       });
@@ -241,6 +242,30 @@ export const handleBackgroundPushMessage = async (remoteMessage: any) => {
         callId,
         callType,
       });
+
+      // Genuine recipient-device acknowledgement, not just "the push
+      // provider accepted the send" — this device has actually registered
+      // the call with the OS and shown the incoming-call notification, so
+      // the caller's "Calling…" can advance to "Ringing…". The live-socket
+      // equivalent (SocketProvider.tsx's `s.emit('call.ringing', ...)`)
+      // can't run here — there is no live socket in this headless,
+      // killed-process push context — so this plain HTTP endpoint is the
+      // one path that CAN reach the server from here. Best-effort: a
+      // failure here only costs the caller a "Ringing…" label, never the
+      // call itself.
+      if (conversationId) {
+        postRequest(ROUTES.calls.ringingAck(callId), { conversation_id: String(conversationId) })
+          .then((res) => {
+            void logCallDiagnostic({
+              stage: res?.success ? 'RINGING_ACK_SENT' : 'RINGING_ACK_FAILED',
+              callId,
+              callType,
+            });
+          })
+          .catch(() => {
+            void logCallDiagnostic({ stage: 'RINGING_ACK_FAILED', callId, callType });
+          });
+      }
       return;
     }
 

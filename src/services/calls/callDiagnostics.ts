@@ -53,6 +53,15 @@ export type CallDiagnosticStage =
   // cancelled at this exact point so the two ring sources never play at
   // once for more than an instant.
   | 'RINGTONE_HANDOFF_TO_INCALL'
+  // Genuine recipient-device acknowledgement sent to the server (POST
+  // /calls/:callId/ringing-ack) from the headless background-push context,
+  // where there is no live socket to emit the equivalent call.ringing
+  // event over. Lets the CALLER's "Calling…" advance to "Ringing…" even
+  // when the recipient was reached purely via push (backgrounded/killed
+  // process). FAILED is best-effort/non-fatal — it only costs the caller
+  // a status label, never the call itself.
+  | 'RINGING_ACK_SENT'
+  | 'RINGING_ACK_FAILED'
   | 'USER_ANSWERED'
   | 'CALL_ENDED';
 

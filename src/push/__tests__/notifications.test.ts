@@ -13,6 +13,9 @@ jest.mock('@/network', () => ({
       deviceTokenRegister: 'https://api.example.com/api/v1/notification-device-tokens/register/',
       deviceTokenUnregister: 'https://api.example.com/api/v1/notification-device-tokens/unregister/',
     },
+    calls: {
+      ringingAck: (callId: string) => `https://nest.example.com/calls/${callId}/ringing-ack`,
+    },
   },
 }));
 
@@ -278,11 +281,12 @@ describe('handleBackgroundPushMessage — incoming_call pipeline', () => {
       mockedDisplayIncomingCall.mockResolvedValue(true);
 
       await handleBackgroundPushMessage({
-        data: { type: 'incoming_call', callId: 'call-123', callerName: 'Jane', callType: 'video' },
+        data: { type: 'incoming_call', callId: 'call-123', conversationId: 'conv-1', callerName: 'Jane', callType: 'video' },
       });
 
       expect(mockedShowIncomingCallNotification).toHaveBeenCalledWith({
         callId: 'call-123',
+        conversationId: 'conv-1',
         callerName: 'Jane',
         callType: 'video',
       });
@@ -292,11 +296,12 @@ describe('handleBackgroundPushMessage — incoming_call pipeline', () => {
       mockedDisplayIncomingCall.mockResolvedValue(false);
 
       await handleBackgroundPushMessage({
-        data: { type: 'incoming_call', callId: 'call-456', callerName: 'Jane', callType: 'voice' },
+        data: { type: 'incoming_call', callId: 'call-456', conversationId: 'conv-1', callerName: 'Jane', callType: 'voice' },
       });
 
       expect(mockedShowIncomingCallNotification).toHaveBeenCalledWith({
         callId: 'call-456',
+        conversationId: 'conv-1',
         callerName: 'Jane',
         callType: 'voice',
       });
@@ -335,6 +340,61 @@ describe('handleBackgroundPushMessage — incoming_call pipeline', () => {
       });
 
       expect(mockedShowIncomingCallNotification).not.toHaveBeenCalled();
+    });
+  });
+
+  // Coverage for the Calling→Ringing device-acknowledgement path that
+  // works even with no live socket at all (fully backgrounded/killed
+  // process, woken only by this FCM push). Mirrors the socket-based
+  // call.ringing event for the one path sockets can't reach.
+  describe('ringing-ack wiring (Calling→Ringing device acknowledgement)', () => {
+    it('POSTs a ringing acknowledgement for the call, with the conversation id', async () => {
+      await handleBackgroundPushMessage({
+        data: { type: 'incoming_call', callId: 'call-123', callType: 'voice', conversationId: 'conv-1' },
+      });
+
+      expect(mockedPostRequest).toHaveBeenCalledWith(
+        'https://nest.example.com/calls/call-123/ringing-ack',
+        { conversation_id: 'conv-1' },
+      );
+    });
+
+    it('does not POST an ack when there is no conversation id to report', async () => {
+      await handleBackgroundPushMessage({
+        data: { type: 'incoming_call', callId: 'call-123', callType: 'voice' },
+      });
+
+      expect(mockedPostRequest).not.toHaveBeenCalledWith(
+        expect.stringContaining('ringing-ack'),
+        expect.anything(),
+      );
+    });
+
+    it('does not POST an ack for a stale push — it never reaches this point', async () => {
+      await handleBackgroundPushMessage({
+        data: {
+          type: 'incoming_call',
+          callId: 'call-stale',
+          callType: 'voice',
+          conversationId: 'conv-1',
+          sentAt: String(Date.now() - 80_000),
+        },
+      });
+
+      expect(mockedPostRequest).not.toHaveBeenCalledWith(
+        expect.stringContaining('ringing-ack'),
+        expect.anything(),
+      );
+    });
+
+    it('a failed ack is best-effort — never throws, never blocks the rest of the handler', async () => {
+      mockedPostRequest.mockRejectedValueOnce(new Error('network down'));
+
+      await expect(
+        handleBackgroundPushMessage({
+          data: { type: 'incoming_call', callId: 'call-123', callType: 'voice', conversationId: 'conv-1' },
+        }),
+      ).resolves.toBeUndefined();
     });
   });
 

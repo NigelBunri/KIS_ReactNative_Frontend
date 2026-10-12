@@ -148,6 +148,25 @@ export function participantsToStrings(participants?: string[] | ParticipantWire[
   return [];
 }
 
+/**
+ * Resolves the USER id a participant wire entry refers to, regardless of
+ * whether `.user` arrived as a full nested object or (per ParticipantWire's
+ * own type — `UserWire | number | string | null`) a bare id. Returns null
+ * when no reliable user identity is available at all (never falls back to
+ * `.id`, which is the participant/membership ROW's own id, a different
+ * namespace entirely — comparing that against a user id can never
+ * correctly detect self and must not be used for exclusion).
+ */
+function participantUserId(p: ParticipantWire): string | null {
+  const u = p?.user;
+  if (u && typeof u === 'object') {
+    const uid = (u as UserWire).id;
+    return uid != null ? String(uid) : null;
+  }
+  if (u != null) return String(u);
+  return null;
+}
+
 export function directConversationName(
   participants: string[] | ParticipantWire[] | undefined,
   currentUserId: string | undefined,
@@ -166,10 +185,24 @@ export function directConversationName(
   if (Array.isArray(participants)) {
     for (const p of participants as ParticipantWire[]) {
       if (!p) continue;
+
+      // Single self-check up front, regardless of whether `.user` arrived
+      // as an object or a bare id — this is the fix for the real bug this
+      // function used to have: when `.user` was a bare id (not an object),
+      // the self-check below it was skipped ENTIRELY (it lived inside the
+      // `typeof u === 'object'` branch), and execution fell straight
+      // through to the unguarded `p.display_name` fallback — which, for
+      // the CURRENT USER'S OWN participant entry, returned the current
+      // user's own name as if they were "the other participant". Since a
+      // conversation's participants array is identical regardless of who
+      // requests it, whichever participant happened to be first in the
+      // array got shown to EVERY viewer, including that participant
+      // themselves — exactly the "both users see the same name" report.
+      const uid = participantUserId(p);
+      if (hasCurrentUser && uid && uid === String(currentUserId)) continue;
+
       const u = (p as ParticipantWire).user;
       if (u && typeof u === 'object') {
-        const uid = String((u as UserWire).id ?? '');
-        if (hasCurrentUser && uid && uid === String(currentUserId)) continue;
         const name =
           (u as UserWire).display_name ??
           (u as UserWire).username ??
@@ -182,6 +215,12 @@ export function directConversationName(
         return name;
       }
 
+      // Participant-row id only, as an absolute last resort when no name
+      // of any kind is available. The real self-exclusion already happened
+      // above via participantUserId — this extra currentUserId comparison
+      // is kept only for parity with the previous behavior (it compares a
+      // different id namespace, so it rarely matches either way, but
+      // removing it isn't necessary to fix the actual bug).
       if ((p as ParticipantWire).id != null && (!hasCurrentUser || String((p as ParticipantWire).id) !== String(currentUserId))) {
         return String((p as ParticipantWire).id);
       }
@@ -201,10 +240,16 @@ export function directConversationAvatar(
   if (Array.isArray(participants)) {
     for (const p of participants as ParticipantWire[]) {
       if (!p) continue;
+
+      // Same fix as directConversationName's self-check above, and for
+      // the same reason: this must run regardless of whether `.user`
+      // arrived as an object or a bare id, or the fallback below can
+      // return the CURRENT user's own avatar as "the other participant's".
+      const uid = participantUserId(p);
+      if (hasCurrentUser && uid && uid === String(currentUserId)) continue;
+
       const u = (p as ParticipantWire).user;
       if (u && typeof u === 'object') {
-        const uid = String((u as UserWire).id ?? '');
-        if (hasCurrentUser && uid && uid === String(currentUserId)) continue;
         const avatar =
           (u as any)?.profile?.avatar_url ??
           (u as any)?.profile?.avatarUrl ??

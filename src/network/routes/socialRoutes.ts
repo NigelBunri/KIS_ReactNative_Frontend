@@ -178,6 +178,8 @@ const socialRoutes = {
     joinByToken: (token: string) => `${NEST_API_BASE_URL}/calls/join/${token}`,
     active: (conversationId: string) => `${NEST_API_BASE_URL}/calls/active?conversationId=${encodeURIComponent(conversationId)}`,
     forConversation: (conversationId: string, limit = 30) => `${NEST_API_BASE_URL}/calls/conversation?conversationId=${encodeURIComponent(conversationId)}&limit=${limit}`,
+    ringingAck: (callId: string) => `${NEST_API_BASE_URL}/calls/${encodeURIComponent(callId)}/ringing-ack`,
+    decline: (callId: string) => `${NEST_API_BASE_URL}/calls/${encodeURIComponent(callId)}/decline`,
   },
   e2ee: {
     conversationKey: (conversationId: string) =>

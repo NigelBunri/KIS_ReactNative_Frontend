@@ -239,6 +239,37 @@ export function decidePendingCallPresentation(args: {
   return { action: 'present' };
 }
 
+/**
+ * Pure resolution of the incoming-call title/caller-name shown to the
+ * RECIPIENT, extracted for unit-testability. Fixes the real root cause of
+ * "both call participants see the same name": `payload.title` is the
+ * CALLER's own call label (startCall()'s `args.title`, set from the
+ * caller's chat-list display name for the conversation — i.e. the
+ * recipient's OWN name, from the caller's point of view). Using it as the
+ * recipient's incoming-call title made the recipient see their own name
+ * reflected back at them. `payload.displayName` is the server-authoritative
+ * field (overridden from the caller's real username server-side for every
+ * call event — see createCallHandler in Nest's realtime/handlers/calls.ts,
+ * never trusted from the client) and is always the CALLER's real identity,
+ * which is what the recipient actually needs to see.
+ *
+ * `title` remains meaningful only for group/broadcast calls, where it is a
+ * legitimately shared room label (not a single person's name) and every
+ * viewer is correctly meant to see the same string.
+ */
+export function resolveIncomingCallTitle(args: {
+  isGroupCall: boolean;
+  payloadTitle?: string | null;
+  payloadDisplayName?: string | null;
+  payloadCallerName?: string | null;
+}): string {
+  const fallback = 'Incoming call';
+  if (args.isGroupCall) {
+    return safeDisplayName(args.payloadTitle ?? args.payloadDisplayName ?? args.payloadCallerName, fallback);
+  }
+  return safeDisplayName(args.payloadDisplayName ?? args.payloadCallerName, fallback);
+}
+
 /* ============================================================================
  * HELPERS
  * ============================================================================ */
@@ -2066,9 +2097,27 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         const rawType = payload?.callType ?? (payload?.media === 'video' ? 'video' : 'voice');
         const callType: CallType = rawType as CallType;
 
+        // `payload.title` is the CALLER's own call label — for a 1:1 call
+        // that's "args.title" from startCall(), which the caller sets to
+        // the OTHER participant's name FROM THE CALLER'S OWN VIEWPOINT
+        // (i.e. the recipient's own name). Using it as the recipient's
+        // incoming-call title was the real root cause of "both users see
+        // the same name": the recipient would show their own name back at
+        // themselves. `payload.displayName` is now authoritative — the
+        // backend overrides it to the caller's real username for every
+        // call event (see createCallHandler in realtime/handlers/calls.ts),
+        // never trusting a client-supplied value — so it's always the
+        // CALLER's actual identity, which is what the recipient needs to
+        // see. `title` remains meaningful only for group/broadcast calls,
+        // where it's a legitimately shared room label, not a person's name.
+        const callerDisplayName = safeDisplayName(
+          payload?.displayName ?? payload?.callerName,
+          'Caller',
+        );
+
         const callerParticipant = makeParticipant({
           userId: fromUserId ?? 'caller',
-          displayName: safeDisplayName(payload?.callerName ?? payload?.title, 'Caller'),
+          displayName: callerDisplayName,
           role: 'host',
         });
 
@@ -2076,11 +2125,18 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         // 1:1 voice/video go straight to the incoming ring screen.
         const useLobby = isGroupCall(callType);
 
+        const incomingTitle = resolveIncomingCallTitle({
+          isGroupCall: isGroupCall(callType),
+          payloadTitle: payload?.title,
+          payloadDisplayName: payload?.displayName,
+          payloadCallerName: payload?.callerName,
+        });
+
         const session: CallSession = {
           callId,
           conversationId,
           callType,
-          title: safeDisplayName(payload?.title ?? payload?.callerName, 'Incoming call'),
+          title: incomingTitle,
           state: useLobby ? 'lobby' : 'incoming',
           participants: [callerParticipant],
           localUserId: myUserId ?? '',
