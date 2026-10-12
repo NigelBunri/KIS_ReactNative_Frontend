@@ -5,6 +5,7 @@ import {
   Animated,
   Easing,
   Modal,
+  Platform,
   Pressable,
   StatusBar,
   StyleSheet,
@@ -16,6 +17,8 @@ import {
 import type { CallSession } from '@/services/calls/callTypes';
 import { callTypeLabel, callTypeIcon } from '@/services/calls/callTypes';
 import { audioRouteManager } from '@/services/calls/audioRouteManager';
+import { cancelIncomingCallNotification } from '@/services/calls/incomingCallNotification';
+import { logCallDiagnostic } from '@/services/calls/callDiagnostics';
 import { KISIcon } from '@/constants/kisIcons';
 import { SafeAreaView } from '@/components/common/SafeAreaViewWithTopPadding';
 import { useKISTheme } from '@/theme/useTheme';
@@ -62,6 +65,29 @@ export default function IncomingCallScreen({ session, onAnswer, onDecline }: Pro
     if (!session) return;
     Vibration.vibrate(VIBRATE_PATTERN, true);
     audioRouteManager.startRingtone();
+
+    // Android only: the background/killed-state push path's own notification
+    // (see incomingCallNotification.ts) rings on its own, guaranteed, the
+    // instant the push lands — independent of whether this screen has
+    // mounted yet. Once it HAS mounted, audioRouteManager above is the
+    // richer ring owner (proper earpiece/speaker audio routing, already
+    // correctly stopped on every unmount path below) — cancel the
+    // notification's own sound immediately so the two don't both play at
+    // once. Safe even if the user backgrounds this still-ringing screen
+    // again afterward: the call's pending-payload state (separate from this
+    // notification) is what last round's foreground-resume fix uses to
+    // bring the screen back, not the notification's continued existence.
+    // A no-op for a call that arrived via the live socket path with no
+    // background notification ever shown (cancelling a nonexistent
+    // notification id is a harmless no-op).
+    if (Platform.OS === 'android') {
+      void cancelIncomingCallNotification(session.callId);
+      void logCallDiagnostic({
+        stage: 'RINGTONE_HANDOFF_TO_INCALL',
+        callId: session.callId,
+        callType: session.callType,
+      });
+    }
 
     const ringLoop = (anim: Animated.Value, delay: number) =>
       Animated.loop(

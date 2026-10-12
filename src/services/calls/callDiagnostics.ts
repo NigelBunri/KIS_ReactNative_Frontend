@@ -47,6 +47,12 @@ export type CallDiagnosticStage =
   // for that call.
   | 'FULLSCREEN_NOTIFICATION_SHOWN'
   | 'FULLSCREEN_NOTIFICATION_FAILED'
+  // IncomingCallScreen has mounted and taken over ringing via
+  // audioRouteManager (richer, properly-routed audio) — the background
+  // notification's own looping sound (see incomingCallNotification.ts) is
+  // cancelled at this exact point so the two ring sources never play at
+  // once for more than an instant.
+  | 'RINGTONE_HANDOFF_TO_INCALL'
   | 'USER_ANSWERED'
   | 'CALL_ENDED';
 

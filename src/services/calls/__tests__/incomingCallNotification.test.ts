@@ -13,6 +13,15 @@
 // trail (react-native-callkeep's actual native source,
 // VoiceConnectionService.java / RNCallKeepModule.java).
 //
+// This notification was originally built silent on the theory that
+// Telecom's own Ringer supplied ring audio. Physical-device testing
+// disproved that (react-native-callkeep's native Android source contains
+// no ringtone-playing code at all) — the notification showed with no
+// audible ring. This file's own channel sound is now the guaranteed ring
+// source instead; see the module's top-of-file comment for the full
+// evidence trail and the channel-migration reasoning (channels are
+// immutable post-creation, hence the new ".v2" channel id).
+//
 // Each test resets modules and re-mocks @notifee/react-native fresh,
 // since the module under test caches its channel-creation promise at
 // module scope (deliberately — see ensureChannel's own comment on why
@@ -73,7 +82,7 @@ describe('incomingCallNotification — showIncomingCallNotification', () => {
     await showIncomingCallNotification({ callId: 'call-1', callerName: 'A', callType: 'voice' });
 
     expect(mockNotifee.createChannel).toHaveBeenCalledWith(
-      expect.objectContaining({ id: 'com.kis.calls.incoming', importance: 4 }),
+      expect.objectContaining({ id: 'com.kis.calls.incoming.v2', importance: 4 }),
     );
   });
 
@@ -97,14 +106,36 @@ describe('incomingCallNotification — showIncomingCallNotification', () => {
     );
   });
 
-  it('does not attach a sound/vibration of its own — Telecom already owns the ring, a second sound source would double-ring', async () => {
+  it('attaches a real sound and vibration to the channel — this notification is now the guaranteed ring source, not Telecom', async () => {
     const { showIncomingCallNotification } = loadModuleWithNotifeeAvailable();
 
     await showIncomingCallNotification({ callId: 'call-1', callerName: 'A', callType: 'voice' });
 
     const channelArgs = mockNotifee.createChannel.mock.calls[0][0];
-    expect(channelArgs.sound).toBeUndefined();
-    expect(channelArgs.vibration).toBe(false);
+    expect(channelArgs.sound).toBe('default');
+    expect(channelArgs.vibration).toBe(true);
+  });
+
+  it('loops the sound and only alerts once per notification id — a duplicate FCM delivery for the same call must not restart or stack the ring', async () => {
+    const { showIncomingCallNotification } = loadModuleWithNotifeeAvailable();
+
+    await showIncomingCallNotification({ callId: 'call-1', callerName: 'A', callType: 'voice' });
+
+    expect(mockNotifee.displayNotification).toHaveBeenCalledWith(
+      expect.objectContaining({
+        android: expect.objectContaining({ loopSound: true, onlyAlertOnce: true }),
+      }),
+    );
+  });
+
+  it('falls back to a call-type-aware title (not a generic "Incoming call") when the caller name is unavailable', async () => {
+    const { showIncomingCallNotification } = loadModuleWithNotifeeAvailable();
+
+    await showIncomingCallNotification({ callId: 'call-1', callerName: '', callType: 'video' });
+
+    expect(mockNotifee.displayNotification).toHaveBeenCalledWith(
+      expect.objectContaining({ title: 'Incoming video call' }),
+    );
   });
 
   it('carries a timeoutAfter backstop matching the server-side ring-timeout margin, so a missed explicit cancel cannot leave it (and the UI it can relaunch) stuck forever', async () => {
