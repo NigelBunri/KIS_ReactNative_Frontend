@@ -203,12 +203,17 @@ import {
   MarketplaceOrdersSummary,
   PartnerOrganizationSummary,
   ProfileHeroCard,
+  ProfileSnapshotCard,
+  type ProfileSnapshotTile,
   QuickActionGrid,
   RecentActivityTimeline,
   WalletSummaryCard,
   WorkspaceLauncherSection,
 } from './profile/components/dashboard';
-import { createProfileDashboardTheme } from './profile/profileDashboardTheme';
+import {
+  createProfileDashboardTheme,
+  getProfileDashboardCardStyle,
+} from './profile/profileDashboardTheme';
 import {
   buildImpactSnapshotStats,
   buildRecentActivityItems,
@@ -2098,6 +2103,52 @@ export default function ProfileScreen() {
     [recentMarketplaceOrders],
   );
 
+  const snapshotTiles: ProfileSnapshotTile[] = useMemo(
+    () => [
+      {
+        key: 'wallet',
+        label: 'Wallet & rewards',
+        value: `${points} pts`,
+        icon: 'card',
+        tone: 'primary',
+        onPress: () => setActiveProfileTab('wallet'),
+      },
+      {
+        key: 'business',
+        label: 'Business',
+        value:
+          partnerProfiles.length > 0
+            ? `${partnerProfiles.length} org${partnerProfiles.length > 1 ? 's' : ''}`
+            : 'Get started',
+        icon: 'briefcase',
+        tone: partnerProfiles.length > 0 ? 'success' : 'primary',
+        onPress: () => setActiveProfileTab('business'),
+      },
+      {
+        key: 'orders',
+        label: 'Open orders',
+        value: marketplaceOrderSummary.pending,
+        icon: 'card',
+        tone: marketplaceOrderSummary.pending > 0 ? 'warning' : 'success',
+        onPress: () => setActiveProfileTab('wallet'),
+      },
+      {
+        key: 'account',
+        label: 'Account & security',
+        value: userVerificationSummary?.verified ? 'Verified' : 'Action needed',
+        icon: 'shield',
+        tone: userVerificationSummary?.verified ? 'success' : 'warning',
+        onPress: () => setActiveProfileTab('account'),
+      },
+    ],
+    [
+      points,
+      partnerProfiles.length,
+      marketplaceOrderSummary.pending,
+      userVerificationSummary?.verified,
+    ],
+  );
+
   const workspaceLaunchers = useMemo(
     () =>
       BROADCAST_PROFILE_DEFINITIONS.map(def => {
@@ -2545,29 +2596,33 @@ export default function ProfileScreen() {
                 display: activeProfileTab === 'overview' ? 'flex' : 'none',
               }}
             >
+              <ProfileSnapshotCard tiles={snapshotTiles} />
+
               <View
                 style={[
                   styles.card,
-                  {
-                    backgroundColor: palette.surfaceElevated,
-                    borderColor: palette.borderMuted,
-                    borderWidth: 1,
-                    borderRadius: compactProfile ? 18 : 24,
-                    shadowColor: palette.shadow,
-                    shadowOpacity: dashboardTheme.isDark ? 0.22 : 0.08,
-                    shadowRadius: dashboardTheme.isDark ? 22 : 14,
-                    shadowOffset: {
-                      width: 0,
-                      height: dashboardTheme.isDark ? 14 : 8,
-                    },
-                    elevation: dashboardTheme.isDark ? 8 : 4,
-                  },
+                  getProfileDashboardCardStyle(dashboardTheme, 'dashboard'),
+                  { borderRadius: compactProfile ? 18 : 24 },
                 ]}
               >
                 <View style={[styles.headerRow, compactProfile && styles.wrapRow]}>
-                  <Text style={[styles.title, { color: palette.text }]}>
-                    Profile overview
-                  </Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
+                    <View
+                      style={{
+                        width: 36,
+                        height: 36,
+                        borderRadius: 12,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        backgroundColor: palette.primarySoft,
+                      }}
+                    >
+                      <KISIcon name="person" size={17} color={palette.primaryStrong} />
+                    </View>
+                    <Text style={[dashboardTheme.sectionHeader.title, { color: palette.text }]}>
+                      Profile overview
+                    </Text>
+                  </View>
                   <Text style={[styles.subtext, { color: palette.subtext }]}>
                     {c.profile.profile?.industry || 'Industry not set'}
                   </Text>

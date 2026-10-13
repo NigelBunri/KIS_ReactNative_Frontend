@@ -193,7 +193,7 @@ export default function LiveWatchPage() {
   // left-35% even after rotating to landscape, clustering reactions in a
   // now-stale, too-narrow band instead of spreading across the actual
   // current width.
-  const { width: SCREEN_W } = useWindowDimensions();
+  const { width: SCREEN_W, height: SCREEN_H } = useWindowDimensions();
   const { isTablet } = useResponsiveLayout();
   // The chat/polls/Q&A side panel was hardcoded to 230pt regardless of
   // screen size - not broken on tablet (the video is still full-bleed,
@@ -230,6 +230,23 @@ export default function LiveWatchPage() {
   const [superChatOpen, setSuperChatOpen] = useState(false);
   const [controlsVisible, setControlsVisible] = useState(true);
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // playPauseCenter (the invisible full-screen tap-to-pause Pressable
+  // rendered below) used to span the entire screen via top/left/right/
+  // bottom: 0, which put it directly over topOverlay's back button and
+  // the real Share/Super Chat/Subscribe/reactions buttons in rightActions
+  // and bottomOverlay — the exact "full-span invisible tap zone wins the
+  // touch over real controls on real devices" bug confirmed in
+  // UpdatesTab.tsx's Status viewer, even though those buttons paint on top
+  // (they're later siblings, same as the already-fixed case). Measuring
+  // each real overlay's actual on-screen position and clamping
+  // playPauseCenter's span to the gap between them fixes it the same way.
+  // All four views share the same parent (styles.root), so each onLayout's
+  // `y` is directly comparable. Defaults are conservative guesses used
+  // only until the real onLayout measurements land.
+  const [topOverlayBottom, setTopOverlayBottom] = useState(90);
+  const [rightActionsTop, setRightActionsTop] = useState(SCREEN_H);
+  const [bottomOverlayTop, setBottomOverlayTop] = useState(SCREEN_H);
 
   const playbackUrl = useMemo(() => {
     if (stream?.status === 'live') return stream.playback_url ?? null;
@@ -382,6 +399,7 @@ export default function LiveWatchPage() {
           { opacity: controlsVisible ? 1 : 0 },
         ]}
         pointerEvents={controlsVisible ? 'box-none' : 'none'}
+        onLayout={(e) => setTopOverlayBottom(e.nativeEvent.layout.y + e.nativeEvent.layout.height)}
       >
         <LinearGradient
           colors={['rgba(0,0,0,0.65)', 'transparent']}
@@ -442,7 +460,13 @@ export default function LiveWatchPage() {
       {/* ── Play/Pause center tap (live only) ── */}
       {playbackUrl && controlsVisible && (
         <Pressable
-          style={styles.playPauseCenter}
+          style={[
+            styles.playPauseCenter,
+            {
+              top: topOverlayBottom,
+              height: Math.max(0, Math.min(rightActionsTop, bottomOverlayTop) - topOverlayBottom),
+            },
+          ]}
           onPress={() => { setPaused(p => !p); showControls(); }}
           hitSlop={20}
           accessibilityRole="button"
@@ -463,6 +487,7 @@ export default function LiveWatchPage() {
           { bottom: insets.bottom + 90 },
         ]}
         pointerEvents="box-none"
+        onLayout={(e) => setRightActionsTop(e.nativeEvent.layout.y)}
       >
         <Pressable style={styles.actionBtn} onPress={handleShare} accessibilityRole="button" accessibilityLabel="Share stream">
           <KISIcon name="share" size={22} color={palette.ivory} />
@@ -483,6 +508,7 @@ export default function LiveWatchPage() {
           { paddingBottom: insets.bottom + 10, right: chatPanelWidth },
         ]}
         pointerEvents="box-none"
+        onLayout={(e) => setBottomOverlayTop(e.nativeEvent.layout.y)}
       >
         <LinearGradient
           colors={['transparent', 'rgba(0,0,0,0.72)']}

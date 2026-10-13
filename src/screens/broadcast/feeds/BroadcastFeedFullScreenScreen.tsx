@@ -13,6 +13,7 @@ import {
   ActivityIndicator,
   FlatList,
   Image,
+  LayoutChangeEvent,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -138,6 +139,22 @@ function FeedFullScreenCard({
     setTimeout(() => setShowHeart(false), 800);
   }, [item, onLike]);
 
+  // Same cross-component gap as ShortsScreen.tsx's ShortCard (see its
+  // infoRowTop doc): BroadcastFeedVideoPreview's internal tap-zones only
+  // clamp against ITS OWN internal progress bar, not infoRow's real
+  // avatar/like/comment/share/save/full-view buttons rendered below as an
+  // external sibling — which that near-full-height span otherwise sits
+  // directly under. infoRow and the `card` View it measures against (via
+  // its own onLayout `y`) share the same parent, and rotateOuter below
+  // (what the video actually sizes itself to) matches `card`'s own box
+  // exactly whenever not rotated (True Full View, which hides infoRow
+  // entirely, is the only time they'd differ). Default is a conservative
+  // guess until the real measurement lands.
+  const [infoRowTop, setInfoRowTop] = useState(screenHeight - 260);
+  const handleInfoRowLayout = (e: LayoutChangeEvent) => {
+    setInfoRowTop(e.nativeEvent.layout.y);
+  };
+
   const isUserSource = isUserBroadcastSource(item as any);
   const authorName = String(item.author?.display_name ?? '').trim();
   const sourceName = item.source?.name || (item.source?.type ? String(item.source.type) : '');
@@ -170,6 +187,7 @@ function FeedFullScreenCard({
           progressBarOnly
           progressBarStyle={{ position: 'absolute', left: 12, right: 12, bottom: bottomInset + 4 }}
           onDoubleTapMiddle={handleDoubleTapLike}
+          tapZoneBoundaryBottom={infoRowTop}
         />
       ) : activeAttachment?.previewUri || activeAttachment?.url ? (
         <>
@@ -244,7 +262,10 @@ function FeedFullScreenCard({
       ) : (
         <>
           {/* ── Bottom-left caption ─────────────────────────────────── */}
-          <View style={[styles.infoRow, { bottom: Math.max(60, bottomInset + 20) }]}>
+          <View
+            style={[styles.infoRow, { bottom: Math.max(60, bottomInset + 20) }]}
+            onLayout={handleInfoRowLayout}
+          >
             <View style={styles.metaCol}>
               {displayName ? (
                 <Text style={[styles.channelName, { color: palette.ivory }]} numberOfLines={1}>

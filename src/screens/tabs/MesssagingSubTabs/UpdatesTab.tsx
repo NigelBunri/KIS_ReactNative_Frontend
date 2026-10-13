@@ -50,6 +50,7 @@ import LinearGradient from 'react-native-linear-gradient';
 import DocumentPicker from 'react-native-document-picker';
 import Pdf from 'react-native-pdf';
 import { useRawTopInset } from '@/hooks/useSafeTopInset';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { ScrollableHandle } from '@/hooks/useHeaderDragToScroll';
 
 type StatusVisibility = 'contacts' | 'contacts_except' | 'only_share_with';
@@ -337,6 +338,22 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
   // full inset here was pure dead space between the tab bar and this
   // screen's content (ChatsTab, the sibling tab, has none either).
   const viewerTopInset = useRawTopInset();
+  // Real bottom safe-area inset (home indicator / Android gesture nav bar).
+  // The reaction row, reply input, and "seen by" row below the media were
+  // previously flush against the literal bottom of the screen with no
+  // allowance for it at all - on any device with a gesture nav bar or home
+  // indicator, the system's own controls sat directly over them, making the
+  // reply input and reactions unreachable.
+  const viewerBottomInset = useSafeAreaInsets().bottom;
+  // Measured height of whichever footer row (reaction+reply, or seen-by) is
+  // actually on screen, so the two full-height tap-to-advance zones below
+  // can stop short of it instead of overlapping it. They previously spanned
+  // the full height of the viewer, including the reaction/reply footer, and
+  // intercepted the touch before a reaction button or the reply input ever
+  // saw it - world-standard story viewers (WhatsApp, Instagram) deliberately
+  // stop their tap-to-advance zones above this same footer for the same
+  // reason. Defaults to a sane minimum before the first real measurement.
+  const [viewerFooterHeight, setViewerFooterHeight] = useState(72);
   const scrollRef = useRef<ScrollView>(null);
   useImperativeHandle(ref, () => ({
     scrollTo: (opts) => scrollRef.current?.scrollTo(opts),
@@ -3203,12 +3220,12 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
             </Pressable>
           ) : null}
           <Pressable
-            style={styles.viewerTapZone}
+            style={[styles.viewerTapZone, { bottom: viewerFooterHeight }]}
             onPressIn={handleTapHoldStart}
             onPressOut={() => handleTapHoldEnd(handlePrev)}
           />
           <Pressable
-            style={[styles.viewerTapZone, { left: '50%' }]}
+            style={[styles.viewerTapZone, { left: '50%', bottom: viewerFooterHeight }]}
             onPressIn={handleTapHoldStart}
             onPressOut={() => handleTapHoldEnd(handleNext)}
           />
@@ -3390,6 +3407,19 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
             </View>
           )}
 
+          {/* Single wrapper around every bottom control (reactions, reply
+              input, seen-by row) so its real rendered height - whichever
+              one of the three is actually showing - can be measured once
+              and used to keep the tap-to-advance zones above from
+              overlapping it (see viewerFooterHeight). paddingBottom here is
+              the real device safe-area inset, not a guess - these controls
+              were previously flush against the literal screen edge with no
+              allowance for the home indicator or Android's gesture nav
+              bar, which sat directly on top of them. */}
+          <View
+            onLayout={e => setViewerFooterHeight(e.nativeEvent.layout.height)}
+            style={{ paddingBottom: viewerBottomInset || 12 }}
+          >
           {/* Heart/emoji quick-reactions - each one sends the same way a
               typed reply does (see handleSendReaction), so it lands in the
               chat room exactly like a reply would. */}
@@ -3471,6 +3501,7 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
               </Text>
             </Pressable>
           )}
+          </View>
         </Animated.View>
       </Modal>
 

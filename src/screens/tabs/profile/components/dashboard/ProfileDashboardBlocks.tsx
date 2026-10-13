@@ -401,6 +401,38 @@ export const ProfileHeroCard = ({
                 clips the image, so the edit badge (positioned partly outside
                 the circle) doesn't get clipped along with it. */}
             <View style={{ width: bigAvatarSize, height: bigAvatarSize }}>
+              {/* Gold halo + gradient ring — purely decorative, sits behind
+                  the clipped avatar circle (which keeps its own cream
+                  border), giving the avatar the "lit from behind" weight a
+                  luxury-gold profile picture should have instead of just
+                  floating flat on the cover backdrop. */}
+              <View
+                pointerEvents="none"
+                style={{
+                  position: 'absolute',
+                  top: -8,
+                  left: -8,
+                  right: -8,
+                  bottom: -8,
+                  borderRadius: (bigAvatarSize + 16) / 2,
+                  backgroundColor: palette.gold,
+                  opacity: isDark ? 0.32 : 0.24,
+                }}
+              />
+              <LinearGradient
+                pointerEvents="none"
+                colors={[palette.goldHighlight ?? palette.gold, palette.goldDeep ?? palette.primaryStrong]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={{
+                  position: 'absolute',
+                  top: -3,
+                  left: -3,
+                  right: -3,
+                  bottom: -3,
+                  borderRadius: (bigAvatarSize + 6) / 2,
+                }}
+              />
               <View style={[dashboardStyles.bigAvatarWrap, { width: bigAvatarSize, height: bigAvatarSize, borderRadius: bigAvatarSize / 2 }]}>
                 {avatarUrl ? (
                   <Image source={{ uri: avatarUrl }} style={StyleSheet.absoluteFillObject as any} resizeMode="cover" />
@@ -554,6 +586,67 @@ export const ProfileHeroCard = ({
         </Pressable>
       </Animated.View>
     </View>
+  );
+};
+
+export type ProfileSnapshotTile = {
+  key: string;
+  label: string;
+  value: string | number;
+  icon?: KISIconName;
+  tone?: 'primary' | 'success' | 'warning' | 'info';
+  onPress?: () => void;
+};
+
+// "At a glance" jump-tiles — surfaces the one or two numbers that matter most
+// from each of the other profile tabs (wallet, business, account) directly on
+// Overview, so the user doesn't have to tap into a tab just to see whether
+// there's anything there worth looking at. Each tile IS the navigation, same
+// as tapping the tab itself, so this never becomes a second source of truth.
+export const ProfileSnapshotCard = ({
+  title = 'At a glance',
+  tiles,
+}: {
+  title?: string;
+  tiles: ProfileSnapshotTile[];
+}) => {
+  const { palette, dashboardTheme } = useDashboardTheme();
+  return (
+    <DashboardCard>
+      <SectionHeader title={title} />
+      <View style={dashboardStyles.statGrid}>
+        {tiles.map((tile) => {
+          const toneColors = resolveToneColors(tile.tone, dashboardTheme, palette);
+          return (
+            <Pressable
+              key={tile.key}
+              onPress={tile.onPress}
+              disabled={!tile.onPress}
+              accessibilityRole={tile.onPress ? 'button' : undefined}
+              accessibilityLabel={`${tile.label}: ${tile.value}`}
+              style={[dashboardStyles.statCard, getProfileDashboardCardStyle(dashboardTheme, 'stat')]}
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                {tile.icon ? (
+                  <View style={[dashboardStyles.statIconWrap, { backgroundColor: toneColors.bg }]}>
+                    <KISIcon name={tile.icon} size={18} color={toneColors.color} />
+                  </View>
+                ) : null}
+                {tile.onPress ? (
+                  <KISIcon name="chevron-right" size={14} color={palette.subtext} />
+                ) : null}
+              </View>
+              <Text style={dashboardTheme.content.meta} numberOfLines={1}>
+                {tile.label}
+              </Text>
+              <Text style={[dashboardTheme.content.heading, { fontSize: 22 }]} numberOfLines={1}>
+                {tile.value}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+    </DashboardCard>
   );
 };
 

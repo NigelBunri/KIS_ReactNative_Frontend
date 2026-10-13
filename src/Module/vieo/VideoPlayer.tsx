@@ -3,6 +3,7 @@ import {
   Animated,
   ActivityIndicator,
   Image,
+  LayoutChangeEvent,
   Linking,
   Pressable,
   StyleSheet,
@@ -92,6 +93,28 @@ export type VideoPlayerProps = {
   // only if playback was actually running at the moment it was forced off
   // — never resumes a video the user had already paused themselves.
   externalPause?: boolean;
+  // footerTop (see its declaration below) only clamps the invisible
+  // left/middle/right tap-zones against THIS component's own internal
+  // VideoControls/VideoProgressBar — it has no idea a caller like
+  // ShortsScreen.tsx, BroadcastDetailScreen.tsx, or
+  // BroadcastFeedFullScreenScreen.tsx has placed this whole player
+  // full-bleed (containerStyle={StyleSheet.absoluteFillObject}) behind its
+  // OWN real caption/like/comment/share column rendered as an external
+  // sibling outside this component entirely. That column sits well inside
+  // footerTop's old near-full-screen span (footerTop only clears this
+  // component's own tiny progress bar near the very bottom edge), so the
+  // exact same "full-span invisible tap zone wins the touch over real
+  // controls on real devices" bug already fixed inside this file (see
+  // footerTop's comment) and in LiveWatchPage.tsx/
+  // ChannelContentDetailPage.tsx reproduces across that component
+  // boundary too. These two props let such a caller pass in its OWN
+  // onLayout-measured boundary — in the SAME coordinate space as this
+  // component's own absoluteFillObject container, since every caller that
+  // needs this also gives this component that exact full-bleed sizing —
+  // to further clamp the tap-zones from either edge. Omit (undefined) for
+  // every other caller; the internal-only clamp behaves exactly as before.
+  tapZoneBoundaryTop?: number;
+  tapZoneBoundaryBottom?: number;
 };
 
 export default function VideoPlayer({
@@ -119,6 +142,8 @@ export default function VideoPlayer({
   chapters,
   forceTextureView = false,
   externalPause = false,
+  tapZoneBoundaryTop,
+  tapZoneBoundaryBottom,
 }: VideoPlayerProps) {
   const { palette } = useKISTheme();
   // See containerAspectFallback's comment above `styles` - only fall back to
@@ -197,6 +222,39 @@ export default function VideoPlayer({
   const rightSeekAnim = useRef(new Animated.Value(0)).current;
   const lastLeftTap = useRef(0);
   const lastRightTap = useRef(0);
+  // How far down the invisible tap-zones (left/middle/right, below) may
+  // extend before they'd start overlapping VideoControls/VideoProgressBar's
+  // real buttons and slider. Measured from that panel's own onLayout (its
+  // `y` is already relative to this same container, since both are
+  // position:absolute siblings here) rather than left at the zones' old
+  // full-height span — a full-height invisible Pressable sitting over a row
+  // of real buttons intercepted/won the touch on real devices (confirmed on
+  // Android in the Status viewer, UpdatesTab.tsx) even though the buttons
+  // painted on top and had a nominally higher position in the tree.
+  // Defaults to a conservative estimate of each panel's typical height
+  // until the first real measurement lands, so there's no frame where the
+  // zones cover the full player before onLayout fires.
+  const [measuredFooterTop, setMeasuredFooterTop] = useState<number | null>(null);
+  const handleFooterLayout = (e: LayoutChangeEvent) => {
+    setMeasuredFooterTop(e.nativeEvent.layout.y);
+  };
+  // VideoControls (time/settings/slider/play/mute/speed) is visually taller
+  // than VideoProgressBar (just the scrubber), so each gets its own rough
+  // estimate to use for this one render before the real onLayout lands.
+  const footerTop = measuredFooterTop ?? (progressBarOnly ? 60 : 130);
+  // Further clamps footerTop against an external caller's own measured
+  // control bounds — see tapZoneBoundaryTop/tapZoneBoundaryBottom's
+  // declaration above. tapZoneHasBottomLimit stays true whenever
+  // showControls already established an internal limit OR a caller passed
+  // its own, so the height style below only omits a height (falling back
+  // to the full remaining span via absoluteFillObject's bottom:0) when
+  // truly nothing should be clamped.
+  const tapZoneTop = tapZoneBoundaryTop ?? 0;
+  const tapZoneHasBottomLimit = showControls || tapZoneBoundaryBottom != null;
+  const tapZoneBottomLimit = Math.min(
+    showControls ? footerTop : Number.POSITIVE_INFINITY,
+    tapZoneBoundaryBottom ?? Number.POSITIVE_INFINITY,
+  );
   // Pending play/pause toggle from a tap on the left/right zone that
   // hasn't (yet) turned out to be the first half of a double-tap seek -
   // see handleLeftTap/handleRightTap below. Cleared instead of fired if a
@@ -509,12 +567,25 @@ export default function VideoPlayer({
           </Pressable>
         </View>
       ) : null}
-      {/* Tap zones — sits below controls in z-order. Left/right: single tap
-          toggles play/pause (delayed - see handleLeftTap/handleRightTap),
-          double tap seeks ±10s. Middle: single tap toggles play/pause
-          immediately, no double-tap gesture of its own. */}
+      {/* Tap zones. Left/right: single tap toggles play/pause (delayed -
+          see handleLeftTap/handleRightTap), double tap seeks ±10s. Middle:
+          single tap toggles play/pause immediately, no double-tap gesture
+          of its own. Stops at footerTop (see its declaration above) instead
+          of spanning the full player height — painting "below" the real
+          controls in z-order doesn't reliably stop these Pressables from
+          winning the touch over them on real devices, so the fix is to
+          shrink the zone's actual bounds, not rely on z-order/zIndex. */}
       {!state.error && (
-        <View style={StyleSheet.absoluteFillObject} pointerEvents="box-none">
+        <View
+          style={[
+            StyleSheet.absoluteFillObject,
+            tapZoneTop ? { top: tapZoneTop } : null,
+            tapZoneHasBottomLimit
+              ? { height: Math.max(0, tapZoneBottomLimit - tapZoneTop) }
+              : null,
+          ]}
+          pointerEvents="box-none"
+        >
           <View style={{ flexDirection: 'row', flex: 1 }}>
             <Pressable style={{ flex: 0.3, height: '100%' }} onPress={handleLeftTap} />
             <Pressable style={{ flex: 0.4, height: '100%' }} onPress={handleMiddleTap} />
@@ -540,6 +611,7 @@ export default function VideoPlayer({
             actions={actions}
             onSeekComplete={actions.seekTo}
             style={progressBarStyle}
+            onLayout={handleFooterLayout}
           />
         ) : (
           <VideoControls
@@ -550,6 +622,7 @@ export default function VideoPlayer({
             chapters={chapters}
             enablePip={enablePip || pictureInPicture}
             onPipPress={handlePipPress}
+            onLayout={handleFooterLayout}
           />
         )
       )}

@@ -64,6 +64,56 @@ export const withAlpha = (hex: string, alpha: number): string => {
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 };
 
+// WCAG relative luminance / contrast ratio - used below to guarantee a
+// "dark enough to pair with white text/icons" color actually IS dark
+// enough, rather than trusting a single fixed shade() percentage to work
+// for every possible accent hue/lightness.
+const relativeLuminance = (hex: string): number => {
+  const [r, g, b] = hexToRgbChannels(hex).map((c) => {
+    const v = c / 255;
+    return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
+  });
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+};
+const contrastRatio = (hexA: string, hexB: string): number => {
+  const lA = relativeLuminance(hexA);
+  const lB = relativeLuminance(hexB);
+  const lighter = Math.max(lA, lB);
+  const darker = Math.min(lA, lB);
+  return (lighter + 0.05) / (darker + 0.05);
+};
+
+/**
+ * shade(hex, amount) toward black, but guaranteed to keep darkening past
+ * `amount` until the result reaches at least `minContrastVsWhite` against
+ * white (WCAG AA's 4.5:1 by default). A fixed darken percentage looks
+ * right for mid/dark accent hues but silently fails for light/pastel ones
+ * - e.g. shade('#74C0FC', -0.1) (a light-blue accent's near-raw gradient
+ * stop) is only ~2.4:1 against white, well under the ~4.5:1 forced-white
+ * text/icons actually need to stay legible. Every real consumer of
+ * getAccentGradients().tabSelected below pairs it with white or
+ * near-white foreground content (selected tab icons, KISFab, KISButton's
+ * primary variant, Sidebar/BroadcastMainTabs pills), so guaranteeing the
+ * contrast here - once, at the source - fixes all of them instead of each
+ * consumer needing its own clamp.
+ */
+const darkenForContrast = (
+  hex: string,
+  amount: number,
+  minContrastVsWhite = 4.5,
+): string => {
+  let result = shade(hex, Math.min(0, amount));
+  let step = Math.max(0, Math.abs(amount));
+  // Keep pushing darker in fixed increments past the requested amount
+  // until the floor is met or we've hit full black (no infinite loop risk
+  // either way).
+  while (contrastRatio(result, '#FFFFFF') < minContrastVsWhite && step < 1) {
+    step += 0.1;
+    result = shade(hex, -step);
+  }
+  return result;
+};
+
 export const KIS_COLORS = {
   brand: {
     // Royal gold is a metallic range, not a single flat color.
@@ -644,8 +694,25 @@ export const getAccentGradients = (tone: KISTone, accentId: string = DEFAULT_THE
   const p = accent.primary;
   return {
     header: [p, shade(p, -0.25), shade(p, -0.45), shade(p, -0.65)],
+    // The 'dark' branch is specifically the one every real consumer pairs
+    // with white/near-white foreground content (KISButton's primary
+    // variant always forces this branch regardless of the app's actual
+    // tone - see its own comment - plus KISFab, Sidebar, and
+    // BroadcastMainTabs's selected-pill treatment) - so each of its 4
+    // stops is darkenForContrast()-guaranteed rather than a fixed shade()
+    // percentage that silently under-darkens light/pastel accent choices
+    // (e.g. a light-blue or pale-yellow accent previously left white text
+    // at ~2:1 contrast, well under WCAG's 4.5:1, on the gradient's
+    // lightest stop). The 'light' branch isn't touched here - it's paired
+    // with its own tone-appropriate foreground elsewhere, not confirmed to
+    // need the same guarantee.
     tabSelected: tone === 'dark'
-      ? [shade(p, -0.65), shade(p, -0.35), shade(p, -0.1), shade(p, -0.55)]
+      ? [
+          darkenForContrast(p, -0.65),
+          darkenForContrast(p, -0.35),
+          darkenForContrast(p, -0.1),
+          darkenForContrast(p, -0.55),
+        ]
       : [shade(p, 0.55), shade(p, 0.15), p, shade(p, -0.4)],
   };
 };

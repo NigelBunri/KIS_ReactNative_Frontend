@@ -124,6 +124,16 @@ function VideoPlayerControls({
   const [qualityModal, setQualityModal] = useState(false);
   const [showEndScreen, setShowEndScreen] = useState(false);
   const [countdown, setCountdown] = useState(5);
+  // centerBtn (the invisible full-stage tap-to-play/pause Pressable below)
+  // used to span the entire video stage via absoluteFillObject, which put
+  // it directly over bottomRow's real scrubber/captions/speed/quality
+  // buttons - the exact "full-span invisible tap zone wins the touch over
+  // real controls on real devices" bug confirmed in UpdatesTab.tsx's Status
+  // viewer, even though bottomRow paints on top. Measuring bottomRow's
+  // actual height and stopping centerBtn there (instead of at the very
+  // bottom) fixes it the same way. Default guesses bottomRow's typical
+  // rendered height until the real onLayout measurement lands.
+  const [bottomRowHeight, setBottomRowHeight] = useState(48);
 
   useEffect(() => {
     fetchChannelContentChapters(content.id)
@@ -275,7 +285,7 @@ function VideoPlayerControls({
 
         {/* Center play/pause */}
         <Pressable
-          style={vstyles.centerBtn}
+          style={[vstyles.centerBtn, { bottom: bottomRowHeight }]}
           onPress={() => { setPaused(p => !p); showControls(); }}
         >
           <View style={vstyles.centerCircle}>
@@ -284,7 +294,10 @@ function VideoPlayerControls({
         </Pressable>
 
         {/* Bottom controls */}
-        <View style={vstyles.bottomRow}>
+        <View
+          style={vstyles.bottomRow}
+          onLayout={(e) => setBottomRowHeight(e.nativeEvent.layout.height)}
+        >
           {/* Time */}
           <Text style={[vstyles.timeText, { color: palette.ivory }]}>{formatTime(seeking ? seekValue : currentTime)}</Text>
 

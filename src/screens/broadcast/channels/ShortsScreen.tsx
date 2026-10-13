@@ -4,6 +4,7 @@ import {
   ActivityIndicator,
   FlatList,
   Image,
+  LayoutChangeEvent,
   Modal,
   Pressable,
   ScrollView,
@@ -65,9 +66,14 @@ type ShortCardProps = {
   onCommentPress: (id: string) => void;
   onSubscribe: (channelId: string) => void;
   subscribedChannels: Set<string>;
+  // Measured once at the ShortsScreen level (the back button/"Shorts"
+  // title header sits above the FlatList, not per-card) and handed down so
+  // every card's own tap-zone clamp (see headerBottom's declaration below)
+  // can stay out from under it too.
+  headerBottom: number;
 };
 
-function ShortCard({ item, isVisible, shouldPreload, onLike, onDislike, onShare, onCommentPress, onSubscribe, subscribedChannels }: ShortCardProps) {
+function ShortCard({ item, isVisible, shouldPreload, onLike, onDislike, onShare, onCommentPress, onSubscribe, subscribedChannels, headerBottom }: ShortCardProps) {
   const { palette } = useKISTheme();
   const { minTouchTarget } = useResponsiveLayout();
   const { height: screenHeight } = useWindowDimensions();
@@ -77,6 +83,28 @@ function ShortCard({ item, isVisible, shouldPreload, onLike, onDislike, onShare,
   const likeCount = item.localLikeCount ?? item.engagement_counts?.reactions ?? 0;
   const channelId = item.channel?.id;
   const isSubscribed = channelId ? subscribedChannels.has(channelId) : false;
+
+  // KISVideo's own internal invisible tap-zones (left/middle/right, for
+  // tap-to-play/pause) only clamp against ITS OWN internal progress bar
+  // (see VideoPlayer.tsx's footerTop) — with containerStyle set to
+  // StyleSheet.absoluteFillObject below, that only clears a few pixels
+  // near the very bottom edge, leaving the zones spanning almost this
+  // entire card's height. That span sits directly over infoRow's real
+  // channel-name/follow-pill and like/dislike/comment/share buttons
+  // (metaCol/actionsCol, rendered below) — the same "full-span invisible
+  // tap zone wins the touch over real controls on real devices" bug
+  // already fixed in UpdatesTab.tsx/LiveWatchPage.tsx/
+  // ChannelContentDetailPage.tsx, just crossing this component boundary
+  // instead of being contained inside one file. infoRow's own onLayout
+  // `y` is relative to the `card` View just below — the same parent
+  // KISVideo's own absoluteFillObject wrapper sizes itself to — so it's
+  // directly usable as tapZoneBoundaryBottom. Defaults to a conservative
+  // guess (roughly infoRow's typical height) until the real measurement
+  // lands.
+  const [infoRowTop, setInfoRowTop] = useState(screenHeight - 260);
+  const handleInfoRowLayout = (e: LayoutChangeEvent) => {
+    setInfoRowTop(e.nativeEvent.layout.y);
+  };
 
   // Double-tap like detection - fires via KISVideo's onDoubleTapMiddle
   // (see VideoPlayer.tsx's doc on that prop), not this view's own onPress
@@ -122,6 +150,8 @@ function ShortCard({ item, isVisible, shouldPreload, onLike, onDislike, onShare,
               right: 16,
               bottom: bottomInset + 4,
             }}
+            tapZoneBoundaryTop={headerBottom}
+            tapZoneBoundaryBottom={infoRowTop}
           />
         ) : item.thumbUrl ? (
           // Not the visible card or its immediate neighbor - a real player
@@ -147,7 +177,10 @@ function ShortCard({ item, isVisible, shouldPreload, onLike, onDislike, onShare,
 
       <View style={styles.overlay} />
 
-      <View style={[styles.infoRow, { bottom: Math.max(60, bottomInset + 20) }]}>
+      <View
+        style={[styles.infoRow, { bottom: Math.max(60, bottomInset + 20) }]}
+        onLayout={handleInfoRowLayout}
+      >
         <View style={styles.metaCol}>
           {item.channel?.display_name ? (
             <Pressable
@@ -204,6 +237,15 @@ export default function ShortsScreen() {
 
   // Subscribe state
   const [subscribedChannels, setSubscribedChannels] = useState<Set<string>>(new Set());
+
+  // See ShortCard's headerBottom/infoRowTop doc above — this header
+  // (back button + "Shorts" title) is absolutely positioned over the top
+  // of the FlatList below, rendered once here rather than per-card, so it
+  // gets measured once here too and handed down to every card.
+  const [headerBottom, setHeaderBottom] = useState(90);
+  const handleHeaderLayout = (e: LayoutChangeEvent) => {
+    setHeaderBottom(e.nativeEvent.layout.y + e.nativeEvent.layout.height);
+  };
 
   const openComments = useCallback((id: string) => {
     setCommentsContentId(id);
@@ -320,7 +362,7 @@ export default function ShortsScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: palette.royalInk }}>
-      <SafeAreaView style={styles.header} edges={['top']}>
+      <SafeAreaView style={styles.header} edges={['top']} onLayout={handleHeaderLayout}>
         <Pressable onPress={() => navigation.goBack()} hitSlop={12} accessibilityRole="button" accessibilityLabel="Go back">
           <KISIcon name="arrow-left" size={22} color={palette.ivory} />
         </Pressable>
@@ -346,6 +388,7 @@ export default function ShortsScreen() {
             onCommentPress={openComments}
             onSubscribe={handleSubscribe}
             subscribedChannels={subscribedChannels}
+            headerBottom={headerBottom}
           />
         )}
         pagingEnabled

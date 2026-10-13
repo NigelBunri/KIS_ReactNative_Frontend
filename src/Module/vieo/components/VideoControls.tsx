@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { LayoutChangeEvent, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import Slider from '@react-native-community/slider';
 import { KISIcon } from '@/constants/kisIcons';
 import { useKISTheme } from '@/theme/useTheme';
@@ -17,9 +17,16 @@ export type VideoControlsProps = {
   chapters?: ChannelContentChapter[];
   enablePip?: boolean;
   onPipPress?: () => void;
+  // Reports this panel's measured top edge (relative to the shared video
+  // container - this panel is position:absolute within the same parent as
+  // VideoPlayer's invisible tap-to-play/seek zones) so those zones can stop
+  // short of it instead of spanning the full player height and winning the
+  // touch over these real buttons on real devices. See VideoPlayer.tsx's
+  // tap-zone comment for the full story.
+  onLayout?: (e: LayoutChangeEvent) => void;
 };
 
-export default function VideoControls({ state, actions, onFullScreenPress, onSeekComplete, chapters, enablePip, onPipPress }: VideoControlsProps) {
+export default function VideoControls({ state, actions, onFullScreenPress, onSeekComplete, chapters, enablePip, onPipPress, onLayout }: VideoControlsProps) {
   const { palette } = useKISTheme();
   const duration = Math.max(state.duration, 0.01);
   const normalizedProgress = Math.min(Math.max(state.progress, 0), duration);
@@ -46,7 +53,7 @@ export default function VideoControls({ state, actions, onFullScreenPress, onSee
   const speedLabel = state.speed === 1 ? '1×' : `${state.speed}×`;
 
   return (
-    <View style={styles.container} pointerEvents="box-none">
+    <View style={styles.container} onLayout={onLayout} pointerEvents="box-none">
       <View style={styles.topRow}>
         <Text style={[styles.timeText, { color: palette.ivory }]}>
           {formatVideoTime(normalizedProgress)} / {formatVideoTime(duration)}

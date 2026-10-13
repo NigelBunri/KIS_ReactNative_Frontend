@@ -48,6 +48,13 @@ type Props = {
   // (BroadcastFeedFullScreenScreen) that want double-tap-to-like without
   // reaching past this wrapper to the raw player.
   onDoubleTapMiddle?: () => void;
+  // See VideoPlayer.tsx's tapZoneBoundaryTop/tapZoneBoundaryBottom doc —
+  // passthrough for full-bleed callers (BroadcastDetailScreen,
+  // BroadcastFeedFullScreenScreen) whose own caption/action-button chrome
+  // lives outside this wrapper entirely, so VideoPlayer's internal
+  // clamping can't see it on its own.
+  tapZoneBoundaryTop?: number;
+  tapZoneBoundaryBottom?: number;
 };
 
 const basePlaybackMessage = 'Unable to play this video preview.';
@@ -64,6 +71,8 @@ export default function BroadcastFeedVideoPreview({
   progressBarOnly = false,
   progressBarStyle,
   onDoubleTapMiddle,
+  tapZoneBoundaryTop,
+  tapZoneBoundaryBottom,
 }: Props) {
   // See VideoPlayer.tsx's containerAspectFallback/hasOwnSizing comments -
   // same conflict, same fix: styles.outerWrap's own aspectRatio:16/9
@@ -286,6 +295,8 @@ export default function BroadcastFeedVideoPreview({
         progressBarOnly={progressBarOnly}
         progressBarStyle={progressBarStyle}
         onDoubleTapMiddle={onDoubleTapMiddle}
+        tapZoneBoundaryTop={tapZoneBoundaryTop}
+        tapZoneBoundaryBottom={tapZoneBoundaryBottom}
       />
       {playbackError && sourceIndex > 0 ? (
         <View

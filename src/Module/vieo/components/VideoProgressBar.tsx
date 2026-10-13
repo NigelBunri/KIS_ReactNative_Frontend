@@ -10,7 +10,7 @@
 // the piece those screens actually asked for - drag-to-any-position,
 // still-visible progress - positioned however the caller needs via `style`.
 import React from 'react';
-import { StyleProp, StyleSheet, View, ViewStyle } from 'react-native';
+import { LayoutChangeEvent, StyleProp, StyleSheet, View, ViewStyle } from 'react-native';
 import Slider from '@react-native-community/slider';
 import { useKISTheme } from '@/theme/useTheme';
 import type { VideoPlayerActions, VideoPlayerState } from '../hooks/useVideoPlayer';
@@ -20,15 +20,22 @@ export type VideoProgressBarProps = {
   actions: VideoPlayerActions;
   onSeekComplete?: (value: number) => void;
   style?: StyleProp<ViewStyle>;
+  // Reports this bar's measured top edge (relative to the shared video
+  // container - it's position:absolute within the same parent as
+  // VideoPlayer's invisible tap-to-play/seek zones) so those zones can stop
+  // short of it instead of spanning the full player height and winning the
+  // touch over this slider on real devices. See VideoPlayer.tsx's tap-zone
+  // comment for the full story.
+  onLayout?: (e: LayoutChangeEvent) => void;
 };
 
-export default function VideoProgressBar({ state, actions, onSeekComplete, style }: VideoProgressBarProps) {
+export default function VideoProgressBar({ state, actions, onSeekComplete, style, onLayout }: VideoProgressBarProps) {
   const { palette } = useKISTheme();
   const duration = Math.max(state.duration, 0.01);
   const normalizedProgress = Math.min(Math.max(state.progress, 0), duration);
 
   return (
-    <View style={[styles.wrap, style]} pointerEvents="box-none">
+    <View style={[styles.wrap, style]} onLayout={onLayout} pointerEvents="box-none">
       <Slider
         value={normalizedProgress}
         maximumValue={duration}

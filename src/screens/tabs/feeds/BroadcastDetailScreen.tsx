@@ -6,6 +6,7 @@ import {
   AppState,
   DeviceEventEmitter,
   Image,
+  LayoutChangeEvent,
   Modal,
   PanResponder,
   Pressable,
@@ -715,6 +716,30 @@ export default function BroadcastDetailScreen() {
   }, []);
   const videoExternalPause = !isScreenFocused || !isAppActive;
 
+  // BroadcastFeedVideoPreview (→ KISVideo → VideoPlayer)'s internal
+  // invisible tap-zones only clamp against ITS OWN internal progress bar
+  // (progressBarStyle below) — with this screen's full-bleed
+  // containerStyle={styles.fullMedia} inside mediaLayer, that only clears
+  // the very bottom edge, leaving the zones spanning almost the entire
+  // pageFrame. That span sits directly under topBar's real back button/
+  // title (near the top) AND floatingActions' real save/react/comment/
+  // share buttons (near the bottom) — both rendered as external siblings
+  // of mediaLayer, same "full-span invisible tap zone wins the touch over
+  // real controls on real devices" bug already fixed elsewhere in this
+  // app. topBar and floatingActions share the same parent (pageFrame)
+  // that mediaLayer sizes itself to, so each one's own onLayout `y` (or
+  // `y + height`) is directly usable as VideoPlayer's
+  // tapZoneBoundaryTop/tapZoneBoundaryBottom. Defaults are conservative
+  // guesses until the real measurements land.
+  const [topBarBottom, setTopBarBottom] = useState(topInset + 60);
+  const [floatingActionsTop, setFloatingActionsTop] = useState(screenHeight - 300);
+  const handleTopBarLayout = (e: LayoutChangeEvent) => {
+    setTopBarBottom(e.nativeEvent.layout.y + e.nativeEvent.layout.height);
+  };
+  const handleFloatingActionsLayout = (e: LayoutChangeEvent) => {
+    setFloatingActionsTop(e.nativeEvent.layout.y);
+  };
+
   const openImageModal = useCallback((uri?: string | null) => {
     if (!uri) return;
     setImageModalUri(uri);
@@ -1078,6 +1103,8 @@ export default function BroadcastDetailScreen() {
                   right: 16,
                   bottom: insets.bottom + 2,
                 }}
+                tapZoneBoundaryTop={topBarBottom}
+                tapZoneBoundaryBottom={floatingActionsTop}
               />
             ) : attachmentUrl ? (
               <Pressable
@@ -1113,7 +1140,10 @@ export default function BroadcastDetailScreen() {
         <View style={styles.scrimTop} pointerEvents="none" />
         <View style={styles.scrimBottom} pointerEvents="none" />
 
-        <View style={[styles.topBar, { paddingTop: topInset + 10 }]}>
+        <View
+          style={[styles.topBar, { paddingTop: topInset + 10 }]}
+          onLayout={handleTopBarLayout}
+        >
           <Pressable
             onPress={() => navigation.goBack()}
             style={styles.backButton}
@@ -1178,7 +1208,10 @@ export default function BroadcastDetailScreen() {
           </>
         ) : null}
 
-        <View style={[styles.floatingActions, { bottom: insets.bottom + 34 }]}>
+        <View
+          style={[styles.floatingActions, { bottom: insets.bottom + 34 }]}
+          onLayout={handleFloatingActionsLayout}
+        >
           <Pressable
             onPress={handleToggleSaved}
             style={styles.floatingAction}
