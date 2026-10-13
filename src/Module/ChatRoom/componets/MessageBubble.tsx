@@ -2216,6 +2216,88 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   /* ─────────────────────────────────────────
    * Helper: reply preview
    * ──────────────────────────────────────── */
+  // A message created from a status reply/reaction (see
+  // apps.statuses.views on the Django side) carries a snapshot of the
+  // status it was about - render that above the reaction/comment itself
+  // so both sides can tell at a glance which status this refers to,
+  // instead of a bare, context-free text or emoji bubble.
+  const renderStatusContextPreview = () => {
+    const statusContext = (message as ChatMessage)?.statusContext;
+    if (!statusContext) return null;
+
+    const actionLabel = statusContext.isReaction ? 'reacted to' : 'replied to';
+    const label = isMe ? `You ${actionLabel} their status` : `${actionLabel === 'reacted to' ? 'Reacted' : 'Replied'} to your status`;
+
+    const labelColor = isMe
+      ? palette.replyPreviewLabelOnOutgoing ?? '#ffffffcc'
+      : palette.replyPreviewLabelOnIncoming ?? palette.primary;
+    const borderColor = isMe
+      ? palette.replyPreviewBorderOnOutgoing ?? '#ffffff55'
+      : palette.replyPreviewBorderOnIncoming ?? palette.primary;
+    const bgColor = isMe
+      ? palette.replyPreviewBgOnOutgoing ?? '#00000022'
+      : palette.replyPreviewBgOnIncoming ?? '#00000011';
+
+    const isMedia = statusContext.statusType === 'image' || statusContext.statusType === 'video';
+
+    return (
+      <View
+        style={{
+          marginBottom: 6,
+          paddingVertical: 6,
+          paddingHorizontal: 8,
+          borderLeftWidth: 3,
+          borderLeftColor: borderColor,
+          borderRadius: 8,
+          backgroundColor: bgColor,
+        }}
+      >
+        <Text style={{ fontSize: 11, fontWeight: '600', color: labelColor, marginBottom: 4 }}>
+          {label}
+        </Text>
+        {isMedia && statusContext.previewUrl ? (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <Image
+              source={{ uri: statusContext.previewUrl }}
+              style={{ width: 44, height: 44, borderRadius: 6, backgroundColor: '#00000022' }}
+              resizeMode="cover"
+            />
+            {statusContext.statusType === 'video' ? (
+              <KISIcon name="play" size={14} color={isMe ? palette.onPrimary : palette.text} />
+            ) : null}
+          </View>
+        ) : statusContext.statusType === 'text' ? (
+          <View
+            style={{
+              paddingVertical: 6,
+              paddingHorizontal: 8,
+              borderRadius: 6,
+              backgroundColor: statusContext.previewStyle?.backgroundColor || '#00000022',
+            }}
+          >
+            <Text
+              numberOfLines={2}
+              ellipsizeMode="tail"
+              style={{
+                fontSize: 12,
+                color: statusContext.previewStyle?.fontColor || (isMe ? palette.onPrimary : palette.text),
+              }}
+            >
+              {statusContext.previewText || 'Status'}
+            </Text>
+          </View>
+        ) : (
+          <Text
+            numberOfLines={1}
+            style={{ fontSize: 12, color: isMe ? palette.onPrimary : palette.text }}
+          >
+            {statusContext.statusType === 'audio' ? 'Voice status' : statusContext.previewText || 'Document status'}
+          </Text>
+        )}
+      </View>
+    );
+  };
+
   const renderReplyPreview = () => {
     if (!replySource) return null;
 
@@ -3712,6 +3794,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
           ]}
         >
           {renderSenderName()}
+          {renderStatusContextPreview()}
           {renderReplyPreview()}
 
           <Image
@@ -3800,6 +3883,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
           ]}
         >
           {renderSenderName()}
+          {renderStatusContextPreview()}
           {renderReplyPreview()}
 
           <Text
@@ -3871,6 +3955,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
       <View style={[styles.messageRow, styles.messageRowThem]}>
         <View style={[bubbleBaseStyle, pinnedStyle || undefined, selectedStyle || undefined, highlightedStyle || undefined]}>
           {renderSenderName()}
+          {renderStatusContextPreview()}
           {renderReplyPreview()}
           <Pressable
             onPress={openViewOnceViewer}
@@ -4036,6 +4121,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
           ]}
         >
           {renderSenderName()}
+          {renderStatusContextPreview()}
           {renderReplyPreview()}
 
           {isTopLevelViewOnce && isMe && (
@@ -4241,6 +4327,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
         ]}
       >
         {renderSenderName()}
+        {renderStatusContextPreview()}
         {renderReplyPreview()}
 
         {/* View-once label on sender side */}

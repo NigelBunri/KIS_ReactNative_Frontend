@@ -537,6 +537,19 @@ export type ChatMessage = {
     participantCount?: number;
     initiatedBy?: string;
   };
+
+  /** Present only on a message created from a status reply/reaction (see
+   * apps.statuses.views on the Django side) - a point-in-time snapshot of
+   * the status being replied/reacted to, so this bubble can show what it
+   * was actually about instead of a bare, context-free text/emoji. */
+  statusContext?: {
+    statusId: string;
+    statusType: 'image' | 'video' | 'audio' | 'text' | 'document';
+    isReaction: boolean;
+    previewText?: string;
+    previewUrl?: string | null;
+    previewStyle?: { backgroundColor?: string; fontColor?: string; fontSize?: number } | null;
+  };
 };
 
 /* ============================================================================

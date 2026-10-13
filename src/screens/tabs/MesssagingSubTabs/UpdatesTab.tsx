@@ -1363,6 +1363,12 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
     }
   };
 
+  // Visible confirmation that a typed reply actually went through - the
+  // quick-emoji reactions already got a brief scale-bounce (see
+  // reactionSentEmoji below); a typed reply previously gave the sender no
+  // feedback at all beyond the input silently clearing, which is
+  // indistinguishable from the text just being deleted.
+  const [replySentConfirmation, setReplySentConfirmation] = useState(false);
   const handleSendReply = useCallback(async () => {
     const text = viewerReplyText.trim();
     if (!text || !currentItem?.id) return;
@@ -1388,6 +1394,8 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
       }
       setViewerReplyText('');
       replyClientIdRef.current = null;
+      setReplySentConfirmation(true);
+      setTimeout(() => setReplySentConfirmation(false), 1500);
     } finally {
       setSendingReply(false);
     }
@@ -3443,28 +3451,48 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
 
           {/* Status reply input — shown for other users' statuses when replies are allowed */}
           {activeUser && activeUser.id !== 'me' && activeUser.userId !== currentUserId && currentItem?.replyPermission !== 'nobody' && (
-            <View style={[styles.viewerReplyRow, { backgroundColor: palette.royalInk }]}>
-              <TextInput
-                value={viewerReplyText}
-                onChangeText={setViewerReplyText}
-                placeholder={`Reply to ${activeUser.name}…`}
-                placeholderTextColor={palette.subtext}
-                style={[styles.viewerReplyInput, { color: palette.ivory, borderColor: palette.divider }]}
-                returnKeyType="send"
-                onSubmitEditing={handleSendReply}
-                onFocus={beginManualPause}
-                onBlur={endManualPause}
-              />
-              <Pressable
-                onPress={handleSendReply}
-                disabled={sendingReply || !viewerReplyText.trim()}
-                style={[styles.viewerReplySend, { backgroundColor: palette.primary }]}
-                accessibilityRole="button"
-                accessibilityLabel="Send reply"
-              >
-                <KISIcon name="send" size={16} color={palette.onPrimary} />
-              </Pressable>
-            </View>
+            <>
+              {replySentConfirmation && (
+                <View style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  alignSelf: 'center',
+                  gap: 6,
+                  marginBottom: 6,
+                  paddingHorizontal: 12,
+                  paddingVertical: 6,
+                  borderRadius: 14,
+                  backgroundColor: 'rgba(0,0,0,0.55)',
+                }}>
+                  <KISIcon name="check" size={13} color={palette.success ?? '#4ADE80'} />
+                  <Text style={{ color: palette.ivory, fontSize: 12, fontWeight: '600' }}>
+                    Reply sent
+                  </Text>
+                </View>
+              )}
+              <View style={[styles.viewerReplyRow, { backgroundColor: palette.royalInk }]}>
+                <TextInput
+                  value={viewerReplyText}
+                  onChangeText={setViewerReplyText}
+                  placeholder={`Reply to ${activeUser.name}…`}
+                  placeholderTextColor={palette.subtext}
+                  style={[styles.viewerReplyInput, { color: palette.ivory, borderColor: palette.divider }]}
+                  returnKeyType="send"
+                  onSubmitEditing={handleSendReply}
+                  onFocus={beginManualPause}
+                  onBlur={endManualPause}
+                />
+                <Pressable
+                  onPress={handleSendReply}
+                  disabled={sendingReply || !viewerReplyText.trim()}
+                  style={[styles.viewerReplySend, { backgroundColor: palette.primary }]}
+                  accessibilityRole="button"
+                  accessibilityLabel="Send reply"
+                >
+                  <KISIcon name="send" size={16} color={palette.onPrimary} />
+                </Pressable>
+              </View>
+            </>
           )}
 
           {/* Seen-by count for own statuses */}

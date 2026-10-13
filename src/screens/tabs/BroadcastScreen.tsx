@@ -502,6 +502,8 @@ export default function BroadcastScreen() {
                 width: compactBroadcast ? 34 : 40,
                 height: compactBroadcast ? 34 : 40,
                 borderRadius: compactBroadcast ? 17 : 20,
+                paddingHorizontal: 0,
+                minHeight: 0,
                 backgroundColor: palette.primaryStrong,
               }]}
             >
@@ -516,6 +518,8 @@ export default function BroadcastScreen() {
                 width: compactBroadcast ? 34 : 40,
                 height: compactBroadcast ? 34 : 40,
                 borderRadius: compactBroadcast ? 17 : 20,
+                paddingHorizontal: 0,
+                minHeight: 0,
                 backgroundColor: `${palette.royalInk}70`,
                 borderColor: palette.goldBorder,
               }]}

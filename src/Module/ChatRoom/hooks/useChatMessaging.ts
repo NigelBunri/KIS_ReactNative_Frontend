@@ -1268,6 +1268,7 @@ export function useChatMessaging({
           : undefined,
         linkPreview: serverMsg.linkPreview ?? serverMsg.link_preview ?? undefined,
         callEvent: serverMsg.callEvent ?? serverMsg.call_event ?? undefined,
+        statusContext: serverMsg.statusContext ?? serverMsg.status_context ?? undefined,
         viewOnce: !!(serverMsg.viewOnce ?? serverMsg.view_once),
         viewedAt: serverMsg.viewedAt ?? serverMsg.viewed_at ?? undefined,
       } as ChatMessage & { senderAvatar?: string };

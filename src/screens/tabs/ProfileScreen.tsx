@@ -52,6 +52,7 @@ import { KISIcon } from '@/constants/kisIcons';
 import { useAuth } from '../../../App';
 import { launchImageLibrary, Asset } from 'react-native-image-picker';
 import { profileLayout, styles } from './profile/profile.styles';
+import { tierMetaFor } from './profile/profile/tierMeta';
 import { useProfileController } from './profile/useProfileController';
 import ROUTES from '@/network';
 import { getRequest } from '@/network/get';
@@ -565,6 +566,7 @@ export default function ProfileScreen() {
     currentTier?.tier_label ??
     currentTier?.tierName ??
     null;
+  const currentTierMeta = useMemo(() => tierMetaFor(currentTier || {}), [currentTier]);
   const partnerProfiles = c.profile?.partner_profiles || [];
   const partnerProfilesLimitLabel = c.profile?.partner_profiles_limit_label;
   const partnerProfilesLimitValue =
@@ -2669,31 +2671,6 @@ export default function ProfileScreen() {
                     />
                   )}
                 </View>
-                <View
-                  style={[
-                    styles.actionRow,
-                    {
-                      alignItems: 'stretch',
-                      gap: 10,
-                      flexWrap: 'wrap',
-                    },
-                  ]}
-                >
-                  <VerificationStatusCard
-                    palette={palette}
-                    summary={userVerificationSummary}
-                    title="Profile verification"
-                    subtitle="Submit private evidence references for staff/provider review."
-                    onOpen={() =>
-                      setVerificationCenterTarget({
-                        subject: { type: 'user' },
-                        title: 'User verification',
-                        subtitle: 'Verify your identity and unlock trusted profile badges.',
-                        summary: userVerificationSummary,
-                      })
-                    }
-                  />
-                </View>
               </View>
 
               <QuickActionGrid
@@ -3028,6 +3005,59 @@ export default function ProfileScreen() {
               <View
                 style={{
                   borderWidth: 1,
+                  borderColor: palette.divider,
+                  borderRadius: 18,
+                  backgroundColor: palette.surface,
+                  padding: 14,
+                  gap: 10,
+                }}
+              >
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.title, { color: palette.text, fontSize: 15 }]}>
+                      {tierLabel || currentTier?.name || 'Free'} plan
+                      {currentTierMeta.badge ? ` · ${currentTierMeta.badge}` : ''}
+                    </Text>
+                    <Text style={[styles.subtext, { color: palette.subtext }]}>
+                      {currentTierMeta.tagline}
+                    </Text>
+                  </View>
+                </View>
+                <View style={{ gap: 6 }}>
+                  {currentTierMeta.features.slice(0, 6).map((feature: string) => (
+                    <View key={feature} style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 8 }}>
+                      <KISIcon name="check" size={14} color={palette.success} style={{ marginTop: 2 }} />
+                      <Text style={{ flex: 1, fontSize: responsive.bodyFontSize, color: palette.text }}>
+                        {feature}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+                <KISButton
+                  title="Compare all plans"
+                  variant="outline"
+                  onPress={() => c.openSheet('upgrade')}
+                />
+              </View>
+
+              <VerificationStatusCard
+                palette={palette}
+                summary={userVerificationSummary}
+                title="Profile verification"
+                subtitle="Submit private evidence references for staff/provider review."
+                onOpen={() =>
+                  setVerificationCenterTarget({
+                    subject: { type: 'user' },
+                    title: 'User verification',
+                    subtitle: 'Verify your identity and unlock trusted profile badges.',
+                    summary: userVerificationSummary,
+                  })
+                }
+              />
+
+              <View
+                style={{
+                  borderWidth: 1,
                   borderColor: palette.goldBorder || palette.divider,
                   borderRadius: 18,
                   backgroundColor: palette.surface,
@@ -3180,56 +3210,45 @@ export default function ProfileScreen() {
                 </View>
               </View>
 
-              {/* ── Theme color: collapsed by default, Gold selected by
-                  default. Expanding reveals a row of small phone-shaped
-                  mockups, one per accent color, previewing that color's
-                  header gradient. The Light/Dark/System row above still
-                  governs how whichever color is picked here renders. ── */}
+              {/* ── Theme color: always visible, Gold selected by default.
+                  A row of small phone-shaped mockups, one per accent color,
+                  previewing that color's header gradient. The Light/Dark/
+                  System row above still governs how whichever color is
+                  picked here renders. ── */}
               <View style={{ borderTopWidth: 1, borderTopColor: palette.divider }}>
-                <Pressable
-                  onPress={() => setAccentPickerExpanded(v => !v)}
-                  style={({ pressed }) => ({
+                <View
+                  style={{
                     flexDirection: 'row',
                     alignItems: 'center',
-                    justifyContent: 'space-between',
+                    gap: 10,
                     paddingHorizontal: 16,
                     paddingVertical: 14,
-                    backgroundColor: pressed ? palette.surfaceElevated : 'transparent',
-                  })}
+                  }}
                 >
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                    <View style={{ width: 22, height: 22, borderRadius: 6, overflow: 'hidden' }}>
-                      <LinearGradient
-                        colors={[
-                          (KIS_ACCENT_THEMES.find(t => t.id === accentId) ?? KIS_ACCENT_THEMES[0]).headerGradient[0],
-                          (KIS_ACCENT_THEMES.find(t => t.id === accentId) ?? KIS_ACCENT_THEMES[0]).headerGradient[2],
-                        ]}
-                        style={{ flex: 1 }}
-                      />
-                    </View>
-                    <Text style={{ fontSize: responsive.labelFontSize, color: palette.text, fontWeight: '600' }}>
-                      Theme color · {(KIS_ACCENT_THEMES.find(t => t.id === accentId) ?? KIS_ACCENT_THEMES[0]).name}
-                    </Text>
+                  <View style={{ width: 22, height: 22, borderRadius: 6, overflow: 'hidden' }}>
+                    <LinearGradient
+                      colors={[
+                        (KIS_ACCENT_THEMES.find(t => t.id === accentId) ?? KIS_ACCENT_THEMES[0]).headerGradient[0],
+                        (KIS_ACCENT_THEMES.find(t => t.id === accentId) ?? KIS_ACCENT_THEMES[0]).headerGradient[2],
+                      ]}
+                      style={{ flex: 1 }}
+                    />
                   </View>
-                  <KISIcon
-                    name="chevron-down"
-                    size={18}
-                    color={palette.subtext}
-                    style={{ transform: [{ rotate: accentPickerExpanded ? '180deg' : '0deg' }] }}
-                  />
-                </Pressable>
+                  <Text style={{ fontSize: responsive.labelFontSize, color: palette.text, fontWeight: '600' }}>
+                    Theme color · {(KIS_ACCENT_THEMES.find(t => t.id === accentId) ?? KIS_ACCENT_THEMES[0]).name}
+                  </Text>
+                </View>
 
-                {accentPickerExpanded && (
-                  <View style={{ paddingHorizontal: 16, paddingBottom: 16 }}>
-                    <Text style={{ fontSize: responsive.labelFontSize - 1, color: palette.subtext, marginBottom: 10 }}>
-                      Gold is the KIS default. Pick any color below, then use the theme row above to render it light, dark, or match your device.
-                    </Text>
-                    <ScrollView
-                      horizontal
-                      showsHorizontalScrollIndicator={false}
-                      contentContainerStyle={{ gap: 16, paddingVertical: 4, paddingHorizontal: 2 }}
-                    >
-                      {KIS_ACCENT_THEMES.map((accentTheme) => {
+                <View style={{ paddingHorizontal: 16, paddingBottom: 16 }}>
+                  <Text style={{ fontSize: responsive.labelFontSize - 1, color: palette.subtext, marginBottom: 10 }}>
+                    Gold is the KIS default. Pick any color below, then use the theme row above to render it light, dark, or match your device.
+                  </Text>
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={{ gap: 16, paddingVertical: 4, paddingHorizontal: 2 }}
+                  >
+                    {KIS_ACCENT_THEMES.map((accentTheme) => {
                         const selected = accentId === accentTheme.id;
                         return (
                           <Pressable
@@ -3310,7 +3329,6 @@ export default function ProfileScreen() {
                       })}
                     </ScrollView>
                   </View>
-                )}
               </View>
             </View>
 
