@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import {
+  Alert,
   Animated,
   Image,
   Pressable,
@@ -283,6 +284,7 @@ export default function ServiceEditorDrawer({
   } as const;
 
   const [form, setForm] = useState(() => ({ ...DEFAULT_SERVICE_FORM }));
+  const initialFormSnapshotRef = useRef<string>(JSON.stringify(DEFAULT_SERVICE_FORM));
   const [featuredImageAsset, setFeaturedImageAsset] = useState<PersistedMedia | null>(null);
   const [galleryImages, setGalleryImages] = useState<PersistedMedia[]>([]);
   const [removedGalleryImageIds, setRemovedGalleryImageIds] = useState<string[]>([]);
@@ -340,7 +342,7 @@ export default function ServiceEditorDrawer({
       setRemovedGalleryImageIds([]);
       setRemoveFeaturedImage(false);
 
-      setForm({
+      const nextForm = {
         ...DEFAULT_SERVICE_FORM,
         ...service,
         name: service.name ?? '',
@@ -401,15 +403,38 @@ export default function ServiceEditorDrawer({
         seoTitle: service.seo_title ?? '',
         seoDescription: service.seo_description ?? '',
         featured: Boolean(service.featured ?? service.is_featured),
-      });
+      };
+      setForm(nextForm);
+      initialFormSnapshotRef.current = JSON.stringify(nextForm);
     } else {
       setForm({ ...DEFAULT_SERVICE_FORM });
+      initialFormSnapshotRef.current = JSON.stringify(DEFAULT_SERVICE_FORM);
       setFeaturedImageAsset(null);
       setGalleryImages([]);
       setRemovedGalleryImageIds([]);
       setRemoveFeaturedImage(false);
     }
   }, [visible, mode, service]);
+
+  const hasUnsavedChanges = useCallback(
+    () => JSON.stringify(form) !== initialFormSnapshotRef.current,
+    [form],
+  );
+
+  const requestClose = useCallback(() => {
+    if (hasUnsavedChanges()) {
+      Alert.alert(
+        'Discard changes?',
+        'This service listing has unsaved changes. Closing now will discard them.',
+        [
+          { text: 'Keep editing', style: 'cancel' },
+          { text: 'Discard', style: 'destructive', onPress: onClose },
+        ],
+      );
+    } else {
+      onClose();
+    }
+  }, [hasUnsavedChanges, onClose]);
 
   const updateField = (changes: Partial<typeof DEFAULT_SERVICE_FORM>) => {
     setForm((prev) => ({ ...prev, ...changes }));
@@ -520,6 +545,7 @@ export default function ServiceEditorDrawer({
       updateField({ featuredImage: image.uri });
     } catch (error) {
       console.error('Service image pick failed', error);
+      Alert.alert('Image not selected', 'Could not open your photo library. Please try again.');
     }
   };
 
@@ -540,6 +566,7 @@ export default function ServiceEditorDrawer({
       });
     } catch (error) {
       console.error('Service gallery pick failed', error);
+      Alert.alert('Photos not added', 'Could not open your photo library. Please try again.');
     }
   }, []);
 
@@ -611,7 +638,7 @@ export default function ServiceEditorDrawer({
 
   return (
     <>
-      {visible && <Pressable style={marketStyles.drawerOverlay} onPress={onClose} />}
+      {visible && <Pressable style={marketStyles.drawerOverlay} onPress={requestClose} />}
 
       <Animated.View
         style={[
@@ -635,7 +662,12 @@ export default function ServiceEditorDrawer({
                 Build a premium, bookable, scalable service listing.
               </Text>
             </View>
-            <Pressable onPress={onClose} style={{ padding: 6 }}>
+            <Pressable
+              onPress={requestClose}
+              style={{ padding: 6 }}
+              accessibilityRole="button"
+              accessibilityLabel="Close"
+            >
               <KISIcon name="close" size={22} color={palette.subtext} />
             </Pressable>
           </View>
@@ -692,7 +724,12 @@ export default function ServiceEditorDrawer({
                           <Text style={{ color: palette.text, fontSize: 12, fontWeight: '600' }}>
                             {category.name || 'Category'}
                           </Text>
-                          <Pressable onPress={() => handleServiceCategorySelect(category.id)} style={{ padding: 4 }}>
+                          <Pressable
+                            onPress={() => handleServiceCategorySelect(category.id)}
+                            style={{ padding: 4 }}
+                            accessibilityRole="button"
+                            accessibilityLabel={`Remove ${category.name || 'category'}`}
+                          >
                             <KISIcon name="close" size={12} color={palette.danger} />
                           </Pressable>
                         </View>
@@ -762,9 +799,12 @@ export default function ServiceEditorDrawer({
               <Text style={{ color: palette.subtext, fontSize: 12, marginBottom: 8 }}>
                 Set how customers will be charged for this service.
               </Text>
+              <Text style={{ color: palette.subtext, fontSize: 12, fontWeight: '700', marginBottom: 8 }}>
+                All amounts below are in USD. Payments are processed through Flutterwave.
+              </Text>
 
               <KISTextInput
-                label="Base price"
+                label="Base price (USD)"
                 value={form.price}
                 onChangeText={(value) => updateField({ price: sanitizeDecimalInput(value) })}
                 keyboardType="numeric"
@@ -840,10 +880,7 @@ export default function ServiceEditorDrawer({
 
               <View style={{ marginTop: 10 }}>
                 <Text style={{ color: palette.subtext, fontSize: 12 }}>
-                  Approximate USD value: ${priceInUsd}
-                </Text>
-                <Text style={{ color: palette.subtext, fontSize: 12 }}>
-                  USD direct provider checkout
+                  Customers will be charged ${priceInUsd} USD via Flutterwave.
                 </Text>
               </View>
 
@@ -1147,6 +1184,8 @@ export default function ServiceEditorDrawer({
                       borderRadius: 14,
                       padding: 4,
                     }}
+                    accessibilityRole="button"
+                    accessibilityLabel="Remove featured image"
                   >
                     <KISIcon name="close" size={14} color={palette.danger} />
                   </Pressable>
@@ -1170,6 +1209,8 @@ export default function ServiceEditorDrawer({
                             borderRadius: 12,
                             padding: 2,
                           }}
+                          accessibilityRole="button"
+                          accessibilityLabel="Remove photo"
                         >
                           <KISIcon name="close" size={12} color={palette.danger} />
                         </Pressable>
@@ -1246,7 +1287,7 @@ export default function ServiceEditorDrawer({
             ]}
           >
             <View style={marketStyles.drawerFooterActions}>
-              <KISButton title="Cancel" variant="ghost" size="sm" onPress={onClose} />
+              <KISButton title="Cancel" variant="ghost" size="sm" onPress={requestClose} />
               <KISButton
                 title="Save draft"
                 variant="secondary"

@@ -802,6 +802,8 @@ export default function BroadcastDetailScreen() {
               setFetchRetryCount(c => c + 1);
             }}
             style={[styles.retryButton, { backgroundColor: palette.surface }]}
+            accessibilityRole="button"
+            accessibilityLabel="Retry"
           >
             <Text style={[styles.retryText, { color: palette.text }]}>Retry</Text>
           </Pressable>
@@ -809,6 +811,8 @@ export default function BroadcastDetailScreen() {
           <Pressable
             onPress={() => navigation.goBack()}
             style={[styles.retryButton, { backgroundColor: palette.surface }]}
+            accessibilityRole="button"
+            accessibilityLabel="Go back"
           >
             <Text style={[styles.retryText, { color: palette.text }]}>Go back</Text>
           </Pressable>
@@ -827,7 +831,12 @@ export default function BroadcastDetailScreen() {
     );
   }
 
-  const mutedActionColor = palette.ivory;
+  // Was `palette.ivory` — identical to the "active" branch below, so the
+  // save/heart icons never actually changed color between saved/unsaved or
+  // reacted/unreacted (only the text label underneath did). A dimmed white
+  // restores the visual on/off distinction the ternaries were clearly
+  // written to express.
+  const mutedActionColor = 'rgba(255,255,255,0.68)';
   const nextPreviewTitle = getFeedTitle(nextFeedItem);
   const nextPreviewSource = getFeedSource(nextFeedItem);
   const nextPreviewBody = getFeedBody(nextFeedItem);
@@ -1108,6 +1117,8 @@ export default function BroadcastDetailScreen() {
           <Pressable
             onPress={() => navigation.goBack()}
             style={styles.backButton}
+            accessibilityRole="button"
+            accessibilityLabel="Go back"
           >
             <KISIcon name="arrow-left" size={22} color={palette.ivory} />
           </Pressable>
@@ -1134,12 +1145,16 @@ export default function BroadcastDetailScreen() {
             <Pressable
               style={[styles.navButton, styles.navLeft, { borderColor: palette.ivory }]}
               onPress={handlePrevAttachment}
+              accessibilityRole="button"
+              accessibilityLabel="Previous attachment"
             >
               <Text style={[styles.navButtonText, { color: palette.ivory }]}>{'‹'}</Text>
             </Pressable>
             <Pressable
               style={[styles.navButton, styles.navRight, { borderColor: palette.ivory }]}
               onPress={handleNextAttachment}
+              accessibilityRole="button"
+              accessibilityLabel="Next attachment"
             >
               <Text style={[styles.navButtonText, { color: palette.ivory }]}>{'›'}</Text>
             </Pressable>
@@ -1164,7 +1179,12 @@ export default function BroadcastDetailScreen() {
         ) : null}
 
         <View style={[styles.floatingActions, { bottom: insets.bottom + 34 }]}>
-          <Pressable onPress={handleToggleSaved} style={styles.floatingAction}>
+          <Pressable
+            onPress={handleToggleSaved}
+            style={styles.floatingAction}
+            accessibilityRole="button"
+            accessibilityLabel={viewerSaved ? 'Remove from saved' : 'Save'}
+          >
             <View style={styles.iconBubble}>
               <KISIcon
                 name="bookmark"
@@ -1176,7 +1196,12 @@ export default function BroadcastDetailScreen() {
               {viewerSaved ? 'Saved' : 'Save'}
             </Text>
           </Pressable>
-          <Pressable onPress={handleReact} style={styles.floatingAction}>
+          <Pressable
+            onPress={handleReact}
+            style={styles.floatingAction}
+            accessibilityRole="button"
+            accessibilityLabel={viewerReaction ? 'Remove reaction' : 'React with heart'}
+          >
             <View style={styles.iconBubble}>
               <KISIcon
                 name="heart"
@@ -1186,13 +1211,23 @@ export default function BroadcastDetailScreen() {
             </View>
             <Text style={[styles.actionCount, { color: palette.ivory }]}>{reactionCount}</Text>
           </Pressable>
-          <Pressable onPress={handleOpenComments} style={styles.floatingAction}>
+          <Pressable
+            onPress={handleOpenComments}
+            style={styles.floatingAction}
+            accessibilityRole="button"
+            accessibilityLabel="Open comments"
+          >
             <View style={styles.iconBubble}>
               <KISIcon name="comment" size={22} color={mutedActionColor} />
             </View>
             <Text style={[styles.actionCount, { color: palette.ivory }]}>{commentCount}</Text>
           </Pressable>
-          <Pressable onPress={handleShare} style={styles.floatingAction}>
+          <Pressable
+            onPress={handleShare}
+            style={styles.floatingAction}
+            accessibilityRole="button"
+            accessibilityLabel="Share"
+          >
             <View style={styles.iconBubble}>
               <KISIcon name="share" size={22} color={mutedActionColor} />
             </View>
@@ -1260,6 +1295,8 @@ export default function BroadcastDetailScreen() {
             onPress={closeImageModal}
             hitSlop={12}
             style={[styles.imageModalClose, { top: topInset + 12 }]}
+            accessibilityRole="button"
+            accessibilityLabel="Close"
           >
             <KISIcon name="close" size={26} color={palette.ivory} />
           </Pressable>

@@ -61,10 +61,21 @@ export default function NotificationsDashboardScreen() {
         }),
       ]);
 
-      const listItems: NotifItem[] =
-        listRes.status === 'fulfilled'
-          ? listRes.value.data?.results ?? listRes.value.data ?? []
-          : [];
+      // Promise.allSettled never throws, so a rejected list request used to
+      // fall straight through to `[]` with no error - the screen then showed
+      // "No notifications found" (a legitimate-looking empty state) instead
+      // of surfacing that the request actually failed. Only the summary
+      // (secondary) call is allowed to fail silently; the primary list call
+      // now sets the blocking error state like every other fetch on this
+      // screen.
+      if (listRes.status !== 'fulfilled') {
+        setItems([]);
+        setStats(null);
+        setError(listRes.reason?.message || 'Unable to load notifications data.');
+        return;
+      }
+
+      const listItems: NotifItem[] = listRes.value.data?.results ?? listRes.value.data ?? [];
       setItems(listItems.slice(0, 20));
 
       const summaryData =

@@ -19,6 +19,7 @@ import { postRequest } from '@/network/post';
 import ROUTES from '@/network';
 import { KISIcon } from '@/constants/kisIcons';
 import { useSafeTopInset } from '@/hooks/useSafeTopInset';
+import QRCode from 'react-native-qrcode-svg';
 
 type TwoFactorStatus = {
   enabled: boolean;
@@ -212,8 +213,19 @@ export default function TwoFactorScreen({ onBack }: Props) {
             </Text>
             {status?.qr_code && (
               <View style={[styles.qrContainer, { borderColor: palette.inputBorder }]}>
-                <Text style={{ color: palette.subtext, textAlign: 'center' }}>
-                  [QR Code — open in authenticator app]{'\n'}
+                <View style={[styles.qrCodeWrap, { backgroundColor: palette.ivory }]}>
+                  {/* Actual scannable QR, not just the raw provisioning URI as text */}
+                  <QRCode
+                    value={status.qr_code}
+                    size={180}
+                    backgroundColor={palette.ivory}
+                    color={palette.royalInk}
+                  />
+                </View>
+                <Text style={{ color: palette.subtext, textAlign: 'center', marginTop: 10, fontSize: 12 }}>
+                  Can't scan? Enter this key manually in your authenticator app:
+                </Text>
+                <Text selectable style={{ color: palette.text, textAlign: 'center', marginTop: 4, fontSize: 12 }}>
                   {status.provisioning_uri}
                 </Text>
               </View>
@@ -341,6 +353,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   qrContainer: { borderWidth: 1, borderRadius: 10, padding: 16, alignItems: 'center' },
+  qrCodeWrap: { padding: 12, borderRadius: 8 },
   dangerBtn: { paddingVertical: 13, borderRadius: 10, alignItems: 'center', borderWidth: 1 },
   dangerBtnText: { fontSize: 14, fontWeight: '600' },
   modalBackdrop: {

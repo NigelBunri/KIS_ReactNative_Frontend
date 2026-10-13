@@ -197,7 +197,20 @@ export default function FulfillmentQueuePage() {
             <KISButton
               title="Cancel"
               size="xs" variant="ghost" loading={busyId === item.id}
-              onPress={() => runFulfillmentAction(item, ROUTES.commerce.fulfillmentCancel(item.id), 'Cancel order')}
+              onPress={() =>
+                Alert.alert(
+                  'Cancel order',
+                  'Are you sure you want to cancel this order? This cannot be undone.',
+                  [
+                    { text: 'Keep order', style: 'cancel' },
+                    {
+                      text: 'Cancel order',
+                      style: 'destructive',
+                      onPress: () => runFulfillmentAction(item, ROUTES.commerce.fulfillmentCancel(item.id), 'Cancel order'),
+                    },
+                  ],
+                )
+              }
               disabled={Boolean(busyId)}
             />
           ) : null}
@@ -209,7 +222,13 @@ export default function FulfillmentQueuePage() {
   return (
     <View style={[styles.root, { backgroundColor: palette.bg, paddingTop: topInset }]}>
       <View style={[styles.header, { backgroundColor: palette.surface, borderColor: palette.divider }]}>
-        <Pressable onPress={() => navigation.goBack()} style={styles.backButton}>
+        <Pressable
+          onPress={() => navigation.goBack()}
+          style={styles.backButton}
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        >
           <KISIcon name="arrow-left" size={18} color={palette.text} />
         </Pressable>
         <Text style={[styles.title, { color: palette.text }]}>Orders to fulfill</Text>

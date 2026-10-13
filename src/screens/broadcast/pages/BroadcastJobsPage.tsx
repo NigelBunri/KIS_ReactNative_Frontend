@@ -58,10 +58,12 @@ export default function BroadcastJobsPage({ searchTerm = '', searchContext = 'al
   const [submitting, setSubmitting] = useState(false);
   const [applyError, setApplyError] = useState<string | null>(null);
   const [appliedIds, setAppliedIds] = useState<Set<string>>(new Set());
+  const [loadError, setLoadError] = useState(false);
 
   const fetchJobs = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true);
     else setLoading(true);
+    setLoadError(false);
     try {
       const params = new URLSearchParams();
       if (searchTerm.trim()) params.set('search', searchTerm.trim());
@@ -72,7 +74,10 @@ export default function BroadcastJobsPage({ searchTerm = '', searchContext = 'al
       const list = res?.data ?? res ?? [];
       setJobs(Array.isArray(list) ? list : []);
     } catch {
-      setJobs([]);
+      // Jobs failed to load — keep any previously loaded jobs on screen and
+      // surface the error distinctly from a genuine "no jobs" empty state,
+      // rather than silently reporting zero results.
+      setLoadError(true);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -152,6 +157,9 @@ export default function BroadcastJobsPage({ searchTerm = '', searchContext = 'al
           style={[styles.applyBtn, { backgroundColor: alreadyApplied ? palette.surface : palette.primary }]}
           disabled={alreadyApplied}
           onPress={() => openApply(item)}
+          accessibilityRole="button"
+          accessibilityLabel={alreadyApplied ? `Already applied to ${item.title}` : `Apply to ${item.title}`}
+          accessibilityState={{ disabled: alreadyApplied }}
         >
           <Text style={[styles.applyBtnText, { color: alreadyApplied ? palette.subtext : palette.onPrimary }]}>
             {alreadyApplied ? 'Applied' : 'Apply'}
@@ -177,6 +185,21 @@ export default function BroadcastJobsPage({ searchTerm = '', searchContext = 'al
             <View style={styles.emptyState}>
               <ActivityIndicator color={palette.primary} />
             </View>
+          ) : loadError ? (
+            <View style={styles.emptyState}>
+              <KISIcon name="alert-circle" size={40} color={palette.danger ?? palette.subtext} />
+              <Text style={[styles.emptyText, { color: palette.danger ?? palette.subtext }]}>
+                Unable to load jobs
+              </Text>
+              <Pressable
+                style={[styles.applyBtn, { backgroundColor: palette.primary, paddingHorizontal: 20 }]}
+                onPress={() => fetchJobs()}
+                accessibilityRole="button"
+                accessibilityLabel="Retry loading jobs"
+              >
+                <Text style={[styles.applyBtnText, { color: palette.onPrimary }]}>Retry</Text>
+              </Pressable>
+            </View>
           ) : (
             <View style={styles.emptyState}>
               <KISIcon name="briefcase" size={40} color={palette.subtext} />
@@ -191,6 +214,14 @@ export default function BroadcastJobsPage({ searchTerm = '', searchContext = 'al
 
       <Modal visible={!!applyTarget} animationType="slide" transparent onRequestClose={() => setApplyTarget(null)}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.modalWrap}>
+          <Pressable
+            style={StyleSheet.absoluteFill}
+            onPress={() => setApplyTarget(null)}
+            accessibilityRole="button"
+            accessibilityLabel="Close"
+          >
+            <View style={[StyleSheet.absoluteFill, { backgroundColor: palette.backdrop ?? 'rgba(0,0,0,0.4)' }]} />
+          </Pressable>
           <View style={[styles.sheet, { backgroundColor: palette.surfaceElevated ?? palette.card }]}>
             <Text style={{ color: palette.text, fontSize: 16, fontWeight: '700' }}>
               Apply to {applyTarget?.title}

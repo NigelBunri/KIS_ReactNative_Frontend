@@ -218,6 +218,7 @@ export default function CompleteVerseGame({ gameKey, stageIndex, isReplay, onExi
             }}
             onBackToJourney={onExit}
             onViewStats={onOpenStats}
+            persisted={stageResult.persisted}
           />
         </View>
       </GameShell>

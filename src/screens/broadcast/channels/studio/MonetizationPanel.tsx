@@ -79,34 +79,47 @@ export default function MonetizationPanel({ channelId }: Props) {
   const [payoutSchedule,    setPayoutSchedule]     = useState<PayoutSchedule>('monthly');
   const [payoutRequests,    setPayoutRequests]     = useState<PayoutRequest[]>([]);
   const [payoutAmount,      setPayoutAmount]       = useState('');
+  const [loadFailed,        setLoadFailed]         = useState(false);
 
   // ── Fetch ────────────────────────────────────────────────────────────────────
 
   const fetchData = useCallback(async () => {
     if (!channelId) return;
     setLoading(true);
+    setLoadFailed(false);
     try {
       const res = await getRequest(ROUTES.broadcasts.channelMonetization(channelId));
-      if (res?.data) {
-        const d: MonetizationData = res.data;
-        setTipsEnabled(d.tips_enabled ?? false);
-        setMembershipsEnabled(d.memberships_enabled ?? false);
-        setAdRevenueEnabled(d.ad_revenue_enabled ?? false);
-        setCreatorShare(d.creator_share ?? 70);
-        setPlatformShare(d.platform_share ?? 30);
-        setPayoutThreshold(d.payout_threshold ?? '');
-        setPayoutSchedule(d.payout_schedule ?? 'monthly');
-        setPayoutRequests(d.payout_requests ?? []);
+      // getRequest resolves {success:false, data: <error body>} on failure
+      // rather than throwing — `if (res?.data)` was truthy even on a failed
+      // load (an error body is still an object), so every toggle below
+      // silently defaulted to OFF/0 and the threshold/schedule reset to
+      // blank/monthly. Tapping "Save Settings" on that fabricated state
+      // would then overwrite the creator's real monetization settings with
+      // these defaults. Now a failed load blocks Save entirely instead.
+      if (!res?.success) {
+        setLoadFailed(true);
+        Alert.alert('Error', 'Could not load monetization settings. Pull to retry before saving — saving now would overwrite your real settings with blank defaults.');
+        return;
       }
+      const d: MonetizationData = res.data;
+      setTipsEnabled(d.tips_enabled ?? false);
+      setMembershipsEnabled(d.memberships_enabled ?? false);
+      setAdRevenueEnabled(d.ad_revenue_enabled ?? false);
+      setCreatorShare(d.creator_share ?? 70);
+      setPlatformShare(d.platform_share ?? 30);
+      setPayoutThreshold(d.payout_threshold ?? '');
+      setPayoutSchedule(d.payout_schedule ?? 'monthly');
+      setPayoutRequests(d.payout_requests ?? []);
       // Also fetch payout requests separately if not bundled
       const reqRes = await getRequest(ROUTES.broadcasts.channelPayoutRequests(channelId));
-      if (reqRes?.data) {
+      if (reqRes?.success && reqRes?.data) {
         const raw: PayoutRequest[] = Array.isArray(reqRes.data)
           ? reqRes.data
           : reqRes.data.results ?? [];
         setPayoutRequests(raw.slice(0, 5));
       }
     } catch {
+      setLoadFailed(true);
       Alert.alert('Error', 'Could not load monetization settings.');
     } finally {
       setLoading(false);
@@ -269,11 +282,17 @@ export default function MonetizationPanel({ channelId }: Props) {
         </View>
       </View>
 
+      {loadFailed && (
+        <Text style={[styles.loadFailedNote, { color: palette.danger }]}>
+          Settings failed to load — saving is disabled until this reloads correctly, to avoid overwriting your real settings with blank defaults.
+        </Text>
+      )}
+
       {/* Save button */}
       <Pressable
         onPress={handleSave}
-        disabled={saving}
-        style={[styles.saveBtn, { backgroundColor: palette.gold }]}
+        disabled={saving || loadFailed}
+        style={[styles.saveBtn, { backgroundColor: palette.gold, opacity: loadFailed ? 0.5 : 1 }]}
       >
         {saving ? (
           <ActivityIndicator size="small" color={palette.onPrimary} />
@@ -418,6 +437,12 @@ const styles = StyleSheet.create({
   pillText: {
     fontWeight: '700',
     fontSize: 13,
+  },
+  loadFailedNote: {
+    fontSize: 12,
+    fontWeight: '700',
+    lineHeight: 17,
+    textAlign: 'center',
   },
   saveBtn: {
     borderRadius: 12,

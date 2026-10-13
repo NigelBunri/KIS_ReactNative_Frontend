@@ -22,31 +22,7 @@ import type { RootStackParamList } from '@/navigation/types';
 import { useProfileController } from '@/screens/tabs/profile/useProfileController';
 import KISButton from '@/constants/KISButton';
 import { useAuth } from '../../../App';
-
-const CATEGORY_LABELS: Record<string, string> = {
-  health: 'Health & Medical',
-  finances: 'Financial Hardship',
-  relationships: 'Relationships & Marriage',
-  faith: 'Faith & Spirituality',
-  business: 'Business & Career',
-  grief: 'Loss & Grief',
-  addiction: 'Addiction & Recovery',
-  family: 'Family & Parenting',
-  mental_health: 'Mental Health',
-  other: 'Other',
-};
-const CATEGORY_EMOJI: Record<string, string> = {
-  health: '🏥',
-  finances: '💰',
-  relationships: '💑',
-  faith: '🙏',
-  business: '💼',
-  grief: '🕊️',
-  addiction: '🌱',
-  family: '👨‍👩‍👧',
-  mental_health: '🧠',
-  other: '💙',
-};
+import { CATEGORY_EMOJI, CATEGORY_LABELS } from './testimonyCategories';
 
 function timeAgo(iso: string) {
   const diff = Date.now() - new Date(iso).getTime();
@@ -73,15 +49,23 @@ export default function TestimonyReachInboxScreen() {
   const [reachOuts, setReachOuts] = useState<any[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const styles = useMemo(() => makeStyles(palette), [palette]);
 
+  // This is literally the inbox for people reaching out after sharing
+  // something vulnerable — silently rendering "Nothing here yet" on a
+  // load failure (the previous behavior: no error branch at all) reads as
+  // "no one reached out" when the real story might be "we couldn't check."
   const loadData = useCallback(async () => {
-    const res = await getRequest(ROUTES.testimony.reach);
+    setLoadError(null);
+    const res = await getRequest(ROUTES.testimony.reach, { errorMessage: 'Unable to load reach-outs.' });
     if (res?.success) {
       const data = res.data;
       const list = Array.isArray(data) ? data : Array.isArray(data?.results) ? data.results : [];
       setReachOuts(list);
+    } else {
+      setLoadError((res as any)?.message || 'Unable to load reach-outs. Please try again.');
     }
   }, []);
 
@@ -257,7 +241,7 @@ export default function TestimonyReachInboxScreen() {
   return (
     <SafeAreaView style={[{ flex: 1, backgroundColor: palette.bg, }]} edges={['top']}>
       <View style={[styles.header, { backgroundColor: palette.bg, }]}>
-        <Pressable onPress={() => navigation.goBack()} style={styles.backBtn} hitSlop={12}>
+        <Pressable onPress={() => navigation.goBack()} style={styles.backBtn} hitSlop={12} accessibilityRole="button" accessibilityLabel="Go back">
           <KISIcon name="arrow-left" size={22} color={palette.text} />
         </Pressable>
         <Text style={[styles.headerTitle, { color: palette.text }]}>Reach-out Inbox</Text>
@@ -286,7 +270,18 @@ export default function TestimonyReachInboxScreen() {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={palette.primary} colors={[palette.primary]} />
         }
       >
-        {currentList.length === 0 ? (
+        {loadError ? (
+          <View style={styles.emptyState}>
+            <Text style={{ fontSize: 32 }}>⚠️</Text>
+            <Text style={[styles.emptyText, { color: palette.danger }]}>{loadError}</Text>
+            <Pressable
+              onPress={() => void loadData()}
+              style={{ marginTop: 8, paddingHorizontal: 20, paddingVertical: 10, borderRadius: 10, backgroundColor: palette.primary }}
+            >
+              <Text style={{ color: palette.onPrimary, fontWeight: '700' }}>Retry</Text>
+            </Pressable>
+          </View>
+        ) : currentList.length === 0 ? (
           <View style={styles.emptyState}>
             <KISIcon name="bell" size={40} color={palette.subtext} />
             <Text style={[styles.emptyText, { color: palette.subtext }]}>Nothing here yet.</Text>

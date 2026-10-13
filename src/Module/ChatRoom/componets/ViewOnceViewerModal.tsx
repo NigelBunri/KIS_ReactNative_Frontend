@@ -109,6 +109,8 @@ export const ViewOnceViewerModal: React.FC<Props> = ({ visible, content, palette
         <Pressable
           onPress={() => setVoicePlaying((p) => !p)}
           disabled={!uri}
+          accessibilityRole="button"
+          accessibilityLabel={voicePlaying ? 'Pause voice message' : 'Play voice message'}
           style={{
             width: 76,
             height: 76,
@@ -189,6 +191,9 @@ export const ViewOnceViewerModal: React.FC<Props> = ({ visible, content, palette
               <Pressable
                 key={i}
                 onPress={() => setAttachmentIndex(i)}
+                accessibilityRole="button"
+                accessibilityLabel={`View item ${i + 1} of ${attachments.length}`}
+                accessibilityState={{ selected: i === attachmentIndex }}
                 style={{
                   width: 8,
                   height: 8,
@@ -203,6 +208,8 @@ export const ViewOnceViewerModal: React.FC<Props> = ({ visible, content, palette
         <Pressable
           onPress={onClose}
           hitSlop={12}
+          accessibilityRole="button"
+          accessibilityLabel="Close"
           style={{
             position: 'absolute',
             top: insets.top + 8,

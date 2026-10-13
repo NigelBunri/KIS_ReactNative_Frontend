@@ -59,6 +59,8 @@ export default function AgeGateScreen({ ageRestriction, onConfirm, onBack }: Pro
         <Pressable
           onPress={onConfirm}
           style={[styles.confirmBtn, { backgroundColor: palette.gold, minHeight: Math.max(50, minTouchTarget) }]}
+          accessibilityRole="button"
+          accessibilityLabel={`I am ${ageRestriction} years old`}
         >
           <Text style={[styles.confirmText, { color: palette.onPrimary, fontSize: bodyFontSize + 1 }]}>
             I am {ageRestriction} years old
@@ -69,6 +71,8 @@ export default function AgeGateScreen({ ageRestriction, onConfirm, onBack }: Pro
         <Pressable
           onPress={onBack}
           style={[styles.backBtn, { minHeight: minTouchTarget, justifyContent: 'center' }]}
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
         >
           <Text style={[styles.backText, { color: palette.subtext, fontSize: labelFontSize }]}>
             Go Back

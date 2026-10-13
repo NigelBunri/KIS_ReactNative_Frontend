@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, FlatList, Text, View } from 'react-native';
 import { getRequest } from '@/network/get';
 import ROUTES from '@/network';
+import KISButton from '@/constants/KISButton';
 import {
   getHealthThemeColors,
   HEALTH_THEME_SPACING,
@@ -30,14 +31,21 @@ export default function WebsiteFormResponsesScreen({ route, navigation }: Props)
   const typography = HEALTH_THEME_TYPOGRAPHY;
 
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [submissions, setSubmissions] = useState<Submission[]>([]);
 
   const load = useCallback(async () => {
     setLoading(true);
+    setError(null);
     try {
       const res = await getRequest(ROUTES.websites.formResponses(websiteId));
+      if ((res as any)?.success === false) {
+        throw new Error((res as any)?.message || 'Unable to load form responses.');
+      }
       const data = (res as any)?.data ?? res;
       setSubmissions(Array.isArray(data) ? data : []);
+    } catch (e: any) {
+      setError(e?.message || 'Unable to load form responses.');
     } finally {
       setLoading(false);
     }
@@ -53,6 +61,20 @@ export default function WebsiteFormResponsesScreen({ route, navigation }: Props)
         <ScreenHeader title="Form Responses" onBack={() => navigation.goBack()} />
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
           <ActivityIndicator color={palette.accentPrimary} />
+        </View>
+      </View>
+    );
+  }
+
+  if (error) {
+    return (
+      <View style={{ flex: 1, backgroundColor: palette.bg }}>
+        <ScreenHeader title="Form Responses" onBack={() => navigation.goBack()} />
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.md }}>
+          <Text style={{ ...typography.body, color: palette.text, textAlign: 'center', marginBottom: spacing.md }}>
+            {error}
+          </Text>
+          <KISButton title="Retry" onPress={() => { load().catch(() => {}); }} />
         </View>
       </View>
     );

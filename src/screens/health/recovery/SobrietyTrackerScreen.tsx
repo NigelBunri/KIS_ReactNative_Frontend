@@ -102,6 +102,8 @@ export default function SobrietyTrackerScreen({ navigation }: Props) {
           onPress={() => navigation.goBack()}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           style={styles.backBtn}
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
         >
           <KISIcon name="arrow-left" size={22} color={palette.ivory} />
         </TouchableOpacity>
@@ -112,6 +114,26 @@ export default function SobrietyTrackerScreen({ navigation }: Props) {
         contentContainerStyle={[styles.content, { paddingBottom: 80 }]}
         showsVerticalScrollIndicator={false}
       >
+        {/* Compassionate, always-visible support link. This screen's streak
+            counter and milestones have no in-app (or backend) path for
+            logging a setback/relapse — see audit doc. Until that's designed
+            properly, at minimum a struggling user should never be more than
+            one tap from a human/crisis resource, regardless of where their
+            counter stands. */}
+        <TouchableOpacity
+          style={styles.supportBanner}
+          onPress={() => navigation.navigate('CrisisResources')}
+          accessibilityRole="button"
+          accessibilityLabel="Having a hard moment? Get support now."
+          accessibilityHint="Opens crisis resources and hotlines"
+        >
+          <KISIcon name="heart" size={18} color={palette.primary} />
+          <Text style={styles.supportBannerText}>
+            Having a hard moment? You don't have to face it alone — get support now.
+          </Text>
+          <KISIcon name="chevron-right" size={16} color={palette.subtext} />
+        </TouchableOpacity>
+
         {/* Main Counter */}
         <LinearGradient
           colors={[palette.primarySoft, palette.card]}
@@ -229,6 +251,18 @@ function makeStyles(palette: any, sp: number) {
     backBtn: { minWidth: 44, minHeight: 44, justifyContent: 'center' },
     headerTitle: { fontSize: 22, fontWeight: '700', color: palette.ivory },
     content: { padding: sp, gap: 16 },
+    supportBanner: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      backgroundColor: palette.primarySoft,
+      borderRadius: 12,
+      padding: 14,
+      borderWidth: 1,
+      borderColor: palette.primary + '44',
+      minHeight: 44,
+    },
+    supportBannerText: { flex: 1, fontSize: 13, color: palette.text, lineHeight: 18 },
     counterCard: {
       borderRadius: 20,
       padding: 32,

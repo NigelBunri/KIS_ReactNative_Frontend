@@ -63,9 +63,12 @@ export default function CopyrightClaimsPanel({ channelId }: Props) {
         ROUTES.broadcasts.channelCopyrightClaims(channelId),
         { errorMessage: '' },
       );
-      // getRequest resolves to the ApiResult wrapper — the final
-      // `res?.results` fallback checked the wrapper instead of
-      // `res.data.results`, so a paginated response always fell through to [].
+      // getRequest resolves (never throws) on failure too — without this
+      // check, a failed load fell through to the same `res?.data?.results`
+      // fallback used for a genuinely empty list, rendering the reassuring
+      // "Your content is in good standing" empty state on a load failure,
+      // which is actively misleading for a copyright-claims screen.
+      if (!res?.success) throw new Error('Could not load copyright claims.');
       const raw: CopyrightClaim[] = Array.isArray(res?.data)
         ? res.data
         : res?.data?.results ?? [];

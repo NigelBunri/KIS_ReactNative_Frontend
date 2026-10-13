@@ -52,7 +52,13 @@ export default function AdminSystemHealthPanel({
           <Pressable onPress={onRefresh} style={[styles.refreshBtn, { borderColor: palette.border }]}>
             <Text style={{ color: palette.primaryStrong ?? palette.primary, fontWeight: '700', fontSize: 12 }}>Refresh</Text>
           </Pressable>
-          <Pressable onPress={onClose} style={styles.closeBtn}>
+          <Pressable
+            onPress={onClose}
+            style={styles.closeBtn}
+            accessibilityRole="button"
+            accessibilityLabel="Close"
+            hitSlop={8}
+          >
             <Text style={{ color: palette.subtext, fontSize: 20, lineHeight: 22 }}>✕</Text>
           </Pressable>
         </View>

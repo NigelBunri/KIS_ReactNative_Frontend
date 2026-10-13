@@ -63,6 +63,7 @@ export default function SimulcastPanel({ streamId }: Props) {
   const { palette } = useKISTheme();
   const [targets, setTargets] = useState<SimulcastTarget[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [adding, setAdding] = useState(false);
   const [removingId, setRemovingId] = useState<string | null>(null);
@@ -76,20 +77,25 @@ export default function SimulcastPanel({ streamId }: Props) {
   const fetchTargets = useCallback(async () => {
     if (!streamId) return;
     setLoading(true);
+    setLoadError(false);
     try {
       const res = await getRequest(
         ROUTES.broadcasts.liveStreamSimulcast(streamId),
         { errorMessage: '' },
       );
-      // getRequest resolves to the ApiResult wrapper — the final
-      // `res?.results` fallback checked the wrapper instead of
-      // `res.data.results`, so a paginated response always fell through to [].
+      // getRequest resolves (never throws) on failure too — this used to
+      // swallow that into the same "No simulcast targets yet" empty state
+      // as a genuinely empty list, with zero indication a load failed.
+      if (!res?.success) {
+        setLoadError(true);
+        return;
+      }
       const raw: SimulcastTarget[] = Array.isArray(res?.data)
         ? res.data
         : res?.data?.results ?? [];
       setTargets(raw);
     } catch {
-      // silently fail — list may be empty on first open
+      setLoadError(true);
     } finally {
       setLoading(false);
     }
@@ -150,12 +156,23 @@ export default function SimulcastPanel({ streamId }: Props) {
         onPress: async () => {
           setRemovingId(target.id);
           try {
-            await postRequest(
+            // postRequest resolves (never throws) on failure too — the
+            // trailing `.catch(() => {})` here used to swallow that, so a
+            // failed removal still re-fetched and looked like nothing
+            // happened (the target just silently stayed in the list with
+            // no explanation why).
+            const res = await postRequest(
               `${ROUTES.broadcasts.liveStreamSimulcast(streamId)}${target.id}/remove/`,
               {},
               { errorMessage: '' },
-            ).catch(() => {});
+            );
+            if (!res?.success) {
+              Alert.alert('Error', 'Could not remove simulcast target. Please try again.');
+              return;
+            }
             await fetchTargets();
+          } catch {
+            Alert.alert('Error', 'Could not remove simulcast target. Please try again.');
           } finally {
             setRemovingId(null);
           }
@@ -271,7 +288,13 @@ export default function SimulcastPanel({ streamId }: Props) {
       )}
 
       {/* Target list */}
-      {targets.length === 0 ? (
+      {loadError ? (
+        <View style={[styles.emptyState, { borderColor: palette.border, backgroundColor: palette.card }]}>
+          <Text style={[styles.emptyText, { color: palette.danger }]}>
+            Could not load simulcast targets. Reopen this panel to retry.
+          </Text>
+        </View>
+      ) : targets.length === 0 ? (
         <View style={[styles.emptyState, { borderColor: palette.border, backgroundColor: palette.card }]}>
           <Text style={[styles.emptyText, { color: palette.subtext }]}>
             No simulcast targets yet. Add one above.

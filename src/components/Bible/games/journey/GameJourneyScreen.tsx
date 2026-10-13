@@ -83,7 +83,13 @@ export default function GameJourneyScreen({ gameKey, onExit, onOpenStats, onEnte
           <Text style={[styles.title, { color: palette.text }]} numberOfLines={1}>{meta.title}</Text>
           <Text style={[styles.subtitle, { color: theme.accent }]} numberOfLines={1}>{theme.journeyTitle}</Text>
         </View>
-        <Pressable onPress={onOpenStats} hitSlop={10} style={[styles.backBtn, { backgroundColor: palette.selectedBg, borderColor: palette.inputBorder }]}>
+        <Pressable
+          onPress={onOpenStats}
+          hitSlop={10}
+          accessibilityRole="button"
+          accessibilityLabel="View stats"
+          style={[styles.backBtn, { backgroundColor: palette.selectedBg, borderColor: palette.inputBorder }]}
+        >
           <KISIcon name="bar-chart" size={16} color={palette.primary} />
         </Pressable>
       </View>

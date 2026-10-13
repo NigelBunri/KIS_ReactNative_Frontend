@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Animated, ScrollView, Text, View } from 'react-native';
+import { Alert, Animated, Pressable, ScrollView, Text, View } from 'react-native';
 import { useKISTheme } from '@/theme/useTheme';
 import KISButton from '@/constants/KISButton';
 import type {
@@ -30,18 +30,33 @@ const TYPE_LABELS: Record<PartnerOrganizationType, string> = {
 };
 
 export default function PartnerOrganizationsPanel({
+  isOpen,
   panelWidth,
   panelTranslateX,
   organizations,
   linkable,
   loading,
   error,
+  onClose,
   onLink,
   onUnlink,
   onRefresh,
 }: Props) {
   const { palette } = useKISTheme();
   const [showLinkable, setShowLinkable] = useState(false);
+
+  if (!isOpen) return null;
+
+  const confirmUnlink = (org: PartnerOrganizationLink) => {
+    Alert.alert(
+      'Unlink organization',
+      `Disconnect "${org.exists ? org.name || 'Untitled' : 'this organization'}" from this partner profile? You can link it again later.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Unlink', style: 'destructive', onPress: () => onUnlink(org.id) },
+      ],
+    );
+  };
 
   return (
     <Animated.View
@@ -62,12 +77,23 @@ export default function PartnerOrganizationsPanel({
               Connect the shops, institutions, and channels you own to this partner profile.
             </Text>
           </View>
-          <KISButton
-            title={showLinkable ? 'Cancel' : '+ Link'}
-            size="sm"
-            variant={showLinkable ? 'outline' : 'primary'}
-            onPress={() => setShowLinkable((prev) => !prev)}
-          />
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <KISButton
+              title={showLinkable ? 'Cancel' : '+ Link'}
+              size="sm"
+              variant={showLinkable ? 'outline' : 'primary'}
+              onPress={() => setShowLinkable((prev) => !prev)}
+            />
+            <Pressable
+              onPress={onClose}
+              accessibilityRole="button"
+              accessibilityLabel="Close"
+              hitSlop={8}
+              style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1, padding: 4 })}
+            >
+              <Text style={{ color: palette.text, fontSize: 20, lineHeight: 22 }}>✕</Text>
+            </Pressable>
+          </View>
         </View>
 
         {loading ? (
@@ -147,7 +173,7 @@ export default function PartnerOrganizationsPanel({
                     </Text>
                     <TypeChip type={org.owner_type} palette={palette} />
                   </View>
-                  <KISButton title="Unlink" size="sm" variant="outline" onPress={() => onUnlink(org.id)} />
+                  <KISButton title="Unlink" size="sm" variant="outline" onPress={() => confirmUnlink(org)} />
                 </View>
               </View>
             ))

@@ -415,6 +415,8 @@ export const AttachmentPreviewPage: React.FC<AttachmentPreviewPageProps> = ({
                   >
                     <Pressable
                       onPress={() => playAudio(item)}
+                      accessibilityRole="button"
+                      accessibilityLabel={playingId === item.uri ? 'Pause audio preview' : 'Play audio preview'}
                       style={{
                         width: responsive.isWatch ? 36 : 44,
                         height: responsive.isWatch ? 36 : 44,
@@ -504,6 +506,8 @@ export const AttachmentPreviewPage: React.FC<AttachmentPreviewPageProps> = ({
                     {canRemove && (
                       <Pressable
                         onPress={() => handleRemoveItem(index)}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Remove ${item.name}`}
                         style={{
                           marginLeft: KIS_TOKENS.spacing.sm,
                           padding: 6,
@@ -673,6 +677,8 @@ export const AttachmentPreviewPage: React.FC<AttachmentPreviewPageProps> = ({
                 );
                 handleClose();
               }}
+              accessibilityRole="button"
+              accessibilityLabel="Cancel"
               style={({ pressed }) => ({
                 paddingHorizontal: KIS_TOKENS.spacing.md,
                 paddingVertical: KIS_TOKENS.spacing.sm,
@@ -700,6 +706,8 @@ export const AttachmentPreviewPage: React.FC<AttachmentPreviewPageProps> = ({
                 handleSendPress();
               }}
               disabled={isUploading}
+              accessibilityRole="button"
+              accessibilityLabel={isUploading ? 'Uploading attachments' : 'Send attachments'}
               style={({ pressed }) => ({
                 paddingHorizontal: modalPadding,
                 paddingVertical: KIS_TOKENS.spacing.sm,

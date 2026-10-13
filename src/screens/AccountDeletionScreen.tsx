@@ -173,7 +173,13 @@ export default function AccountDeletionScreen() {
               autoCapitalize="none"
               autoCorrect={false}
             />
-            <Pressable onPress={() => setShowPassword(v => !v)} style={styles.eyeBtn}>
+            <Pressable
+              onPress={() => setShowPassword(v => !v)}
+              style={styles.eyeBtn}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel={showPassword ? 'Hide password' : 'Show password'}
+            >
               <Text style={{ color: palette.subtext, fontSize: 16 }}>{showPassword ? '🙈' : '👁'}</Text>
             </Pressable>
           </View>

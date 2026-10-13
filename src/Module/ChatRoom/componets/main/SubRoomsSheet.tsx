@@ -209,7 +209,7 @@ export const SubRoomsSheet: React.FC<SubRoomsSheetProps> = ({
               Sub-rooms ({count})
             </Text>
 
-            <Pressable onPress={onClose}>
+            <Pressable onPress={onClose} accessibilityRole="button" accessibilityLabel="Close">
               <KISIcon name="close" size={20} color={palette.subtext} />
             </Pressable>
           </View>

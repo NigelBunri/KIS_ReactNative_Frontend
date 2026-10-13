@@ -42,7 +42,13 @@ type Props = {
 function SectionDragHandle({ palette, spacing }: { palette: any; spacing: any }) {
   const drag = useReorderableDrag();
   return (
-    <Pressable onLongPress={drag} hitSlop={10} style={{ paddingHorizontal: spacing.xs, paddingVertical: 2 }}>
+    <Pressable
+      onLongPress={drag}
+      hitSlop={10}
+      accessibilityRole="button"
+      accessibilityLabel="Reorder section, press and hold to drag"
+      style={{ paddingHorizontal: spacing.xs, paddingVertical: 2 }}
+    >
       <KISIcon name="menu" size={18} color={palette.subtext} />
     </Pressable>
   );
@@ -231,10 +237,20 @@ const AnimatedSectionCard = ({
                   </Text>
                 </View>
                 <View style={{ flexDirection: 'row', gap: spacing.sm }}>
-                  <TouchableOpacity onPress={() => onEdit?.(section.id)}>
+                  <TouchableOpacity
+                    onPress={() => onEdit?.(section.id)}
+                    hitSlop={10}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Edit section ${index + 1}`}
+                  >
                     <Text style={{ ...typography.label, color: palette.accentPrimary }}>Edit</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity onPress={() => onDelete?.(section.id)}>
+                  <TouchableOpacity
+                    onPress={() => onDelete?.(section.id)}
+                    hitSlop={10}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Delete section ${index + 1}`}
+                  >
                     <Text style={{ ...typography.label, color: palette.danger }}>Delete</Text>
                   </TouchableOpacity>
                 </View>

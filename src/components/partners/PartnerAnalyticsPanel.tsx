@@ -87,6 +87,7 @@ export default function PartnerAnalyticsPanel({ isOpen, panelWidth, panelTransla
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState<Analytics | null>(null);
   const [windowDays, setWindowDays] = useState(30);
+  const [error, setError] = useState<string | null>(null);
 
   const backdropOpacity = panelTranslateX.interpolate({ inputRange: [0, panelWidth], outputRange: [1, 0], extrapolate: 'clamp' });
 
@@ -97,7 +98,13 @@ export default function PartnerAnalyticsPanel({ isOpen, panelWidth, panelTransla
     // undefined — the old `?? res` fallback set `data` to the wrapper
     // object, and unguarded reads like `data.members.total` below (not
     // optional-chained) crashed the panel on any network failure.
-    const payload = (res?.success ? res?.data : null) as Analytics | null;
+    if (!res?.success) {
+      setError(res?.message || "Couldn't load analytics. Tap to retry.");
+      setData(null);
+      return;
+    }
+    setError(null);
+    const payload = res?.data as Analytics | null;
     setData(payload);
   }, [partnerId, windowDays]);
 
@@ -149,7 +156,30 @@ export default function PartnerAnalyticsPanel({ isOpen, panelWidth, panelTransla
             ))}
           </View>
 
-          {loading || !data ? (
+          {loading ? (
+            <ActivityIndicator size="small" color={palette.primary} />
+          ) : error ? (
+            <View
+              style={{
+                borderRadius: 10,
+                borderWidth: 1,
+                borderColor: palette.danger,
+                backgroundColor: palette.danger + '15',
+                padding: 12,
+              }}
+            >
+              <Text style={{ color: palette.danger, fontSize: 13, fontWeight: '600' }}>{error}</Text>
+              <Pressable
+                onPress={() => {
+                  setLoading(true);
+                  load().finally(() => setLoading(false));
+                }}
+                style={{ marginTop: 8 }}
+              >
+                <Text style={{ color: palette.primary, fontWeight: '700', fontSize: 13 }}>Tap to retry</Text>
+              </Pressable>
+            </View>
+          ) : !data ? (
             <ActivityIndicator size="small" color={palette.primary} />
           ) : (
             <>

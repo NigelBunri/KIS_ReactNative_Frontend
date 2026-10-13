@@ -58,13 +58,19 @@ export default function PartnerMembershipRulesPanel({ isOpen, panelWidth, panelT
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [config, setConfig] = useState<JoinConfig | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const backdropOpacity = panelTranslateX.interpolate({ inputRange: [0, panelWidth], outputRange: [1, 0], extrapolate: 'clamp' });
 
   const load = useCallback(async () => {
     if (!partnerId) return;
     const res = await getRequest(ROUTES.partners.detail(partnerId), { errorMessage: 'Unable to load membership rules.' });
-    const payload = res?.data ?? res ?? {};
+    if (!res?.success) {
+      setError(res?.message || "Couldn't load membership rules. Tap to retry.");
+      return;
+    }
+    setError(null);
+    const payload = res?.data ?? {};
     const joinConfig = payload.join_config ?? {};
     setConfig({
       allow_public_listing: joinConfig.allow_public_listing ?? true,
@@ -131,7 +137,30 @@ export default function PartnerMembershipRulesPanel({ isOpen, panelWidth, panelT
         </View>
 
         <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.settingsPanelBody} showsVerticalScrollIndicator={false}>
-          {loading || !config ? (
+          {loading ? (
+            <ActivityIndicator size="small" color={palette.primary} />
+          ) : error ? (
+            <View
+              style={{
+                borderRadius: 10,
+                borderWidth: 1,
+                borderColor: palette.danger,
+                backgroundColor: palette.danger + '15',
+                padding: 12,
+              }}
+            >
+              <Text style={{ color: palette.danger, fontSize: 13, fontWeight: '600' }}>{error}</Text>
+              <Pressable
+                onPress={() => {
+                  setLoading(true);
+                  load().finally(() => setLoading(false));
+                }}
+                style={{ marginTop: 8 }}
+              >
+                <Text style={{ color: palette.primary, fontWeight: '700', fontSize: 13 }}>Tap to retry</Text>
+              </Pressable>
+            </View>
+          ) : !config ? (
             <ActivityIndicator size="small" color={palette.primary} />
           ) : (
             <>

@@ -58,18 +58,23 @@ export const useAdminSystemHealthPanel = (width: number) => {
         getRequest((ROUTES as any).control?.monitoringAlerts ?? '', { errorMessage: '' }),
         getRequest((ROUTES as any).control?.performance ?? '', { errorMessage: '' }),
       ]);
-      if (metricsRes.status === 'fulfilled' && metricsRes.value?.success) setMetrics(metricsRes.value.data);
-      if (alertsRes.status === 'fulfilled' && alertsRes.value?.success) {
+      // getRequest never rejects — it catches internally and always resolves
+      // with { success: false } — so `.status === 'rejected'` below was dead
+      // code. On a full outage this silently left `error` unset and the
+      // panel just showed its "no data" placeholder with no indication of a
+      // failure. Check `.value?.success` instead, which actually reflects
+      // whether the request succeeded.
+      const metricsOk = metricsRes.status === 'fulfilled' && !!metricsRes.value?.success;
+      const alertsOk = alertsRes.status === 'fulfilled' && !!alertsRes.value?.success;
+      const perfOk = perfRes.status === 'fulfilled' && !!perfRes.value?.success;
+      if (metricsOk) setMetrics(metricsRes.value.data);
+      if (alertsOk) {
         setAlerts(alertsRes.value.data?.alerts ?? alertsRes.value.data?.results ?? []);
       }
-      if (perfRes.status === 'fulfilled' && perfRes.value?.success) {
+      if (perfOk) {
         setPerformance(perfRes.value.data?.endpoints ?? perfRes.value.data?.results ?? []);
       }
-      if (
-        metricsRes.status === 'rejected' &&
-        alertsRes.status === 'rejected' &&
-        perfRes.status === 'rejected'
-      ) {
+      if (!metricsOk && !alertsOk && !perfOk) {
         setError('Failed to load system health data.');
       }
     } catch {

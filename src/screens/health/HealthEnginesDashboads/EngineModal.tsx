@@ -218,7 +218,7 @@ export default function EngineModal({ data, onClose, visible, institutionId }: P
                 padding: spacing.xs,
                 backgroundColor: palette.card,
               }}
-              accessibilityLabel="Close services page"
+              accessibilityLabel="Close engine details"
             >
               <KISIcon name="close" size={18} color={palette.text} />
             </TouchableOpacity>

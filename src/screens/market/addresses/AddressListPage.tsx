@@ -126,7 +126,7 @@ export default function AddressListPage() {
     await load();
   }, [form, editingId, load]);
 
-  const handleDelete = useCallback(async (address: DeliveryAddress) => {
+  const deleteAddress = useCallback(async (address: DeliveryAddress) => {
     setBusyId(address.id);
     const response = await deleteRequest(ROUTES.commerce.address(address.id), { errorMessage: 'Unable to delete address.' });
     setBusyId(null);
@@ -136,6 +136,24 @@ export default function AddressListPage() {
     }
     await load();
   }, [load]);
+
+  const handleDelete = useCallback((address: DeliveryAddress) => {
+    // Deleting a saved address was previously one tap with zero
+    // confirmation — easy to hit by mistake while reaching for "Edit" or
+    // "Set default" right next to it in the same row.
+    Alert.alert(
+      'Delete address',
+      `Delete "${address.label ? `${address.label} · ` : ''}${address.recipient_name}"? This can't be undone.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => void deleteAddress(address),
+        },
+      ],
+    );
+  }, [deleteAddress]);
 
   const handleSetDefault = useCallback(async (address: DeliveryAddress) => {
     setBusyId(address.id);
@@ -181,7 +199,12 @@ export default function AddressListPage() {
   return (
     <View style={[styles.root, { backgroundColor: palette.bg, paddingTop: topInset }]}>
       <View style={[styles.header, { backgroundColor: palette.surface, borderColor: palette.divider }]}>
-        <Pressable onPress={() => navigation.goBack()} style={styles.backButton}>
+        <Pressable
+          onPress={() => navigation.goBack()}
+          style={styles.backButton}
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
+        >
           <KISIcon name="arrow-left" size={18} color={palette.text} />
         </Pressable>
         <Text style={[styles.title, { color: palette.text }]}>Delivery addresses</Text>
@@ -209,7 +232,12 @@ export default function AddressListPage() {
       <Modal visible={formVisible} animationType="slide" onRequestClose={() => setFormVisible(false)}>
         <View style={[styles.root, { backgroundColor: palette.bg, paddingTop: topInset }]}>
           <View style={[styles.header, { backgroundColor: palette.surface, borderColor: palette.divider }]}>
-            <Pressable onPress={() => setFormVisible(false)} style={styles.backButton}>
+            <Pressable
+              onPress={() => setFormVisible(false)}
+              style={styles.backButton}
+              accessibilityRole="button"
+              accessibilityLabel="Close address form"
+            >
               <KISIcon name="close" size={18} color={palette.text} />
             </Pressable>
             <Text style={[styles.title, { color: palette.text }]}>{editingId ? 'Edit address' : 'Add address'}</Text>

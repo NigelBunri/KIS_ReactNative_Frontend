@@ -16,6 +16,9 @@ export function DropButton({
   return (
     <Pressable
       onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ selected: active }}
       style={{
         paddingHorizontal: 12,
         paddingVertical: 10,

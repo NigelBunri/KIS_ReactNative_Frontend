@@ -1276,6 +1276,9 @@ export default function BroadcastHealthcarePage({
 
       <TouchableOpacity
         onPress={() => loadHealthcareBroadcasts().catch(() => undefined)}
+        style={{ paddingVertical: 12, minHeight: 44, justifyContent: 'center' }}
+        accessibilityRole="button"
+        accessibilityLabel="Refresh healthcare broadcasts"
       >
         <Text
           style={{

@@ -116,6 +116,9 @@ export default function MentalHealthScreen({ navigation }: Props) {
                   moodScore === n && styles.scoreBtnActive,
                 ]}
                 hitSlop={{ top: 4, bottom: 4, left: 2, right: 2 }}
+                accessibilityRole="button"
+                accessibilityLabel={`Mood score ${n} of 10`}
+                accessibilityState={{ selected: moodScore === n }}
               >
                 <Text style={[
                   styles.scoreBtnText,
@@ -139,6 +142,9 @@ export default function MentalHealthScreen({ navigation }: Props) {
                 ]}
                 onPress={() => toggleTag(e.key)}
                 hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
+                accessibilityRole="button"
+                accessibilityLabel={e.label}
+                accessibilityState={{ selected: selectedTags.includes(e.key) }}
               >
                 <KISIcon
                   name={e.icon as any}
@@ -175,7 +181,10 @@ export default function MentalHealthScreen({ navigation }: Props) {
             <View style={styles.chartContainer}>
               {last7Trends.map((t, i) => {
                 const barHeight = Math.max(4, (t.mood_score / maxScore) * 80);
-                const barColor = t.mood_score >= 7 ? palette.primary : t.mood_score >= 4 ? palette.gold : palette.danger;
+                // Low mood scores use `warning` (amber), not `danger` (red) — a
+                // low check-in score is not an error/alarm state, and red here
+                // risks pathologizing a normal bad day as an emergency.
+                const barColor = t.mood_score >= 7 ? palette.primary : t.mood_score >= 4 ? palette.gold : palette.warning;
                 return (
                   <View key={i} style={styles.barColumn}>
                     <View style={[styles.bar, { height: barHeight, backgroundColor: barColor }]} />
@@ -256,7 +265,7 @@ function makeStyles(palette: any, sp: number) {
     },
     scoreBtn: {
       flex: 1,
-      minHeight: 36,
+      minHeight: 44,
       borderRadius: 8,
       backgroundColor: palette.surface,
       justifyContent: 'center',

@@ -175,6 +175,8 @@ export default function DiscipleshipScreen({ navigation }: Props) {
                 style={styles.contactBtn}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 onPress={() => Alert.alert('Contact', `Contact ${data.mentor?.name} at ${data.mentor?.contact ?? 'N/A'}`)}
+                accessibilityRole="button"
+                accessibilityLabel={`Contact mentor ${data.mentor?.name ?? ''}`}
               >
                 <KISIcon name="send" size={18} tone="primary" />
               </TouchableOpacity>

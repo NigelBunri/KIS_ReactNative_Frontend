@@ -335,6 +335,7 @@ export default function BibleScreen() {
               }]}
               hitSlop={6}
               accessibilityLabel="Settings"
+              accessibilityRole="button"
             >
               <KISIcon name="settings" size={17} color={palette.onGold} />
             </Pressable>

@@ -45,6 +45,8 @@ export default function GeoBlockedScreen({ onBack }: Props) {
         <Pressable
           onPress={onBack}
           style={[styles.backBtn, { borderColor: palette.border, minHeight: Math.max(50, minTouchTarget) }]}
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
         >
           <Text style={[styles.backText, { color: palette.ivory, fontSize: bodyFontSize }]}>Go Back</Text>
         </Pressable>

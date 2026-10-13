@@ -155,6 +155,7 @@ export default function WhoSaidItGame({ gameKey, stageIndex, isReplay, onExit, o
             }}
             onBackToJourney={onExit}
             onViewStats={onOpenStats}
+            persisted={stageResult.persisted}
           />
         </View>
       </GameShell>

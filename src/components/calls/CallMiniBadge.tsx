@@ -106,6 +106,7 @@ export default function CallMiniBadge({ onRestore }: Props) {
         onPress={() => leaveCall?.()}
         style={[styles.endBtn, { backgroundColor: palette.danger }]}
         accessibilityLabel="Leave call"
+        accessibilityRole="button"
         hitSlop={6}
       >
         <KISIcon name="phone-off" size={14} color={palette.ivory} />

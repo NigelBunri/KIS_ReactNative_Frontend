@@ -8,6 +8,7 @@ import React, {
 } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Animated,
   KeyboardAvoidingView,
   Modal,
@@ -130,9 +131,39 @@ export default function FeedComposerSheet({
       onClose();
     });
   }, [sheetY, onClose, resetAll]);
+  const hasDraftContent = useCallback(() => {
+    if (step !== 'form') return false;
+    if (rich.text.trim().length) return true;
+    if (attachments.length) return true;
+    if (link.trim().length) return true;
+    if (pollQuestion.trim().length) return true;
+    if (eventTitle.trim().length) return true;
+    return false;
+  }, [step, rich.text, attachments, link, pollQuestion, eventTitle]);
+
+  // Tapping the backdrop or either close affordance used to discard
+  // whatever the user had drafted immediately and silently — no confirm,
+  // no undo. A stray tap outside the sheet mid-post lost real work. Now
+  // only a sheet with actual drafted content asks before discarding;
+  // empty/picker-step dismissal still closes instantly.
+  const requestClose = useCallback(() => {
+    if (!hasDraftContent()) {
+      closeSheet();
+      return;
+    }
+    Alert.alert(
+      'Discard post?',
+      "You'll lose what you've written if you leave now.",
+      [
+        { text: 'Keep editing', style: 'cancel' },
+        { text: 'Discard', style: 'destructive', onPress: closeSheet },
+      ],
+    );
+  }, [hasDraftContent, closeSheet]);
+
   const { dragY, panHandlers } = usePullDownToClose({
     enabled: visible,
-    onClose: closeSheet,
+    onClose: requestClose,
   });
 
   const options = useMemo(
@@ -343,9 +374,9 @@ export default function FeedComposerSheet({
       transparent
       visible={visible}
       animationType="fade"
-      onRequestClose={closeSheet}
+      onRequestClose={requestClose}
     >
-      <Pressable style={styles.backdrop} onPress={closeSheet} />
+      <Pressable style={styles.backdrop} onPress={requestClose} accessibilityLabel="Dismiss" />
       <Animated.View
         style={[
           styles.sheet,
@@ -377,7 +408,7 @@ export default function FeedComposerSheet({
                     </Text>
                   ) : null}
                 </View>
-                <Pressable onPress={closeSheet}>
+                <Pressable onPress={requestClose} hitSlop={10} accessibilityRole="button" accessibilityLabel="Close">
                   <KISIcon name="close" size={20} color={palette.text} />
                 </Pressable>
               </View>
@@ -420,6 +451,8 @@ export default function FeedComposerSheet({
                 <Pressable
                   onPress={() => setStep('picker')}
                   style={{ padding: 6 }}
+                  accessibilityRole="button"
+                  accessibilityLabel="Back to post type picker"
                 >
                   <KISIcon name="arrow-left" size={18} color={palette.text} />
                 </Pressable>
@@ -435,7 +468,7 @@ export default function FeedComposerSheet({
                   ) : null}
                 </View>
 
-                <Pressable onPress={closeSheet}>
+                <Pressable onPress={requestClose} hitSlop={10} accessibilityRole="button" accessibilityLabel="Close">
                   <KISIcon name="close" size={20} color={palette.text} />
                 </Pressable>
               </View>

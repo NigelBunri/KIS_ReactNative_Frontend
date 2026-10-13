@@ -132,7 +132,13 @@ export default function UserProfileScreen() {
     const profileId = profile?.profile_id ?? profile?.id ?? userId;
     setEndorsingSkillId(skillId);
     try {
-      await queueableJsonRequest({
+      // queueableJsonRequest resolves { success: false, message } on a
+      // genuine (non-retryable) backend failure rather than throwing — see
+      // shouldQueueResult/executeAction in offlineActionQueue.ts, same
+      // design as postRequest/patchRequest. This previously marked the
+      // skill "Endorsed" and bumped the count unconditionally, even when
+      // the server rejected the endorsement.
+      const res = await queueableJsonRequest({
         domain: 'Profile',
         kind: 'profile.endorse_skill',
         method: 'POST',
@@ -140,6 +146,9 @@ export default function UserProfileScreen() {
         body: { skill_id: skillId },
         dedupeKey: `profile:endorse:${profileId}:${skillId}`,
       });
+      if (res?.success === false) {
+        throw new Error(res?.message || 'Could not endorse skill.');
+      }
       setEndorsedSkillIds(prev => new Set(prev).add(skillId));
       setSkillEndorseCounts(prev => ({
         ...prev,
@@ -228,7 +237,13 @@ export default function UserProfileScreen() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg, }} edges={['top']}>
       <View style={styles.header}>
-        <Pressable onPress={() => navigation.goBack()} hitSlop={8} style={styles.backBtn}>
+        <Pressable
+          onPress={() => navigation.goBack()}
+          hitSlop={8}
+          style={styles.backBtn}
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
+        >
           <KISIcon name="arrow-left" size={22} color={palette.text} />
         </Pressable>
         <Text style={[styles.headerTitle, { color: palette.text }]} numberOfLines={1}>

@@ -119,7 +119,7 @@ export default function JobDetailScreen({ navigation, route }: Props) {
   if (!job) {
     return (
       <SafeAreaView style={styles.safe} edges={['top']}>
-        <Pressable style={styles.backBtn} onPress={() => navigation.goBack()} hitSlop={8}>
+        <Pressable style={styles.backBtn} onPress={() => navigation.goBack()} hitSlop={8} accessibilityRole="button" accessibilityLabel="Go back">
           <KISIcon name="arrow-back-outline" size={24} color={palette.text} />
         </Pressable>
         <View style={styles.empty}>
@@ -140,7 +140,7 @@ export default function JobDetailScreen({ navigation, route }: Props) {
     <SafeAreaView style={styles.safe} edges={['top']}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
         <View style={styles.navBar}>
-          <Pressable style={styles.backBtn} onPress={() => navigation.goBack()} hitSlop={8}>
+          <Pressable style={styles.backBtn} onPress={() => navigation.goBack()} hitSlop={8} accessibilityRole="button" accessibilityLabel="Go back">
             <KISIcon name="arrow-back-outline" size={24} color={palette.text} />
           </Pressable>
           <Text style={styles.navTitle} numberOfLines={1}>Job Detail</Text>

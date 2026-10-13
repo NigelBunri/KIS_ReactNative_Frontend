@@ -101,6 +101,8 @@ function OBSGuide({
       <Pressable
         onPress={() => setOpen(o => !o)}
         style={styles.guideHeader}
+        accessibilityRole="button"
+        accessibilityLabel={open ? 'Collapse OBS setup guide' : 'Expand OBS setup guide'}
       >
         <KISIcon name="monitor" size={16} color={palette.primaryStrong} />
         <Text style={[styles.guideTitle, { color: palette.text }]}>
@@ -168,7 +170,12 @@ function CredRow({
       </View>
       <View style={styles.credActions}>
         {mask && (
-          <KISButton variant="ghost" onPress={() => setRevealed(r => !r)} style={styles.credBtn}>
+          <KISButton
+            variant="ghost"
+            onPress={() => setRevealed(r => !r)}
+            style={styles.credBtn}
+            accessibilityLabel={revealed ? `Hide ${label}` : `Reveal ${label}`}
+          >
             <KISIcon name={revealed ? 'eye-off' : 'eye'} size={15} color={palette.subtext} />
           </KISButton>
         )}
@@ -176,6 +183,7 @@ function CredRow({
           variant="ghost"
           onPress={() => { Clipboard.setString(value); Alert.alert('Copied to clipboard'); }}
           style={styles.credBtn}
+          accessibilityLabel={`Copy ${label}`}
         >
           <KISIcon name="copy" size={15} color={palette.subtext} />
         </KISButton>
@@ -274,7 +282,7 @@ function RecordingsPanel({
         <Text style={[recStyles.title, { color: palette.text }]}>Recordings</Text>
         {loading
           ? <ActivityIndicator size="small" color={palette.primaryStrong} />
-          : <KISButton variant="ghost" onPress={load}>
+          : <KISButton variant="ghost" onPress={load} accessibilityLabel="Refresh recordings">
               <KISIcon name="refresh" size={14} color={palette.subtext} />
             </KISButton>
         }
@@ -574,7 +582,11 @@ function BroadcasterPanel({
           >
             {connectionErrorMessage}
           </Text>
-          <KISButton variant="ghost" onPress={() => setConnectionErrorMessage(null)}>
+          <KISButton
+            variant="ghost"
+            onPress={() => setConnectionErrorMessage(null)}
+            accessibilityLabel="Dismiss connection error"
+          >
             <Text style={{ color: palette?.warningStrong ?? '#f5a623', fontWeight: '900' }}>×</Text>
           </KISButton>
         </View>
@@ -624,7 +636,7 @@ function BroadcasterPanel({
                 </Text>
               </View>
               {isDeviceLive && (
-                <KISButton variant="outline" onPress={handleFlipCamera}>
+                <KISButton variant="outline" onPress={handleFlipCamera} accessibilityLabel="Flip camera">
                   <KISIcon name="refresh" size={16} color={palette.primaryStrong} />
                 </KISButton>
               )}
@@ -751,6 +763,9 @@ export default function LiveControlRoom({ channel, onOpenWatch }: Props) {
     if (!title.trim()) return;
     setSaving(true);
     try {
+      // scheduleChannelLiveStream resolves null (never throws) on failure —
+      // without an else branch here, a failed schedule attempt just left
+      // the form filled in with zero feedback that nothing was saved.
       const next = await scheduleChannelLiveStream(channel.id, {
         title:        title.trim(),
         description:  description.trim(),
@@ -761,6 +776,8 @@ export default function LiveControlRoom({ channel, onOpenWatch }: Props) {
         setTitle('');
         setDescription('');
         setScheduledAt('');
+      } else {
+        Alert.alert('Could not schedule stream', 'Please check the details and try again.');
       }
     } finally {
       setSaving(false);
@@ -784,7 +801,19 @@ export default function LiveControlRoom({ channel, onOpenWatch }: Props) {
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Start',
-          onPress: () => startLiveStream(stream.id).then(updateStream),
+          onPress: () => {
+            // startLiveStream resolves null (never throws) on failure —
+            // piping straight into updateStream (a no-op on null) meant a
+            // failed "Start" tap did nothing with zero feedback that the
+            // stream never actually went live.
+            void startLiveStream(stream.id).then(next => {
+              if (next) {
+                updateStream(next);
+              } else {
+                Alert.alert('Could not start stream', 'Please try again.');
+              }
+            });
+          },
         },
       ],
     );
@@ -803,7 +832,7 @@ export default function LiveControlRoom({ channel, onOpenWatch }: Props) {
         </View>
         {loading
           ? <ActivityIndicator color={palette.primaryStrong} />
-          : <KISButton variant="ghost" onPress={load}>
+          : <KISButton variant="ghost" onPress={load} accessibilityLabel="Refresh live streams">
               <KISIcon name="refresh" size={20} color={palette.primaryStrong} />
             </KISButton>
         }
@@ -913,7 +942,22 @@ export default function LiveControlRoom({ channel, onOpenWatch }: Props) {
                     onPress={() =>
                       Alert.alert('End stream?', `"${stream.title}" will end for all viewers.`, [
                         { text: 'Cancel', style: 'cancel' },
-                        { text: 'End', style: 'destructive', onPress: () => endLiveStream(stream.id).then(updateStream) },
+                        {
+                          text: 'End',
+                          style: 'destructive',
+                          onPress: () => {
+                            // endLiveStream resolves null (never throws) on
+                            // failure — same silent-no-op risk as
+                            // handleStart above.
+                            void endLiveStream(stream.id).then(next => {
+                              if (next) {
+                                updateStream(next);
+                              } else {
+                                Alert.alert('Could not end stream', 'Please try again.');
+                              }
+                            });
+                          },
+                        },
                       ])
                     }
                   />

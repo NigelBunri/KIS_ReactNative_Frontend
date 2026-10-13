@@ -64,6 +64,7 @@ export default function PartnerPolicyPanel({
   const [settings, setSettings] = useState<PartnerPolicySettings>(emptySettings);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const rowCardStyle = {
     backgroundColor: palette.surface,
     borderColor: palette.borderMuted,
@@ -96,6 +97,11 @@ export default function PartnerPolicyPanel({
     const res = await getRequest(ROUTES.partners.policy(partnerId), {
       errorMessage: 'Unable to load policy.',
     });
+    if (!res?.success) {
+      setError(res?.message || "Couldn't load policy. Tap to retry.");
+      return;
+    }
+    setError(null);
     const incoming = (res?.data?.settings ?? null) as PartnerPolicySettings | null;
     if (incoming) {
       setSettings({ ...emptySettings, ...incoming });
@@ -157,6 +163,8 @@ export default function PartnerPolicyPanel({
         >
           <Pressable
             onPress={onClose}
+            accessibilityRole="button"
+            accessibilityLabel="Close"
             style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}
           >
             <Text style={{ color: palette.text, fontSize: 18 }}>‹</Text>
@@ -202,6 +210,27 @@ export default function PartnerPolicyPanel({
         >
           {loading ? (
             <ActivityIndicator size="small" color={palette.primary} />
+          ) : error ? (
+            <View
+              style={{
+                borderRadius: 10,
+                borderWidth: 1,
+                borderColor: palette.danger,
+                backgroundColor: palette.danger + '15',
+                padding: 12,
+              }}
+            >
+              <Text style={{ color: palette.danger, fontSize: 13, fontWeight: '600' }}>{error}</Text>
+              <Pressable
+                onPress={() => {
+                  setLoading(true);
+                  loadPolicy().finally(() => setLoading(false));
+                }}
+                style={{ marginTop: 8 }}
+              >
+                <Text style={{ color: palette.primary, fontWeight: '700', fontSize: 13 }}>Tap to retry</Text>
+              </Pressable>
+            </View>
           ) : (
             <>
               <Text style={[styles.settingsSectionTitle, { color: palette.text }]}>

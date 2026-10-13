@@ -75,7 +75,12 @@ export default function TrafficSourcesPanel({ channelId }: Props) {
         `${ROUTES.broadcasts.channelAnalyticsTrafficSources(channelId)}?period=${p}`,
         { errorMessage: '' },
       );
-      setData(res?.data ?? res ?? {});
+      // getRequest resolves (never throws) on failure too — without this
+      // check, a failed load's error body passed straight through as the
+      // source list, rendering "No traffic source data available" on a load
+      // failure, indistinguishable from a genuinely empty period.
+      if (!res?.success) throw new Error('Could not load traffic sources.');
+      setData(res.data ?? {});
     } catch {
       setError('Could not load traffic sources.');
     } finally {

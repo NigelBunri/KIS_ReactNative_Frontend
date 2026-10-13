@@ -95,7 +95,13 @@ function PDFReader({ book, onClose }: { book: KCANBook; onClose: () => void }) {
   return (
     <View style={[styles.readerWrap, { backgroundColor: palette.bg}]}>
       <View style={[styles.readerHeader, { paddingHorizontal: responsive.pageGutter, backgroundColor: palette.surface, borderBottomColor: palette.divider }]}>
-        <TouchableOpacity onPress={onClose} style={styles.readerBack}>
+        <TouchableOpacity
+          onPress={onClose}
+          style={styles.readerBack}
+          hitSlop={10}
+          accessibilityRole="button"
+          accessibilityLabel="Close book"
+        >
           <KISIcon name="arrow-back" size={22} color={palette.text} />
         </TouchableOpacity>
         <View style={{ flex: 1, marginLeft: 10 }}>
@@ -134,6 +140,7 @@ export default function BibleBooksPanel() {
   const responsive = useResponsiveLayout();
   const [books, setBooks] = useState<KCANBook[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
   const [genre, setGenre] = useState('');
   const [query, setQuery] = useState('');
   const [selectedBook, setSelectedBook] = useState<KCANBook | null>(null);
@@ -147,7 +154,9 @@ export default function BibleBooksPanel() {
       if (genreFilter) params.push(`genre=${encodeURIComponent(genreFilter)}`);
       if (q.trim()) params.push(`q=${encodeURIComponent(q.trim())}`);
       if (params.length) url += `?${params.join('&')}`;
-      const res = await getRequest(url, {});
+      const res = await getRequest(url, {
+        errorMessage: 'Unable to load KCAN books right now.',
+      });
       // getRequest resolves to the ApiResult wrapper ({success, data,
       // message}) — this read `.ok`/`.payload`, fields that wrapper never
       // has (that's a raw fetch() Response shape, not this contract), so
@@ -156,8 +165,18 @@ export default function BibleBooksPanel() {
       // the backend returned.
       if (res.success && res.data?.results) {
         setBooks(res.data.results);
+        setLoadError('');
       } else if (res.success && Array.isArray(res.data)) {
         setBooks(res.data);
+        setLoadError('');
+      } else if (!res.success) {
+        // A failed request (network/server error) is not the same thing as
+        // "no books have been published yet" — surfacing it as the latter
+        // told the user there was simply nothing to read when the real
+        // problem was connectivity, with no way to tell the difference or
+        // retry.
+        setBooks([]);
+        setLoadError(res.message || 'Unable to load KCAN books right now.');
       }
     } finally {
       setLoading(false);
@@ -187,7 +206,12 @@ export default function BibleBooksPanel() {
           style={[styles.searchInput, { color: palette.text }]}
         />
         {query.length > 0 && (
-          <Pressable onPress={() => { setQuery(''); fetchBooks(genre, ''); }}>
+          <Pressable
+            onPress={() => { setQuery(''); fetchBooks(genre, ''); }}
+            hitSlop={10}
+            accessibilityRole="button"
+            accessibilityLabel="Clear search"
+          >
             <KISIcon name="close-circle" size={16} color={palette.subtext} />
           </Pressable>
         )}
@@ -226,6 +250,23 @@ export default function BibleBooksPanel() {
         <View style={styles.centered}>
           <ActivityIndicator color={palette.primary} />
           <Text style={{ color: palette.subtext, marginTop: 8 }}>Loading books…</Text>
+        </View>
+      ) : loadError ? (
+        <View style={styles.centered}>
+          <KISIcon name="warning" size={40} color={palette.subtext} />
+          <Text style={{ color: palette.text, fontWeight: '900', marginTop: 10 }}>Couldn't load books</Text>
+          <Text style={{ color: palette.subtext, fontSize: 13, marginTop: 4, textAlign: 'center' }}>
+            {loadError}
+          </Text>
+          <TouchableOpacity
+            onPress={() => fetchBooks(genre, query)}
+            style={[styles.retryBtn, { borderColor: palette.primary }]}
+            accessibilityRole="button"
+            accessibilityLabel="Retry loading books"
+          >
+            <KISIcon name="refresh" size={14} color={palette.primary} />
+            <Text style={{ color: palette.primary, fontWeight: '800', fontSize: 13 }}>Try again</Text>
+          </TouchableOpacity>
         </View>
       ) : books.length === 0 ? (
         <View style={styles.centered}>
@@ -329,5 +370,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 6,
     paddingHorizontal: 24,
+  },
+  retryBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    borderWidth: 1.5,
+    borderRadius: 999,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    marginTop: 8,
   },
 });

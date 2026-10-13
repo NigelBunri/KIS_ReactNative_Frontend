@@ -68,6 +68,7 @@ export default function GuestInviteSheet({
 
   const [guests, setGuests]         = useState<Guest[]>([]);
   const [loading, setLoading]       = useState(false);
+  const [loadError, setLoadError]   = useState(false);
   const [inviteInput, setInviteInput] = useState('');
   const [inviteRole, setInviteRole] = useState<GuestRole>('GUEST');
   const [inviting, setInviting]     = useState(false);
@@ -79,16 +80,23 @@ export default function GuestInviteSheet({
   const fetchGuests = useCallback(async () => {
     if (!streamId) return;
     setLoading(true);
+    setLoadError(false);
     try {
       const res = await getRequest(ROUTES.broadcasts.liveStreamGuests(streamId));
-      if (res?.data) {
-        const raw: Guest[] = Array.isArray(res.data)
-          ? res.data
-          : res.data.results ?? [];
-        setGuests(raw);
+      // getRequest resolves (never throws) on failure too — this used to
+      // only check `res?.data` truthy, which is also true on a failed
+      // response (the error body is still an object), so a load failure
+      // silently rendered "No guests yet" instead of any error.
+      if (!res?.success) {
+        setLoadError(true);
+        return;
       }
+      const raw: Guest[] = Array.isArray(res.data)
+        ? res.data
+        : res.data.results ?? [];
+      setGuests(raw);
     } catch {
-      // silent
+      setLoadError(true);
     } finally {
       setLoading(false);
     }
@@ -132,7 +140,7 @@ export default function GuestInviteSheet({
 
   // ── Guest action (Activate / Remove) ─────────────────────────────────────────
 
-  const handleGuestAction = useCallback(async (
+  const runGuestAction = useCallback(async (
     guestId: string,
     action: 'activate' | 'remove',
   ) => {
@@ -155,6 +163,23 @@ export default function GuestInviteSheet({
       setActioning(null);
     }
   }, [actioning, streamId, fetchGuests]);
+
+  // "Remove" revokes a guest's access mid-stream — the one destructive
+  // action here (vs. "Activate", which only grants access). Confirm it.
+  const handleGuestAction = useCallback((guestId: string, action: 'activate' | 'remove') => {
+    if (action === 'activate') {
+      void runGuestAction(guestId, action);
+      return;
+    }
+    Alert.alert(
+      'Remove this guest?',
+      'They will be disconnected from the co-stream immediately.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Remove', style: 'destructive', onPress: () => void runGuestAction(guestId, action) },
+      ],
+    );
+  }, [runGuestAction]);
 
   // ── Render ───────────────────────────────────────────────────────────────────
 
@@ -189,6 +214,10 @@ export default function GuestInviteSheet({
             {/* Guest list */}
             {loading ? (
               <ActivityIndicator color={palette.gold} style={styles.loader} />
+            ) : loadError ? (
+              <Text style={[styles.empty, { color: palette.danger }]}>
+                Could not load guests. Reopen this sheet to retry.
+              </Text>
             ) : guests.length === 0 ? (
               <Text style={[styles.empty, { color: palette.subtext }]}>
                 No guests yet.

@@ -43,11 +43,13 @@ export function useCatalogCategories(categoryType: CatalogCategoryType = 'all') 
   const cachedCategories = cachedCategoriesByType[categoryType];
   const [categories, setCategories] = useState<FixedCategoryOption[]>(cachedCategories);
   const [loading, setLoading] = useState(!cachedCategories.length);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (cachedCategories.length) {
       setCategories(cachedCategories);
       setLoading(false);
+      setError(null);
       return;
     }
     setLoading(true);
@@ -59,10 +61,15 @@ export function useCatalogCategories(categoryType: CatalogCategoryType = 'all') 
       .then((result) => {
         cachedCategoriesByType[categoryType] = result;
         setCategories(result);
+        setError(null);
       })
-      .catch((error) => {
-        console.error('Failed to load catalog categories', error);
-        setCategories([]);
+      .catch((err) => {
+        console.error('Failed to load catalog categories', err);
+        // Keep whatever categories were already shown rather than wiping
+        // the list to empty on a transient network failure - an empty list
+        // reads as "no categories exist" when it may really mean "couldn't
+        // reach the server". Callers should surface `error` to the user.
+        setError(err?.message ?? 'Unable to load categories.');
       })
       .finally(() => {
         pendingRequestsByType.delete(categoryType);
@@ -76,10 +83,14 @@ export function useCatalogCategories(categoryType: CatalogCategoryType = 'all') 
       const result = await fetchCategories(categoryType);
       cachedCategoriesByType[categoryType] = result;
       setCategories(result);
+      setError(null);
+    } catch (err: any) {
+      console.error('Failed to refresh catalog categories', err);
+      setError(err?.message ?? 'Unable to load categories.');
     } finally {
       setLoading(false);
     }
   }, [categoryType]);
 
-  return { categories, loading, refresh };
+  return { categories, loading, error, refresh };
 }

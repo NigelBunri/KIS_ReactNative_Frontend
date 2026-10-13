@@ -258,7 +258,7 @@ const ShopProductsPage = () => {
             />
             {!alreadyInCart && (
               <KISButton
-                title="Buy now"
+                title="View & buy"
                 size="xs"
                 style={productStyles.actionButton}
                 onPress={() => openProductDetail(String(item.id ?? ''))}
@@ -308,6 +308,8 @@ const ShopProductsPage = () => {
       >
         <Pressable
           onPress={() => navigation.goBack()}
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
           style={productStyles.headerBack}
         >
           <KISIcon name="arrow-left" size={20} color={palette.primaryStrong} />
@@ -398,8 +400,8 @@ const productStyles = StyleSheet.create({
     borderBottomWidth: 1,
   },
   headerBack: {
-    width: 40,
-    height: 40,
+    width: 44,
+    height: 44,
     borderRadius: 12,
     borderWidth: 1,
     alignItems: 'center',

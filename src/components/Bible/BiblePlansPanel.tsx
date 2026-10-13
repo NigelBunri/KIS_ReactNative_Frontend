@@ -450,6 +450,23 @@ export default function BiblePlansPanel() {
     loadEvents();
   };
 
+  const confirmDeleteEvent = (event: PlannerEvent) => {
+    Alert.alert(
+      'Delete this reading?',
+      `Remove "${event.passage_ref}" from your planner${
+        event.reminder_offsets?.length ? ' and cancel its reminders' : ''
+      }. This cannot be undone.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => deleteEvent(event),
+        },
+      ],
+    );
+  };
+
   const loadPlans = useCallback(async () => {
     setLoadingPlans(true);
     const res = await getRequest(ROUTES.bible.plans, {
@@ -773,7 +790,7 @@ export default function BiblePlansPanel() {
                     title="Delete"
                     size="xs"
                     variant="ghost"
-                    onPress={() => deleteEvent(event)}
+                    onPress={() => confirmDeleteEvent(event)}
                   />
                 </ScrollView>
               </View>

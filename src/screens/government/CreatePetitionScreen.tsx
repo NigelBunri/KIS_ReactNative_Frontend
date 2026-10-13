@@ -50,7 +50,12 @@ export default function CreatePetitionScreen({ navigation }: Props) {
 
     setSaving(true);
     try {
-      await postRequest(ROUTES.government.petitions, {
+      // postRequest resolves (never throws) on a failed request too, with
+      // `success: false` — the previous code ignored that flag and always
+      // showed "Petition Created" and navigated back, even when the
+      // backend rejected the submission. Checking `success` routes a
+      // genuine failure to the error alert below instead.
+      const res = await postRequest(ROUTES.government.petitions, {
         title: title.trim(),
         description: description.trim(),
         target: target.trim(),
@@ -59,11 +64,14 @@ export default function CreatePetitionScreen({ navigation }: Props) {
         country: country.trim(),
         deadline: deadline.trim() || undefined,
       });
+      if (!res?.success) {
+        throw new Error(res?.message || 'Could not create petition. Please try again.');
+      }
       Alert.alert('Petition Created', 'Your petition has been submitted.', [
         { text: 'OK', onPress: () => navigation.goBack() },
       ]);
-    } catch {
-      Alert.alert('Error', 'Could not create petition. Please try again.');
+    } catch (e: any) {
+      Alert.alert('Error', e?.message || 'Could not create petition. Please try again.');
     } finally {
       setSaving(false);
     }

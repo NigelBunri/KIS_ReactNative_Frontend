@@ -227,6 +227,7 @@ export default function PartnerTasksPanel({
   const [uploadProgress, setUploadProgress] = useState<Record<string, TaskReportUploadProgress>>({});
   const [submitting, setSubmitting] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const backdropOpacity = panelTranslateX.interpolate({ inputRange: [0, panelWidth], outputRange: [1, 0], extrapolate: 'clamp' });
 
@@ -240,6 +241,11 @@ export default function PartnerTasksPanel({
       getRequest(`${ROUTES.partners.channelTasks(partnerId, channelId)}${qs ? `?${qs}` : ''}`, { errorMessage: 'Unable to load tasks.' }),
       getRequest(ROUTES.partners.channelTaskSummary(partnerId, channelId), { errorMessage: 'Unable to load task summary.' }),
     ]);
+    if (!listRes?.success) {
+      setError(listRes?.message || "Couldn't load tasks. Tap to retry.");
+      return;
+    }
+    setError(null);
     const listPayload = listRes?.data ?? listRes ?? {};
     setTasks(Array.isArray(listPayload.tasks) ? listPayload.tasks : []);
     const summaryPayload = summaryRes?.data ?? summaryRes ?? {};
@@ -249,6 +255,7 @@ export default function PartnerTasksPanel({
   const loadMembers = useCallback(async () => {
     if (!partnerId) return;
     const res = await getRequest(`${ROUTES.partners.members(partnerId)}?page=1`, { errorMessage: 'Unable to load members.' });
+    if (!res?.success) return;
     const payload = res?.data ?? res ?? {};
     const results = (payload.results ?? payload.members ?? []) as MemberEntry[];
     setMembers(Array.isArray(results) ? results : []);
@@ -477,7 +484,7 @@ export default function PartnerTasksPanel({
         ]}
       >
         <View style={[styles.settingsPanelHeader, { borderBottomColor: palette.divider }]}>
-          <Pressable onPress={view === 'detail' ? backToList : onClose} style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}>
+          <Pressable onPress={view === 'detail' ? backToList : onClose} accessibilityRole="button" accessibilityLabel={view === 'detail' ? 'Back to tasks' : 'Close'} style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}>
             <Text style={{ color: palette.text, fontSize: 18 }}>‹</Text>
           </Pressable>
           <View style={{ flex: 1 }}>
@@ -487,7 +494,7 @@ export default function PartnerTasksPanel({
             </Text>
           </View>
           {view === 'detail' ? (
-            <Pressable onPress={onClose} style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}>
+            <Pressable onPress={onClose} accessibilityRole="button" accessibilityLabel="Close" style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}>
               <Text style={{ color: palette.subtext, fontSize: 18 }}>✕</Text>
             </Pressable>
           ) : null}
@@ -497,6 +504,16 @@ export default function PartnerTasksPanel({
           {view === 'list' ? (
             loading ? (
               <ActivityIndicator size="small" color={palette.primary} />
+            ) : error ? (
+              <View style={[styles.settingsFeatureRow, { borderColor: palette.danger, backgroundColor: palette.danger + '15' }]}>
+                <Text style={{ color: palette.danger, fontSize: 13, fontWeight: '600' }}>{error}</Text>
+                <Pressable
+                  onPress={() => { setLoading(true); Promise.all([loadBoard(), loadMembers()]).finally(() => setLoading(false)); }}
+                  style={{ marginTop: 8 }}
+                >
+                  <Text style={{ color: palette.primary, fontWeight: '700', fontSize: 13 }}>Tap to retry</Text>
+                </Pressable>
+              </View>
             ) : (
               <>
                 <View style={styles.overviewGrid}>

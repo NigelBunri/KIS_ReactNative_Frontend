@@ -171,7 +171,15 @@ export default function CategoryBrowsePage(props: Props) {
   if (error) {
     return (
       <View style={[styles.centered, { backgroundColor: palette.card, paddingTop: topInset }]}>
-        <Text style={[styles.errorText, { color: palette.subtext }]}>{error}</Text>
+        <Text style={[styles.errorText, { color: palette.danger }]}>{error}</Text>
+        <Pressable
+          onPress={() => (isGridMode ? fetchCategories() : fetchBrowse(categorySlug!, 1, false))}
+          accessibilityRole="button"
+          accessibilityLabel="Retry"
+          style={{ marginTop: 12, paddingHorizontal: 20, paddingVertical: 10, borderRadius: 10, backgroundColor: palette.primary }}
+        >
+          <Text style={{ color: palette.onPrimary, fontWeight: '700', fontSize: 14 }}>Retry</Text>
+        </Pressable>
       </View>
     );
   }

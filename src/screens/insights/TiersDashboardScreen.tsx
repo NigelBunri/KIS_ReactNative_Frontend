@@ -56,6 +56,23 @@ export default function TiersDashboardScreen() {
         }),
       ]);
 
+      // Promise.allSettled never throws, so a rejected request used to fall
+      // straight through to `[]` with no error surfaced at all. When BOTH
+      // requests fail there is no real data to show, so this now sets the
+      // blocking error state instead of silently rendering "No data
+      // available" as if that were the genuine (empty) state. A single
+      // failed request still degrades quietly to partial data, since the
+      // other half of the screen remains genuinely useful.
+      if (plansRes.status !== 'fulfilled' && subsRes.status !== 'fulfilled') {
+        setPlans([]);
+        setSubscriptions([]);
+        setStats(null);
+        setError(
+          plansRes.reason?.message || subsRes.reason?.message || 'Unable to load tiers data.',
+        );
+        return;
+      }
+
       const planItems: TierPlan[] =
         plansRes.status === 'fulfilled'
           ? plansRes.value.data?.results ?? plansRes.value.data ?? []
@@ -228,9 +245,20 @@ export default function TiersDashboardScreen() {
                 typeof sub.plan === 'string'
                   ? sub.plan
                   : (sub.plan as any)?.name ?? 'Unknown plan';
+              // Was a two-way success/gold split that lumped genuinely
+              // concerning statuses (canceled, past_due, unpaid, incomplete)
+              // in with the same neutral gold used for merely-pending states,
+              // so a failed-payment subscription looked no more alarming
+              // than a normal trial to an admin scanning the list.
               const statusColor =
                 sub.status === 'active' || sub.status === 'trialing'
                   ? palette.success
+                  : sub.status === 'canceled' ||
+                    sub.status === 'past_due' ||
+                    sub.status === 'unpaid' ||
+                    sub.status === 'incomplete' ||
+                    sub.status === 'incomplete_expired'
+                  ? palette.danger
                   : palette.gold;
               return (
                 <View

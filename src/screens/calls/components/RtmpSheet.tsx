@@ -53,7 +53,14 @@ export default function RtmpSheet({ visible, onClose, rtmpActive, rtmpUrl, onSta
     >
       <View style={styles.header}>
         <Text style={[styles.title, { color: palette.ivory }]}>Live streaming</Text>
-        <Pressable onPress={onClose} hitSlop={10}><KISIcon name="close" size={20} color={palette.subtext} /></Pressable>
+        <Pressable
+          onPress={onClose}
+          hitSlop={10}
+          accessibilityRole="button"
+          accessibilityLabel="Close live streaming"
+        >
+          <KISIcon name="close" size={20} color={palette.subtext} />
+        </Pressable>
       </View>
 
       <View style={[styles.body, { paddingBottom: Math.max(insets.bottom, 20) }]}>

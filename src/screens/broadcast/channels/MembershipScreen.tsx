@@ -64,11 +64,18 @@ export default function MembershipScreen() {
           text: 'Cancel membership', style: 'destructive',
           onPress: async () => {
             setJoining(tier.id);
-            await postRequest(
+            const res = await postRequest(
               ROUTES.broadcasts.channelMembership(channelId),
               { tier_id: tier.id, _method: 'DELETE' },
               { errorMessage: 'Could not cancel.' }
-            ).catch(() => {});
+            ).catch(() => null);
+            // Previously the failure was swallowed entirely and the screen
+            // just silently reloaded — if `is_joined` was still true after
+            // the reload (because the cancel actually failed), the user had
+            // no indication anything went wrong.
+            if (!res || res.success === false) {
+              Alert.alert('Error', res?.message || 'Could not cancel your membership. Please try again.');
+            }
             await load();
             setJoining(null);
           },
@@ -136,7 +143,7 @@ export default function MembershipScreen() {
   return (
     <SafeAreaView style={[styles.screen, { backgroundColor: palette.bg, }]} edges={['top']}>
       <View style={[styles.header, { borderBottomColor: palette.border }]}>
-        <Pressable onPress={() => navigation.goBack()} hitSlop={12} style={styles.backBtn}>
+        <Pressable onPress={() => navigation.goBack()} hitSlop={12} accessibilityRole="button" accessibilityLabel="Go back" style={styles.backBtn}>
           <KISIcon name="arrow-left" size={20} color={palette.text} />
         </Pressable>
         <Text style={[styles.title, { color: palette.text }]}>

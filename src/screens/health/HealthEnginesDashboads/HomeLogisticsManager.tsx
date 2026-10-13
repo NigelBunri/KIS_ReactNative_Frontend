@@ -191,17 +191,16 @@ export default function HomeLogisticsManager({ institutionId, engineKey }: Props
       status: "Available",
     });
 
-    const staff: Staff =
-      res.success && res.data
-        ? normalizeStaff(res.data)
-        : {
-            id: Date.now().toString(),
-            name: newStaff.name,
-            role: newStaff.role,
-            status: "Available",
-          };
+    // Previously: a failed POST silently fell through to a local-only fake
+    // staff entry with no indication the backend write failed, so a staff
+    // member could appear "added" and assignable when they never existed
+    // server-side. Surface the failure instead of fabricating staff data.
+    if (!res.success || !res.data) {
+      Alert.alert("Staff", res?.message || "Unable to add staff member. Please try again.");
+      return;
+    }
 
-    setStaffList((prev) => [...prev, staff]);
+    setStaffList((prev) => [...prev, normalizeStaff(res.data)]);
     setNewStaff({ name: "", role: "" });
   }, [newStaff]);
 
@@ -245,21 +244,15 @@ export default function HomeLogisticsManager({ institutionId, engineKey }: Props
       payload
     );
 
-    const newRequest: ServiceRequest =
-      res.success && res.data
-        ? normalizeRequest(res.data)
-        : {
-            id: Date.now().toString(),
-            patientName,
-            location,
-            type: serviceType,
-            priority,
-            assignedStaff: assigned,
-            status: "Requested",
-            price,
-          };
+    // Previously: a failed POST silently fell through to a local-only fake
+    // service request — staff could appear dispatched for a home visit that
+    // was never created on the backend. Surface the failure instead.
+    if (!res.success || !res.data) {
+      Alert.alert("Home logistics", res?.message || "Unable to create the service request. Please try again.");
+      return;
+    }
 
-    setRequests((prev) => [...prev, newRequest]);
+    setRequests((prev) => [...prev, normalizeRequest(res.data)]);
 
     if (assigned && autoAssign && availableStaff) {
       updateStaffStatus(availableStaff.id, "Busy");

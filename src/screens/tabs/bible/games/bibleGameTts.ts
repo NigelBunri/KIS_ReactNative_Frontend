@@ -65,7 +65,9 @@ export function useBibleGameTts() {
       mounted = false;
       finishSub?.remove?.();
       cancelSub?.remove?.();
-      Tts?.stop();
+      try {
+        Tts?.stop();
+      } catch {}
     };
   }, []);
 
@@ -76,13 +78,28 @@ export function useBibleGameTts() {
     }
     onDoneRef.current = onDone ?? null;
     setStatus('speaking');
-    Tts.stop();
-    Tts.speak(text);
+    try {
+      Tts.stop();
+      Tts.speak(text);
+    } catch {
+      // Mirrors useBibleReadAloud's defensive try/catch around the same
+      // native calls: react-native-tts can throw synchronously rather than
+      // reject. Without this, status would stay stuck at 'speaking' forever
+      // — no 'tts-finish' event is ever coming for an utterance that never
+      // started — which permanently disables the Play button in both of
+      // this hook's two callers. Degrade to "done" instead so the game can
+      // continue in text-only mode.
+      onDoneRef.current = null;
+      setStatus('idle');
+      onDone?.();
+    }
   }, []);
 
   const stop = useCallback(() => {
     onDoneRef.current = null;
-    Tts?.stop();
+    try {
+      Tts?.stop();
+    } catch {}
     setStatus('idle');
   }, []);
 

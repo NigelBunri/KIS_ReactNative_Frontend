@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   Image,
   Pressable,
@@ -103,7 +104,15 @@ export default function WishlistPage() {
         }
         setItems(prev => prev.filter(entry => entry.id !== item.id));
       } catch (removeError: any) {
-        setError(removeError?.message || 'Unable to remove from wishlist.');
+        // This used to call the page-level setError(), which swaps the
+        // *entire* FlatList out for a bare error message — so a single
+        // item's remove failing made every other saved item disappear
+        // from view too. A per-action Alert fixes the failed item's own
+        // feedback without nuking the rest of the list.
+        Alert.alert(
+          'Wishlist',
+          removeError?.message || 'Unable to remove from wishlist.',
+        );
       } finally {
         setRemovingId(null);
       }
@@ -113,7 +122,11 @@ export default function WishlistPage() {
 
   const renderItem = ({ item }: { item: SavedItem }) => {
     const product = item.product_detail;
-    const price = product.sale_price ?? product.price;
+    const hasDiscount =
+      product.sale_price != null &&
+      product.price != null &&
+      Number(product.sale_price) < Number(product.price);
+    const price = hasDiscount ? product.sale_price : product.price;
 
     return (
       <Pressable
@@ -145,9 +158,21 @@ export default function WishlistPage() {
           >
             {product.name}
           </Text>
-          <Text style={[styles.price, { color: palette.primaryStrong }]}>
-            {product.currency_display ?? 'USD'} {price}
-          </Text>
+          <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6 }}>
+            <Text style={[styles.price, { color: palette.primaryStrong }]}>
+              {product.currency_display ?? 'USD'} {price}
+            </Text>
+            {hasDiscount ? (
+              <Text
+                style={[
+                  styles.originalPrice,
+                  { color: palette.subtext },
+                ]}
+              >
+                {product.currency_display ?? 'USD'} {product.price}
+              </Text>
+            ) : null}
+          </View>
           {product.stock_qty === 0 ? (
             <Text style={[styles.outOfStock, { color: palette.danger }]}>
               Out of stock
@@ -279,6 +304,11 @@ const styles = StyleSheet.create({
   price: {
     fontSize: 14,
     fontWeight: '800',
+  },
+  originalPrice: {
+    fontSize: 12,
+    fontWeight: '600',
+    textDecorationLine: 'line-through',
   },
   outOfStock: {
     fontSize: 11,

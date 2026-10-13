@@ -354,7 +354,13 @@ export default function LearningPlayerScreen() {
     <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg }}>
       <ScrollView contentContainerStyle={{ padding: responsive.pageGutter, gap: 18, paddingBottom: 100 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-          <Pressable onPress={() => navigation.navigate('EducationCourseDetail', { contentId })} style={{ padding: 4, marginLeft: -4 }}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Back to course"
+            onPress={() => navigation.navigate('EducationCourseDetail', { contentId })}
+            hitSlop={12}
+            style={{ padding: 4, marginLeft: -4 }}
+          >
             <KISIcon name="back" size={20} color={palette.text} />
           </Pressable>
           <Text style={{ color: palette.subtext, fontWeight: '700', textTransform: 'uppercase', fontSize: 12 }}>

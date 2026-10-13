@@ -181,7 +181,7 @@ export const PinnedMessagesSheet: React.FC<PinnedMessagesSheetProps> = ({
               Pinned messages ({count})
             </Text>
 
-            <Pressable onPress={onClose}>
+            <Pressable onPress={onClose} accessibilityRole="button" accessibilityLabel="Close">
               <KISIcon name="close" size={20} color={palette.subtext} />
             </Pressable>
           </View>

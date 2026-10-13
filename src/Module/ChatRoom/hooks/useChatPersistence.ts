@@ -137,11 +137,17 @@ const STATUS_FAILED: MessageStatus = 'failed';
 // status (e.g. a 'read' receipt restored from disk getting clobbered by a
 // stale 'sent'/'delivered' copy merged in from another source). Keep in
 // sync with CACHE_STATUS_ORDER in Storage/chatStorage.ts.
+//
+// 'failed' ranks above pending/sending/local_only (not below - it was -1
+// here before) so a merge against a stale cached 'pending'/'sending' copy
+// of the same message can never silently erase a real send failure the
+// user still needs to see and retry, while a genuine later success
+// (sent/delivered/read) still correctly outranks it.
 const MESSAGE_STATUS_RANK: Record<string, number> = {
-  failed: -1,
   pending: 0,
   sending: 0,
   local_only: 0,
+  failed: 0.5,
   sent: 1,
   delivered: 2,
   read: 3,

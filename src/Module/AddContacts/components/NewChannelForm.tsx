@@ -149,6 +149,8 @@ export const NewChannelForm: React.FC<NewChannelFormProps> = ({
       <View style={{ alignItems: 'center', marginBottom: 20 }}>
         <Pressable
           onPress={handlePickAvatar}
+          accessibilityRole="button"
+          accessibilityLabel={avatarPreview ? 'Change channel photo' : 'Add channel photo'}
           style={({ pressed }) => ({
             width: 84,
             height: 84,

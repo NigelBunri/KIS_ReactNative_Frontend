@@ -272,6 +272,18 @@ export function useBibleData() {
   const readRequestSeqRef = useRef(0);
   const [loadingDaily, setLoadingDaily] = useState(false);
   const [loadingMeditations, setLoadingMeditations] = useState(false);
+  // Mirrors readerError's intent for the other loads below: getRequest()
+  // never throws (it always resolves to { success, message, ... }), so
+  // without tracking this explicitly a failed fetch here was previously
+  // indistinguishable from "genuinely nothing to show" — translations/books
+  // silently kept their last-known (or bundled-local) value, and
+  // devotionals/meditations/the growth summary silently stayed empty, with
+  // no way for a consuming screen to tell "failed" apart from "empty."
+  const [translationsError, setTranslationsError] = useState<string | null>(null);
+  const [booksError, setBooksError] = useState<string | null>(null);
+  const [devotionalsError, setDevotionalsError] = useState<string | null>(null);
+  const [meditationsError, setMeditationsError] = useState<string | null>(null);
+  const [spiritualGrowthError, setSpiritualGrowthError] = useState<string | null>(null);
   const [spiritualGrowthSummary, setSpiritualGrowthSummary] =
     useState<BibleSpiritualGrowthSummary | null>(null);
   const [offlineManifest, setOfflineManifest] = useState<BibleOfflineManifest>({});
@@ -307,6 +319,11 @@ export function useBibleData() {
       staleWhileRevalidate: true,
       offlineTtlSeconds: 7 * 24 * 3600,
     });
+    if (!res?.success) {
+      setTranslationsError(res?.message || 'Unable to load translations.');
+    } else {
+      setTranslationsError(null);
+    }
     const list = listFromResponse(res?.data);
     if (list.length) setTranslations(list);
   }, []);
@@ -318,6 +335,11 @@ export function useBibleData() {
       staleWhileRevalidate: true,
       offlineTtlSeconds: 7 * 24 * 3600,
     });
+    if (!res?.success) {
+      setBooksError(res?.message || 'Unable to load books.');
+    } else {
+      setBooksError(null);
+    }
     const list = listFromResponse(res?.data);
     if (list.length) setBooks(list);
   }, []);
@@ -444,6 +466,17 @@ export function useBibleData() {
         .filter(Boolean) as DailyDevotional[];
       const next = todayItem ? [todayItem, ...history.filter((item) => item.id !== todayItem.id)] : history;
       setDevotionals(next);
+      // Both requests failing (as opposed to one legitimately returning an
+      // empty list) is the signal that this was a fetch failure rather than
+      // "no devotionals published yet" — surface that distinction instead of
+      // silently leaving the panel looking like an empty-but-healthy state.
+      if (!today?.success && !list?.success) {
+        setDevotionalsError(today?.message || list?.message || 'Unable to load daily devotionals.');
+      } else {
+        setDevotionalsError(null);
+      }
+    } catch {
+      setDevotionalsError('Unable to load daily devotionals.');
     } finally {
       setLoadingDaily(false);
     }
@@ -456,6 +489,13 @@ export function useBibleData() {
         errorMessage: 'Unable to load meditations.',
       });
       setMeditations(listFromResponse(res?.data).map(normalizeMeditation));
+      if (!res?.success) {
+        setMeditationsError(res?.message || 'Unable to load meditations.');
+      } else {
+        setMeditationsError(null);
+      }
+    } catch {
+      setMeditationsError('Unable to load meditations.');
     } finally {
       setLoadingMeditations(false);
     }
@@ -467,6 +507,9 @@ export function useBibleData() {
     });
     if (res?.success && res?.data) {
       setSpiritualGrowthSummary(res.data as BibleSpiritualGrowthSummary);
+      setSpiritualGrowthError(null);
+    } else {
+      setSpiritualGrowthError(res?.message || 'Unable to load spiritual growth summary.');
     }
   }, []);
 
@@ -523,15 +566,20 @@ export function useBibleData() {
 
   return {
     translations: orderedTranslations,
+    translationsError,
     books,
+    booksError,
     reader,
     readerError,
     devotionals,
+    devotionalsError,
     meditations,
+    meditationsError,
     loadingReader,
     loadingDaily,
     loadingMeditations,
     spiritualGrowthSummary,
+    spiritualGrowthError,
     loadReader,
     loadSpiritualGrowthSummary,
     reload,

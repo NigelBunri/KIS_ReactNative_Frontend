@@ -724,7 +724,13 @@ export default function CommentThreadPanel({
               {replyTarget.text}
             </Text>
           </View>
-          <Pressable onPress={() => setReplyTarget(null)} style={panelStyles.replyPreviewClose}>
+          <Pressable
+            onPress={() => setReplyTarget(null)}
+            style={panelStyles.replyPreviewClose}
+            hitSlop={10}
+            accessibilityRole="button"
+            accessibilityLabel="Cancel reply"
+          >
             <KISIcon name="close" size={14} color={palette.text} />
           </Pressable>
         </View>
@@ -751,6 +757,8 @@ export default function CommentThreadPanel({
         <Pressable
           onPress={sendComment}
           disabled={!canSend}
+          accessibilityRole="button"
+          accessibilityLabel="Send comment"
           style={({ pressed }) => [
             panelStyles.sendButton,
             {

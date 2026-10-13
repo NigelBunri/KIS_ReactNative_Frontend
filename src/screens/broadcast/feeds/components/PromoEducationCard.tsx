@@ -1,5 +1,5 @@
 import React from 'react';
-import { Image, Pressable, Text, View } from 'react-native';
+import { Image, Text, View } from 'react-native';
 import { useKISTheme } from '@/theme/useTheme';
 import KISButton from '@/constants/KISButton';
 
@@ -46,9 +46,7 @@ export default function PromoEducationCard({
           <Text style={{ color: palette.subtext, fontWeight: '700', fontSize: 12 }} numberOfLines={2}>
             {footerLeft ?? ''}
           </Text>
-          <Pressable onPress={onPress} style={{ minWidth: 120 }}>
-            <KISButton title={ctaLabel} onPress={onPress ?? (() => {})} />
-          </Pressable>
+          <KISButton title={ctaLabel} onPress={onPress ?? (() => {})} style={{ minWidth: 120 }} />
         </View>
       </View>
     </View>

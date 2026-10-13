@@ -57,7 +57,12 @@ export default function AudienceDemographicsPanel({ channelId }: Props) {
         `${ROUTES.broadcasts.channelDemographics(channelId)}?period=${p}`,
         { errorMessage: '' },
       );
-      setData(res?.data ?? res ?? {});
+      // getRequest resolves (never throws) on failure too — without this
+      // check, a failed load's error body passed straight through as the
+      // demographics payload, rendering "No age/country data yet" on a
+      // load failure, indistinguishable from a genuinely empty period.
+      if (!res?.success) throw new Error('Could not load demographics data.');
+      setData(res.data ?? {});
     } catch {
       setError('Could not load demographics data.');
     } finally {

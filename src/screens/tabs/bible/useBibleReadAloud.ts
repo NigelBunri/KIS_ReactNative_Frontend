@@ -89,6 +89,15 @@ export function useBibleReadAloud({ reader, verses, translationCode, onLoadChapt
 
   const verseIndexRef = useRef(0);
   const awaitingChapterRef = useRef<{ book: string; chapter: number } | null>(null);
+  // Guards against onLoadChapter's fetch silently never resolving (or
+  // resolving to something that never matches `awaiting`, e.g. a network
+  // error swallowed upstream) — without this, status would stay stuck on
+  // 'loading' forever: Play is disabled while loading, so the only way out
+  // would be Stop, with no indication anything went wrong. Cleared whenever
+  // the awaited chapter actually arrives (see the effect below) or playback
+  // is stopped.
+  const chapterLoadTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const CHAPTER_LOAD_TIMEOUT_MS = 15000;
   const speakingChapterKeyRef = useRef<string | null>(null);
   const accumulatedMsRef = useRef(0);
   const playStartedAtRef = useRef<number | null>(null);
@@ -121,6 +130,32 @@ export function useBibleReadAloud({ reader, verses, translationCode, onLoadChapt
     setElapsedMs(accumulatedMsRef.current);
   };
 
+  const clearChapterLoadTimeout = () => {
+    if (chapterLoadTimeoutRef.current) {
+      clearTimeout(chapterLoadTimeoutRef.current);
+      chapterLoadTimeoutRef.current = null;
+    }
+  };
+
+  // Plain function (not a hook) so it can be called both from stop() and
+  // from the chapter-load-timeout fallback above without a useCallback
+  // declaration-order/TDZ problem.
+  const resetToIdle = () => {
+    Tts?.stop(false)?.catch(() => {});
+    stopTicking();
+    clearChapterLoadTimeout();
+    pendingTickStartRef.current = false;
+    awaitingChapterRef.current = null;
+    speakingChapterKeyRef.current = null;
+    verseIndexRef.current = 0;
+    accumulatedMsRef.current = 0;
+    playStartedAtRef.current = null;
+    setElapsedMs(0);
+    setCurrentVerseNumber(null);
+    setFinishReason(null);
+    setStatus('idle');
+  };
+
   const finishReading = useCallback((reason: 'completed' | 'time-limit') => {
     Tts?.stop(false)?.catch(() => {});
     stopTicking();
@@ -143,14 +178,35 @@ export function useBibleReadAloud({ reader, verses, translationCode, onLoadChapt
     const nextChapterNumber = next?.number;
     const translation = translationCodeRef.current;
     if (next && nextBookCode && nextChapterNumber && translation) {
-      awaitingChapterRef.current = { book: nextBookCode, chapter: Number(nextChapterNumber) };
+      const target = { book: nextBookCode, chapter: Number(nextChapterNumber) };
+      awaitingChapterRef.current = target;
       setStatus('loading');
       onLoadChapterRef.current(translation, nextBookCode, Number(nextChapterNumber));
+      clearChapterLoadTimeout();
+      chapterLoadTimeoutRef.current = setTimeout(() => {
+        chapterLoadTimeoutRef.current = null;
+        // Only bail out if we're still waiting on this exact chapter — if it
+        // already arrived (or a newer wait superseded it), this fires as a
+        // no-op.
+        if (
+          awaitingChapterRef.current &&
+          awaitingChapterRef.current.book === target.book &&
+          awaitingChapterRef.current.chapter === target.chapter
+        ) {
+          setErrorMessage('Could not load the next chapter — reading stopped.');
+          resetToIdle();
+        }
+      }, CHAPTER_LOAD_TIMEOUT_MS);
     } else {
       // navigation.next is empty only at the very end of Revelation — the
       // whole Bible from the start point has now been read.
       finishReading('completed');
     }
+    // resetToIdle is a plain function (not useCallback) with a stable body
+    // that only touches refs and setState setters — same intentionally-
+    // omitted-dependency pattern already used elsewhere in this file for
+    // freezeElapsed/startTicking.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [finishReading]);
 
   const playFromIndex = useCallback((startIndex: number) => {
@@ -242,6 +298,7 @@ export function useBibleReadAloud({ reader, verses, translationCode, onLoadChapt
     const chapterNumber = reader?.chapter?.number;
     if (bookCode === awaiting.book && Number(chapterNumber) === awaiting.chapter && verses.length > 0) {
       awaitingChapterRef.current = null;
+      clearChapterLoadTimeout();
       speakingChapterKeyRef.current = chapterKey(reader);
       verseIndexRef.current = 0;
       setStatus('playing');
@@ -276,7 +333,9 @@ export function useBibleReadAloud({ reader, verses, translationCode, onLoadChapt
       if (Platform.OS === 'ios') {
         try {
           await Tts.resume();
-        } catch {}
+        } catch {
+          setErrorMessage('Could not resume reading.');
+        }
       } else {
         // react-native-tts's pause()/resume() are hard-coded no-ops on
         // Android (index.js: both just `return Promise.resolve(false)`
@@ -331,22 +390,14 @@ export function useBibleReadAloud({ reader, verses, translationCode, onLoadChapt
         // resume-from-position on this platform.
         await Tts?.stop();
       }
-    } catch {}
+    } catch {
+      setErrorMessage('Could not pause reading.');
+    }
   }, []);
 
   const stop = useCallback(() => {
-    Tts?.stop(false)?.catch(() => {});
-    stopTicking();
-    pendingTickStartRef.current = false;
-    awaitingChapterRef.current = null;
-    speakingChapterKeyRef.current = null;
-    verseIndexRef.current = 0;
-    accumulatedMsRef.current = 0;
-    playStartedAtRef.current = null;
-    setElapsedMs(0);
-    setCurrentVerseNumber(null);
-    setFinishReason(null);
-    setStatus('idle');
+    resetToIdle();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const setSpeed = useCallback((multiplier: number) => {
@@ -425,6 +476,7 @@ export function useBibleReadAloud({ reader, verses, translationCode, onLoadChapt
   useEffect(() => {
     return () => {
       stopTicking();
+      clearChapterLoadTimeout();
       Tts?.stop(false)?.catch(() => {});
     };
   }, []);

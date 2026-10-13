@@ -125,6 +125,8 @@ export default function ProfileSheets(props: Props) {
           </Text>
           <Pressable
             onPress={closeSheet}
+            accessibilityRole="button"
+            accessibilityLabel="Close"
             style={{ minHeight: 44, minWidth: 44, alignItems: 'center', justifyContent: 'center' }}
           >
             <KISIcon name="close" size={22} color={palette.subtext} />

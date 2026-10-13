@@ -540,6 +540,7 @@ export default function TwelvePillarsPanel() {
               activeOpacity={0.8}
               onPress={() => setReadAloudSheetOpen(true)}
               disabled={!readAloudVerses.length}
+              hitSlop={8}
               accessibilityRole="button"
               accessibilityLabel={readAloud.status === 'playing' ? 'Reading aloud' : readAloud.status === 'paused' ? 'Paused' : 'Listen'}
               style={[
@@ -677,6 +678,7 @@ export default function TwelvePillarsPanel() {
           <View style={{ flexDirection: 'row', gap: 8 }}>
             <TouchableOpacity
               onPress={() => setMode('intro')}
+              hitSlop={7}
               accessibilityRole="button"
               accessibilityLabel="About this journey"
               style={[styles.iconBadge, { backgroundColor: palette.divider }]}

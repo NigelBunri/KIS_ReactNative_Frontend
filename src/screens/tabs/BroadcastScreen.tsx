@@ -497,6 +497,7 @@ export default function BroadcastScreen() {
 
             <KISButton
               onPress={() => (navigation as any).navigate('TestimonyHub')}
+              accessibilityLabel="Testimonies"
               style={[styles.miniPill, {
                 width: compactBroadcast ? 34 : 40,
                 height: compactBroadcast ? 34 : 40,
@@ -510,6 +511,7 @@ export default function BroadcastScreen() {
             <KISButton
               variant="outline"
               onPress={() => setVisionVisible(true)}
+              accessibilityLabel="Our vision"
               style={[styles.miniPill, {
                 width: compactBroadcast ? 34 : 40,
                 height: compactBroadcast ? 34 : 40,

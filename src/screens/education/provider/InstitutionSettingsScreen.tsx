@@ -206,7 +206,7 @@ export default function InstitutionSettingsScreen() {
     }
   }, [institutionId, selectedPartnerId, load]);
 
-  const handleDisconnectPartner = useCallback(async () => {
+  const disconnectPartner = useCallback(async () => {
     if (!institutionId) return;
     setPartnerConnecting(true);
     try {
@@ -225,6 +225,21 @@ export default function InstitutionSettingsScreen() {
       setPartnerConnecting(false);
     }
   }, [institutionId, load]);
+
+  // Disconnecting changes who else can manage this institution and its
+  // people — a meaningful access-control change, not a cosmetic toggle — so
+  // confirm first rather than firing on a single tap, same as other
+  // access/permission-affecting actions elsewhere in this flow.
+  const handleDisconnectPartner = useCallback(() => {
+    Alert.alert(
+      'Disconnect partner organization?',
+      `${institution?.partner_name || 'This partner organization'} will no longer be able to manage this institution. Learners and staff already added stay as they are.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Disconnect', style: 'destructive', onPress: () => void disconnectPartner() },
+      ],
+    );
+  }, [institution?.partner_name, disconnectPartner]);
 
   if (loading && !institution) {
     return (

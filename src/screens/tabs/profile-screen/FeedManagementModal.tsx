@@ -1,5 +1,6 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import {
+  Alert,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -55,6 +56,21 @@ const RemoveAttachment = ({
   attachment: any;
   palette: any;
 }) => {
+  const confirmRemove = () => {
+    Alert.alert(
+      'Remove attachment',
+      'This removes the attachment from this broadcast item. This cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Remove',
+          style: 'destructive',
+          onPress: () => onRemoveAttachment(feed, attachment),
+        },
+      ],
+    );
+  };
+
   return (
     <View
       style={[
@@ -63,7 +79,8 @@ const RemoveAttachment = ({
       ]}
     >
       <KISButton
-        onPress={() => onRemoveAttachment(feed, attachment)}
+        onPress={confirmRemove}
+        accessibilityLabel="Remove attachment"
         style={{ backgroundColor: alpha(palette.danger, '18') }}
       >
         <KISIcon name="trash" size={20} color={palette.danger} />
@@ -870,7 +887,20 @@ export function FeedManagementModal(props: FeedManagementModalProps) {
                       loading={panelFeedDeletingId === feed.id}
                       size="xs"
                       variant="secondary"
-                      onPress={() => handleDeleteFeedItem(feed.id)}
+                      onPress={() =>
+                        Alert.alert(
+                          'Delete broadcast item',
+                          'This permanently deletes this item. This cannot be undone.',
+                          [
+                            { text: 'Cancel', style: 'cancel' },
+                            {
+                              text: 'Delete',
+                              style: 'destructive',
+                              onPress: () => handleDeleteFeedItem(feed.id),
+                            },
+                          ],
+                        )
+                      }
                       disabled={panelFeedDeletingId === feed.id}
                     />
                   </View>

@@ -62,6 +62,7 @@ export default function PartnerDiscoveryPanel({
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
   const [inviteCode, setInviteCode] = useState('');
   const [redeemLoading, setRedeemLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const redeemInviteCode = async () => {
     const code = inviteCode.trim().toUpperCase();
@@ -109,6 +110,12 @@ export default function PartnerDiscoveryPanel({
       const res = await getRequest(url, {
         errorMessage: 'Unable to load partner listings.',
       });
+      if (!res?.success) {
+        setError(res?.message || "Couldn't load partner listings. Tap to retry.");
+        setPartners([]);
+        return;
+      }
+      setError(null);
       const list = (res?.data ?? res ?? []) as PartnerDiscover[];
       setPartners(Array.isArray(list) ? list : []);
     } finally {
@@ -301,6 +308,21 @@ export default function PartnerDiscoveryPanel({
 
           {loading ? (
             <ActivityIndicator color={palette.primaryStrong} />
+          ) : error ? (
+            <View
+              style={{
+                borderRadius: 10,
+                borderWidth: 1,
+                borderColor: palette.danger,
+                backgroundColor: palette.danger + '15',
+                padding: 12,
+              }}
+            >
+              <Text style={{ color: palette.danger, fontSize: 13, fontWeight: '600' }}>{error}</Text>
+              <Pressable onPress={() => loadPartners()} style={{ marginTop: 8 }}>
+                <Text style={{ color: palette.primary, fontWeight: '700', fontSize: 13 }}>Tap to retry</Text>
+              </Pressable>
+            </View>
           ) : partners.length === 0 ? (
             <Text style={{ color: palette.subtext }}>No partners found.</Text>
           ) : (

@@ -110,16 +110,23 @@ export default function NGOToolsScreen(_props: Props) {
       };
       // postRequest resolves to the ApiResult wrapper ({success, data,
       // message}), not the created record directly - the previous
-      // whole-wrapper cast was a real bug, not just a type nuisance.
+      // whole-wrapper cast was a real bug, not just a type nuisance. It also
+      // never checked `success`, so a rejected save still fell through to
+      // the wrapper-as-record cast, set `profile` to a non-profile object,
+      // and told the user "Saved" regardless of what the backend actually
+      // did with it.
       const apiResult = await postRequest(
         ROUTES.government.ngoProfiles,
         payload,
       );
-      const result = (apiResult?.data ?? apiResult) as NGOProfile;
+      if (!apiResult?.success || !apiResult?.data) {
+        throw new Error(apiResult?.message || 'Could not save profile. Please try again.');
+      }
+      const result = apiResult.data as NGOProfile;
       setProfile(result);
       Alert.alert('Saved', 'NGO profile saved successfully.');
-    } catch {
-      Alert.alert('Error', 'Could not save profile. Please try again.');
+    } catch (e: any) {
+      Alert.alert('Error', e?.message || 'Could not save profile. Please try again.');
     } finally {
       setSavingProfile(false);
     }
@@ -132,17 +139,24 @@ export default function NGOToolsScreen(_props: Props) {
     }
     setSavingGrant(true);
     try {
+      // Same class of bug as handleSaveProfile above: the previous code
+      // never checked `success` before casting the wrapper to a Grant, so
+      // a rejected submission inserted a bogus row and closed the form as
+      // if the application had actually gone through.
       const apiResult = await postRequest(ROUTES.government.grants, {
         title: grantTitle.trim(),
         amount: grantAmount.trim(),
       });
-      const result = (apiResult?.data ?? apiResult) as Grant;
+      if (!apiResult?.success || !apiResult?.data) {
+        throw new Error(apiResult?.message || 'Could not submit application. Please try again.');
+      }
+      const result = apiResult.data as Grant;
       setGrants((prev) => [result, ...prev]);
       setGrantTitle('');
       setGrantAmount('');
       setShowGrantForm(false);
-    } catch {
-      Alert.alert('Error', 'Could not submit application. Please try again.');
+    } catch (e: any) {
+      Alert.alert('Error', e?.message || 'Could not submit application. Please try again.');
     } finally {
       setSavingGrant(false);
     }

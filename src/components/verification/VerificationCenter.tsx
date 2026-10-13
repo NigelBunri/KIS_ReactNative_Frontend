@@ -129,6 +129,8 @@ export function VerificationStatusCard({
   return (
     <Pressable
       onPress={onOpen}
+      accessibilityRole="button"
+      accessibilityLabel={subtitle ? `${title}. ${statusLabel}. ${subtitle}` : `${title}. ${statusLabel}`}
       style={({ pressed }) => [
         styles.statusCard,
         {
@@ -138,12 +140,17 @@ export function VerificationStatusCard({
         },
       ]}
     >
-      <View style={[styles.statusIcon, { backgroundColor: colors.bg }]}>
+      <View style={[styles.statusIconBadge, { backgroundColor: colors.bg }]}>
         <KISIcon name="shield" size={20} color={colors.text} />
-        <Text style={[styles.statusTitle, { color: palette.text }]}>Verification</Text>
-        <KISIcon name="chevron-right" size={18} color={palette.subtext} />
       </View>
-        
+      <View style={styles.statusTextWrap}>
+        <Text style={[styles.statusTitle, { color: palette.text }]} numberOfLines={1}>{title}</Text>
+        <Text style={[styles.statusMeta, { color: colors.text }]} numberOfLines={1}>{statusLabel}</Text>
+        {subtitle ? (
+          <Text style={[styles.statusBody, { color: palette.subtext }]} numberOfLines={2}>{subtitle}</Text>
+        ) : null}
+      </View>
+      <KISIcon name="chevron-right" size={18} color={palette.subtext} />
     </Pressable>
   );
 }
@@ -319,7 +326,12 @@ export function VerificationCenterSheet({
               <Text style={[styles.sheetTitle, { color: palette.text }]}>{title}</Text>
               {subtitle ? <Text style={[styles.sheetSubtitle, { color: palette.subtext }]}>{subtitle}</Text> : null}
             </View>
-            <Pressable onPress={onClose} style={[styles.closeButton, { backgroundColor: palette.surface }]}>
+            <Pressable
+              onPress={onClose}
+              style={[styles.closeButton, { backgroundColor: palette.surface }]}
+              accessibilityRole="button"
+              accessibilityLabel="Close"
+            >
               <KISIcon name="close" size={18} color={palette.text} />
             </Pressable>
           </View>
@@ -496,6 +508,7 @@ const styles = StyleSheet.create({
     gap: 12,
     borderRadius: 20,
     borderWidth: 1,
+    padding: 14,
   },
   statusIcon: {
     padding: 5,
@@ -504,6 +517,18 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     flexDirection: 'row',
     gap: 6,
+  },
+  statusIconBadge: {
+    width: 40,
+    height: 40,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+  statusTextWrap: {
+    flex: 1,
+    gap: 2,
   },
   statusTitle: { fontSize: 14, fontWeight: '900' },
   statusMeta: { fontSize: 12, fontWeight: '800' },

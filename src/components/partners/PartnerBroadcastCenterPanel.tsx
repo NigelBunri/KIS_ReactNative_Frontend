@@ -60,12 +60,19 @@ export default function PartnerBroadcastCenterPanel({ isOpen, panelWidth, panelT
   const [text, setText] = useState('');
   const [scheduledFor, setScheduledFor] = useState('');
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const backdropOpacity = panelTranslateX.interpolate({ inputRange: [0, panelWidth], outputRange: [1, 0], extrapolate: 'clamp' });
 
   const loadQueue = useCallback(async () => {
     if (!partnerId) return;
     const res = await getRequest(ROUTES.partners.postQueue(partnerId), { errorMessage: 'Unable to load the announcement queue.' });
+    if (!res?.success) {
+      setError(res?.message || "Couldn't load the announcement queue. Tap to retry.");
+      setQueue([]);
+      return;
+    }
+    setError(null);
     const payload = res?.data ?? [];
     setQueue(Array.isArray(payload) ? payload : []);
   }, [partnerId]);
@@ -198,6 +205,27 @@ export default function PartnerBroadcastCenterPanel({ isOpen, panelWidth, panelT
           </Text>
           {loading ? (
             <ActivityIndicator size="small" color={palette.primary} />
+          ) : error ? (
+            <View
+              style={{
+                borderRadius: 10,
+                borderWidth: 1,
+                borderColor: palette.danger,
+                backgroundColor: palette.danger + '15',
+                padding: 12,
+              }}
+            >
+              <Text style={{ color: palette.danger, fontSize: 13, fontWeight: '600' }}>{error}</Text>
+              <Pressable
+                onPress={() => {
+                  setLoading(true);
+                  loadQueue().finally(() => setLoading(false));
+                }}
+                style={{ marginTop: 8 }}
+              >
+                <Text style={{ color: palette.primary, fontWeight: '700', fontSize: 13 }}>Tap to retry</Text>
+              </Pressable>
+            </View>
           ) : queue.length === 0 ? (
             <Text style={{ color: palette.subtext, fontSize: 13 }}>Nothing scheduled.</Text>
           ) : (

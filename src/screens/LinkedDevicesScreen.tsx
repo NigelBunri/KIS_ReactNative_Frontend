@@ -299,7 +299,13 @@ export default function LinkedDevicesScreen() {
           },
         ]}
       >
-        <Pressable onPress={() => navigation.goBack()} hitSlop={12} style={styles.backBtn}>
+        <Pressable
+          onPress={() => navigation.goBack()}
+          hitSlop={12}
+          style={styles.backBtn}
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
+        >
           <KISIcon name="back" size={24} color={palette.text} />
         </Pressable>
         <View style={styles.headerTitleRow}>

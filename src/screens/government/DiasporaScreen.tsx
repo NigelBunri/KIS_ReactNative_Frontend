@@ -72,7 +72,16 @@ export default function DiasporaScreen(_props: Props) {
   async function handleJoin(id: string) {
     setJoining(id);
     try {
-      await postRequest(ROUTES.government.diasporaJoin(id), {});
+      // postRequest resolves (never throws) on a failed request too, with
+      // `success: false` — the previous code ignored that flag and always
+      // marked the community as joined locally, even when the backend
+      // rejected the join. Checking `success` routes a genuine failure to
+      // the error alert below instead of showing a membership that was
+      // never actually recorded.
+      const res = await postRequest(ROUTES.government.diasporaJoin(id), {});
+      if (!res?.success) {
+        throw new Error(res?.message || 'Could not join community. Please try again.');
+      }
       setCommunities((prev) =>
         prev.map((c) =>
           c.id === id
@@ -80,8 +89,8 @@ export default function DiasporaScreen(_props: Props) {
             : c,
         ),
       );
-    } catch {
-      Alert.alert('Error', 'Could not join community. Please try again.');
+    } catch (e: any) {
+      Alert.alert('Error', e?.message || 'Could not join community. Please try again.');
     } finally {
       setJoining(null);
     }

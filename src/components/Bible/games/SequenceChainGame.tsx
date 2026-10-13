@@ -150,6 +150,7 @@ export default function SequenceChainGame({ gameKey, stageIndex, isReplay, onExi
             }}
             onBackToJourney={onExit}
             onViewStats={onOpenStats}
+            persisted={stageResult.persisted}
           />
         </View>
       </GameShell>

@@ -202,6 +202,7 @@ export default function PunctuationRestoreGame({ gameKey, stageIndex, isReplay, 
             onPlayAgain={resetGame}
             onBackToJourney={onExit}
             onViewStats={onOpenStats}
+            persisted={stageResult.persisted}
           />
         </View>
       </GameShell>

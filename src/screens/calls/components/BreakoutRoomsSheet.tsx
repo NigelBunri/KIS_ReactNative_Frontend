@@ -82,7 +82,12 @@ export default function BreakoutRoomsSheet({
     >
       <View style={styles.header}>
         <Text style={[styles.title, { color: palette.ivory }]}>Breakout rooms</Text>
-        <Pressable onPress={onClose} hitSlop={10}>
+        <Pressable
+          onPress={onClose}
+          hitSlop={10}
+          accessibilityRole="button"
+          accessibilityLabel="Close breakout rooms"
+        >
           <KISIcon name="close" size={20} color={palette.subtext} />
         </Pressable>
       </View>

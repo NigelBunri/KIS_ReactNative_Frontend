@@ -295,7 +295,7 @@ export function CompliancePanel({
     }
   }, [consentForm, loadComplianceData]);
 
-  const handleRevokeConsent = useCallback(
+  const performRevokeConsent = useCallback(
     async (id: string) => {
       setRevokingId(id);
       try {
@@ -310,6 +310,20 @@ export function CompliancePanel({
       }
     },
     [loadComplianceData],
+  );
+
+  const handleRevokeConsent = useCallback(
+    (id: string) => {
+      Alert.alert(
+        'Revoke consent',
+        'This immediately revokes the patient’s data access consent. This cannot be undone. Continue?',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Revoke', style: 'destructive', onPress: () => void performRevokeConsent(id) },
+        ],
+      );
+    },
+    [performRevokeConsent],
   );
 
   const sectionStyle = useMemo(

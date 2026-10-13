@@ -1,5 +1,5 @@
 import React from 'react';
-import { View } from 'react-native';
+import { Alert, View } from 'react-native';
 import { useKISTheme } from '@/theme/useTheme';
 import KISButton from '@/constants/KISButton';
 import KISText from '@/components/common/KISText';
@@ -65,6 +65,28 @@ const PartnerProfilesList = ({
         : 'Grace window expired'
       : null;
 
+    const partnerLabel = partner.name || 'this partner organization';
+
+    const confirmDeactivate = () =>
+      Alert.alert(
+        'Deactivate partner organization',
+        `Deactivate ${partnerLabel}? It will stop being visible to others until you reactivate it, and reactivation may be time-limited.`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Deactivate', style: 'destructive', onPress: () => onDeactivate(partner.id) },
+        ],
+      );
+
+    const confirmDelete = () =>
+      Alert.alert(
+        'Delete partner organization',
+        `This will permanently delete ${partnerLabel}. This cannot be undone.`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Delete', style: 'destructive', onPress: () => onDelete(partner.id) },
+        ],
+      );
+
     return (
       <View
         key={partner.id}
@@ -104,7 +126,7 @@ const PartnerProfilesList = ({
               title="Deactivate"
               size="xs"
               variant="ghost"
-              onPress={() => onDeactivate(partner.id)}
+              onPress={confirmDeactivate}
               disabled={isBusy}
             />
           )}
@@ -121,7 +143,7 @@ const PartnerProfilesList = ({
             title="Delete"
             size="xs"
             variant="outline"
-            onPress={() => onDelete(partner.id)}
+            onPress={confirmDelete}
             disabled={isBusy}
           />
           {onOpenLandingBuilder ? (

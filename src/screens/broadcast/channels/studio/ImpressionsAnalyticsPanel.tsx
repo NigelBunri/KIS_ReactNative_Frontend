@@ -76,7 +76,12 @@ export default function ImpressionsAnalyticsPanel({ channelId }: Props) {
         `${ROUTES.broadcasts.channelAnalyticsImpressions(channelId)}?period=${p}`,
         { errorMessage: '' },
       );
-      setData(res?.data ?? res ?? {});
+      // getRequest resolves (never throws) on failure too — without this
+      // check, a failed load's error body passed straight through as the
+      // summary, rendering confident "0" impressions/views/CTR on a load
+      // failure, indistinguishable from a genuine zero-traffic period.
+      if (!res?.success) throw new Error('Could not load impressions data.');
+      setData(res.data ?? {});
     } catch {
       setError('Could not load impressions data.');
     } finally {

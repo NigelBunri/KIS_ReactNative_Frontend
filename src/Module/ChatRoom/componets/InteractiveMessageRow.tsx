@@ -10,6 +10,7 @@ import {
   Share,
   ScrollView,
   useWindowDimensions,
+  Alert,
 } from 'react-native';
 import Clipboard from '@react-native-clipboard/clipboard';
 import Ionicons from 'react-native-vector-icons/Ionicons';
@@ -105,6 +106,9 @@ const QuickEmojiButton: React.FC<QuickEmojiButtonProps> = ({
   return (
     <Pressable
       onPress={handlePress}
+      accessibilityRole="button"
+      accessibilityLabel={`React with ${emoji}`}
+      accessibilityState={{ selected: isSelected }}
       style={{
         width: 48,
         height: 48,
@@ -398,7 +402,27 @@ export const InteractiveMessageRow: React.FC<Props> = ({
         icon: 'trash-outline',
         label: 'Delete for everyone',
         destructive: true,
-        onPress: () => closeSheet(() => onDeleteMessage(message)),
+        // Unlike bulk selection delete (useBulkMessageActions.ts), this
+        // single-message path fired the irreversible, everyone-visible
+        // delete the instant the row was tapped, with zero confirmation -
+        // a mis-tap in a long action sheet permanently removed a message
+        // for every participant. Bring it in line with the bulk path's
+        // existing confirm step instead of leaving this one unguarded.
+        onPress: () =>
+          closeSheet(() => {
+            Alert.alert(
+              'Delete for everyone?',
+              'This message will be removed for everyone in this conversation. This cannot be undone.',
+              [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                  text: 'Delete',
+                  style: 'destructive',
+                  onPress: () => onDeleteMessage(message),
+                },
+              ],
+            );
+          }),
       });
     }
   }

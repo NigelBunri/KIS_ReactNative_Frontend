@@ -18,6 +18,7 @@ import ROUTES from '@/network';
 import { getRequest } from '@/network/get';
 import { postRequest } from '@/network/post';
 import { SafeAreaView } from '@/components/common/SafeAreaViewWithTopPadding';
+import { KIS_COIN_LABEL } from '@/screens/market/market.constants';
 
 type PromoCode = {
   id?: string;
@@ -60,7 +61,9 @@ const formatDiscount = (code: PromoCode): string => {
     code.discount_type === 'fixed'
       ? code.discount_value
       : code.discount_amount;
-  if (fixed) return `-${fixed}`;
+  // Fixed discounts had no currency unit at all ("-10"), leaving the user
+  // unsure whether a promo took 10 cents or 10 dollars off their total.
+  if (fixed) return `-${fixed} ${KIS_COIN_LABEL} off`;
 
   if (code.description) return code.description;
   return 'Discount applied';

@@ -314,6 +314,9 @@ export default function MarketplaceOrderDetailPage() {
         <Pressable
           onPress={() => navigation.goBack()}
           style={styles.backButton}
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
           <KISIcon name="arrow-left" size={18} color={palette.text} />
         </Pressable>
@@ -542,9 +545,21 @@ export default function MarketplaceOrderDetailPage() {
               size="sm"
               variant="outline"
               onPress={() =>
-                handleAction(
-                  ROUTES.commerce.marketplaceOrderCancel(order.id),
-                  'Unable to cancel order',
+                Alert.alert(
+                  'Cancel order',
+                  'Are you sure you want to cancel this order? This cannot be undone.',
+                  [
+                    { text: 'Keep order', style: 'cancel' },
+                    {
+                      text: 'Cancel order',
+                      style: 'destructive',
+                      onPress: () =>
+                        handleAction(
+                          ROUTES.commerce.marketplaceOrderCancel(order.id),
+                          'Unable to cancel order',
+                        ),
+                    },
+                  ],
                 )
               }
               loading={actionLoading === 'cancel'}

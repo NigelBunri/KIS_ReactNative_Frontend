@@ -195,7 +195,13 @@ export default function CourseDetailScreen() {
         <PermanentRemoteImage uri={item.coverUrl || ''} domain="Education" style={{ width: '100%', height: 200, backgroundColor: palette.border }} />
         <View style={{ padding: responsive.pageGutter, gap: 14 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-            <Pressable onPress={() => navigation.goBack()} style={{ padding: 4, marginLeft: -4 }}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Back"
+              onPress={() => navigation.goBack()}
+              hitSlop={12}
+              style={{ padding: 4, marginLeft: -4 }}
+            >
               <KISIcon name="back" size={20} color={palette.text} />
             </Pressable>
             <Text style={{ fontSize: 12, fontWeight: '700', color: palette.subtext, textTransform: 'uppercase', flex: 1 }}>

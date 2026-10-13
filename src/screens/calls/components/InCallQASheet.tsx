@@ -59,7 +59,12 @@ export default function InCallQASheet({
     >
       <View style={styles.header}>
         <Text style={[styles.title, { color: palette.ivory }]}>Q&A</Text>
-        <Pressable onPress={onClose} hitSlop={10}>
+        <Pressable
+          onPress={onClose}
+          hitSlop={10}
+          accessibilityRole="button"
+          accessibilityLabel="Close Q&A"
+        >
           <KISIcon name="close" size={20} color={palette.subtext} />
         </Pressable>
       </View>

@@ -112,6 +112,8 @@ export const StarredMessagesSheet: React.FC<Props> = ({
           onPress={() => handleUnstar(item)}
           style={styles.unstarBtn}
           hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel="Remove star"
         >
           <KISIcon name="close" size={16} color={palette.subtext} />
         </Pressable>
@@ -130,7 +132,7 @@ export const StarredMessagesSheet: React.FC<Props> = ({
       >
         <View style={[styles.header, { borderBottomColor: palette.divider }]}>
           <Text style={[styles.title, { color: palette.text }]}>Starred Messages</Text>
-          <Pressable onPress={onClose} hitSlop={8}>
+          <Pressable onPress={onClose} hitSlop={8} accessibilityRole="button" accessibilityLabel="Close">
             <KISIcon name="close" size={22} color={palette.text} />
           </Pressable>
         </View>

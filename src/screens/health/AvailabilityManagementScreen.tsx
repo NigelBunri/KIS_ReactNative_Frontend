@@ -1371,6 +1371,9 @@ export default function AvailabilityManagementScreen({
           key={dateKey}
           onPress={() => handleDayPress(date)}
           disabled={!isSelectable}
+          accessibilityRole="button"
+          accessibilityLabel={`${date.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}${statusMeta ? `, ${statusMeta.label}` : ''}${countdownLabel ? `, ${countdownLabel}` : ''}`}
+          accessibilityState={{ selected: isActive, disabled: !isSelectable }}
           onLayout={
             compact
               ? undefined
@@ -1664,6 +1667,7 @@ export default function AvailabilityManagementScreen({
               variant="outline"
               size="xs"
               onPress={() => navigation.goBack()}
+              accessibilityLabel="Close availability management"
             >
               <KISIcon name="close" size={18} color={palette.text} />
             </KISButton>
@@ -1733,6 +1737,7 @@ export default function AvailabilityManagementScreen({
             variant="outline"
             size="xs"
             onPress={() => navigation.goBack()}
+            accessibilityLabel="Close availability management"
           >
             <KISIcon name="close" size={18} color={palette.text} />
           </KISButton>

@@ -33,6 +33,7 @@ export const PollModal: React.FC<PollModalProps> = ({
 }) => {
   const [question, setQuestion] = useState('');
   const [options, setOptions] = useState<string[]>(['', '']);
+  const [attempted, setAttempted] = useState(false);
   const { dragY, panHandlers } = usePullDownToClose({
     enabled: visible,
     onClose,
@@ -54,22 +55,30 @@ export const PollModal: React.FC<PollModalProps> = ({
     setOptions(prev => prev.filter((_, i) => i !== idx));
   };
 
+  const cleanedOptions = options.map(o => o.trim()).filter(Boolean);
+  const questionValid = !!question.trim();
+  const optionsValid = cleanedOptions.length >= 2;
+  const canCreate = questionValid && optionsValid;
+
   const handleCreate = () => {
-    const cleaned = options.map(o => o.trim()).filter(Boolean);
-    if (!question.trim() || cleaned.length < 2) {
-      // minimal guard; real validation later
-      return;
-    }
+    setAttempted(true);
+    // Previously this silently did nothing on invalid input ("minimal
+    // guard; real validation later") - tapping Create with a blank
+    // question or fewer than 2 options just appeared to not respond at
+    // all, with no indication why. Now mirrors EventModal's pattern:
+    // show the specific reason beneath each invalid field.
+    if (!canCreate) return;
+
     if (onCreatePoll) {
       onCreatePoll({
         question: question.trim(),
-        options: cleaned,
+        options: cleanedOptions,
       });
     }
     onClose();
-    // Optional: reset if you want
     setQuestion('');
     setOptions(['', '']);
+    setAttempted(false);
   };
 
   return (
@@ -140,9 +149,14 @@ export const PollModal: React.FC<PollModalProps> = ({
                 paddingHorizontal: KIS_TOKENS.spacing.md,
                 paddingVertical: KIS_TOKENS.spacing.sm,
                 color: palette.text,
-                marginBottom: KIS_TOKENS.spacing.lg,
+                marginBottom: attempted && !questionValid ? KIS_TOKENS.spacing.xs : KIS_TOKENS.spacing.lg,
               }}
             />
+            {attempted && !questionValid && (
+              <Text style={{ color: palette.danger, marginBottom: KIS_TOKENS.spacing.md, fontSize: 12 }}>
+                A question is required.
+              </Text>
+            )}
 
             <Text
               style={{
@@ -181,7 +195,9 @@ export const PollModal: React.FC<PollModalProps> = ({
                 {options.length > 2 && (
                   <Pressable
                     onPress={() => removeOption(idx)}
-                    style={{ marginLeft: KIS_TOKENS.spacing.sm }}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Remove option ${idx + 1}`}
+                    style={{ marginLeft: KIS_TOKENS.spacing.sm, padding: 10, minHeight: 44, justifyContent: 'center' }}
                   >
                     <Text style={{ color: palette.danger }}>Remove</Text>
                   </Pressable>
@@ -189,12 +205,22 @@ export const PollModal: React.FC<PollModalProps> = ({
               </View>
             ))}
 
-            <Pressable onPress={addOption}>
+            {attempted && !optionsValid && (
+              <Text style={{ color: palette.danger, marginBottom: KIS_TOKENS.spacing.sm, fontSize: 12 }}>
+                Enter at least 2 options.
+              </Text>
+            )}
+
+            <Pressable
+              onPress={addOption}
+              accessibilityRole="button"
+              accessibilityLabel="Add option"
+              style={{ paddingVertical: 10, minHeight: 44, justifyContent: 'center' }}
+            >
               <Text
                 style={{
                   color: palette.primary,
-                  marginTop: KIS_TOKENS.spacing.sm,
-                  marginBottom: KIS_TOKENS.spacing.lg,
+                  marginBottom: KIS_TOKENS.spacing.sm,
                 }}
               >
                 + Add option
@@ -211,11 +237,21 @@ export const PollModal: React.FC<PollModalProps> = ({
               marginTop: KIS_TOKENS.spacing.sm,
             }}
           >
-            <Pressable onPress={onClose}>
+            <Pressable
+              onPress={onClose}
+              accessibilityRole="button"
+              accessibilityLabel="Cancel"
+              style={{ paddingHorizontal: 14, paddingVertical: 12, minHeight: 44, justifyContent: 'center' }}
+            >
               <Text style={{ color: palette.subtext }}>Cancel</Text>
             </Pressable>
-            <Pressable onPress={handleCreate}>
-              <Text style={{ color: palette.primary, fontWeight: '700' }}>
+            <Pressable
+              onPress={handleCreate}
+              accessibilityRole="button"
+              accessibilityLabel="Create poll"
+              style={{ paddingHorizontal: 14, paddingVertical: 12, minHeight: 44, justifyContent: 'center' }}
+            >
+              <Text style={{ color: canCreate ? palette.primary : palette.subtext, fontWeight: '700' }}>
                 Create
               </Text>
             </Pressable>

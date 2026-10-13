@@ -1476,6 +1476,20 @@ export default function HealthcareScreen() {
     [patientDetail, loadPatientDetail],
   );
 
+  const confirmRevokeAccessGrant = useCallback(
+    (grantId: string) => {
+      Alert.alert(
+        'Revoke access?',
+        'This user will immediately lose access to this patient\'s health records.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Revoke', style: 'destructive', onPress: () => handleRevokeAccessGrant(grantId) },
+        ],
+      );
+    },
+    [handleRevokeAccessGrant],
+  );
+
   const handleCreateProblemRecord = useCallback(async () => {
     if (!patientDetail) {
       Alert.alert('Problem list', 'Select a patient first.');
@@ -2815,7 +2829,13 @@ export default function HealthcareScreen() {
                       User {grant.granted_to}
                     </Text>
                     {grant.status === 'active' && (
-                      <Pressable onPress={() => handleRevokeAccessGrant(grant.id)} hitSlop={10} style={{ marginTop: 2 }}>
+                      <Pressable
+                        onPress={() => confirmRevokeAccessGrant(grant.id)}
+                        hitSlop={10}
+                        style={{ marginTop: 2 }}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Revoke access for user ${grant.granted_to}`}
+                      >
                         <Text style={{ color: palette.primaryStrong, fontSize: 11, fontWeight: '800' }}>Revoke</Text>
                       </Pressable>
                     )}

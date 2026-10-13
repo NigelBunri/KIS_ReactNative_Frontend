@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import {
+  Alert,
   Animated,
   Image,
   Pressable,
@@ -315,11 +316,26 @@ const parseVariantsValue = (raw: ExistingProduct['variants']): ExistingVariant[]
     try {
       const parsed = JSON.parse(raw);
       return Array.isArray(parsed) ? parsed : [];
-    } catch {
+    } catch (error) {
+      console.error('Failed to parse existing product variants JSON', error);
       return [];
     }
   }
   return [];
+};
+
+// Returns true when `raw` is a variants string that failed to parse, so the
+// editor can warn the seller instead of silently showing an empty variants
+// list (which would otherwise look like "no variants" and risk wiping real
+// variant data on the next save).
+const didVariantsFailToParse = (raw: ExistingProduct['variants']): boolean => {
+  if (typeof raw !== 'string' || !raw) return false;
+  try {
+    JSON.parse(raw);
+    return false;
+  } catch {
+    return true;
+  }
 };
 
 const convertVariantsFromProduct = (raw: ExistingProduct['variants']): VariantEntry[] => {
@@ -360,6 +376,7 @@ export default function ProductEditorDrawer({
   const slide = useRef(new Animated.Value(drawerWidth)).current;
 
   const [form, setForm] = useState<ProductFormState>(DEFAULT_PRODUCT_FORM);
+  const initialFormSnapshotRef = useRef<string>(JSON.stringify(DEFAULT_PRODUCT_FORM));
   const [attributeEntries, setAttributeEntries] = useState<AttributeEntry[]>([]);
   const [variantEntries, setVariantEntries] = useState<VariantEntry[]>([]);
   const [productCategoryModalVisible, setProductCategoryModalVisible] = useState(false);
@@ -490,7 +507,7 @@ export default function ProductEditorDrawer({
         normalizedGallery[0]?.uri ||
         '';
 
-      setForm({
+      const nextForm: ProductFormState = {
         name: product.name ?? '',
         sku: product.sku ?? '',
         slug: product.slug ?? '',
@@ -507,7 +524,9 @@ export default function ProductEditorDrawer({
         is_featured: product.is_featured ?? false,
         requires_shipping: product.requires_shipping ?? true,
         categoryIds: collectCategoryIds(product.catalog_categories, PRODUCT_CATEGORY_TYPES),
-      });
+      };
+      setForm(nextForm);
+      initialFormSnapshotRef.current = JSON.stringify(nextForm);
 
       setMainImage(
         mainImageUri
@@ -522,14 +541,42 @@ export default function ProductEditorDrawer({
       setGalleryImages(normalizedGallery);
       setAttributeEntries(convertAttributesFromProduct(product.attributes));
       setVariantEntries(convertVariantsFromProduct(product.variants));
+
+      if (didVariantsFailToParse(product.variants)) {
+        Alert.alert(
+          'Variants could not be loaded',
+          "This product's existing variant data could not be read, so the variants list below is showing empty. Saving changes now will remove its existing variants. Please contact support before publishing if this product should have variants.",
+        );
+      }
     } else {
       setForm(DEFAULT_PRODUCT_FORM);
+      initialFormSnapshotRef.current = JSON.stringify(DEFAULT_PRODUCT_FORM);
       setMainImage(null);
       setGalleryImages([]);
       setAttributeEntries([]);
       setVariantEntries([]);
     }
   }, [visible, mode, product]);
+
+  const hasUnsavedChanges = useCallback(
+    () => JSON.stringify(form) !== initialFormSnapshotRef.current,
+    [form],
+  );
+
+  const requestClose = useCallback(() => {
+    if (hasUnsavedChanges()) {
+      Alert.alert(
+        'Discard changes?',
+        'This product listing has unsaved changes. Closing now will discard them.',
+        [
+          { text: 'Keep editing', style: 'cancel' },
+          { text: 'Discard', style: 'destructive', onPress: onClose },
+        ],
+      );
+    } else {
+      onClose();
+    }
+  }, [hasUnsavedChanges, onClose]);
 
   useEffect(() => {
     if (form.inventory_type === 'DIGITAL' || form.inventory_type === 'SERVICE') {
@@ -1001,7 +1048,7 @@ export default function ProductEditorDrawer({
 
   return (
     <>
-      <Pressable style={marketStyles.drawerOverlay} onPress={onClose} />
+      <Pressable style={marketStyles.drawerOverlay} onPress={requestClose} />
 
       <Animated.View
         style={[

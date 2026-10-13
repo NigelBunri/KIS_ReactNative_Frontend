@@ -89,7 +89,13 @@ export default function AdminVerificationPanel({
           <Text style={[styles.headerTitle, { color: palette.text }]}>Verification Queue</Text>
           <Text style={[styles.headerSub, { color: palette.subtext }]}>Review flagged content and badge requests</Text>
         </View>
-        <Pressable onPress={onClose} style={styles.closeBtn}>
+        <Pressable
+          onPress={onClose}
+          style={styles.closeBtn}
+          accessibilityRole="button"
+          accessibilityLabel="Close"
+          hitSlop={8}
+        >
           <Text style={{ color: palette.subtext, fontSize: 20, lineHeight: 22 }}>✕</Text>
         </Pressable>
       </View>

@@ -94,17 +94,26 @@ export default function BoardGovernanceScreen(_props: Props) {
     }
     setVoting(electionId);
     try {
-      await postRequest(ROUTES.government.electionVote(electionId), {
+      // postRequest resolves (never throws) on a failed request too, with
+      // `success: false` — the previous code ignored that flag entirely and
+      // always marked the election as voted and showed "Vote Recorded",
+      // even when the backend rejected the vote. Checking `success` routes
+      // a genuine failure to the error alert below instead of lying to the
+      // voter about their ballot being cast.
+      const res = await postRequest(ROUTES.government.electionVote(electionId), {
         candidate_index: candidateIndex,
       });
+      if (!res?.success) {
+        throw new Error(res?.message || 'Could not submit vote. Please try again.');
+      }
       setElections((prev) =>
         prev.map((e) =>
           e.id === electionId ? { ...e, user_voted: true } : e,
         ),
       );
       Alert.alert('Vote Recorded', 'Your vote has been cast successfully.');
-    } catch {
-      Alert.alert('Error', 'Could not submit vote. Please try again.');
+    } catch (e: any) {
+      Alert.alert('Error', e?.message || 'Could not submit vote. Please try again.');
     } finally {
       setVoting(null);
     }

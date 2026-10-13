@@ -139,6 +139,7 @@ export type UseImageEditorReturn = {
   handleAddMosaicBlock: () => void;
   handleClearBrush: () => void;
   handleAddTextTag: () => void;
+  handleClearText: () => void;
   handleReset: () => void;
 
   buildEditedAsset: () => Promise<ImagePickerAsset>;

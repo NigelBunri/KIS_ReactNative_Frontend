@@ -85,7 +85,11 @@ export default function WebsiteCollaboratorsScreen({ route }: Props) {
         text: 'Revoke',
         style: 'destructive',
         onPress: async () => {
-          await postRequest(ROUTES.websites.inviteRevoke(websiteId, invite.id), {}, { errorMessage: 'Unable to revoke invite.' });
+          const res = await postRequest(ROUTES.websites.inviteRevoke(websiteId, invite.id), {}, { errorMessage: 'Unable to revoke invite.' });
+          if (!res?.success) {
+            Alert.alert('Invites', (res as any)?.message || 'Unable to revoke invite.');
+            return;
+          }
           await load();
         },
       },
@@ -99,7 +103,11 @@ export default function WebsiteCollaboratorsScreen({ route }: Props) {
         text: 'Remove',
         style: 'destructive',
         onPress: async () => {
-          await deleteRequest(ROUTES.websites.collaboratorDetail(websiteId, collaborator.id), { errorMessage: 'Unable to remove collaborator.' });
+          const res = await deleteRequest(ROUTES.websites.collaboratorDetail(websiteId, collaborator.id), { errorMessage: 'Unable to remove collaborator.' });
+          if (!res?.success) {
+            Alert.alert('Collaborators', (res as any)?.message || 'Unable to remove collaborator.');
+            return;
+          }
           await load();
         },
       },

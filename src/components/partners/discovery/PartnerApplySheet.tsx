@@ -222,6 +222,9 @@ export default function PartnerApplySheet({
       />
       <Pressable
         onPress={() => onChangeShareProfile(!shareProfile)}
+        accessibilityRole="checkbox"
+        accessibilityState={{ checked: shareProfile }}
+        accessibilityLabel="Share my profile as your CV"
         style={{ flexDirection: 'row', alignItems: 'center', marginTop: 12, gap: 8 }}
       >
         <View

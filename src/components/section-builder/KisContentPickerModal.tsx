@@ -35,14 +35,25 @@ export default function KisContentPickerModal({ visible, targetType, ownerType, 
   const [query, setQuery] = useState('');
   const [items, setItems] = useState<KisContentItem[]>([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!ownerType || !ownerId) return;
     setLoading(true);
+    setError(null);
     try {
       const res = await getRequest(ROUTES.websites.kisContentSearch(targetType), {
         params: { owner_type: ownerType, owner_id: ownerId, q: query },
+        errorMessage: 'Unable to search content.',
       });
+      // getRequest resolves (never throws) on a failed request too — without
+      // a `res?.success` check, a failed search silently rendered the same
+      // "No content found" empty state as a genuine zero-result search.
+      if (!(res as any)?.success) {
+        setItems([]);
+        setError((res as any)?.message || 'Unable to search content.');
+        return;
+      }
       const results = (res as any)?.data?.results ?? (res as any)?.results ?? [];
       setItems(Array.isArray(results) ? results : []);
     } finally {
@@ -75,6 +86,11 @@ export default function KisContentPickerModal({ visible, targetType, ownerType, 
           />
           {loading ? (
             <ActivityIndicator style={{ marginTop: 16 }} color={palette.primaryStrong} />
+          ) : error ? (
+            <View style={{ alignItems: 'center', gap: 8, paddingVertical: 16 }}>
+              <Text style={[styles.empty, { color: palette.danger }]}>{error}</Text>
+              <KISButton title="Retry" size="sm" variant="outline" onPress={load} />
+            </View>
           ) : (
             <ScrollView style={styles.list} keyboardShouldPersistTaps="handled">
               {items.length === 0 ? (

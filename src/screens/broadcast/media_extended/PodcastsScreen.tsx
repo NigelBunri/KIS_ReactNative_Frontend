@@ -16,6 +16,7 @@ import LinearGradient from 'react-native-linear-gradient';
 import { useKISTheme } from '@/theme/useTheme';
 import { useResponsiveLayout } from '@/theme/responsive';
 import { KISIcon } from '@/constants/kisIcons';
+import KISButton from '@/constants/KISButton';
 import { getRequest } from '@/network/get';
 import ROUTES from '@/network';
 import type { RootStackParamList } from '@/navigation/types';
@@ -49,26 +50,30 @@ export default function PodcastsScreen({ navigation }: Props) {
 
   const [channels, setChannels] = useState<PodcastChannel[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState(ALL_CATEGORY);
   const [expandedChannelId, setExpandedChannelId] = useState<string | null>(null);
   const [episodes, setEpisodes] = useState<Record<string, Episode[]>>({});
   const [loadingEpisodes, setLoadingEpisodes] = useState<string | null>(null);
+  const [episodeError, setEpisodeError] = useState<string | null>(null);
 
-  useFocusEffect(
-    useCallback(() => {
-      let active = true;
-      setLoading(true);
-      getRequest(ROUTES.mediaExtended.podcastChannels)
-        .then((res: any) => {
-          // Same fix as KingdomNewsScreen — `channels.map(...)`/`.filter(...)`
-          // below would crash on the leaked wrapper object.
-          if (active) setChannels(Array.isArray(res?.data) ? res.data : []);
-        })
-        .catch(() => {})
-        .finally(() => { if (active) setLoading(false); });
-      return () => { active = false; };
-    }, []),
-  );
+  const fetchChannels = useCallback(() => {
+    let active = true;
+    setLoading(true);
+    setLoadError(false);
+    getRequest(ROUTES.mediaExtended.podcastChannels)
+      .then((res: any) => {
+        if (!active) return;
+        // Same fix as KingdomNewsScreen — `channels.map(...)`/`.filter(...)`
+        // below would crash on the leaked wrapper object.
+        setChannels(Array.isArray(res?.data) ? res.data : []);
+      })
+      .catch(() => { if (active) setLoadError(true); })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, []);
+
+  useFocusEffect(useCallback(() => fetchChannels(), [fetchChannels]));
 
   const categories = [ALL_CATEGORY, ...Array.from(new Set(channels.map((c) => c.category).filter(Boolean)))];
 
@@ -76,21 +81,29 @@ export default function PodcastsScreen({ navigation }: Props) {
     ? channels
     : channels.filter((c) => c.category === selectedCategory);
 
+  const loadEpisodesFor = async (channelId: string) => {
+    setEpisodeError(null);
+    setLoadingEpisodes(channelId);
+    try {
+      const res: any = await getRequest(ROUTES.mediaExtended.podcastEpisodes + `?channel=${channelId}`);
+      // Same fix as loadChannels above — `episodes[id].map(...)` in the
+      // render below would crash on the leaked wrapper object.
+      setEpisodes((prev) => ({ ...prev, [channelId]: Array.isArray(res?.data) ? res.data : [] }));
+    } catch {
+      setEpisodeError('Unable to load episodes. Check your connection and try again.');
+    }
+    setLoadingEpisodes(null);
+  };
+
   const handleChannelPress = async (channel: PodcastChannel) => {
     if (expandedChannelId === channel.id) {
       setExpandedChannelId(null);
       return;
     }
     setExpandedChannelId(channel.id);
+    setEpisodeError(null);
     if (!episodes[channel.id]) {
-      setLoadingEpisodes(channel.id);
-      try {
-        const res: any = await getRequest(ROUTES.mediaExtended.podcastEpisodes + `?channel=${channel.id}`);
-        // Same fix as loadChannels above — `episodes[id].map(...)` in the
-        // render below would crash on the leaked wrapper object.
-        setEpisodes((prev) => ({ ...prev, [channel.id]: Array.isArray(res?.data) ? res.data : [] }));
-      } catch {}
-      setLoadingEpisodes(null);
+      await loadEpisodesFor(channel.id);
     }
   };
 
@@ -183,7 +196,13 @@ export default function PodcastsScreen({ navigation }: Props) {
   return (
     <SafeAreaView style={styles.safe}>
       <LinearGradient colors={[palette.gradientStart, palette.gradientEnd]} style={styles.header}>
-        <Pressable style={styles.backBtn} onPress={() => navigation.goBack()} hitSlop={8}>
+        <Pressable
+          style={styles.backBtn}
+          onPress={() => navigation.goBack()}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
+        >
           <KISIcon name="chevron-back-outline" size={22} color={palette.ivory} />
           <Text style={styles.backLabel}>Back</Text>
         </Pressable>
@@ -217,7 +236,15 @@ export default function PodcastsScreen({ navigation }: Props) {
       </ScrollView>
 
       <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
-        {filtered.length === 0 && (
+        {loadError && (
+          <View style={{ paddingHorizontal: sp, paddingTop: 10, gap: 8 }}>
+            <Text style={[styles.empty, { color: palette.danger, padding: 0 }]}>
+              Unable to load podcast channels. Check your connection and try again.
+            </Text>
+            <KISButton title="Retry" size="sm" variant="outline" onPress={fetchChannels} />
+          </View>
+        )}
+        {filtered.length === 0 && !loadError && (
           <Text style={styles.empty}>No podcast channels found.</Text>
         )}
 
@@ -250,6 +277,20 @@ export default function PodcastsScreen({ navigation }: Props) {
             {loadingEpisodes === expandedChannelId ? (
               <View style={styles.episodeLoadingWrap}>
                 <ActivityIndicator size="small" color={palette.primary} />
+              </View>
+            ) : episodeError ? (
+              <View style={{ padding: sp, gap: 8 }}>
+                <Text style={[styles.empty, { color: palette.danger, padding: 0 }]}>
+                  {episodeError}
+                </Text>
+                <KISButton
+                  title="Retry"
+                  size="sm"
+                  variant="outline"
+                  onPress={() => {
+                    if (expandedChannelId) void loadEpisodesFor(expandedChannelId);
+                  }}
+                />
               </View>
             ) : (episodes[expandedChannelId] ?? []).length === 0 ? (
               <Text style={[styles.empty, { padding: 16 }]}>No episodes yet.</Text>

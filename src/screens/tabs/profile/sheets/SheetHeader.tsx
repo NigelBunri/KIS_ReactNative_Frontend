@@ -12,6 +12,8 @@ export default function SheetHeader({ title, onClose }: { title: string; onClose
       <Text style={{ fontSize: 18, fontWeight: '800', color: palette.text }}>{title}</Text>
       <Pressable
         onPress={onClose}
+        accessibilityRole="button"
+        accessibilityLabel="Close"
         style={{ minHeight: 44, minWidth: 44, alignItems: 'center', justifyContent: 'center' }}
       >
         <KISIcon name="close" size={22} color={palette.subtext} />

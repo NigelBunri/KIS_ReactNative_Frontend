@@ -15,7 +15,12 @@ export default function KpiTile({ kpi }: Props) {
       : typeof kpi.change === 'string'
       ? kpi.change
       : null;
-  const changeColor = kpi.change && Number(kpi.change) >= 0 ? palette.success : palette.danger;
+  // Was `kpi.change && Number(kpi.change) >= 0` - with change === 0 (a genuine
+  // "no change" KPI), `0 && ...` short-circuits to the falsy `0` itself, so a
+  // flat trend rendered in palette.danger (red) as if it had gotten worse.
+  // Checking the type first (not truthiness) treats 0% as non-negative, same
+  // as any other non-negative change.
+  const changeColor = typeof kpi.change === 'number' && kpi.change >= 0 ? palette.success : palette.danger;
 
   return (
     <View style={[styles.wrap, { backgroundColor: palette.surface, borderColor: palette.border }]}>

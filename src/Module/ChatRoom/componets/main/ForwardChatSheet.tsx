@@ -118,7 +118,10 @@ export const ForwardChatSheet: React.FC<ForwardChatSheetProps> = ({
         >
           <Pressable
             onPress={onClose}
-            style={{ padding: 4, marginRight: 8 }}
+            hitSlop={12}
+            accessibilityRole="button"
+            accessibilityLabel="Close"
+            style={{ padding: 10, marginRight: 8 }}
           >
             <KISIcon
               name="arrow-left"
@@ -231,6 +234,8 @@ export const ForwardChatSheet: React.FC<ForwardChatSheetProps> = ({
           <Pressable
             onPress={() => onConfirm(selectedChatIds)}
             disabled={selectedChatIds.length === 0}
+            accessibilityRole="button"
+            accessibilityLabel="Forward to selected chats"
             style={{
               borderRadius: 999,
               paddingVertical: 10,

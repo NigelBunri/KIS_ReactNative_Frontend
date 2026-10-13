@@ -49,6 +49,7 @@ export default function PartnerRecruitmentPanel({
   const [communities, setCommunities] = useState<Option[]>([]);
   const [groups, setGroups] = useState<Option[]>([]);
   const [channels, setChannels] = useState<Option[]>([]);
+  const [error, setError] = useState<string | null>(null);
 
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -86,7 +87,13 @@ export default function PartnerRecruitmentPanel({
     const res = await getRequest(ROUTES.partners.jobs(partnerId), {
       errorMessage: 'Unable to load jobs.',
     });
-    const list = (res?.data ?? res ?? []) as PartnerJobPost[];
+    if (!res?.success) {
+      setError(res?.message || "Couldn't load the recruitment pipeline. Tap to retry.");
+      setJobs([]);
+      return;
+    }
+    setError(null);
+    const list = (res?.data ?? []) as PartnerJobPost[];
     setJobs(Array.isArray(list) ? list : []);
   }, [partnerId]);
 
@@ -95,7 +102,12 @@ export default function PartnerRecruitmentPanel({
     const res = await getRequest(ROUTES.partners.applications(partnerId), {
       errorMessage: 'Unable to load applications.',
     });
-    const list = (res?.data ?? res ?? []) as Application[];
+    if (!res?.success) {
+      setError(res?.message || "Couldn't load applications. Tap to retry.");
+      setApplications([]);
+      return;
+    }
+    const list = (res?.data ?? []) as Application[];
     setApplications(Array.isArray(list) ? list : []);
   }, [partnerId]);
 
@@ -112,9 +124,9 @@ export default function PartnerRecruitmentPanel({
         errorMessage: 'Unable to load channels.',
       }),
     ]);
-    const communityList = (communitiesRes?.data?.results ?? communitiesRes?.data ?? communitiesRes ?? []) as any[];
-    const groupList = (groupsRes?.data?.results ?? groupsRes?.data ?? groupsRes ?? []) as any[];
-    const channelList = (channelsRes?.data ?? channelsRes ?? []) as any[];
+    const communityList = (communitiesRes?.success ? communitiesRes?.data?.results ?? communitiesRes?.data : []) as any[];
+    const groupList = (groupsRes?.success ? groupsRes?.data?.results ?? groupsRes?.data : []) as any[];
+    const channelList = (channelsRes?.success ? channelsRes?.data : []) as any[];
     setCommunities(
       Array.isArray(communityList)
         ? communityList.map((c) => ({ id: String(c.id), name: c.name || 'Community' }))
@@ -241,7 +253,7 @@ export default function PartnerRecruitmentPanel({
             { borderBottomColor: palette.divider },
           ]}
         >
-          <Pressable onPress={onClose} style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}>
+          <Pressable onPress={onClose} accessibilityRole="button" accessibilityLabel="Close" style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}>
             <Text style={{ color: palette.text, fontSize: 18 }}>‹</Text>
           </Pressable>
           <View style={{ flex: 1 }}>
@@ -272,6 +284,28 @@ export default function PartnerRecruitmentPanel({
         {loading ? (
           <View style={{ padding: 16 }}>
             <ActivityIndicator color={palette.primaryStrong} />
+          </View>
+        ) : error ? (
+          <View
+            style={{
+              margin: 16,
+              borderRadius: 10,
+              borderWidth: 1,
+              borderColor: palette.danger,
+              backgroundColor: palette.danger + '15',
+              padding: 12,
+            }}
+          >
+            <Text style={{ color: palette.danger, fontSize: 13, fontWeight: '600' }}>{error}</Text>
+            <Pressable
+              onPress={() => {
+                setLoading(true);
+                Promise.all([loadJobs(), loadApplications(), loadSpaces()]).finally(() => setLoading(false));
+              }}
+              style={{ marginTop: 8 }}
+            >
+              <Text style={{ color: palette.primary, fontWeight: '700', fontSize: 13 }}>Tap to retry</Text>
+            </Pressable>
           </View>
         ) : (
           <ScrollView

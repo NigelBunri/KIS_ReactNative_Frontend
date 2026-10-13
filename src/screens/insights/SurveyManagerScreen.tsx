@@ -675,7 +675,7 @@ export default function SurveyManagerScreen() {
       )}
 
       {/* FAB – Create */}
-      <KISFab icon="add" onPress={() => setShowCreate(true)} style={styles.fab} />
+      <KISFab icon="add" accessibilityLabel="Create survey" onPress={() => setShowCreate(true)} style={styles.fab} />
 
       {/* Create Modal */}
       <CreateSurveyModal

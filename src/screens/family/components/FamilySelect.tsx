@@ -49,6 +49,8 @@ export default function FamilySelect({
             borderColor: palette.divider,
           },
         ]}
+        accessibilityRole="button"
+        accessibilityLabel={`${placeholder}: ${selected?.label ?? 'none selected'}`}
       >
         <Text style={[styles.triggerText, { color: palette.text }]} numberOfLines={1}>
           {selected?.label ?? placeholder}
@@ -83,6 +85,8 @@ export default function FamilySelect({
                         borderColor: isSelected ? palette.gold : palette.divider,
                       },
                     ]}
+                    accessibilityRole="radio"
+                    accessibilityState={{ checked: isSelected }}
                   >
                     <Text
                       style={[

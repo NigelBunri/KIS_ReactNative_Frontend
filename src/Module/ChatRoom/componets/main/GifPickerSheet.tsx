@@ -138,7 +138,12 @@ export const GifPickerSheet: React.FC<Props> = ({
             onSubmitEditing={() => fetchGifs(query)}
           />
           {query.length > 0 && (
-            <Pressable onPress={() => { setQuery(''); fetchGifs(''); }} hitSlop={8}>
+            <Pressable
+              onPress={() => { setQuery(''); fetchGifs(''); }}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel="Clear GIF search"
+            >
               <KISIcon name="close" size={16} color={palette.subtext} />
             </Pressable>
           )}
@@ -175,6 +180,8 @@ export const GifPickerSheet: React.FC<Props> = ({
                     });
                     onClose();
                   }}
+                  accessibilityRole="button"
+                  accessibilityLabel={item.title ? `Send GIF: ${item.title}` : 'Send GIF'}
                 >
                   <Image
                     source={{ uri: item.previewUrl }}

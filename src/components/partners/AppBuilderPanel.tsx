@@ -227,7 +227,7 @@ export default function AppBuilderPanel({ isOpen, panelWidth, panelTranslateX, p
         </Text>
         <Text style={[styles.small, { color: palette.subtext }]}>{block.status ?? 'draft'} · active: {block.is_active ? 'yes' : 'no'}</Text>
       </View>
-      <KISButton variant="ghost" onPress={() => handleDeleteBlock(block)}>
+      <KISButton variant="ghost" onPress={() => handleDeleteBlock(block)} accessibilityLabel="Delete block">
         <Text style={{ color: palette.danger, fontWeight: '700', fontSize: 12 }}>✕</Text>
       </KISButton>
     </View>
@@ -265,7 +265,7 @@ export default function AppBuilderPanel({ isOpen, panelWidth, panelTranslateX, p
             title={blockCount === 0 ? '+ Blocks' : 'Blocks'}
             onPress={() => openTab(tab)}
           />
-          <KISButton variant="ghost" onPress={() => handleDeleteTab(tab)}>
+          <KISButton variant="ghost" onPress={() => handleDeleteTab(tab)} accessibilityLabel="Delete tab">
             <Text style={{ color: palette.danger, fontWeight: '700', fontSize: 13 }}>✕</Text>
           </KISButton>
         </View>
@@ -287,7 +287,7 @@ export default function AppBuilderPanel({ isOpen, panelWidth, panelTranslateX, p
       </View>
       <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
         <Text style={{ color: palette.primary, fontWeight: '700', fontSize: 12 }}>Edit →</Text>
-        <KISButton variant="ghost" onPress={() => handleDeleteApp(app)}>
+        <KISButton variant="ghost" onPress={() => handleDeleteApp(app)} accessibilityLabel="Delete app">
           <Text style={{ color: palette.danger, fontWeight: '700', fontSize: 13 }}>✕</Text>
         </KISButton>
       </View>
@@ -300,7 +300,7 @@ export default function AppBuilderPanel({ isOpen, panelWidth, panelTranslateX, p
     <>
       <View style={[styles.header, { borderBottomColor: palette.border }]}>
         <Text style={[styles.title, { color: palette.text }]}>App Builder</Text>
-        <KISButton variant="ghost" onPress={onClose}>
+        <KISButton variant="ghost" onPress={onClose} accessibilityLabel="Close">
           <Text style={{ color: palette.subtext, fontSize: 20 }}>✕</Text>
         </KISButton>
       </View>
@@ -361,7 +361,7 @@ export default function AppBuilderPanel({ isOpen, panelWidth, panelTranslateX, p
     return (
       <>
         <View style={[styles.header, { borderBottomColor: palette.border }]}>
-          <KISButton variant="ghost" onPress={() => { setView('apps'); setSelectedApp(null); setTabs([]); }}>
+          <KISButton variant="ghost" onPress={() => { setView('apps'); setSelectedApp(null); setTabs([]); }} accessibilityLabel="Back to apps">
             <Text style={{ color: palette.primary, fontWeight: '700', fontSize: 13 }}>← Apps</Text>
           </KISButton>
           <Text style={[styles.title, { color: palette.text, flex: 1, textAlign: 'center' }]} numberOfLines={1}>
@@ -426,7 +426,7 @@ export default function AppBuilderPanel({ isOpen, panelWidth, panelTranslateX, p
     return (
       <>
         <View style={[styles.header, { borderBottomColor: palette.border }]}>
-          <KISButton variant="ghost" onPress={() => { setView('app_detail'); setSelectedTab(null); setBlocks([]); }}>
+          <KISButton variant="ghost" onPress={() => { setView('app_detail'); setSelectedTab(null); setBlocks([]); }} accessibilityLabel="Back to tabs">
             <Text style={{ color: palette.primary, fontWeight: '700', fontSize: 13 }}>← Tabs</Text>
           </KISButton>
           <Text style={[styles.title, { color: palette.text, flex: 1, textAlign: 'center' }]} numberOfLines={1}>

@@ -113,6 +113,8 @@ export default function CrisisResourcesScreen({ navigation }: Props) {
           onPress={() => navigation.goBack()}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           style={styles.backBtn}
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
         >
           <KISIcon name="arrow-left" size={22} color={palette.ivory} />
         </TouchableOpacity>
@@ -133,6 +135,10 @@ export default function CrisisResourcesScreen({ navigation }: Props) {
             style={styles.countryPicker}
             onPress={() => setShowCountryPicker(!showCountryPicker)}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            accessibilityRole="button"
+            accessibilityLabel={`Country: ${country}`}
+            accessibilityHint="Opens a list of countries to choose crisis hotlines for"
+            accessibilityState={{ expanded: showCountryPicker }}
           >
             <Text style={styles.countryText}>{country}</Text>
             <KISIcon name="chevron-down" size={18} color={palette.subtext} />
@@ -145,6 +151,9 @@ export default function CrisisResourcesScreen({ navigation }: Props) {
                   key={c}
                   style={[styles.dropdownItem, c === country && styles.dropdownItemActive]}
                   onPress={() => handleCountrySelect(c)}
+                  accessibilityRole="button"
+                  accessibilityLabel={c}
+                  accessibilityState={{ selected: c === country }}
                 >
                   <Text style={[styles.dropdownText, c === country && styles.dropdownTextActive]}>
                     {c}
@@ -197,6 +206,9 @@ export default function CrisisResourcesScreen({ navigation }: Props) {
               style={styles.accordionItem}
               onPress={() => setExpandedExercise(expandedExercise === i ? null : i)}
               activeOpacity={0.8}
+              accessibilityRole="button"
+              accessibilityLabel={ex.title}
+              accessibilityState={{ expanded: expandedExercise === i }}
             >
               <View style={styles.accordionHeader}>
                 <Text style={styles.accordionTitle}>{ex.title}</Text>

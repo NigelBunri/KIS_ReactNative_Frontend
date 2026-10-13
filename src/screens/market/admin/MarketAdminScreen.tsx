@@ -74,7 +74,13 @@ export default function MarketAdminScreen() {
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: palette.bg }]} edges={['top']}>
       <View style={[styles.header, { borderBottomColor: palette.divider }]}>
-        <Pressable onPress={() => navigation.goBack()} style={styles.backButton} hitSlop={12}>
+        <Pressable
+          onPress={() => navigation.goBack()}
+          style={styles.backButton}
+          hitSlop={12}
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
+        >
           <KISIcon name="arrow-back" size={22} color={palette.text} />
         </Pressable>
         <Text style={[styles.headerTitle, { color: palette.text }]}>Market Admin</Text>
@@ -328,7 +334,20 @@ function ProductsTab({ palette, responsive, insets }: TabProps) {
               <ActionButton
                 label={item.is_active ? 'Deactivate' : 'Activate'}
                 color={item.is_active ? palette.danger : palette.success}
-                onPress={() => void toggleActive(item)}
+                onPress={() => {
+                  if (item.is_active) {
+                    Alert.alert(
+                      'Deactivate product',
+                      `Deactivate "${item.name ?? 'this product'}"? It will no longer be visible to buyers.`,
+                      [
+                        { text: 'Cancel', style: 'cancel' },
+                        { text: 'Deactivate', style: 'destructive', onPress: () => void toggleActive(item) },
+                      ],
+                    );
+                  } else {
+                    void toggleActive(item);
+                  }
+                }}
               />
             )}
           </View>

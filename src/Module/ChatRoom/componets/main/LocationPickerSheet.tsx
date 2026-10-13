@@ -103,7 +103,7 @@ export const LocationPickerSheet: React.FC<Props> = ({
         <View style={[styles.handle, { backgroundColor: palette.divider }]} />
         <View style={[styles.header, { borderBottomColor: palette.divider }]}>
           <Text style={[styles.title, { color: palette.text }]}>Share Location</Text>
-          <Pressable onPress={onClose} hitSlop={8}>
+          <Pressable onPress={onClose} hitSlop={8} accessibilityRole="button" accessibilityLabel="Close">
             <KISIcon name="close" size={22} color={palette.text} />
           </Pressable>
         </View>
@@ -155,6 +155,8 @@ export const LocationPickerSheet: React.FC<Props> = ({
             <Pressable
               style={[styles.refreshBtn, { borderColor: palette.divider }]}
               onPress={fetchLocation}
+              accessibilityRole="button"
+              accessibilityLabel="Refresh location"
             >
               <KISIcon name="refresh" size={16} color={palette.primary} />
               <Text style={[styles.refreshText, { color: palette.primary }]}>
@@ -170,6 +172,8 @@ export const LocationPickerSheet: React.FC<Props> = ({
               { backgroundColor: location ? palette.primary : palette.divider },
             ]}
             disabled={!location || loading}
+            accessibilityRole="button"
+            accessibilityLabel="Send this location"
             onPress={() => {
               if (location) {
                 onSendLocation(location);
@@ -200,11 +204,30 @@ export const LocationPickerSheet: React.FC<Props> = ({
               { backgroundColor: location ? '#E53935' : palette.divider, marginTop: 8 },
             ]}
             disabled={!location || loading}
+            accessibilityRole="button"
+            accessibilityLabel="Share live location for 15 minutes"
             onPress={() => {
-              if (location) {
-                onSendLocation({ ...location, isLive: true, expiresAt: Date.now() + 15 * 60 * 1000 });
-                onClose();
-              }
+              if (!location) return;
+              // Unlike the one-time pin above, this continuously shares the
+              // user's real-time position with everyone in the chat for a
+              // full 15 minutes - a materially different privacy commitment
+              // that fired on a single tap with no chance to back out. A
+              // short confirm costs one tap but prevents an accidental share
+              // of live whereabouts for a quarter of an hour.
+              Alert.alert(
+                'Share live location?',
+                'Your real-time location will be visible to everyone in this chat for the next 15 minutes.',
+                [
+                  { text: 'Cancel', style: 'cancel' },
+                  {
+                    text: 'Share',
+                    onPress: () => {
+                      onSendLocation({ ...location, isLive: true, expiresAt: Date.now() + 15 * 60 * 1000 });
+                      onClose();
+                    },
+                  },
+                ],
+              );
             }}
           >
             <KISIcon

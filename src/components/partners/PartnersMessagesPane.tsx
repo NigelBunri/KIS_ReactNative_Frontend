@@ -160,6 +160,8 @@ export default function PartnersMessagesPane({
           <Pressable
             onPress={closeMessagesPane}
             hitSlop={12}
+            accessibilityRole="button"
+            accessibilityLabel="Close messages"
             style={{
               position: 'absolute',
               top: safeAreaInsets.top + 12,

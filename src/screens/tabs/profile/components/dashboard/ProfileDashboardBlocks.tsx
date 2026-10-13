@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Image,
   Pressable,
   ScrollView,
@@ -287,7 +288,6 @@ export const ProfileHeroCard = ({
     if (pendingLayoutTimer.current) clearTimeout(pendingLayoutTimer.current);
   }, []);
   const bigAvatarSize = compact ? BIG_AVATAR_SIZE_COMPACT : BIG_AVATAR_SIZE_REGULAR;
-  console.log('profile Image', avatarUrl);
   const collapseStyle = useAnimatedStyle(() => ({
     maxHeight: interpolate(
       scrollY.value,
@@ -412,6 +412,9 @@ export const ProfileHeroCard = ({
               </View>
               <Pressable
                 onPress={onEdit}
+                hitSlop={8}
+                accessibilityRole="button"
+                accessibilityLabel="Edit profile photo"
                 style={[dashboardStyles.bigAvatarEditBtn, getProfileDashboardCardStyle(dashboardTheme, 'glass')]}
               >
                 <KISIcon name="edit" size={14} color={palette.text} />
@@ -436,7 +439,13 @@ export const ProfileHeroCard = ({
                 always visible here (the sticky bar's copies only fade in
                 once scrolled, so without these the actions would be
                 unreachable at rest). */}
-            <Pressable onPress={onNotificationsPress} style={dashboardStyles.stickyIconBtn}>
+            <Pressable
+              onPress={onNotificationsPress}
+              hitSlop={4}
+              accessibilityRole="button"
+              accessibilityLabel={notificationCount ? `Notifications, ${notificationCount} unread` : 'Notifications'}
+              style={dashboardStyles.stickyIconBtn}
+            >
               <KISIcon name="bell" size={18} color="rgba(255,244,184,0.92)" />
               {notificationCount ? (
                 <View style={[dashboardStyles.heroNotificationBadge, { backgroundColor: palette.primaryStrong }]}>
@@ -444,7 +453,13 @@ export const ProfileHeroCard = ({
                 </View>
               ) : null}
             </Pressable>
-            <Pressable onPress={onSettingsPress} style={dashboardStyles.stickyIconBtn}>
+            <Pressable
+              onPress={onSettingsPress}
+              hitSlop={4}
+              accessibilityRole="button"
+              accessibilityLabel="Settings"
+              style={dashboardStyles.stickyIconBtn}
+            >
               <KISIcon name="settings" size={18} color="rgba(255,244,184,0.92)" />
             </Pressable>
           </View>
@@ -474,6 +489,8 @@ export const ProfileHeroCard = ({
               <Pressable
                 onPress={onVerificationPress}
                 disabled={!onVerificationPress}
+                accessibilityRole={onVerificationPress ? 'button' : undefined}
+                accessibilityLabel="Verification status"
                 style={{ minHeight: 44, justifyContent: 'center' }}
               >
                 <VerificationBadgeRow palette={palette} summary={verificationSummary} compact />
@@ -512,7 +529,13 @@ export const ProfileHeroCard = ({
           </Text>
         </View>
 
-        <Pressable onPress={onNotificationsPress} style={dashboardStyles.stickyIconBtn}>
+        <Pressable
+          onPress={onNotificationsPress}
+          hitSlop={4}
+          accessibilityRole="button"
+          accessibilityLabel={notificationCount ? `Notifications, ${notificationCount} unread` : 'Notifications'}
+          style={dashboardStyles.stickyIconBtn}
+        >
           <KISIcon name="bell" size={18} color="rgba(255,244,184,0.92)" />
           {notificationCount ? (
             <View style={[dashboardStyles.heroNotificationBadge, { backgroundColor: palette.primaryStrong }]}>
@@ -520,7 +543,13 @@ export const ProfileHeroCard = ({
             </View>
           ) : null}
         </Pressable>
-        <Pressable onPress={onSettingsPress} style={dashboardStyles.stickyIconBtn}>
+        <Pressable
+          onPress={onSettingsPress}
+          hitSlop={4}
+          accessibilityRole="button"
+          accessibilityLabel="Settings"
+          style={dashboardStyles.stickyIconBtn}
+        >
           <KISIcon name="settings" size={18} color="rgba(255,244,184,0.92)" />
         </Pressable>
       </Animated.View>
@@ -961,8 +990,19 @@ export const NotificationSummaryCard = ({
             </View>
             {onDeleteItem ? (
               <Pressable
-                onPress={() => onDeleteItem(item.id)}
+                onPress={() =>
+                  Alert.alert(
+                    'Delete notification',
+                    'This notification will be removed. This cannot be undone.',
+                    [
+                      { text: 'Cancel', style: 'cancel' },
+                      { text: 'Delete', style: 'destructive', onPress: () => onDeleteItem(item.id) },
+                    ],
+                  )
+                }
                 hitSlop={8}
+                accessibilityRole="button"
+                accessibilityLabel="Delete notification"
                 style={{ minHeight: 44, minWidth: 44, alignItems: 'center', justifyContent: 'center' }}
               >
                 <KISIcon name="trash" size={16} color={palette.subtext} />

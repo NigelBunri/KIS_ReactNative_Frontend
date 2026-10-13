@@ -3,7 +3,9 @@ import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { KISIcon } from '@/constants/kisIcons';
 import { useKISTheme } from '@/theme/useTheme';
 import type { BroadcastChannelContent, ChannelAnalyticsSummary } from '@/screens/broadcast/channels/api/channels.types';
-import { fetchChannelAnalytics } from '@/screens/broadcast/channels/hooks/useChannelsData';
+import { normalizeChannelContent } from '@/screens/broadcast/channels/hooks/useChannelsData';
+import ROUTES from '@/network';
+import { getRequest } from '@/network/get';
 import ImpressionsAnalyticsPanel from '@/screens/broadcast/channels/studio/ImpressionsAnalyticsPanel';
 import TrafficSourcesPanel from '@/screens/broadcast/channels/studio/TrafficSourcesPanel';
 
@@ -17,18 +19,45 @@ export default function ChannelAnalyticsPanel({ channelId, queued, live, subscri
   const [summary, setSummary] = useState<ChannelAnalyticsSummary | null>(null);
   const [topContent, setTopContent] = useState<BroadcastChannelContent[]>([]);
   const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState(false);
 
   useEffect(() => {
     let alive = true;
     if (!channelId) return undefined;
     setLoading(true);
-    fetchChannelAnalytics(channelId)
-      .then(result => {
+    setLoadError(false);
+    (async () => {
+      try {
+        // fetchChannelAnalytics() (hooks/useChannelsData.ts) resolves
+        // {summary:{}, topContent:[]} on a failed request rather than
+        // throwing or signaling failure, so a load failure here used to
+        // render as a confident all-zero dashboard — indistinguishable
+        // from a channel that genuinely has zero views/comments/watch
+        // time. Calling getRequest directly (same endpoint the hook
+        // wraps) lets us check the response's success flag and surface
+        // the failure instead of silently fabricating zeros.
+        const res = await getRequest(
+          ROUTES.broadcasts.channelAnalytics(channelId),
+          { errorMessage: '' },
+        );
         if (!alive) return;
-        setSummary(result.summary);
-        setTopContent(result.topContent);
-      })
-      .finally(() => alive && setLoading(false));
+        if (!res?.success) {
+          setLoadError(true);
+          return;
+        }
+        const payload: any = res.data || {};
+        setSummary(payload.summary || {});
+        setTopContent(
+          Array.isArray(payload.top_content)
+            ? (payload.top_content.map(normalizeChannelContent).filter(Boolean) as BroadcastChannelContent[])
+            : [],
+        );
+      } catch {
+        if (alive) setLoadError(true);
+      } finally {
+        if (alive) setLoading(false);
+      }
+    })();
     return () => { alive = false; };
   }, [channelId]);
 
@@ -44,6 +73,11 @@ export default function ChannelAnalyticsPanel({ channelId, queued, live, subscri
   return (
     <View style={styles.wrap}>
       {loading ? <ActivityIndicator color={palette.primaryStrong} style={styles.loader} /> : null}
+      {loadError ? (
+        <Text style={[styles.loadErrorText, { color: palette.danger }]}>
+          Could not load channel analytics. The numbers below may be out of date — pull to refresh or reopen this tab to retry.
+        </Text>
+      ) : null}
       <View style={styles.grid}>
         {cards.map(card => (
           <View key={card.label} style={[styles.card, { backgroundColor: palette.surface, borderColor: palette.border }]}> 
@@ -83,6 +117,7 @@ export default function ChannelAnalyticsPanel({ channelId, queued, live, subscri
 const styles = StyleSheet.create({
   wrap: { marginBottom: 12 },
   loader: { alignSelf: 'flex-start', marginBottom: 8 },
+  loadErrorText: { fontSize: 11, lineHeight: 16, fontWeight: '800', marginBottom: 8 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 12 },
   card: { width: '47.5%', borderWidth: 1, borderRadius: 8, padding: 12 },
   value: { marginTop: 8, fontSize: 20, fontWeight: '900' },

@@ -49,13 +49,20 @@ export default function ChannelMembersScreen() {
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
+  // Without this, a failed fetch left subscribers at [] and rendered the
+  // exact same "No subscribers yet" empty state as a channel that genuinely
+  // has zero subscribers — no way to tell the difference or retry.
+  const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
+    setError(null);
     try {
       const { results, nextCursor: cursor } = await fetchChannelSubscribers(channelId);
       setSubscribers(results);
       setNextCursor(cursor);
+    } catch {
+      setError('Could not load members. Tap to retry.');
     } finally {
       setLoading(false);
     }
@@ -68,6 +75,8 @@ export default function ChannelMembersScreen() {
       const { results, nextCursor: cursor } = await fetchChannelSubscribers(channelId, nextCursor);
       setSubscribers(prev => [...prev, ...results]);
       setNextCursor(cursor);
+    } catch {
+      // Non-fatal — the list already shown stays usable; next scroll retries.
     } finally {
       setLoadingMore(false);
     }
@@ -78,7 +87,7 @@ export default function ChannelMembersScreen() {
   return (
     <SafeAreaView style={[styles.screen, { backgroundColor: palette.bg, }]} edges={['top']}>
       <View style={[styles.header, { borderBottomColor: palette.border, paddingHorizontal: pageGutter }]}>
-        <Pressable onPress={() => navigation.goBack()} hitSlop={12} style={[styles.backBtn, { minWidth: minTouchTarget, minHeight: minTouchTarget, alignItems: 'center', justifyContent: 'center' }]}>
+        <Pressable onPress={() => navigation.goBack()} hitSlop={12} accessibilityRole="button" accessibilityLabel="Go back" style={[styles.backBtn, { minWidth: minTouchTarget, minHeight: minTouchTarget, alignItems: 'center', justifyContent: 'center' }]}>
           <KISIcon name="arrow-left" size={20} color={palette.text} />
         </Pressable>
         <Text style={[styles.title, { color: palette.text, fontSize: headerTitleSize * 0.75 }]}>
@@ -89,6 +98,14 @@ export default function ChannelMembersScreen() {
       {loading ? (
         <View style={styles.centered}>
           <ActivityIndicator color={palette.primaryStrong} />
+        </View>
+      ) : error ? (
+        <View style={styles.centered}>
+          <KISIcon name="warning" size={32} color={palette.danger} />
+          <Text style={[styles.emptyText, { color: palette.danger }]}>{error}</Text>
+          <Pressable onPress={load} accessibilityRole="button" accessibilityLabel="Retry">
+            <Text style={{ color: palette.primaryStrong, fontWeight: '700' }}>Retry</Text>
+          </Pressable>
         </View>
       ) : subscribers.length === 0 ? (
         <View style={styles.centered}>

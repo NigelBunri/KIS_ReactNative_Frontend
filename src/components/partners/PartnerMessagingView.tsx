@@ -44,10 +44,18 @@ export default function PartnerMessagingView({ partnerId, partnerName }: Props) 
   const loadAll = useCallback(async () => {
     try {
       const [groupsRes, channelsRes, commRes] = await Promise.all([
-        getRequest(`${ROUTES.groups.list}?partner=${partnerId}`),
-        getRequest(`${ROUTES.channels.getAllChannels}?partner=${partnerId}`),
-        getRequest(`${ROUTES.community.list}?partner=${partnerId}`),
+        getRequest(`${ROUTES.groups.list}?partner=${partnerId}`, { errorMessage: 'Unable to load groups.' }),
+        getRequest(`${ROUTES.channels.getAllChannels}?partner=${partnerId}`, { errorMessage: 'Unable to load channels.' }),
+        getRequest(`${ROUTES.community.list}?partner=${partnerId}`, { errorMessage: 'Unable to load communities.' }),
       ]);
+
+      if (!groupsRes?.success || !channelsRes?.success || !commRes?.success) {
+        setLoadError(
+          groupsRes?.message || channelsRes?.message || commRes?.message || "Couldn't load messaging content. Tap to retry.",
+        );
+        setItems([]);
+        return;
+      }
 
       const groups: ConvItem[] = (groupsRes?.data?.results ?? groupsRes?.data ?? [])
         .filter((g: any) => !g.community)
@@ -134,11 +142,6 @@ export default function PartnerMessagingView({ partnerId, partnerName }: Props) 
 
   return (
     <View style={[styles.root, { backgroundColor: palette.surface }]}>
-      {loadError ? (
-        <View style={{ padding: 20, alignItems: 'center', gap: 8 }}>
-          <Text style={{ color: palette.danger, textAlign: 'center' }}>{loadError}</Text>
-        </View>
-      ) : null}
       <View style={[styles.header, { borderBottomColor: palette.divider, backgroundColor: palette.surfaceElevated }]}>
         <Text style={[styles.headerTitle, { color: palette.text }]}>{partnerName}</Text>
         <Text style={[styles.headerSub, { color: palette.subtext }]}>Workspace</Text>
@@ -147,6 +150,28 @@ export default function PartnerMessagingView({ partnerId, partnerName }: Props) 
       {loading ? (
         <View style={styles.center}>
           <ActivityIndicator color={palette.primary} />
+        </View>
+      ) : loadError ? (
+        <View
+          style={{
+            margin: 16,
+            borderRadius: 10,
+            borderWidth: 1,
+            borderColor: palette.danger,
+            backgroundColor: palette.danger + '15',
+            padding: 12,
+          }}
+        >
+          <Text style={{ color: palette.danger, fontSize: 13, fontWeight: '600' }}>{loadError}</Text>
+          <Pressable
+            onPress={() => {
+              setLoading(true);
+              loadAll().finally(() => setLoading(false));
+            }}
+            style={{ marginTop: 8 }}
+          >
+            <Text style={{ color: palette.primary, fontWeight: '700', fontSize: 13 }}>Tap to retry</Text>
+          </Pressable>
         </View>
       ) : (
         <FlatList

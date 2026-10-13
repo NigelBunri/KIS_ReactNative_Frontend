@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { ActivityIndicator, Image, Linking, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Image, Linking, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useKISTheme } from '@/theme/useTheme';
 import { useResponsiveLayout } from '@/theme/responsive';
 import BibleSectionCard from './BibleSectionCard';
@@ -132,7 +132,11 @@ export default function MeditationPanel({ meditations, loading = false }: Props)
                   title="Open video"
                   size="sm"
                   variant="secondary"
-                  onPress={() => Linking.openURL(entry.video_url as string)}
+                  onPress={() =>
+                    Linking.openURL(entry.video_url as string).catch(() =>
+                      Alert.alert('Unable to open video', 'This link could not be opened on your device.'),
+                    )
+                  }
                 />
               ) : null}
             </BibleSectionCard>

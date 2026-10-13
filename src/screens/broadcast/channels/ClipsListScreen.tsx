@@ -60,8 +60,12 @@ export default function ClipsListScreen() {
       Alert.alert('Not ready', 'This clip is still processing. Please try again shortly.');
       return;
     }
-    await Share.share({ message: clip.title || 'Check out this clip!', url: clip.clip_url });
-    await shareChannelClip(clip.id);
+    try {
+      await Share.share({ message: clip.title || 'Check out this clip!', url: clip.clip_url });
+      await shareChannelClip(clip.id);
+    } catch {
+      // Share sheet dismissal/failure is not an error worth surfacing.
+    }
   }, []);
 
   const handleDelete = useCallback((clip: Clip) => {
@@ -71,8 +75,12 @@ export default function ClipsListScreen() {
         text: 'Delete',
         style: 'destructive',
         onPress: async () => {
-          await deleteChannelContentClip(contentId, clip.id);
-          setClips(prev => prev.filter(c => c.id !== clip.id));
+          try {
+            await deleteChannelContentClip(contentId, clip.id);
+            setClips(prev => prev.filter(c => c.id !== clip.id));
+          } catch {
+            Alert.alert('Delete failed', 'Could not delete this clip. Please try again.');
+          }
         },
       },
     ]);
@@ -97,12 +105,16 @@ export default function ClipsListScreen() {
         </View>
         <Pressable
           onPress={() => handleShare(item)}
+          accessibilityRole="button"
+          accessibilityLabel="Share clip"
           style={[styles.shareBtn, { borderColor: palette.border, width: minTouchTarget, height: minTouchTarget, borderRadius: minTouchTarget / 2 }]}
         >
           <KISIcon name="share" size={16} color={palette.primaryStrong} />
         </Pressable>
         <Pressable
           onPress={() => handleDelete(item)}
+          accessibilityRole="button"
+          accessibilityLabel="Delete clip"
           style={[styles.shareBtn, { borderColor: palette.border, marginLeft: 6, width: minTouchTarget, height: minTouchTarget, borderRadius: minTouchTarget / 2 }]}
         >
           <KISIcon name="trash" size={16} color={palette.subtext} />
@@ -114,7 +126,7 @@ export default function ClipsListScreen() {
   return (
     <SafeAreaView style={[styles.screen, { backgroundColor: palette.bg, }]} edges={['top']}>
       <View style={[styles.header, { borderBottomColor: palette.border, paddingHorizontal: pageGutter }]}>
-        <Pressable onPress={() => navigation.goBack()} hitSlop={12} style={[styles.backBtn, { minWidth: minTouchTarget, minHeight: minTouchTarget, alignItems: 'center', justifyContent: 'center' }]}>
+        <Pressable onPress={() => navigation.goBack()} hitSlop={12} accessibilityRole="button" accessibilityLabel="Go back" style={[styles.backBtn, { minWidth: minTouchTarget, minHeight: minTouchTarget, alignItems: 'center', justifyContent: 'center' }]}>
           <KISIcon name="arrow-left" size={20} color={palette.text} />
         </Pressable>
         <Text style={[styles.title, { color: palette.text, fontSize: headerTitleSize * 0.7 }]}>My Clips</Text>

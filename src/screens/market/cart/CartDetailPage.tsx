@@ -160,8 +160,31 @@ const CartDetailPage = () => {
 
   const handleQuantityChange = useCallback(
     (item: ShopCartItem, delta: number) => {
+      const nextQuantity = item.quantity + delta;
+      if (nextQuantity <= 0) {
+        // Dropping to 0 deletes the item from the cart (see
+        // updateShopCartItem's removingItem branch) — that's a destructive
+        // action, not a quantity tweak, so confirm it like "Remove item".
+        Alert.alert(
+          'Remove item',
+          `Remove "${item.name ?? 'this item'}" from your cart?`,
+          [
+            { text: 'Cancel', style: 'cancel' },
+            {
+              text: 'Remove',
+              style: 'destructive',
+              onPress: () => {
+                void updateShopCartItem(shopId ?? '', item.id, {
+                  quantity: nextQuantity,
+                });
+              },
+            },
+          ],
+        );
+        return;
+      }
       void updateShopCartItem(shopId ?? '', item.id, {
-        quantity: item.quantity + delta,
+        quantity: nextQuantity,
       });
     },
     [shopId],
@@ -178,7 +201,20 @@ const CartDetailPage = () => {
 
   const handleRemove = useCallback(
     (item: ShopCartItem) => {
-      void removeShopCartItem(shopId ?? '', item.id);
+      Alert.alert(
+        'Remove item',
+        `Remove "${item.name ?? 'this item'}" from your cart?`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Remove',
+            style: 'destructive',
+            onPress: () => {
+              void removeShopCartItem(shopId ?? '', item.id);
+            },
+          },
+        ],
+      );
     },
     [shopId],
   );
@@ -211,7 +247,7 @@ const CartDetailPage = () => {
 
   // Poll / refresh the pending order when the user returns to the app after
   // completing or cancelling the Flutterwave payment flow.
-  const refreshPendingOrder = useCallback(async () => {
+  const refreshPendingOrder = useCallback(async (manual = false) => {
     const orderId = pendingOrderIdRef.current;
     if (!orderId) return;
     try {
@@ -247,11 +283,30 @@ const CartDetailPage = () => {
             'Payment incomplete',
             'Your payment was not completed. You can try again.',
           );
+        } else if (manual) {
+          Alert.alert(
+            'Still processing',
+            'Your payment is still being confirmed. This can take a moment — try again shortly.',
+          );
         }
         // otherwise still pending — leave paymentProcessing=true, wait for next active event
+      } else if (manual) {
+        Alert.alert(
+          'Unable to check status',
+          'Could not reach the server to confirm your payment. Please check your connection and try again.',
+        );
       }
     } catch {
-      // silently ignore refresh errors
+      // Background AppState-triggered checks stay silent on a transient
+      // failure (the next resume/manual tap will retry) — but a failure on
+      // the user's own manual "Check payment status" tap must say so,
+      // otherwise tapping it and seeing nothing happen looks broken.
+      if (manual) {
+        Alert.alert(
+          'Unable to check status',
+          'Could not reach the server to confirm your payment. Please check your connection and try again.',
+        );
+      }
     }
   }, [navigation, shopId]);
 
@@ -665,12 +720,27 @@ const CartDetailPage = () => {
           </Text>
         </View>
         <View style={{ flexDirection: 'row', gap: 8 }}>
-          <KISButton
-            title="Delete"
-            size="sm"
-            variant="outline"
-            onPress={handleDeleteCart}
-          />
+          {paymentProcessing ? (
+            // Status normally updates automatically when the app returns to
+            // the foreground after the payment page, but that relies on an
+            // AppState event firing and the status check succeeding; if
+            // either silently misses (flaky network on resume, etc.) this
+            // button is the user's only way out of "Payment Processing…"
+            // instead of being stuck with no recourse but to force-quit.
+            <KISButton
+              title="Check payment status"
+              size="sm"
+              variant="outline"
+              onPress={() => void refreshPendingOrder(true)}
+            />
+          ) : (
+            <KISButton
+              title="Delete"
+              size="sm"
+              variant="outline"
+              onPress={handleDeleteCart}
+            />
+          )}
           {items.length > 0 && !cartIsCheckedOut && (
             <KISButton
               title={

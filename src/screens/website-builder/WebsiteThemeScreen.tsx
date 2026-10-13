@@ -28,22 +28,25 @@ const DEFAULT_PALETTE: Palette = { primary: '#1a1a2e', secondary: '#e94560', bac
 // mediaType: 'photo'), so there's no video-processing dependency keeping
 // this on Django's profileAttachment endpoint the way there is for e.g.
 // useProfileController.ts's mixed image/video profile-attachment upload.
+// On upload failure this throws rather than silently falling back to the
+// device-local `asset.uri` — that fallback let the theme save
+// "successfully" with a local file path baked in as the logo URL, which
+// only ever renders on the uploading device, never on the published site.
+// handlePickLogo already catches and Alert.alert()s on failure.
 const uploadLogo = async (asset: any): Promise<string> => {
   if (!asset?.uri) return '';
-  try {
-    const attachment = await uploadFileToBackend({
-      file: {
-        uri: asset.uri,
-        name: asset.fileName || `website-logo-${Date.now()}.jpg`,
-        type: asset.type || 'image/jpeg',
-      },
-      baseUrl: NEST_API_BASE_URL,
-      context: 'website_logo',
-    });
-    return String(attachment?.url || attachment?.displayUrl || asset.uri);
-  } catch {
-    return asset.uri;
-  }
+  const attachment = await uploadFileToBackend({
+    file: {
+      uri: asset.uri,
+      name: asset.fileName || `website-logo-${Date.now()}.jpg`,
+      type: asset.type || 'image/jpeg',
+    },
+    baseUrl: NEST_API_BASE_URL,
+    context: 'website_logo',
+  });
+  const url = attachment?.url || attachment?.displayUrl;
+  if (!url) throw new Error('Upload succeeded but no logo URL was returned.');
+  return String(url);
 };
 
 const SWATCHES = [

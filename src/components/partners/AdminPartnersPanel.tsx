@@ -49,7 +49,12 @@ export default function AdminPartnersPanel({
       {
         text: action,
         style: partner.is_active ? 'destructive' : 'default',
-        onPress: () => void onSetActive(partner.id, !partner.is_active),
+        onPress: async () => {
+          const ok = await onSetActive(partner.id, !partner.is_active);
+          if (!ok) {
+            Alert.alert('Failed', `Unable to ${action.toLowerCase()} this partner. Please try again.`);
+          }
+        },
       },
     ]);
   };
@@ -68,7 +73,13 @@ export default function AdminPartnersPanel({
           <Text style={[styles.headerTitle, { color: palette.text }]}>Partner Organisations</Text>
           <Text style={[styles.headerSub, { color: palette.subtext }]}>View and manage all partner accounts</Text>
         </View>
-        <Pressable onPress={onClose} style={styles.closeBtn}>
+        <Pressable
+          onPress={onClose}
+          style={styles.closeBtn}
+          accessibilityRole="button"
+          accessibilityLabel="Close"
+          hitSlop={8}
+        >
           <Text style={{ color: palette.subtext, fontSize: 20, lineHeight: 22 }}>✕</Text>
         </Pressable>
       </View>

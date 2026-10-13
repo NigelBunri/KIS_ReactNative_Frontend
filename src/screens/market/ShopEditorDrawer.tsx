@@ -1,5 +1,5 @@
 import React from 'react';
-import { Image, Pressable, ScrollView, Text, View } from 'react-native';
+import { Alert, Image, Pressable, ScrollView, Text, View } from 'react-native';
 
 import { useKISTheme } from '@/theme/useTheme';
 import { useResponsiveLayout } from '@/theme/responsive';
@@ -87,6 +87,7 @@ export default function ShopEditorDrawer({
       }
     } catch (error) {
       console.error('Failed to pick shop image', error);
+      Alert.alert('Image not selected', 'Could not open your photo library. Please try again.');
     }
   };
 
@@ -133,7 +134,12 @@ export default function ShopEditorDrawer({
                 Keep it short: name, description, employee slots, and image
               </Text>
             </View>
-            <Pressable onPress={onClose} style={{ padding: 6 }}>
+            <Pressable
+              onPress={onClose}
+              style={{ padding: 6 }}
+              accessibilityRole="button"
+              accessibilityLabel="Close"
+            >
               <KISIcon name="close" size={22} color={palette.subtext} />
             </Pressable>
           </View>
@@ -385,7 +391,16 @@ export default function ShopEditorDrawer({
                     title="Delete shop"
                     variant="danger"
                     size="sm"
-                    onPress={onDelete}
+                    onPress={() => {
+                      Alert.alert(
+                        'Delete shop',
+                        `Delete "${marketForm.name || 'this shop'}"? This cannot be undone and will remove all of its products and services.`,
+                        [
+                          { text: 'Cancel', style: 'cancel' },
+                          { text: 'Delete', style: 'destructive', onPress: onDelete },
+                        ],
+                      );
+                    }}
                   />
                 ) : null}
               </View>

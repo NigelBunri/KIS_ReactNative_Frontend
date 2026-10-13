@@ -58,6 +58,7 @@ export default function HealthGoalsScreen({ navigation }: Props) {
 
   const [goals, setGoals] = useState<HealthGoal[]>([]);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [showForm, setShowForm] = useState(false);
   const [updateValues, setUpdateValues] = useState<Record<string, string>>({});
@@ -73,13 +74,21 @@ export default function HealthGoalsScreen({ navigation }: Props) {
 
   const fetchGoals = useCallback(async (cat?: string) => {
     setLoading(true);
+    setFetchError(null);
     const params: Record<string, string> = {};
     if (cat && cat !== 'All') params.category = cat;
-    const res = await getRequest(ROUTES.healthExtended.healthGoals, { params });
-    if (res.success) {
-      setGoals(Array.isArray(res.data?.results ?? res.data) ? (res.data?.results ?? res.data) : []);
+    try {
+      const res = await getRequest(ROUTES.healthExtended.healthGoals, { params });
+      if (res.success) {
+        setGoals(Array.isArray(res.data?.results ?? res.data) ? (res.data?.results ?? res.data) : []);
+      } else {
+        setFetchError('Could not load your health goals. Please try again.');
+      }
+    } catch {
+      setFetchError('Unable to load health goals. Check your connection and try again.');
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }, []);
 
   useFocusEffect(useCallback(() => { fetchGoals(selectedCategory); }, [fetchGoals, selectedCategory]));
@@ -112,6 +121,10 @@ export default function HealthGoalsScreen({ navigation }: Props) {
   const handleSubmitGoal = async () => {
     if (!formTitle.trim()) {
       Alert.alert('Title required', 'Please enter a goal title.');
+      return;
+    }
+    if (!(parseFloat(formTarget) > 0)) {
+      Alert.alert('Target required', 'Please enter a target value greater than 0 so progress can be tracked.');
       return;
     }
     setSubmitting(true);
@@ -166,6 +179,9 @@ export default function HealthGoalsScreen({ navigation }: Props) {
             style={[styles.filterChip, selectedCategory === c && styles.filterChipActive]}
             onPress={() => handleCategoryChange(c)}
             hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
+            accessibilityRole="button"
+            accessibilityState={{ selected: selectedCategory === c }}
+            accessibilityLabel={`${c} category filter`}
           >
             <KISIcon
               name={categoryIcon(c) as any}
@@ -193,11 +209,19 @@ export default function HealthGoalsScreen({ navigation }: Props) {
           keyExtractor={(g) => g.id}
           contentContainerStyle={[styles.list, { paddingBottom: 100 }]}
           ListEmptyComponent={
-            <View style={styles.emptyContainer}>
-              <KISIcon name="bolt" size={48} color={palette.subtext} />
-              <Text style={styles.emptyText}>No goals set yet.</Text>
-              <Text style={styles.emptySubtext}>Tap the button below to set your first goal.</Text>
-            </View>
+            fetchError ? (
+              <View style={styles.emptyContainer}>
+                <KISIcon name="bolt" size={48} color={palette.danger} />
+                <Text style={[styles.emptyText, { color: palette.danger }]}>{fetchError}</Text>
+                <KISButton title="Retry" size="sm" variant="outline" onPress={() => fetchGoals(selectedCategory)} />
+              </View>
+            ) : (
+              <View style={styles.emptyContainer}>
+                <KISIcon name="bolt" size={48} color={palette.subtext} />
+                <Text style={styles.emptyText}>No goals set yet.</Text>
+                <Text style={styles.emptySubtext}>Tap the button below to set your first goal.</Text>
+              </View>
+            )
           }
           renderItem={({ item: goal }) => {
             const pct = progressPercent(goal);
@@ -251,7 +275,12 @@ export default function HealthGoalsScreen({ navigation }: Props) {
         />
       )}
 
-      <KISFab icon="add" onPress={() => setShowForm(true)} style={styles.fab} />
+      <KISFab
+        icon="add"
+        onPress={() => setShowForm(true)}
+        style={styles.fab}
+        accessibilityLabel="Add health goal"
+      />
 
       {/* Add Goal Modal */}
       <Modal visible={showForm} animationType="slide" presentationStyle="pageSheet">
@@ -262,6 +291,8 @@ export default function HealthGoalsScreen({ navigation }: Props) {
               onPress={() => setShowForm(false)}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               style={styles.closeBtn}
+              accessibilityRole="button"
+              accessibilityLabel="Close"
             >
               <KISIcon name="close" size={22} color={palette.text} />
             </TouchableOpacity>
@@ -283,6 +314,9 @@ export default function HealthGoalsScreen({ navigation }: Props) {
                   key={c}
                   style={[styles.catChip, formCategory === c && styles.catChipActive]}
                   onPress={() => setFormCategory(c)}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: formCategory === c }}
+                  accessibilityLabel={`${c} category`}
                 >
                   <Text style={[styles.catChipText, formCategory === c && styles.catChipTextActive]}>
                     {c}

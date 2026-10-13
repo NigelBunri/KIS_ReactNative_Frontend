@@ -59,7 +59,7 @@ export function reviewCard(card: SrsCardState, rating: SrsRating, now: Date = ne
     // 'good' leaves easeFactor unchanged — the SM-2 baseline case.
 
     if (repetitions === 0) {
-      intervalDays = rating === 'hard' ? 1 : 1;
+      intervalDays = 1;
     } else if (repetitions === 1) {
       intervalDays = rating === 'hard' ? 3 : 6;
     } else {
@@ -80,7 +80,14 @@ export function reviewCard(card: SrsCardState, rating: SrsRating, now: Date = ne
 }
 
 export function isDue(card: SrsCardState, now: Date = new Date()): boolean {
-  return new Date(card.dueAt).getTime() <= now.getTime();
+  const dueAtMs = new Date(card.dueAt).getTime();
+  // A malformed/corrupted dueAt (e.g. bad persisted JSON) must fail toward
+  // "due" rather than silently hiding the card from review forever — NaN
+  // <= anything is false, so without this guard a corrupted record would
+  // quietly never resurface again, with no error and no sign anything is
+  // wrong.
+  if (Number.isNaN(dueAtMs)) return true;
+  return dueAtMs <= now.getTime();
 }
 
 /** Cards due now, soonest-due first, so a review session always works

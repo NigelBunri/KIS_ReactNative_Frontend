@@ -218,19 +218,16 @@ export default function WellnessProgramManager({ institutionId, engineKey }: Pro
 
     const res = await postRequest(ROUTES.analytics.wellnessChallenges, payload);
 
-    const program: WellnessProgram =
-      res.success && res.data
-        ? normalizeProgram(res.data)
-        : {
-            id: Date.now().toString(),
-            name: newProgram.name,
-            description: newProgram.description,
-            durationDays: Number(newProgram.durationDays),
-            rewardPoints: Number(newProgram.rewardPoints),
-            requiredActivities: [],
-          };
+    // Previously: a failed POST silently fell through to a local-only fake
+    // program with no indication the backend write failed. Surface the
+    // failure instead of fabricating a program patients could be enrolled
+    // into but that never existed server-side.
+    if (!res.success || !res.data) {
+      Alert.alert("Wellness program", res?.message || "Unable to add the program. Please try again.");
+      return;
+    }
 
-    setPrograms((prev) => [...prev, program]);
+    setPrograms((prev) => [...prev, normalizeProgram(res.data)]);
     setNewProgram({ name: "", description: "", durationDays: "7", rewardPoints: "50" });
   }, [newProgram]);
 
@@ -257,16 +254,14 @@ export default function WellnessProgramManager({ institutionId, engineKey }: Pro
         add_activity: payload,
       });
 
-      const activity: Activity =
-        res.success && res.data?.activity
-          ? normalizeActivity(res.data.activity)
-          : {
-              id: Date.now().toString(),
-              name: newActivity.name,
-              type: newActivity.type,
-              points: Number(newActivity.points),
-              completedBy: [],
-            };
+      // Previously: a failed PATCH silently fell through to a local-only
+      // fake activity. Surface the failure instead of fabricating one.
+      if (!res.success || !res.data?.activity) {
+        Alert.alert("Wellness program", res?.message || "Unable to add the activity. Please try again.");
+        return;
+      }
+
+      const activity: Activity = normalizeActivity(res.data.activity);
 
       setActivities((prev) => [...prev, activity]);
       setPrograms((prev) =>
@@ -294,18 +289,14 @@ export default function WellnessProgramManager({ institutionId, engineKey }: Pro
         program_id: programId,
       });
 
-      const enrollment: PatientEnrollment =
-        res.success && res.data
-          ? normalizeEnrollment(res.data)
-          : {
-              id: Date.now().toString(),
-              patientName,
-              programId,
-              completedActivities: [],
-              pointsEarned: 0,
-            };
+      // Previously: a failed POST silently fell through to a local-only
+      // fake enrollment. Surface the failure instead of fabricating one.
+      if (!res.success || !res.data) {
+        Alert.alert("Wellness program", res?.message || "Unable to enroll this patient. Please try again.");
+        return;
+      }
 
-      setEnrollments((prev) => [...prev, enrollment]);
+      setEnrollments((prev) => [...prev, normalizeEnrollment(res.data)]);
       setPatientName("");
     },
     [patientName]
@@ -321,10 +312,18 @@ export default function WellnessProgramManager({ institutionId, engineKey }: Pro
         { activity_id: activityId, completed: true }
       );
 
+      // Previously: completion + points were applied locally "regardless of
+      // server response," so a failed save still showed the activity as
+      // complete and the points as earned with no way to tell the record
+      // never persisted. Surface the failure instead.
+      if (!res.success) {
+        Alert.alert("Wellness program", res?.message || "Unable to record this activity. Please try again.");
+        return;
+      }
+
       const activityPoints =
         activities.find((a) => a.id === activityId)?.points ?? 0;
 
-      // Optimistic update: apply completion locally regardless of server response
       setEnrollments((prev) =>
         prev.map((e) => {
           if (e.id === enrollmentId && !e.completedActivities.includes(activityId)) {

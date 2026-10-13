@@ -44,6 +44,7 @@ export function StageComplete({
   totalStages,
   isFinalStage,
   isReplay = false,
+  persisted = true,
   onPlayAgain,
   onBackToJourney,
   onViewStats,
@@ -54,6 +55,12 @@ export function StageComplete({
   totalStages: number;
   isFinalStage: boolean;
   isReplay?: boolean;
+  /** False when this round's score/progress failed to actually save to the
+   * device (see gameStorage.ts's StageOutcome.persisted) - the card still
+   * shows the real in-memory result below (nothing about scoring changes),
+   * but adds an honest note instead of silently letting "Stage complete!"
+   * imply the save worked when it didn't. */
+  persisted?: boolean;
   onPlayAgain: () => void;
   onBackToJourney: () => void;
   onViewStats?: () => void;
@@ -79,6 +86,12 @@ export function StageComplete({
       </Animated.View>
       <Text style={[styles.completeTitle, { color: palette.text }]}>{title}</Text>
       <Text style={[styles.completeScore, { color: palette.subtext }]}>{scoreLine}</Text>
+      {!persisted ? (
+        <Text style={[styles.saveWarning, { color: palette.goldReadable }]}>
+          This result couldn&apos;t be saved to your device just now — your score above is real, but it may not
+          be there next time you open this stage. Try again in a moment.
+        </Text>
+      ) : null}
       {isFinalStage && !isReplay ? (
         <Text style={[styles.completeScore, { color: palette.subtext, marginTop: -8 }]}>
           Every verse this game carries is done. Play the rest of the 30 games to cover the whole Bible.
@@ -172,6 +185,7 @@ const styles = StyleSheet.create({
   },
   completeTitle: { fontSize: 20, fontWeight: '900', textAlign: 'center' },
   completeScore: { fontSize: 14, fontWeight: '700', textAlign: 'center', marginBottom: 14 },
+  saveWarning: { fontSize: 12, fontWeight: '700', textAlign: 'center', lineHeight: 17, marginTop: -8, marginBottom: 10 },
   primaryBtnWrap: { alignSelf: 'stretch', borderRadius: 999, overflow: 'hidden', marginTop: 4 },
   primaryBtn: { paddingVertical: 14, alignItems: 'center', borderRadius: 999 },
   primaryBtnText: { fontSize: 15, fontWeight: '900' },

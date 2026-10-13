@@ -32,6 +32,7 @@ export default function WebsiteWebhooksScreen({ route }: Props) {
   const typography = HEALTH_THEME_TYPOGRAPHY;
 
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [webhooks, setWebhooks] = useState<Webhook[]>([]);
   const [eventType, setEventType] = useState('published');
   const [targetUrl, setTargetUrl] = useState('');
@@ -39,10 +40,19 @@ export default function WebsiteWebhooksScreen({ route }: Props) {
 
   const load = useCallback(async () => {
     setLoading(true);
+    setError(null);
     try {
       const res = await getRequest(ROUTES.websites.webhooks(websiteId));
+      // A failed request (res.success === false) used to fall through the
+      // `?? res` fallback and render as an empty "No webhooks yet" list —
+      // indistinguishable from a website that genuinely has none.
+      if ((res as any)?.success === false) {
+        throw new Error((res as any)?.message || 'Unable to load webhooks.');
+      }
       const data = (res as any)?.data ?? res;
       setWebhooks(Array.isArray(data) ? data : []);
+    } catch (e: any) {
+      setError(e?.message || 'Unable to load webhooks.');
     } finally {
       setLoading(false);
     }
@@ -86,7 +96,11 @@ export default function WebsiteWebhooksScreen({ route }: Props) {
         text: 'Delete',
         style: 'destructive',
         onPress: async () => {
-          await deleteRequest(ROUTES.websites.webhookDetail(websiteId, webhook.id), { errorMessage: 'Unable to delete webhook.' });
+          const res = await deleteRequest(ROUTES.websites.webhookDetail(websiteId, webhook.id), { errorMessage: 'Unable to delete webhook.' });
+          if (!res?.success) {
+            Alert.alert('Webhooks', (res as any)?.message || 'Unable to delete webhook.');
+            return;
+          }
           await load();
         },
       },
@@ -97,6 +111,17 @@ export default function WebsiteWebhooksScreen({ route }: Props) {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg, alignItems: 'center', justifyContent: 'center' }}>
         <ActivityIndicator color={palette.accentPrimary} />
+      </SafeAreaView>
+    );
+  }
+
+  if (error) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg, alignItems: 'center', justifyContent: 'center', padding: spacing.md }}>
+        <Text style={{ ...typography.body, color: palette.text, textAlign: 'center', marginBottom: spacing.md }}>
+          {error}
+        </Text>
+        <KISButton title="Retry" onPress={() => { load().catch(() => {}); }} />
       </SafeAreaView>
     );
   }

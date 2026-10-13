@@ -179,7 +179,12 @@ export default function SuperChatPanel({ streamId, visible, onClose }: Props) {
           {/* Header */}
           <View style={styles.panelHeader}>
             <Text style={[styles.panelTitle, { color: palette.text }]}>Super Chat</Text>
-            <Pressable onPress={onClose} style={styles.closeBtn}>
+            <Pressable
+              onPress={onClose}
+              style={styles.closeBtn}
+              accessibilityRole="button"
+              accessibilityLabel="Close Super Chat"
+            >
               <Text style={[styles.closeTxt, { color: palette.subtext }]}>✕</Text>
             </Pressable>
           </View>

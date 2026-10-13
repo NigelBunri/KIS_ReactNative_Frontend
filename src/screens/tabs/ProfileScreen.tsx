@@ -3621,6 +3621,9 @@ export default function ProfileScreen() {
                 <Pressable
                   onPress={closeManagementPanel}
                   style={styles.managementClose}
+                  accessibilityRole="button"
+                  accessibilityLabel="Close"
+                  hitSlop={8}
                 >
                   <KISIcon name="close" size={28} color={palette.subtext} />
                 </Pressable>

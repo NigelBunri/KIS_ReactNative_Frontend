@@ -360,6 +360,7 @@ export default function SoloPractitionerDashboard({ onClose }: Props) {
 
   const [tab, setTab] = useState<TabId>('dashboard');
   const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const [profile, setProfile] = useState<PractitionerProfile>({
     displayName: '',
@@ -383,11 +384,20 @@ export default function SoloPractitionerDashboard({ onClose }: Props) {
 
   const loadDashboard = useCallback(async () => {
     setLoading(true);
+    setLoadError(null);
     try {
       const [meRes, apptRes] = await Promise.allSettled([
         getRequest(ROUTES.auth.checkLogin, {}),
         getRequest(ROUTES.healthOps.appointments, {}),
       ]);
+
+      // Previously, a rejected appointments fetch was indistinguishable from
+      // "no appointments" — the queue just stayed empty with no indication
+      // anything had failed. Surface it instead so the practitioner knows
+      // their queue may be stale rather than genuinely clear.
+      if (apptRes.status === 'rejected') {
+        setLoadError('Could not refresh your consultation queue.');
+      }
 
       if (meRes.status === 'fulfilled') {
         const me = meRes.value?.data ?? meRes.value ?? {};
@@ -869,8 +879,19 @@ export default function SoloPractitionerDashboard({ onClose }: Props) {
           </View>
           <Pressable
             onPress={() => { setEditingService(service); setServiceDraft({ ...service }); }}
+            accessibilityRole="button"
+            accessibilityLabel={`Edit ${service.label}`}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
             <KISIcon name="pencil-outline" size={18} color={palette.subtext} />
+          </Pressable>
+          <Pressable
+            onPress={() => deleteService(service)}
+            accessibilityRole="button"
+            accessibilityLabel={`Delete ${service.label}`}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <KISIcon name="trash-outline" size={18} color={kisPalette.danger} />
           </Pressable>
         </HealthCard>
       ))}
@@ -1167,6 +1188,36 @@ export default function SoloPractitionerDashboard({ onClose }: Props) {
     }
   };
 
+  // There was previously no way to remove a service once added — only
+  // "+ Add" and the pencil edit affordance existed, so a mistakenly-added
+  // or discontinued service could never leave the catalog.
+  const deleteService = useCallback((service: ServiceType) => {
+    Alert.alert(
+      'Delete service',
+      `Remove "${service.label}" from your service catalog?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => {
+            const nextServices = profile.services.filter((s) => s.key !== service.key);
+            setProfile((prev) => ({ ...prev, services: nextServices }));
+            if (profile.id) {
+              patchRequest(
+                ROUTES.healthcare.profile(profile.id),
+                { metadata: { services: nextServices } },
+                { errorMessage: '' },
+              ).catch(() => {
+                Alert.alert('Services', 'Service removed on this device. Changes will sync when back online.');
+              });
+            }
+          },
+        },
+      ],
+    );
+  }, [profile.id, profile.services]);
+
   const serviceEditorVisible = serviceDraft && (serviceDraft.key !== undefined || editingService !== null);
 
   const saveService = () => {
@@ -1266,11 +1317,34 @@ export default function SoloPractitionerDashboard({ onClose }: Props) {
         </View>
         <Pressable
           onPress={loadDashboard}
+          accessibilityRole="button"
+          accessibilityLabel="Refresh dashboard"
           style={{ padding: 8, borderRadius: 10, backgroundColor: palette.card }}
         >
           <KISIcon name="refresh-outline" size={18} color={loading ? palette.subtext : palette.text} />
         </Pressable>
       </View>
+
+      {loadError ? (
+        <Pressable
+          onPress={loadDashboard}
+          accessibilityRole="button"
+          accessibilityLabel={loadError}
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 8,
+            paddingVertical: 8,
+            backgroundColor: kisPalette.danger + '1A',
+            borderBottomWidth: 1,
+            borderBottomColor: kisPalette.danger + '55',
+          }}
+        >
+          <KISIcon name="alert-circle-outline" size={14} color={kisPalette.danger} />
+          <Text style={{ color: kisPalette.danger, fontWeight: '700', fontSize: 12 }}>{loadError} Tap to retry.</Text>
+        </Pressable>
+      ) : null}
 
       {/* Tab bar */}
       <HealthTabBar

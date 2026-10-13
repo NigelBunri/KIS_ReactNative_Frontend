@@ -247,6 +247,7 @@ export default function FirstLettersGame({ gameKey, stageIndex, isReplay, onExit
             onPlayAgain={resetGame}
             onBackToJourney={onExit}
             onViewStats={onOpenStats}
+            persisted={stageResult.persisted}
           />
         </View>
       </GameShell>

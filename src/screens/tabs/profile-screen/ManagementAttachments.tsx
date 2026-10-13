@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, Image, Pressable } from 'react-native';
+import { View, Text, Image, Pressable, Alert } from 'react-native';
 import KISButton from '@/constants/KISButton';
 import { getAttachmentPreviewInfo } from '@/components/broadcast/attachmentPreview';
 import type { KISPalette } from '@/theme/constants';
@@ -67,8 +67,23 @@ export function ManagementAttachments(props: ManagementAttachmentsProps) {
               <Text style={{ color: palette.subtext, fontSize: 12 }}>{preview.typeLabel}</Text>
               {onDeleteAttachment ? (
                 <Pressable
-                  onPress={() => onDeleteAttachment(att, index)}
+                  onPress={() =>
+                    Alert.alert(
+                      'Remove attachment',
+                      'This permanently removes this attachment. This cannot be undone.',
+                      [
+                        { text: 'Cancel', style: 'cancel' },
+                        {
+                          text: 'Remove',
+                          style: 'destructive',
+                          onPress: () => onDeleteAttachment(att, index),
+                        },
+                      ],
+                    )
+                  }
                   hitSlop={8}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Remove ${preview.label}`}
                   style={{ marginTop: 4, minHeight: 44, justifyContent: 'center' }}
                 >
                   <Text style={{ color: palette.danger, fontSize: 12, fontWeight: '700' }}>Remove</Text>

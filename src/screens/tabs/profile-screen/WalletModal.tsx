@@ -92,6 +92,11 @@ type Invoice = {
 function InvoicesPanel({ palette }: { palette: KISPalette }) {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(false);
+  // Tracks a failed fetch distinctly from a genuinely empty invoice list —
+  // without this, a network/auth failure rendered the exact same "No
+  // invoices yet." text as actually having zero invoices, silently hiding
+  // real billing errors from the user (financial data).
+  const [loadError, setLoadError] = useState<string | null>(null);
   const insets = useSafeAreaInsets();
   const topInset = useSafeTopInset();
 
@@ -99,11 +104,17 @@ function InvoicesPanel({ palette }: { palette: KISPalette }) {
     setLoading(true);
     try {
       const res = await getRequest(ROUTES.billing.invoices, { errorMessage: 'Could not load invoices' });
+      if (!res?.success) {
+        setLoadError(res?.message || 'Could not load invoices.');
+        setInvoices([]);
+        return;
+      }
       const list: Invoice[] = Array.isArray(res?.data?.results)
         ? res.data.results
         : Array.isArray(res?.data)
         ? res.data
         : [];
+      setLoadError(null);
       setInvoices(list);
     } finally {
       setLoading(false);
@@ -114,6 +125,19 @@ function InvoicesPanel({ palette }: { palette: KISPalette }) {
 
   if (loading) {
     return <ActivityIndicator color={palette.primary} style={{ marginVertical: 16 }} />;
+  }
+
+  if (loadError) {
+    return (
+      <View style={{ alignItems: 'center', gap: 8, marginVertical: 16 }}>
+        <Text style={{ color: palette.danger, fontSize: 13, textAlign: 'center' }}>
+          {loadError}
+        </Text>
+        <Pressable onPress={load} accessibilityRole="button" accessibilityLabel="Retry loading invoices">
+          <Text style={{ color: palette.primary, fontSize: 13, fontWeight: '700' }}>Retry</Text>
+        </Pressable>
+      </View>
+    );
   }
 
   if (invoices.length === 0) {

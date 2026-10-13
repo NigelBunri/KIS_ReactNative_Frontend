@@ -796,6 +796,18 @@ export default function FeedScreen<T extends FeedPost>({
         errorMessage: 'Unable to react.',
       });
 
+      if (!res?.success) {
+        // Genuine failure (not an offline queue, which reports success:true) —
+        // the optimistic toggle above never happened server-side, so revert it
+        // rather than leave the UI silently out of sync with the server.
+        setLikedPostIds((prev) => ({ ...prev, [postId]: alreadyLiked }));
+        setLikeCounts((prev) => ({
+          ...prev,
+          [postId]: Math.max(0, (prev[postId] ?? 0) + (nextLiked ? -1 : 1)),
+        }));
+        return;
+      }
+
       if (res?.data?.has_reacted !== undefined) {
         setLikedPostIds((prev) => ({ ...prev, [postId]: Boolean(res.data.has_reacted) }));
       }
@@ -913,7 +925,11 @@ export default function FeedScreen<T extends FeedPost>({
         dedupeKey: `feed:delete:${postId}`,
         errorMessage: 'Unable to delete post.',
       });
-      if (res?.success) setPosts((prev) => prev.filter((p) => p.id !== postId));
+      if (res?.success) {
+        setPosts((prev) => prev.filter((p) => p.id !== postId));
+      } else {
+        Alert.alert('Delete failed', res?.message || 'Unable to delete post. Please try again.');
+      }
     },
     [deleteEndpoint],
   );
@@ -929,7 +945,11 @@ export default function FeedScreen<T extends FeedPost>({
         dedupeKey: `feed:broadcast:${postId}`,
         errorMessage: 'Unable to broadcast post.',
       });
-      if (res?.success) Alert.alert('Broadcast', 'Post added to broadcast.');
+      if (res?.success) {
+        Alert.alert('Broadcast', 'Post added to broadcast.');
+      } else {
+        Alert.alert('Broadcast failed', res?.message || 'Unable to broadcast post. Please try again.');
+      }
     },
     [broadcastEndpoint],
   );
@@ -945,7 +965,11 @@ export default function FeedScreen<T extends FeedPost>({
       dedupeKey: `feed:block:${userId}`,
       errorMessage: 'Unable to block user.',
     });
-    if (res?.success) setPosts((prev) => prev.filter((p) => p.author?.id !== userId));
+    if (res?.success) {
+      setPosts((prev) => prev.filter((p) => p.author?.id !== userId));
+    } else {
+      Alert.alert('Block failed', res?.message || 'Unable to block user. Please try again.');
+    }
   }, []);
 
   const handleReport = useCallback(async (postId: string) => {
@@ -958,7 +982,11 @@ export default function FeedScreen<T extends FeedPost>({
       dedupeKey: `feed:report:${postId}`,
       errorMessage: 'Unable to report post.',
     });
-    if (res?.success) Alert.alert('Report', 'Thanks for letting us know.');
+    if (res?.success) {
+      Alert.alert('Report', 'Thanks for letting us know.');
+    } else {
+      Alert.alert('Report failed', res?.message || 'Unable to report post. Please try again.');
+    }
   }, []);
 
   const feedItems = useMemo(() => {
@@ -1073,6 +1101,8 @@ export default function FeedScreen<T extends FeedPost>({
           }}
           style={styles.appBarIconBtn}
           hitSlop={10}
+          accessibilityRole="button"
+          accessibilityLabel="Notifications"
         >
           {/* If your icon set uses a different name, swap here (e.g. "notifications") */}
           <KISIcon name="bell" size={22} color={palette.text} />
@@ -1284,6 +1314,8 @@ export default function FeedScreen<T extends FeedPost>({
                     }}
                     style={styles.moreBtnNew}
                     hitSlop={10}
+                    accessibilityRole="button"
+                    accessibilityLabel="More post options"
                   >
                     <Text
                       style={[
@@ -1446,6 +1478,8 @@ export default function FeedScreen<T extends FeedPost>({
               <Pressable
                 onPress={closeVideoModal}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                accessibilityRole="button"
+                accessibilityLabel="Close video"
                 style={[
                   styles.videoCloseButton,
                   { top: 12, left: 16, borderColor: 'rgba(255,255,255,0.4)' },
@@ -1568,8 +1602,20 @@ export default function FeedScreen<T extends FeedPost>({
             : []),
           { key: 'broadcast', label: 'Broadcast', onPress: () => activePost && handleBroadcast(activePost.id) },
           { key: 'report', label: 'Report', onPress: () => activePost && handleReport(activePost.id) },
-          { key: 'block', label: 'Block user', onPress: () => activePost && handleBlockUser(activePost.author?.id) },
-          { key: 'delete', label: 'Delete post', destructive: true, onPress: () => activePost && handleDelete(activePost.id) },
+          {
+            key: 'block',
+            label: 'Block user',
+            destructive: true,
+            confirmMessage: "This person won't be able to see your posts or contact you. You can unblock them later from settings.",
+            onPress: () => activePost && handleBlockUser(activePost.author?.id),
+          },
+          {
+            key: 'delete',
+            label: 'Delete post',
+            destructive: true,
+            confirmMessage: 'This post will be permanently deleted. This cannot be undone.',
+            onPress: () => activePost && handleDelete(activePost.id),
+          },
         ].filter((action) => action.key !== 'delete' || activePost?.id)}
       />
 

@@ -58,22 +58,27 @@ const WEBSITE_PUBLIC_BASE_URL = 'https://kingdomimpactventures.org';
 
 // Direct-to-S3 via Nest — every caller below pickers with mediaType: 'photo',
 // so there's no video-processing dependency keeping this on Django.
+//
+// On upload failure this throws rather than silently falling back to the
+// device-local `asset.uri` — that fallback used to let the section save
+// "successfully" with a local file path baked in as the image URL, which
+// only ever renders on the uploading device (never on the published site,
+// never for collaborators). Callers already catch and Alert.alert() on
+// failure, so a real throw here surfaces the failure instead of hiding it.
 const uploadSectionImage = async (asset: any, context: string): Promise<string> => {
   if (!asset?.uri) return '';
-  try {
-    const attachment = await uploadFileToBackend({
-      file: {
-        uri: asset.uri,
-        name: asset.fileName || `website-${Date.now()}.jpg`,
-        type: asset.type || 'image/jpeg',
-      },
-      baseUrl: NEST_API_BASE_URL,
-      context,
-    });
-    return String(attachment?.url || attachment?.displayUrl || asset.uri);
-  } catch {
-    return asset.uri;
-  }
+  const attachment = await uploadFileToBackend({
+    file: {
+      uri: asset.uri,
+      name: asset.fileName || `website-${Date.now()}.jpg`,
+      type: asset.type || 'image/jpeg',
+    },
+    baseUrl: NEST_API_BASE_URL,
+    context,
+  });
+  const url = attachment?.url || attachment?.displayUrl;
+  if (!url) throw new Error('Upload succeeded but no image URL was returned.');
+  return String(url);
 };
 
 function PageTab({
@@ -102,7 +107,12 @@ function PageTab({
         backgroundColor: isActive ? palette.accentPrimary : palette.card,
       }}
     >
-      <Pressable onLongPress={drag} hitSlop={8}>
+      <Pressable
+        onLongPress={drag}
+        hitSlop={8}
+        accessibilityLabel="Drag to reorder page"
+        accessibilityRole="button"
+      >
         <KISIcon name="menu" size={14} color={isActive ? '#FFFFFF' : palette.subtext} />
       </Pressable>
       <Text style={{ ...typography.label, color: isActive ? '#FFFFFF' : palette.text }}>
@@ -412,10 +422,27 @@ export default function WebsiteBuilderScreen({ navigation, route }: Props) {
     await load();
   }, [website, load]);
 
-  const handleUnpublishWebsite = useCallback(async () => {
+  const handleUnpublishWebsite = useCallback(() => {
     if (!website) return;
-    await postRequest(ROUTES.websites.unpublish(website.id), {}, { errorMessage: 'Unable to unpublish website.' });
-    await load();
+    Alert.alert(
+      'Unpublish website',
+      `Take "${website.name}" offline? Visitors will no longer be able to reach it until you publish again.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Unpublish',
+          style: 'destructive',
+          onPress: async () => {
+            const res = await postRequest(ROUTES.websites.unpublish(website.id), {}, { errorMessage: 'Unable to unpublish website.' });
+            if (!res?.success) {
+              Alert.alert('Website Builder', (res as any)?.message || 'Unable to unpublish website.');
+              return;
+            }
+            await load();
+          },
+        },
+      ],
+    );
   }, [website, load]);
 
   const handlePublishPage = useCallback(async () => {

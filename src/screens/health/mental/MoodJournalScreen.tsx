@@ -86,7 +86,9 @@ export default function MoodJournalScreen({ navigation }: Props) {
   const moodColor = (score: number) => {
     if (score >= 7) return palette.primary;
     if (score >= 4) return palette.gold;
-    return palette.danger;
+    // `warning` (amber), not `danger` (red) — a low mood entry is not an
+    // error/alarm state, and red risks pathologizing a normal bad day.
+    return palette.warning;
   };
 
   const styles = makeStyles(palette, sp);
@@ -103,6 +105,8 @@ export default function MoodJournalScreen({ navigation }: Props) {
           onPress={() => navigation.goBack()}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           style={styles.backBtn}
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
         >
           <KISIcon name="arrow-left" size={22} color={palette.ivory} />
         </TouchableOpacity>
@@ -154,7 +158,12 @@ export default function MoodJournalScreen({ navigation }: Props) {
         />
       )}
 
-      <KISFab icon="add" onPress={() => setShowForm(true)} style={styles.fab} />
+      <KISFab
+        icon="add"
+        onPress={() => setShowForm(true)}
+        style={styles.fab}
+        accessibilityLabel="Add journal entry"
+      />
 
       {/* New Entry Modal */}
       <Modal visible={showForm} animationType="slide" presentationStyle="pageSheet">
@@ -165,6 +174,8 @@ export default function MoodJournalScreen({ navigation }: Props) {
               onPress={() => setShowForm(false)}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               style={styles.closeBtn}
+              accessibilityRole="button"
+              accessibilityLabel="Close"
             >
               <KISIcon name="close" size={22} color={palette.text} />
             </TouchableOpacity>
@@ -191,6 +202,9 @@ export default function MoodJournalScreen({ navigation }: Props) {
                     moodScore === n && styles.scoreBtnActive,
                   ]}
                   hitSlop={{ top: 4, bottom: 4, left: 2, right: 2 }}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Mood score ${n} of 10`}
+                  accessibilityState={{ selected: moodScore === n }}
                 >
                   <Text style={[
                     styles.scoreBtnText,
@@ -306,7 +320,7 @@ function makeStyles(palette: any, sp: number) {
     },
     scoreBtn: {
       flex: 1,
-      minHeight: 36,
+      minHeight: 44,
       borderRadius: 8,
       backgroundColor: palette.surface,
       justifyContent: 'center',

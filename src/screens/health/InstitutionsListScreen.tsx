@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { RefreshControl, ScrollView, Text, View } from 'react-native';
+import { RefreshControl, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 
 import LinearGradient from 'react-native-linear-gradient';
 import { useColorScheme } from 'react-native';
@@ -50,6 +50,7 @@ export function InstitutionsListScreen({
   const [fallbackInstitutions, setFallbackInstitutions] = useState<HealthInstitution[]>([]);
   const [loadingFallback, setLoadingFallback] = useState(false);
   const [preferFallbackData, setPreferFallbackData] = useState(false);
+  const [fallbackError, setFallbackError] = useState<string | null>(null);
 
   const loadFallbackInstitutions = useCallback(async (options?: { forceNetwork?: boolean }) => {
     setLoadingFallback(true);
@@ -59,6 +60,13 @@ export function InstitutionsListScreen({
         ? result.profile!.institutions
         : [];
       setFallbackInstitutions(data);
+      setFallbackError(null);
+    } catch (error: any) {
+      // Previously swallowed with a bare `.catch(() => {})` at the call
+      // site below — a failed fetch here looked identical to "no
+      // institutions yet" (same empty-state card), with no way to tell the
+      // two apart or retry.
+      setFallbackError(error?.message || "Couldn't load institutions. Tap to retry.");
     } finally {
       setLoadingFallback(false);
     }
@@ -140,7 +148,9 @@ export function InstitutionsListScreen({
             ))}
           </View>
         ) : visibleInstitutions.length === 0 ? (
-          <View
+          <TouchableOpacity
+            disabled={!fallbackError}
+            onPress={() => { setPreferFallbackData(true); loadFallbackInstitutions({ forceNetwork: true }).catch(() => {}); }}
             style={{
               borderRadius: spacing.lg,
               backgroundColor: palette.card,
@@ -149,8 +159,8 @@ export function InstitutionsListScreen({
               ...borders.card,
             }}
           >
-            <Text style={{ ...HEALTH_THEME_TYPOGRAPHY.h3, color: palette.text }}>
-              No institutions yet
+            <Text style={{ ...HEALTH_THEME_TYPOGRAPHY.h3, color: fallbackError ? palette.accentPrimary : palette.text }}>
+              {fallbackError ? "Couldn't load institutions" : 'No institutions yet'}
             </Text>
             <Text
               style={{
@@ -159,9 +169,9 @@ export function InstitutionsListScreen({
                 marginTop: 4,
               }}
             >
-              Add your first health institution to get started.
+              {fallbackError ? `${fallbackError} Tap to retry.` : 'Add your first health institution to get started.'}
             </Text>
-          </View>
+          </TouchableOpacity>
         ) : (
           visibleInstitutions.map((institution) => {
             const canEditInstitution = canUserManageInstitution(institution, currentUser);

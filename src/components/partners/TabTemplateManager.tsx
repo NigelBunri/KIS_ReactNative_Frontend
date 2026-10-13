@@ -73,7 +73,7 @@ export default function TabTemplateManager({ tab, appId, partnerId, onBack }: Pr
     <View style={{ flex: 1 }}>
       {/* Header */}
       <View style={[styles.header, { borderBottomColor: palette.divider }]}>
-        <Pressable onPress={onBack} style={styles.backBtn}>
+        <Pressable onPress={onBack} accessibilityRole="button" accessibilityLabel="Back" style={styles.backBtn}>
           <Text style={{ color: palette.primary, fontSize: 28, lineHeight: 32, fontWeight: '300' }}>‹</Text>
         </Pressable>
         <View style={{ flex: 1 }}>
@@ -207,14 +207,23 @@ function BibleTabManager({ tab, appId, partnerId, palette }: {
   const blocksUrl = ROUTES.partners.organizationAppTabBlocks(partnerId, appId, tab.id);
   const [blocks, setBlocks] = useState<BibleBlock[]>([]);
   const [blocksLoading, setBlocksLoading] = useState(false);
+  const [blocksError, setBlocksError] = useState<string | null>(null);
 
   const loadBlocks = useCallback(async (type: string) => {
     setBlocksLoading(true);
     try {
-      const res: any = await getRequest(blocksUrl);
+      const res: any = await getRequest(blocksUrl, { errorMessage: 'Unable to load content.' });
+      if (!res?.success) {
+        setBlocksError(res?.message || "Couldn't load content. Tap to retry.");
+        setBlocks([]);
+        return;
+      }
+      setBlocksError(null);
       const all: BibleBlock[] = Array.isArray(res?.data) ? res.data : res?.data?.results ?? [];
       setBlocks(all.filter(b => b.block_type === type));
-    } catch { /* silently ignored */ }
+    } catch (e: any) {
+      setBlocksError(e?.message || "Couldn't load content. Tap to retry.");
+    }
     finally { setBlocksLoading(false); }
   }, [blocksUrl]);
 
@@ -336,6 +345,7 @@ function BibleTabManager({ tab, appId, partnerId, palette }: {
           blocksUrl={blocksUrl}
           blocks={blocks}
           loading={blocksLoading}
+          error={blocksError}
           onReload={() => loadBlocks('devotional')}
           setBlocks={setBlocks}
           palette={palette}
@@ -357,6 +367,7 @@ function BibleTabManager({ tab, appId, partnerId, palette }: {
           blocksUrl={blocksUrl}
           blocks={blocks}
           loading={blocksLoading}
+          error={blocksError}
           onReload={() => loadBlocks('meditation')}
           setBlocks={setBlocks}
           palette={palette}
@@ -378,6 +389,7 @@ function BibleTabManager({ tab, appId, partnerId, palette }: {
           blocksUrl={blocksUrl}
           blocks={blocks}
           loading={blocksLoading}
+          error={blocksError}
           onReload={() => loadBlocks('prayer_day')}
           setBlocks={setBlocks}
           palette={palette}
@@ -405,10 +417,10 @@ type ContentFormField = {
 };
 
 function BibleContentEditor({
-  blockType, label, icon, blocksUrl, blocks, loading, onReload, setBlocks, palette, formFields,
+  blockType, label, icon, blocksUrl, blocks, loading, error, onReload, setBlocks, palette, formFields,
 }: {
   blockType: string; label: string; icon: string; blocksUrl: string;
-  blocks: BibleBlock[]; loading: boolean; onReload: () => void;
+  blocks: BibleBlock[]; loading: boolean; error?: string | null; onReload: () => void;
   setBlocks: React.Dispatch<React.SetStateAction<BibleBlock[]>>;
   palette: any; formFields: ContentFormField[];
 }) {
@@ -500,6 +512,21 @@ function BibleContentEditor({
 
       {loading ? (
         <ActivityIndicator color={palette.primary} style={{ marginTop: 24 }} />
+      ) : error ? (
+        <View
+          style={{
+            borderRadius: 10,
+            borderWidth: 1,
+            borderColor: palette.danger,
+            backgroundColor: palette.danger + '15',
+            padding: 12,
+          }}
+        >
+          <Text style={{ color: palette.danger, fontSize: 13, fontWeight: '600' }}>{error}</Text>
+          <Pressable onPress={onReload} style={{ marginTop: 8 }}>
+            <Text style={{ color: palette.primary, fontWeight: '700', fontSize: 13 }}>Tap to retry</Text>
+          </Pressable>
+        </View>
       ) : blocks.length === 0 ? (
         <View style={styles.emptyState}>
           <Text style={{ fontSize: 36 }}>{icon}</Text>
@@ -551,6 +578,7 @@ function BroadcastTabManager({ tab, appId, partnerId, palette }: {
 }) {
   const [posts, setPosts] = useState<BroadcastPost[]>([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [saving, setSaving] = useState(false);
   const [body, setBody] = useState('');
@@ -564,10 +592,18 @@ function BroadcastTabManager({ tab, appId, partnerId, palette }: {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res: any = await getRequest(baseUrl);
-      const d = res?.data ?? res;
+      const res: any = await getRequest(baseUrl, { errorMessage: 'Unable to load posts.' });
+      if (!res?.success) {
+        setError(res?.message || "Couldn't load posts. Tap to retry.");
+        setPosts([]);
+        return;
+      }
+      setError(null);
+      const d = res?.data;
       setPosts(Array.isArray(d) ? d : d?.results ?? []);
-    } catch { /* silently ignored */ }
+    } catch (e: any) {
+      setError(e?.message || "Couldn't load posts. Tap to retry.");
+    }
     finally { setLoading(false); }
   }, [baseUrl]);
 
@@ -650,6 +686,21 @@ function BroadcastTabManager({ tab, appId, partnerId, palette }: {
 
       {loading ? (
         <ActivityIndicator color={palette.primary} style={{ marginTop: 24 }} />
+      ) : error ? (
+        <View
+          style={{
+            borderRadius: 10,
+            borderWidth: 1,
+            borderColor: palette.danger,
+            backgroundColor: palette.danger + '15',
+            padding: 12,
+          }}
+        >
+          <Text style={{ color: palette.danger, fontSize: 13, fontWeight: '600' }}>{error}</Text>
+          <Pressable onPress={() => load()} style={{ marginTop: 8 }}>
+            <Text style={{ color: palette.primary, fontWeight: '700', fontSize: 13 }}>Tap to retry</Text>
+          </Pressable>
+        </View>
       ) : posts.length === 0 ? (
         <View style={styles.emptyState}>
           <Text style={{ fontSize: 36 }}>📡</Text>

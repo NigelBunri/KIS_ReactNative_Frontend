@@ -167,7 +167,13 @@ export default function KisAuthRegisterPhoneScreen() {
   return (
     <SafeAreaView style={[styles.root, { backgroundColor: palette.bg }]} edges={['top', 'bottom']}>
       <View style={[styles.header, { borderBottomColor: palette.divider }]}>
-        <Pressable onPress={() => navigation.goBack()} style={styles.backBtn} hitSlop={12}>
+        <Pressable
+          onPress={() => navigation.goBack()}
+          style={styles.backBtn}
+          hitSlop={12}
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
+        >
           <KISIcon name="arrow-left" size={22} color={palette.text} />
         </Pressable>
         <Text style={[styles.headerTitle, { color: palette.text }]}>Almost done</Text>

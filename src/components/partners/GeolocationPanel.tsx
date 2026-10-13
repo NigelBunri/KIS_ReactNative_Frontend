@@ -105,17 +105,39 @@ export default function GeolocationPanel({
     }
   }, [createForm, geo]);
 
-  const handleDeleteEvent = useCallback(async (event: LocationEvent) => {
-    await geo.deleteEvent(event.id);
+  const handleDeleteEvent = useCallback((event: LocationEvent) => {
+    Alert.alert(
+      'Delete event',
+      `Delete "${event.title}"? This also removes its attendance records and cannot be undone.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            const ok = await geo.deleteEvent(event.id);
+            if (!ok) Alert.alert('Failed', 'Unable to delete this event. Please try again.');
+          },
+        },
+      ],
+    );
   }, [geo]);
 
   const handleActivate = useCallback(async (event: LocationEvent) => {
-    await geo.updateEvent(event.id, { status: 'active' });
+    const updated = await geo.updateEvent(event.id, { status: 'active' });
+    if (!updated) {
+      Alert.alert('Failed', 'Unable to activate this event. Please try again.');
+      return;
+    }
     geo.loadEvents();
   }, [geo]);
 
   const handleClose = useCallback(async (event: LocationEvent) => {
-    await geo.updateEvent(event.id, { status: 'closed' });
+    const updated = await geo.updateEvent(event.id, { status: 'closed' });
+    if (!updated) {
+      Alert.alert('Failed', 'Unable to close this event. Please try again.');
+      return;
+    }
     geo.loadEvents();
   }, [geo]);
 
@@ -129,7 +151,12 @@ export default function GeolocationPanel({
       <View style={styles.header}>
         <View style={styles.headerLeft}>
           {view !== 'events' && (
-            <TouchableOpacity onPress={() => setView('events')} style={styles.backBtn}>
+            <TouchableOpacity
+              onPress={() => setView('events')}
+              style={styles.backBtn}
+              accessibilityRole="button"
+              accessibilityLabel="Back"
+            >
               <Text style={styles.backBtnText}>← Back</Text>
             </TouchableOpacity>
           )}
@@ -139,7 +166,12 @@ export default function GeolocationPanel({
              view === 'attendance' ? 'Attendance' : 'Event Details'}
           </Text>
         </View>
-        <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
+        <TouchableOpacity
+          onPress={onClose}
+          style={styles.closeBtn}
+          accessibilityRole="button"
+          accessibilityLabel="Close"
+        >
           <Text style={styles.closeBtnText}>✕</Text>
         </TouchableOpacity>
       </View>
@@ -543,11 +575,26 @@ function _MemberEventView({ event, partnerId, geo, styles, STATUS_COLORS }: {
   }, [event.id]);
 
   const handleGrantConsent = async () => {
-    await geo.setConsented(true);
+    const ok = await geo.setConsented(true);
+    if (!ok) Alert.alert('Failed', 'Unable to grant location consent. Please try again.');
   };
 
-  const handleRevokeConsent = async () => {
-    await geo.setConsented(false);
+  const handleRevokeConsent = () => {
+    Alert.alert(
+      'Revoke Location Consent',
+      'You will no longer be able to check in to location events until you re-grant consent.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Revoke',
+          style: 'destructive',
+          onPress: async () => {
+            const ok = await geo.setConsented(false);
+            if (!ok) Alert.alert('Failed', 'Unable to revoke location consent. Please try again.');
+          },
+        },
+      ],
+    );
   };
 
   const handleCheckin = async () => {

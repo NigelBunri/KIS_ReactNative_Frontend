@@ -63,18 +63,25 @@ function ShelfItemsPanel({
   const [adding, setAdding] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
+  const [loadError, setLoadError] = useState(false);
+
   const loadItems = useCallback(async () => {
     setLoading(true);
+    setLoadError(false);
     try {
       const res = await getRequest(
         ROUTES.broadcasts.channelShelfItems(shelfId),
         { errorMessage: '' },
       );
       // getRequest resolves to the ApiResult wrapper ({success, data,
-      // message}) — Array.isArray(res) can never be true (the wrapper is
-      // never an array), and the final `res?.results` fallback checked the
-      // wrapper instead of `res.data.results`, so a paginated response here
-      // always fell through to [].
+      // message}) and never throws on failure — without checking
+      // `res?.success`, a failed load fell through to the same
+      // `res.data.results` fallback used for a genuinely empty shelf,
+      // rendering "No items in this shelf" on a load failure.
+      if (!res?.success) {
+        setLoadError(true);
+        return;
+      }
       const raw: ShelfItem[] = Array.isArray(res?.data)
         ? res.data
         : res?.data?.results ?? [];
@@ -122,6 +129,10 @@ function ShelfItemsPanel({
     <View style={[itemStyles.panel, { borderColor: palette.border, backgroundColor: palette.surface }]}>
       {loading ? (
         <ActivityIndicator size="small" color={palette.primaryStrong} />
+      ) : loadError ? (
+        <Text style={[itemStyles.emptyText, { color: palette.danger }]}>
+          Could not load shelf items. Pull down or reopen this shelf to retry.
+        </Text>
       ) : (
         <>
           {items.length === 0 && (
@@ -233,8 +244,12 @@ export default function ChannelHomepageShelfEditor({ channelId }: Props) {
         ROUTES.broadcasts.channelShelves(channelId),
         { errorMessage: '' },
       );
-      // Same fix as loadItems above — the wrapper (`res`), not the
-      // payload (`res.data`), was being inspected in the final fallback.
+      // getRequest resolves (never throws) on failure too — without this
+      // check, a failed load fell through to the same `res?.data?.results`
+      // fallback used for a genuinely empty list, rendering "No shelves
+      // configured" on a load failure with zero indication anything went
+      // wrong.
+      if (!res?.success) throw new Error('Could not load shelves.');
       const raw: Shelf[] = Array.isArray(res?.data)
         ? res.data
         : res?.data?.results ?? [];
@@ -276,11 +291,19 @@ export default function ChannelHomepageShelfEditor({ channelId }: Props) {
   const handleToggleActive = useCallback(async (shelf: Shelf) => {
     setPatchingId(shelf.id);
     try {
-      await patchRequest(
+      // patchRequest resolves (never throws) on failure too — applying the
+      // optimistic update unconditionally meant a rejected PATCH still
+      // flipped the Switch locally, showing the shelf as active/inactive
+      // on the homepage when the server never actually changed it.
+      const res = await patchRequest(
         ROUTES.broadcasts.channelShelf(shelf.id),
         { is_active: !shelf.is_active },
         { errorMessage: '' },
       );
+      if (!res?.success) {
+        Alert.alert('Error', 'Could not update shelf.');
+        return;
+      }
       setShelves(prev =>
         prev.map(s => s.id === shelf.id ? { ...s, is_active: !s.is_active } : s),
       );

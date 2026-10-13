@@ -182,7 +182,19 @@ export default function ProviderOrdersPage() {
             <KISButton
               title={rowLoading ? 'Completing…' : 'Mark completed'}
               size="xs"
-              onPress={() => handleComplete(item.id)}
+              onPress={() =>
+                Alert.alert(
+                  'Mark order completed',
+                  'This tells the buyer their order is complete and starts their satisfaction window. Are you sure?',
+                  [
+                    { text: 'Not yet', style: 'cancel' },
+                    {
+                      text: 'Mark completed',
+                      onPress: () => handleComplete(item.id),
+                    },
+                  ],
+                )
+              }
               loading={rowLoading}
             />
           ) : null}

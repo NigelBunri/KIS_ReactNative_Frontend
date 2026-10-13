@@ -99,36 +99,44 @@ export default function BroadcastFeedVideoPreview({
   );
 
   useEffect(() => {
-    console.log(
-      '[BroadcastFeedVideoPreview] mounted',
-      JSON.stringify({
-        attachmentId: attachment?.video_id ?? attachment?.id ?? null,
-        mediaType: attachment?.media_type ?? null,
-        mimeType: attachment?.mime_type ?? null,
-        sourcesCount: sources.length,
-        sources: sources.map((s) => ({
-          kind: s.kind,
-          url: s.url,
-          host: s.host,
-          risk: getBroadcastFeedVideoRiskNote(s) ?? 'none',
-        })),
-        poster: poster ?? null,
-        autoPlay,
-      }),
-    );
+    // Dev-only diagnostics — these can include presigned media URLs, so
+    // they must never ship to a production device log (see the matching
+    // guard on the "active source" effect below and on
+    // feedVideoPlayback.ts's getBroadcastFeedVideoSources).
+    if (__DEV__) {
+      console.log(
+        '[BroadcastFeedVideoPreview] mounted',
+        JSON.stringify({
+          attachmentId: attachment?.video_id ?? attachment?.id ?? null,
+          mediaType: attachment?.media_type ?? null,
+          mimeType: attachment?.mime_type ?? null,
+          sourcesCount: sources.length,
+          sources: sources.map((s) => ({
+            kind: s.kind,
+            url: s.url,
+            host: s.host,
+            risk: getBroadcastFeedVideoRiskNote(s) ?? 'none',
+          })),
+          poster: poster ?? null,
+          autoPlay,
+        }),
+      );
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
-    console.log(
-      '[BroadcastFeedVideoPreview] active source',
-      JSON.stringify({
-        sourceIndex,
-        activeSource: describeBroadcastFeedVideoSource(activeSource),
-        activeSourceType: activeSourceType ?? null,
-        hasAuthHeaders: Boolean(activeSourceHeaders),
-      }),
-    );
+    if (__DEV__) {
+      console.log(
+        '[BroadcastFeedVideoPreview] active source',
+        JSON.stringify({
+          sourceIndex,
+          activeSource: describeBroadcastFeedVideoSource(activeSource),
+          activeSourceType: activeSourceType ?? null,
+          hasAuthHeaders: Boolean(activeSourceHeaders),
+        }),
+      );
+    }
   }, [sourceIndex, activeSource, activeSourceType, activeSourceHeaders]);
 
   useEffect(() => {
@@ -143,12 +151,32 @@ export default function BroadcastFeedVideoPreview({
       const currentSource = activeSource;
       const nextIndex = sourceIndex + 1;
       if (nextIndex < sources.length) {
-        console.info(
-          '[BroadcastFeedVideoPreview] switching video source',
+        if (__DEV__) {
+          console.info(
+            '[BroadcastFeedVideoPreview] switching video source',
+            JSON.stringify({
+              message: nextMessage,
+              from: describeBroadcastFeedVideoSource(currentSource),
+              to: describeBroadcastFeedVideoSource(sources[nextIndex]),
+              attachment: {
+                video_id: attachment?.video_id ?? null,
+                media_type: attachment?.media_type ?? null,
+                mime_type: attachment?.mime_type ?? null,
+              },
+            }),
+          );
+        }
+        setPlaybackError(nextMessage);
+        setSourceIndex(nextIndex);
+        return;
+      }
+      if (__DEV__) {
+        console.warn(
+          '[BroadcastFeedVideoPreview] all sources failed - final failure',
           JSON.stringify({
             message: nextMessage,
-            from: describeBroadcastFeedVideoSource(currentSource),
-            to: describeBroadcastFeedVideoSource(sources[nextIndex]),
+            lastSource: describeBroadcastFeedVideoSource(currentSource),
+            triedCount: sources.length,
             attachment: {
               video_id: attachment?.video_id ?? null,
               media_type: attachment?.media_type ?? null,
@@ -156,23 +184,7 @@ export default function BroadcastFeedVideoPreview({
             },
           }),
         );
-        setPlaybackError(nextMessage);
-        setSourceIndex(nextIndex);
-        return;
       }
-      console.warn(
-        '[BroadcastFeedVideoPreview] all sources failed - final failure',
-        JSON.stringify({
-          message: nextMessage,
-          lastSource: describeBroadcastFeedVideoSource(currentSource),
-          triedCount: sources.length,
-          attachment: {
-            video_id: attachment?.video_id ?? null,
-            media_type: attachment?.media_type ?? null,
-            mime_type: attachment?.mime_type ?? null,
-          },
-        }),
-      );
       setPlaybackError(nextMessage);
       setFinalFailure(true);
     },

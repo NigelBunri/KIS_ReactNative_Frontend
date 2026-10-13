@@ -670,26 +670,42 @@ const ServiceBookingDetailsPage = () => {
   const handleCancelRosterBooking = useCallback(
     async (bookingId: string) => {
       if (!bookingId) return;
-      setCancellingBookingId(bookingId);
-      try {
-        const res = await postRequest(
-          ROUTES.commerce.serviceBookingCancel(bookingId),
-          {},
-        );
-        if (!res?.success) {
-          throw new Error(res?.message || 'Unable to cancel booking.');
-        }
-        Alert.alert(
-          'Booking',
-          'Booking canceled and the payer will be refunded.',
-        );
-        await loadServiceRoster();
-        loadBooking();
-      } catch (error: any) {
-        Alert.alert('Booking', error?.message || 'Unable to cancel booking.');
-      } finally {
-        setCancellingBookingId(null);
-      }
+      Alert.alert(
+        'Cancel this booking?',
+        'The payer will be refunded. This cannot be undone.',
+        [
+          { text: 'Keep booking', style: 'cancel' },
+          {
+            text: 'Cancel booking',
+            style: 'destructive',
+            onPress: async () => {
+              setCancellingBookingId(bookingId);
+              try {
+                const res = await postRequest(
+                  ROUTES.commerce.serviceBookingCancel(bookingId),
+                  {},
+                );
+                if (!res?.success) {
+                  throw new Error(res?.message || 'Unable to cancel booking.');
+                }
+                Alert.alert(
+                  'Booking',
+                  'Booking canceled and the payer will be refunded.',
+                );
+                await loadServiceRoster();
+                loadBooking();
+              } catch (error: any) {
+                Alert.alert(
+                  'Booking',
+                  error?.message || 'Unable to cancel booking.',
+                );
+              } finally {
+                setCancellingBookingId(null);
+              }
+            },
+          },
+        ],
+      );
     },
     [loadBooking, loadServiceRoster],
   );
@@ -698,9 +714,10 @@ const ServiceBookingDetailsPage = () => {
     async (userId: string) => {
       if (!userId || !serviceId) return;
       const existingBlock = blockedUsers[userId];
-      setBlockingUserId(userId);
-      try {
-        if (existingBlock) {
+
+      const runUnblock = async () => {
+        setBlockingUserId(userId);
+        try {
           const res = await deleteRequest(
             `${ROUTES.moderation.userBlocks}${existingBlock}/`,
             {
@@ -719,40 +736,60 @@ const ServiceBookingDetailsPage = () => {
             'Users',
             'User unblocked and can book this service again.',
           );
-          return;
+        } catch (error: any) {
+          Alert.alert('Users', error?.message || 'Unable to unblock user.');
+        } finally {
+          setBlockingUserId(null);
         }
-        const payload: Record<string, unknown> = {
-          blocked: userId,
-          reason: 'service roster block',
-          service: serviceId,
-        };
-        if (shopId) {
-          payload.shop = shopId;
+      };
+
+      const runBlock = async () => {
+        setBlockingUserId(userId);
+        try {
+          const payload: Record<string, unknown> = {
+            blocked: userId,
+            reason: 'service roster block',
+            service: serviceId,
+          };
+          if (shopId) {
+            payload.shop = shopId;
+          }
+          const res = await postRequest(ROUTES.moderation.userBlocks, payload, {
+            errorMessage: 'Unable to block user.',
+          });
+          if (!res?.success) {
+            throw new Error(res?.message || 'Unable to block user.');
+          }
+          const body = res.data ?? res;
+          const newBlockId = String(body?.id ?? '');
+          if (!newBlockId) {
+            throw new Error('Block response missing identifier.');
+          }
+          setBlockedUsers(prev => ({ ...prev, [userId]: newBlockId }));
+          Alert.alert('Users', 'User blocked from booking this service.');
+        } catch (error: any) {
+          Alert.alert('Users', error?.message || 'Unable to block user.');
+        } finally {
+          setBlockingUserId(null);
         }
-        const res = await postRequest(ROUTES.moderation.userBlocks, payload, {
-          errorMessage: 'Unable to block user.',
-        });
-        if (!res?.success) {
-          throw new Error(res?.message || 'Unable to block user.');
-        }
-        const body = res.data ?? res;
-        const newBlockId = String(body?.id ?? '');
-        if (!newBlockId) {
-          throw new Error('Block response missing identifier.');
-        }
-        setBlockedUsers(prev => ({ ...prev, [userId]: newBlockId }));
-        Alert.alert('Users', 'User blocked from booking this service.');
-      } catch (error: any) {
-        Alert.alert(
-          'Users',
-          error?.message ||
-            (existingBlock
-              ? 'Unable to unblock user.'
-              : 'Unable to block user.'),
-        );
-      } finally {
-        setBlockingUserId(null);
+      };
+
+      if (existingBlock) {
+        await runUnblock();
+        return;
       }
+      Alert.alert(
+        'Block this user?',
+        'They will no longer be able to book this service. You can unblock them later.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Block user',
+            style: 'destructive',
+            onPress: () => void runBlock(),
+          },
+        ],
+      );
     },
     [serviceId, shopId, blockedUsers],
   );
@@ -930,25 +967,41 @@ const ServiceBookingDetailsPage = () => {
     });
   }, [availableSlots]);
 
-  const handleCancelBooking = useCallback(async () => {
+  const handleCancelBooking = useCallback(() => {
     if (!bookingId || !canCancelBooking) return;
-    setCancelLoading(true);
-    try {
-      const res = await postRequest(
-        ROUTES.commerce.serviceBookingCancel(bookingId),
-        {},
-      );
-      if (!res?.success) {
-        throw new Error(res?.message || 'Unable to cancel booking.');
-      }
-      Alert.alert('Booking', 'Your booking has been canceled.');
-      loadBooking();
-    } catch (e: any) {
-      Alert.alert('Booking', e?.message || 'Unable to cancel booking.');
-    } finally {
-      setCancelLoading(false);
-    }
-  }, [bookingId, canCancelBooking, loadBooking]);
+    Alert.alert(
+      'Cancel this booking?',
+      refundPolicyText,
+      [
+        { text: 'Keep booking', style: 'cancel' },
+        {
+          text: 'Cancel booking',
+          style: 'destructive',
+          onPress: async () => {
+            setCancelLoading(true);
+            try {
+              const res = await postRequest(
+                ROUTES.commerce.serviceBookingCancel(bookingId),
+                {},
+              );
+              if (!res?.success) {
+                throw new Error(res?.message || 'Unable to cancel booking.');
+              }
+              Alert.alert('Booking', 'Your booking has been canceled.');
+              loadBooking();
+            } catch (e: any) {
+              Alert.alert(
+                'Booking',
+                e?.message || 'Unable to cancel booking.',
+              );
+            } finally {
+              setCancelLoading(false);
+            }
+          },
+        },
+      ],
+    );
+  }, [bookingId, canCancelBooking, loadBooking, refundPolicyText]);
 
   const expiryLabel = useMemo(() => {
     if (!booking?.satisfaction_deadline) return null;
@@ -956,27 +1009,42 @@ const ServiceBookingDetailsPage = () => {
     return date.toLocaleString();
   }, [booking?.satisfaction_deadline]);
 
-  const handleMarkCompleted = useCallback(async () => {
+  const handleMarkCompleted = useCallback(() => {
     if (!bookingId) return;
-    setActionLoading(true);
-    try {
-      const res = await postRequest(
-        `${ROUTES.commerce.serviceBooking(bookingId)}mark-completed/`,
-        {},
-      );
-      if (!res?.success) {
-        throw new Error(res?.message || 'Unable to mark completed.');
-      }
-      Alert.alert(
-        'Booking',
-        'Marked as completed. The payer will confirm satisfaction.',
-      );
-      loadBooking();
-    } catch (e: any) {
-      Alert.alert('Booking', e?.message || 'Unable to mark completed.');
-    } finally {
-      setActionLoading(false);
-    }
+    Alert.alert(
+      'Mark this service as completed?',
+      'The payer will be asked to confirm satisfaction. Only do this once the service has actually been delivered.',
+      [
+        { text: 'Not yet', style: 'cancel' },
+        {
+          text: 'Mark completed',
+          onPress: async () => {
+            setActionLoading(true);
+            try {
+              const res = await postRequest(
+                `${ROUTES.commerce.serviceBooking(bookingId)}mark-completed/`,
+                {},
+              );
+              if (!res?.success) {
+                throw new Error(res?.message || 'Unable to mark completed.');
+              }
+              Alert.alert(
+                'Booking',
+                'Marked as completed. The payer will confirm satisfaction.',
+              );
+              loadBooking();
+            } catch (e: any) {
+              Alert.alert(
+                'Booking',
+                e?.message || 'Unable to mark completed.',
+              );
+            } finally {
+              setActionLoading(false);
+            }
+          },
+        },
+      ],
+    );
   }, [bookingId, loadBooking]);
 
   const handleRescheduleBooking = useCallback(async () => {
@@ -1010,27 +1078,42 @@ const ServiceBookingDetailsPage = () => {
     }
   }, [bookingId, canRescheduleBooking, loadBooking, selectedRescheduleSlot]);
 
-  const handleMarkSatisfied = useCallback(async () => {
+  const handleMarkSatisfied = useCallback(() => {
     if (!booking?.payment?.id) {
       Alert.alert('Booking', 'Payment details are missing.');
       return;
     }
-    setActionLoading(true);
-    try {
-      const res = await patchRequest(
-        ROUTES.commerce.paymentSatisfy(booking.payment.id),
-        {},
-      );
-      if (!res?.success) {
-        throw new Error(res?.message || 'Unable to mark satisfied.');
-      }
-      Alert.alert('Booking', 'Thank you for confirming the service.');
-      loadBooking();
-    } catch (e: any) {
-      Alert.alert('Booking', e?.message || 'Unable to mark satisfied.');
-    } finally {
-      setActionLoading(false);
-    }
+    Alert.alert(
+      'Confirm you are satisfied?',
+      'This releases payment to the provider and ends the window for filing a complaint.',
+      [
+        { text: 'Not yet', style: 'cancel' },
+        {
+          text: 'Confirm',
+          onPress: async () => {
+            setActionLoading(true);
+            try {
+              const res = await patchRequest(
+                ROUTES.commerce.paymentSatisfy(booking.payment.id),
+                {},
+              );
+              if (!res?.success) {
+                throw new Error(res?.message || 'Unable to mark satisfied.');
+              }
+              Alert.alert('Booking', 'Thank you for confirming the service.');
+              loadBooking();
+            } catch (e: any) {
+              Alert.alert(
+                'Booking',
+                e?.message || 'Unable to mark satisfied.',
+              );
+            } finally {
+              setActionLoading(false);
+            }
+          },
+        },
+      ],
+    );
   }, [booking?.payment?.id, loadBooking]);
 
   const handleOpenLink = useCallback((url?: string) => {

@@ -489,7 +489,11 @@ export default function ChannelsDiscoverPage({ searchTerm = '', searchContext = 
       )}
 
       {/* ── All channels list ───────────────────────────────────── */}
-      {(rest.length > 0 || (featured.length > 0)) ? (
+      {/* Only render once there are channels beyond the featured row above -
+          previously this fell back to re-rendering `featured` whenever the
+          whole catalog was <=6 channels, silently duplicating every channel
+          card the user had just scrolled through seconds earlier. */}
+      {rest.length > 0 ? (
         <>
           <View style={[styles.sectionHeaderRow, { marginTop: 20 }]}>
             <View>
@@ -500,7 +504,7 @@ export default function ChannelsDiscoverPage({ searchTerm = '', searchContext = 
             </View>
           </View>
           <View style={{ gap: 10 }}>
-            {(rest.length ? rest : featured).map(channel => (
+            {rest.map(channel => (
               <ChannelListRow key={`row-${channel.id}`} channel={channel} onOpen={openChannel} />
             ))}
           </View>

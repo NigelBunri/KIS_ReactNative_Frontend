@@ -32,6 +32,13 @@ export default function SurveysDashboardScreen() {
     setError(null);
     try {
       const res = await getRequest(ROUTES.surveys.list, { errorMessage: 'Unable to load surveys.' });
+      // getRequest resolves (never throws) on a failed HTTP response too, with
+      // `data` left undefined — without this check a 4xx/5xx response fell
+      // through to "No surveys yet" as if there were genuinely none, silently
+      // masking a real failure as a success/empty-state.
+      if (!res.success) {
+        throw new Error(res.message || 'Unable to load surveys.');
+      }
       const items: SurveyItem[] = res.data?.results ?? res.data ?? [];
       setSurveys(items);
     } catch (e: any) {

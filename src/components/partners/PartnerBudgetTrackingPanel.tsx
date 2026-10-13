@@ -72,6 +72,8 @@ export default function PartnerBudgetTrackingPanel({ isOpen, panelWidth, panelTr
   const [expensesLoading, setExpensesLoading] = useState(false);
   const [expenseDescription, setExpenseDescription] = useState('');
   const [expenseAmount, setExpenseAmount] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [expensesError, setExpensesError] = useState<string | null>(null);
 
   const backdropOpacity = panelTranslateX.interpolate({ inputRange: [0, panelWidth], outputRange: [1, 0], extrapolate: 'clamp' });
 
@@ -81,9 +83,15 @@ export default function PartnerBudgetTrackingPanel({ isOpen, panelWidth, panelTr
       getRequest(ROUTES.partners.budgets(partnerId), { errorMessage: 'Unable to load budgets.' }),
       getRequest(ROUTES.partners.departments(partnerId), { errorMessage: 'Unable to load departments.' }),
     ]);
+    if (!budgetRes?.success) {
+      setError(budgetRes?.message || "Couldn't load budgets. Tap to retry.");
+      setBudgets([]);
+      return;
+    }
+    setError(null);
     const budgetPayload = budgetRes?.data ?? [];
     setBudgets(Array.isArray(budgetPayload) ? budgetPayload : []);
-    const deptPayload = deptRes?.data ?? [];
+    const deptPayload = deptRes?.success ? deptRes?.data ?? [] : [];
     setDepartments(Array.isArray(deptPayload) ? deptPayload : []);
   }, [partnerId]);
 
@@ -100,6 +108,13 @@ export default function PartnerBudgetTrackingPanel({ isOpen, panelWidth, panelTr
       if (!partnerId) return;
       setExpensesLoading(true);
       const res = await getRequest(ROUTES.partners.budgetExpenses(partnerId, String(budgetId)), { errorMessage: 'Unable to load expenses.' });
+      if (!res?.success) {
+        setExpensesError(res?.message || "Couldn't load expenses. Tap to retry.");
+        setExpenses([]);
+        setExpensesLoading(false);
+        return;
+      }
+      setExpensesError(null);
       const payload = (res?.data ?? []) as Expense[];
       setExpenses(Array.isArray(payload) ? payload : []);
       setExpensesLoading(false);
@@ -238,6 +253,27 @@ export default function PartnerBudgetTrackingPanel({ isOpen, panelWidth, panelTr
         <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.settingsPanelBody} showsVerticalScrollIndicator={false}>
           {loading ? (
             <ActivityIndicator size="small" color={palette.primary} />
+          ) : error ? (
+            <View
+              style={{
+                borderRadius: 10,
+                borderWidth: 1,
+                borderColor: palette.danger,
+                backgroundColor: palette.danger + '15',
+                padding: 12,
+              }}
+            >
+              <Text style={{ color: palette.danger, fontSize: 13, fontWeight: '600' }}>{error}</Text>
+              <Pressable
+                onPress={() => {
+                  setLoading(true);
+                  load().finally(() => setLoading(false));
+                }}
+                style={{ marginTop: 8 }}
+              >
+                <Text style={{ color: palette.primary, fontWeight: '700', fontSize: 13 }}>Tap to retry</Text>
+              </Pressable>
+            </View>
           ) : selectedBudget ? (
             <>
               <View style={[styles.settingsFeatureRow, { borderColor: palette.borderMuted, backgroundColor: palette.surface, marginBottom: 16 }]}>
@@ -267,6 +303,22 @@ export default function PartnerBudgetTrackingPanel({ isOpen, panelWidth, panelTr
               </Text>
               {expensesLoading ? (
                 <ActivityIndicator size="small" color={palette.primary} />
+              ) : expensesError ? (
+                <View
+                  style={{
+                    borderRadius: 10,
+                    borderWidth: 1,
+                    borderColor: palette.danger,
+                    backgroundColor: palette.danger + '15',
+                    padding: 12,
+                    marginBottom: 20,
+                  }}
+                >
+                  <Text style={{ color: palette.danger, fontSize: 13, fontWeight: '600' }}>{expensesError}</Text>
+                  <Pressable onPress={() => loadExpenses(selectedBudget.id)} style={{ marginTop: 8 }}>
+                    <Text style={{ color: palette.primary, fontWeight: '700', fontSize: 13 }}>Tap to retry</Text>
+                  </Pressable>
+                </View>
               ) : expenses.length === 0 ? (
                 <Text style={{ color: palette.subtext, fontSize: 13, marginBottom: 20 }}>No expenses recorded yet.</Text>
               ) : (

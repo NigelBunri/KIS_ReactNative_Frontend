@@ -65,7 +65,7 @@ export default function SmallGroupDetailScreen({ route, navigation }: Props) {
     }, [groupId]),
   );
 
-  const handleJoinLeave = useCallback(async () => {
+  const performJoinLeave = useCallback(async () => {
     if (!group) return;
     setActionLoading(true);
     try {
@@ -88,6 +88,24 @@ export default function SmallGroupDetailScreen({ route, navigation }: Props) {
       setActionLoading(false);
     }
   }, [group, groupId]);
+
+  const handleJoinLeave = useCallback(() => {
+    if (!group) return;
+    // Leaving is destructive (loses your spot/history in the group), so
+    // confirm first. Joining is non-destructive and can proceed immediately.
+    if (group.is_member) {
+      Alert.alert(
+        'Leave Group',
+        `Are you sure you want to leave ${group.name}? You'll need to rejoin to see future meetings and updates.`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Leave', style: 'destructive', onPress: () => { void performJoinLeave(); } },
+        ],
+      );
+    } else {
+      void performJoinLeave();
+    }
+  }, [group, performJoinLeave]);
 
   if (loading) {
     return (

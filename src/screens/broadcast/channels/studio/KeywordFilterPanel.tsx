@@ -75,9 +75,12 @@ export default function KeywordFilterPanel({ channelId }: Props) {
         ROUTES.broadcasts.channelKeywordFilters(channelId),
         { errorMessage: '' },
       );
-      // getRequest resolves to the ApiResult wrapper — the final
-      // `res?.results` fallback checked the wrapper instead of
-      // `res.data.results`, so a paginated response always fell through to [].
+      // getRequest resolves (never throws) on failure too — without this
+      // check, a failed load fell through to the same `res?.data?.results`
+      // fallback used for a genuinely empty list, rendering "No keyword
+      // filters set" on a load failure with zero indication anything went
+      // wrong.
+      if (!res?.success) throw new Error('Could not load keyword filters.');
       const raw: KeywordFilter[] = Array.isArray(res?.data)
         ? res.data
         : res?.data?.results ?? [];
@@ -118,11 +121,19 @@ export default function KeywordFilterPanel({ channelId }: Props) {
   const handleToggleActive = useCallback(async (filter: KeywordFilter) => {
     setPatchingId(filter.id);
     try {
-      await patchRequest(
+      // patchRequest resolves (never throws) on failure too — applying the
+      // optimistic update unconditionally meant a rejected PATCH still
+      // flipped the Switch to the new state locally, showing the filter as
+      // active/inactive when the server never actually changed it.
+      const res = await patchRequest(
         ROUTES.broadcasts.channelKeywordFilter(filter.id),
         { is_active: !filter.is_active },
         { errorMessage: '' },
       );
+      if (!res?.success) {
+        Alert.alert('Error', 'Could not update filter.');
+        return;
+      }
       setFilters(prev =>
         prev.map(f => f.id === filter.id ? { ...f, is_active: !f.is_active } : f),
       );
@@ -136,11 +147,17 @@ export default function KeywordFilterPanel({ channelId }: Props) {
   const handleChangeType = useCallback(async (filter: KeywordFilter, newType: FilterType) => {
     setPatchingId(filter.id);
     try {
-      await patchRequest(
+      // Same fix as handleToggleActive above — gate the optimistic update
+      // on the PATCH actually succeeding.
+      const res = await patchRequest(
         ROUTES.broadcasts.channelKeywordFilter(filter.id),
         { filter_type: newType },
         { errorMessage: '' },
       );
+      if (!res?.success) {
+        Alert.alert('Error', 'Could not update filter type.');
+        return;
+      }
       setFilters(prev =>
         prev.map(f => f.id === filter.id ? { ...f, filter_type: newType } : f),
       );

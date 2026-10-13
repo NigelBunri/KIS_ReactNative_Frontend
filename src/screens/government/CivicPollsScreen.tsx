@@ -78,9 +78,17 @@ export default function CivicPollsScreen(_props: Props) {
     }
     setVoting(pollId);
     try {
-      await postRequest(ROUTES.government.pollVote(pollId), {
+      // postRequest resolves (never throws) on a failed request too, with
+      // `success: false` — the previous code ignored that flag and always
+      // applied the optimistic vote update, so a rejected vote still showed
+      // as counted with no indication anything went wrong. Checking
+      // `success` routes a genuine failure to the error alert below.
+      const res = await postRequest(ROUTES.government.pollVote(pollId), {
         option_key: optionKey,
       });
+      if (!res?.success) {
+        throw new Error(res?.message || 'Could not submit vote. Please try again.');
+      }
       setPolls((prev) =>
         prev.map((p) => {
           if (p.id !== pollId) return p;
@@ -96,8 +104,8 @@ export default function CivicPollsScreen(_props: Props) {
           };
         }),
       );
-    } catch {
-      Alert.alert('Error', 'Could not submit vote. Please try again.');
+    } catch (e: any) {
+      Alert.alert('Error', e?.message || 'Could not submit vote. Please try again.');
     } finally {
       setVoting(null);
     }

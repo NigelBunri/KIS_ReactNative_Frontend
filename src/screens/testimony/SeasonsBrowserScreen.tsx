@@ -20,32 +20,7 @@ import ROUTES from '@/network';
 import type { RootStackParamList } from '@/navigation/types';
 import { useProfileController } from '@/screens/tabs/profile/useProfileController';
 import { useAuth } from '../../../App';
-
-const CATEGORY_LABELS: Record<string, string> = {
-  health: 'Health & Medical',
-  finances: 'Financial Hardship',
-  relationships: 'Relationships & Marriage',
-  faith: 'Faith & Spirituality',
-  business: 'Business & Career',
-  grief: 'Loss & Grief',
-  addiction: 'Addiction & Recovery',
-  family: 'Family & Parenting',
-  mental_health: 'Mental Health',
-  other: 'Other',
-};
-const CATEGORIES = Object.keys(CATEGORY_LABELS);
-const CATEGORY_EMOJI: Record<string, string> = {
-  health: '🏥',
-  finances: '💰',
-  relationships: '💑',
-  faith: '🙏',
-  business: '💼',
-  grief: '🕊️',
-  addiction: '🌱',
-  family: '👨‍👩‍👧',
-  mental_health: '🧠',
-  other: '💙',
-};
+import { CATEGORIES, CATEGORY_EMOJI, CATEGORY_LABELS } from './testimonyCategories';
 
 function timeAgo(iso: string) {
   const diff = Date.now() - new Date(iso).getTime();
@@ -182,7 +157,7 @@ export default function SeasonsBrowserScreen() {
   return (
     <SafeAreaView style={[{ flex: 1, backgroundColor: palette.bg, }]} edges={['top']}>
       <View style={[styles.header, { backgroundColor: palette.bg, }]}>
-        <Pressable onPress={() => navigation.goBack()} style={styles.backBtn} hitSlop={12}>
+        <Pressable onPress={() => navigation.goBack()} style={styles.backBtn} hitSlop={12} accessibilityRole="button" accessibilityLabel="Go back">
           <KISIcon name="arrow-left" size={22} color={palette.text} />
         </Pressable>
         <View style={{ flex: 1 }}>

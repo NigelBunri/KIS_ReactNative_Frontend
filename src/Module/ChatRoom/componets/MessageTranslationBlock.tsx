@@ -48,7 +48,7 @@ export const MessageTranslationBlock: React.FC<Props> = ({
           🌐 {sourceLanguageCode ? `Translated from ${getLanguageLabel(sourceLanguageCode)}` : 'Translated'}
         </Text>
         <Text style={{ color: textColor, fontSize: 14 }}>{translatedText}</Text>
-        <Pressable onPress={toggleOriginal} hitSlop={6}>
+        <Pressable onPress={toggleOriginal} hitSlop={6} accessibilityRole="button" accessibilityLabel="Show original text">
           <Text style={{ fontSize: 11, fontWeight: '600', color: subtleColor, marginTop: 4 }}>Original</Text>
         </Pressable>
       </View>
@@ -68,7 +68,7 @@ export const MessageTranslationBlock: React.FC<Props> = ({
 
   if (phase === 'needs_download') {
     return (
-      <Pressable onPress={() => void confirmDownload()} style={{ marginTop: 4 }}>
+      <Pressable onPress={() => void confirmDownload()} style={{ marginTop: 4 }} accessibilityRole="button" accessibilityLabel="Download language pack to translate">
         <Text style={{ fontSize: 11, color: palette.primary, fontWeight: '600' }}>
           {'⬇️ Download '}
           {neededModelLabel ?? 'language pack'}
@@ -89,7 +89,7 @@ export const MessageTranslationBlock: React.FC<Props> = ({
 
   if (phase === 'error' && errorMessage) {
     return (
-      <Pressable onPress={() => void translate()} style={{ marginTop: 4 }}>
+      <Pressable onPress={() => void translate()} style={{ marginTop: 4 }} accessibilityRole="button" accessibilityLabel={`Translation failed: ${errorMessage}. Tap to retry.`}>
         <Text style={{ fontSize: 11, color: palette.danger ?? '#DC2626' }}>⚠️ {errorMessage} (tap to retry)</Text>
       </Pressable>
     );
@@ -98,7 +98,7 @@ export const MessageTranslationBlock: React.FC<Props> = ({
   if (!showInlineTrigger) return null;
 
   return (
-    <Pressable onPress={() => void translate()} style={{ marginTop: 4 }}>
+    <Pressable onPress={() => void translate()} style={{ marginTop: 4 }} accessibilityRole="button" accessibilityLabel="Translate message">
       <Text style={{ color: subtleColor, fontSize: 11 }}>🌐 Translate</Text>
     </Pressable>
   );

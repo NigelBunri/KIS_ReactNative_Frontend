@@ -171,7 +171,13 @@ export default function SyncQueueBanner() {
             </Text>
           ) : null}
         </View>
-        <Pressable onPress={handleDismiss} hitSlop={10} style={styles.dismissButton}>
+        <Pressable
+          onPress={handleDismiss}
+          hitSlop={10}
+          style={styles.dismissButton}
+          accessibilityRole="button"
+          accessibilityLabel="Dismiss"
+        >
           <KISIcon name="close" size={14} color={palette.subtext ?? '#9AA0AE'} />
         </Pressable>
       </Pressable>

@@ -57,6 +57,7 @@ export default function PartnerAutomationPanel({
     { field: '', op: 'eq', value: '' },
   ]);
   const [actions, setActions] = useState<ActionRow[]>([{ type: '', params: {} }]);
+  const [error, setError] = useState<string | null>(null);
 
   const backdropOpacity = panelTranslateX.interpolate({
     inputRange: [0, panelWidth],
@@ -69,7 +70,13 @@ export default function PartnerAutomationPanel({
     const res = await getRequest(ROUTES.partners.automationRules(partnerId), {
       errorMessage: 'Unable to load automation rules.',
     });
-    const list = (res?.data ?? res ?? []) as AutomationRule[];
+    if (!res?.success) {
+      setError(res?.message || "Couldn't load automation rules. Tap to retry.");
+      setRules([]);
+      return;
+    }
+    setError(null);
+    const list = (res?.data ?? []) as AutomationRule[];
     setRules(Array.isArray(list) ? list : []);
   }, [partnerId]);
 
@@ -212,6 +219,27 @@ export default function PartnerAutomationPanel({
         >
           {loading ? (
             <ActivityIndicator size="small" color={palette.primary} />
+          ) : error ? (
+            <View
+              style={{
+                borderRadius: 10,
+                borderWidth: 1,
+                borderColor: palette.danger,
+                backgroundColor: palette.danger + '15',
+                padding: 12,
+              }}
+            >
+              <Text style={{ color: palette.danger, fontSize: 13, fontWeight: '600' }}>{error}</Text>
+              <Pressable
+                onPress={() => {
+                  setLoading(true);
+                  loadRules().finally(() => setLoading(false));
+                }}
+                style={{ marginTop: 8 }}
+              >
+                <Text style={{ color: palette.primary, fontWeight: '700', fontSize: 13 }}>Tap to retry</Text>
+              </Pressable>
+            </View>
           ) : (
             <>
               <View

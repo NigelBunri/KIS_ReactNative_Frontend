@@ -155,22 +155,26 @@ export const getBroadcastFeedVideoSources = (attachment: any): BroadcastFeedVide
     if (leftRisk !== rightRisk) return leftRisk - rightRisk;
     return (KIND_PRIORITY[left.kind] ?? 99) - (KIND_PRIORITY[right.kind] ?? 99);
   });
-  console.log(
-    '[BroadcastFeed:sources] resolved',
-    JSON.stringify({
-      attachmentId: attachment?.video_id ?? attachment?.id ?? null,
-      mediaType: attachment?.media_type ?? null,
-      mimeType: attachment?.mime_type ?? null,
-      rawCandidates,
-      resolved: sorted.map((s) => ({
-        kind: s.kind,
-        url: s.url,
-        host: s.host,
-        risk: getBroadcastFeedVideoRiskNote(s) ?? 'none',
-        needsAuthHeaders: s.needsAuthHeaders,
-      })),
-    }),
-  );
+  if (__DEV__) {
+    // Dev-only - resolved[].url can be a presigned media URL, so this must
+    // never reach a production device log.
+    console.log(
+      '[BroadcastFeed:sources] resolved',
+      JSON.stringify({
+        attachmentId: attachment?.video_id ?? attachment?.id ?? null,
+        mediaType: attachment?.media_type ?? null,
+        mimeType: attachment?.mime_type ?? null,
+        rawCandidates,
+        resolved: sorted.map((s) => ({
+          kind: s.kind,
+          url: s.url,
+          host: s.host,
+          risk: getBroadcastFeedVideoRiskNote(s) ?? 'none',
+          needsAuthHeaders: s.needsAuthHeaders,
+        })),
+      }),
+    );
+  }
   return sorted;
 };
 

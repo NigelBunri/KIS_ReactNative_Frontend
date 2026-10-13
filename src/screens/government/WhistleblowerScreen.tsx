@@ -66,16 +66,26 @@ export default function WhistleblowerScreen(_props: Props) {
     try {
       // postRequest resolves to the ApiResult wrapper ({success, data,
       // message}), not the created record directly - the previous
-      // whole-wrapper cast was a real bug, not just a type nuisance.
+      // whole-wrapper cast was a real bug, not just a type nuisance. It also
+      // never checked `success`: a rejected submission fell through to the
+      // wrapper-as-record cast, which has no `case_ref` field, so the
+      // reporter was shown a "Your Case Reference" confirmation screen with
+      // an undefined reference for a report that was never actually
+      // recorded. For an anonymous corruption/safety report, that silently
+      // leaves the real issue unreported while the reporter believes it is
+      // handled — surface the failure instead.
       const apiResult = await postRequest(
         ROUTES.government.whistleblowerSubmit,
         { content: content.trim(), category },
       );
-      const result = (apiResult?.data ?? apiResult) as { case_ref: string };
+      if (!apiResult?.success || !apiResult?.data?.case_ref) {
+        throw new Error(apiResult?.message || 'Could not submit report. Please try again.');
+      }
+      const result = apiResult.data as { case_ref: string };
       setCaseRef(result.case_ref);
       setContent('');
-    } catch {
-      Alert.alert('Error', 'Could not submit report. Please try again.');
+    } catch (e: any) {
+      Alert.alert('Error', e?.message || 'Could not submit report. Please try again.');
     } finally {
       setSubmitting(false);
     }
@@ -94,13 +104,20 @@ export default function WhistleblowerScreen(_props: Props) {
       // whole-wrapper cast was a real bug: `result.status` read the
       // wrapper's own HTTP status code (a number, hence the type error)
       // instead of the case's actual status string nested under `.data`.
+      // It also never checked `success`, so a failed lookup (case not
+      // found, network error) fell through to the wrapper-as-record cast
+      // and displayed "Unknown" as if that were the case's real status,
+      // instead of surfacing that the lookup itself failed.
       const apiResult = await getRequest(
         `${ROUTES.government.whistleblowerStatus}?case_ref=${encodeURIComponent(checkRef.trim())}`,
       );
-      const result = (apiResult?.data ?? apiResult) as { status: string; message?: string };
+      if (!apiResult?.success || !apiResult?.data) {
+        throw new Error(apiResult?.message || 'No case found with that reference.');
+      }
+      const result = apiResult.data as { status: string; message?: string };
       setCaseStatus(result.status ?? 'Unknown');
-    } catch {
-      Alert.alert('Not Found', 'No case found with that reference.');
+    } catch (e: any) {
+      Alert.alert('Not Found', e?.message || 'No case found with that reference.');
     } finally {
       setChecking(false);
     }

@@ -106,6 +106,8 @@ export default function ChannelContentManager({ contents, legacyFeeds, onCreate,
                 onPress={() => setExpandedTags(prev => ({ ...prev, [item.id]: !prev[item.id] }))}
                 hitSlop={15}
                 style={styles.chevronButton}
+                accessibilityRole="button"
+                accessibilityLabel={expandedTags[item.id] ? 'Collapse tags and thumbnail options' : 'Expand tags and thumbnail options'}
               >
                 <KISIcon name="chevron-down" size={14} color={palette.subtext} />
               </Pressable>
@@ -123,7 +125,12 @@ export default function ChannelContentManager({ contents, legacyFeeds, onCreate,
                   {getTags(item).map(tag => (
                     <View key={tag} style={[styles.tagPill, { backgroundColor: palette.primarySoft, borderColor: palette.primary }]}>
                       <Text style={[styles.tagText, { color: palette.primaryStrong }]}>{tag}</Text>
-                      <Pressable onPress={() => handleRemoveTag(item, tag)} hitSlop={6}>
+                      <Pressable
+                        onPress={() => handleRemoveTag(item, tag)}
+                        hitSlop={6}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Remove tag: ${tag}`}
+                      >
                         <KISIcon name="close" size={10} color={palette.primaryStrong} />
                       </Pressable>
                     </View>

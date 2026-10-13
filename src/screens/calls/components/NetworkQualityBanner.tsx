@@ -64,7 +64,13 @@ const styles = StyleSheet.create({
     right: 0,
     paddingBottom: 8,
     alignItems: 'center',
-    zIndex: 100,
+    // Below ActiveCallScreen's topHud (zIndex 10) so the minimize button,
+    // call title/timer, encryption padlock, and network-quality chip stay
+    // reachable and legible while this banner is showing — previously this
+    // was 100, which painted the banner directly over those controls for as
+    // long as the connection stayed poor, i.e. exactly when a caller is most
+    // likely to want them.
+    zIndex: 9,
   },
   text: { fontWeight: '700', fontSize: 13 },
 });

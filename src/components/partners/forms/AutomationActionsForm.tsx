@@ -97,10 +97,19 @@ type Props = {
 export default function AutomationActionsForm({ palette, partnerId, actions, onChange }: Props) {
   const [roles, setRoles] = useState<PartnerRoleOption[]>([]);
   const [members, setMembers] = useState<MemberOption[]>([]);
+  // Surfaced so an empty picker (network/server failure) doesn't look
+  // identical to "this partner genuinely has no roles/members yet".
+  const [roleLoadError, setRoleLoadError] = useState<string | null>(null);
+  const [memberLoadError, setMemberLoadError] = useState<string | null>(null);
 
   const loadRoles = useCallback(async () => {
     if (!partnerId) return;
     const res = await getRequest(ROUTES.partners.roles(partnerId), { errorMessage: 'Unable to load roles.' });
+    if (!res?.success) {
+      setRoleLoadError(res?.message || 'Unable to load roles.');
+    } else {
+      setRoleLoadError(null);
+    }
     const list = (res?.data ?? res ?? []) as PartnerRoleOption[];
     setRoles(Array.isArray(list) ? list : []);
   }, [partnerId]);
@@ -108,6 +117,11 @@ export default function AutomationActionsForm({ palette, partnerId, actions, onC
   const loadMembers = useCallback(async () => {
     if (!partnerId) return;
     const res = await getRequest(`${ROUTES.partners.members(partnerId)}?page=1`, { errorMessage: 'Unable to load members.' });
+    if (!res?.success) {
+      setMemberLoadError(res?.message || 'Unable to load members.');
+    } else {
+      setMemberLoadError(null);
+    }
     const payload = res?.data ?? res ?? {};
     const results = (payload.results ?? payload.members ?? []) as MemberOption[];
     setMembers(Array.isArray(results) ? results : []);
@@ -187,25 +201,41 @@ export default function AutomationActionsForm({ palette, partnerId, actions, onC
                 <Text style={{ color: palette.subtext, fontSize: 11, fontWeight: '700', marginTop: 10, marginBottom: 4 }}>
                   Role
                 </Text>
-                <ChipPicker
-                  palette={palette}
-                  options={roles}
-                  value={params.role_id}
-                  onSelect={(id) => updateParams(index, { role_id: id })}
-                  getLabel={(r) => r.name}
-                  getKey={(r) => String(r.id)}
-                />
+                {roles.length === 0 && roleLoadError ? (
+                  <Pressable onPress={loadRoles}>
+                    <Text style={{ color: palette.danger, fontSize: 11, marginTop: 4 }}>
+                      {roleLoadError} Tap to retry.
+                    </Text>
+                  </Pressable>
+                ) : (
+                  <ChipPicker
+                    palette={palette}
+                    options={roles}
+                    value={params.role_id}
+                    onSelect={(id) => updateParams(index, { role_id: id })}
+                    getLabel={(r) => r.name}
+                    getKey={(r) => String(r.id)}
+                  />
+                )}
                 <Text style={{ color: palette.subtext, fontSize: 11, fontWeight: '700', marginTop: 10, marginBottom: 4 }}>
                   Member (leave unset to use whoever triggered the rule)
                 </Text>
-                <ChipPicker
-                  palette={palette}
-                  options={members}
-                  value={params.user_id}
-                  onSelect={(id) => updateParams(index, { user_id: params.user_id === id ? undefined : id })}
-                  getLabel={memberLabel}
-                  getKey={(m) => m.user_id}
-                />
+                {members.length === 0 && memberLoadError ? (
+                  <Pressable onPress={loadMembers}>
+                    <Text style={{ color: palette.danger, fontSize: 11, marginTop: 4 }}>
+                      {memberLoadError} Tap to retry.
+                    </Text>
+                  </Pressable>
+                ) : (
+                  <ChipPicker
+                    palette={palette}
+                    options={members}
+                    value={params.user_id}
+                    onSelect={(id) => updateParams(index, { user_id: params.user_id === id ? undefined : id })}
+                    getLabel={memberLabel}
+                    getKey={(m) => m.user_id}
+                  />
+                )}
               </>
             )}
 

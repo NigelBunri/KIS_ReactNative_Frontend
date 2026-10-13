@@ -65,8 +65,7 @@ export default function GiveNowScreen({ navigation }: Props) {
     return true;
   }, [amount]);
 
-  const handleSubmit = useCallback(async () => {
-    if (!validate()) return;
+  const performSubmit = useCallback(async () => {
     setSubmitting(true);
     try {
       const res = await postRequest(ROUTES.church.giving, {
@@ -87,7 +86,24 @@ export default function GiveNowScreen({ navigation }: Props) {
     } finally {
       setSubmitting(false);
     }
-  }, [amount, type, campaignId, isAnonymous, navigation, validate]);
+  }, [amount, type, campaignId, isAnonymous, navigation]);
+
+  const handleSubmit = useCallback(() => {
+    if (!validate()) return;
+    const parsed = parseFloat(amount);
+    const typeLabel = GIVING_TYPES.find(t => t.value === type)?.label ?? type;
+    const campaignLabel = campaignId
+      ? campaigns.find(c => c.id === campaignId)?.title ?? 'selected campaign'
+      : 'General Fund';
+    Alert.alert(
+      'Confirm Your Gift',
+      `You're about to give $${parsed.toFixed(2)} as ${typeLabel} to ${campaignLabel}${isAnonymous ? ' (anonymously)' : ''}. This will be submitted immediately.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: `Confirm $${parsed.toFixed(2)}`, onPress: () => { void performSubmit(); } },
+      ],
+    );
+  }, [amount, type, campaignId, campaigns, isAnonymous, validate, performSubmit]);
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>

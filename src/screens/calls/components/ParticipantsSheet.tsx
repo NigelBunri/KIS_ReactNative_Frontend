@@ -184,6 +184,7 @@ export default function ParticipantsSheet({ participants, visible, onClose, loca
                         ],
                       )}
                       style={styles.actionBtn}
+                      accessibilityRole="button"
                       accessibilityLabel={`Change role for ${item.displayName}`}
                       hitSlop={6}
                     >

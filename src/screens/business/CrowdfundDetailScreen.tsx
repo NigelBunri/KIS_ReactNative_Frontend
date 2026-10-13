@@ -81,12 +81,7 @@ export default function CrowdfundDetailScreen({ navigation, route }: Props) {
     }, [loadCampaign]),
   );
 
-  const handleContribute = async () => {
-    const num = parseFloat(amount);
-    if (!amount || isNaN(num) || num <= 0) {
-      Alert.alert('Invalid amount', 'Please enter a valid contribution amount.');
-      return;
-    }
+  const performContribute = async (num: number) => {
     setSubmitting(true);
     try {
       const res = await postRequest(ROUTES.business.crowdfundContribute(campaignId), {
@@ -113,6 +108,22 @@ export default function CrowdfundDetailScreen({ navigation, route }: Props) {
     }
   };
 
+  const handleContribute = () => {
+    const num = parseFloat(amount);
+    if (!amount || isNaN(num) || num <= 0) {
+      Alert.alert('Invalid amount', 'Please enter a valid contribution amount.');
+      return;
+    }
+    Alert.alert(
+      'Confirm Your Contribution',
+      `You're about to contribute ${cur} ${num.toFixed(2)} to "${campaign?.title ?? 'this campaign'}"${isAnonymous ? ' (anonymously)' : ''}. This will be submitted immediately.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: `Confirm ${cur} ${num.toFixed(2)}`, onPress: () => { void performContribute(num); } },
+      ],
+    );
+  };
+
   if (loading) {
     return (
       <SafeAreaView style={[styles.safe, { justifyContent: 'center', alignItems: 'center' }]} edges={['top']}>
@@ -124,7 +135,7 @@ export default function CrowdfundDetailScreen({ navigation, route }: Props) {
   if (!campaign) {
     return (
       <SafeAreaView style={styles.safe} edges={['top']}>
-        <Pressable style={styles.backBtn} onPress={() => navigation.goBack()} hitSlop={8}>
+        <Pressable style={styles.backBtn} onPress={() => navigation.goBack()} hitSlop={8} accessibilityRole="button" accessibilityLabel="Go back">
           <KISIcon name="arrow-back-outline" size={24} color={palette.text} />
         </Pressable>
         <View style={styles.empty}>
@@ -147,7 +158,7 @@ export default function CrowdfundDetailScreen({ navigation, route }: Props) {
     <SafeAreaView style={styles.safe} edges={['top']}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
         <View style={styles.navBar}>
-          <Pressable style={styles.backBtnNav} onPress={() => navigation.goBack()} hitSlop={8}>
+          <Pressable style={styles.backBtnNav} onPress={() => navigation.goBack()} hitSlop={8} accessibilityRole="button" accessibilityLabel="Go back">
             <KISIcon name="arrow-back-outline" size={24} color={palette.text} />
           </Pressable>
           <Text style={styles.navTitle} numberOfLines={1}>Campaign</Text>

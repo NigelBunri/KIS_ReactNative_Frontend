@@ -1,5 +1,6 @@
 import React from 'react';
 import {
+  Alert,
   Animated,
   Modal,
   Pressable,
@@ -15,6 +16,9 @@ export type FeedPostAction = {
   label: string;
   onPress: () => void;
   destructive?: boolean;
+  /** Shown in a confirmation Alert before `onPress` runs. Only consulted
+   *  when `destructive` is true — non-destructive actions never confirm. */
+  confirmMessage?: string;
 };
 
 type Props = {
@@ -61,6 +65,18 @@ export default function FeedPostActionsSheet({
           <Pressable
             key={action.key}
             onPress={() => {
+              if (action.destructive) {
+                onClose();
+                Alert.alert(
+                  action.label,
+                  action.confirmMessage ?? `Are you sure you want to ${action.label.toLowerCase()}? This can't be undone.`,
+                  [
+                    { text: 'Cancel', style: 'cancel' },
+                    { text: action.label, style: 'destructive', onPress: action.onPress },
+                  ],
+                );
+                return;
+              }
               action.onPress();
               onClose();
             }}
@@ -68,6 +84,8 @@ export default function FeedPostActionsSheet({
               styles.actionRow,
               { backgroundColor: pressed ? palette.surface : 'transparent' },
             ]}
+            accessibilityRole="button"
+            accessibilityLabel={action.label}
           >
             <Text
               style={{

@@ -125,7 +125,13 @@ export default function AdminDashboardPanel({
               Refresh
             </Text>
           </Pressable>
-          <Pressable onPress={onClose} style={styles.closeBtn}>
+          <Pressable
+            onPress={onClose}
+            style={styles.closeBtn}
+            accessibilityRole="button"
+            accessibilityLabel="Close"
+            hitSlop={8}
+          >
             <Text style={{ color: palette.subtext, fontSize: 20, lineHeight: 22 }}>✕</Text>
           </Pressable>
         </View>

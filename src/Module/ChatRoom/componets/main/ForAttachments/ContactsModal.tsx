@@ -169,6 +169,9 @@ export const ContactsModal: React.FC<ContactsModalProps> = ({
                 return (
                   <Pressable
                     onPress={() => toggleContact(item.id)}
+                    accessibilityRole="checkbox"
+                    accessibilityState={{ checked: selected }}
+                    accessibilityLabel={item.name}
                     style={{
                       paddingVertical: KIS_TOKENS.spacing.sm,
                       flexDirection: 'row',
@@ -223,13 +226,24 @@ export const ContactsModal: React.FC<ContactsModalProps> = ({
               gap: KIS_TOKENS.spacing.sm,
             }}
           >
-            <Pressable onPress={onClose}>
+            <Pressable
+              onPress={onClose}
+              accessibilityRole="button"
+              accessibilityLabel="Cancel"
+              style={{ paddingHorizontal: 14, paddingVertical: 12, minHeight: 44, justifyContent: 'center' }}
+            >
               <Text style={{ color: palette.subtext }}>Cancel</Text>
             </Pressable>
             <Pressable
               onPress={handleShare}
               disabled={!selectedIds.length}
+              accessibilityRole="button"
+              accessibilityLabel="Share selected contacts"
               style={{
+                paddingHorizontal: 14,
+                paddingVertical: 12,
+                minHeight: 44,
+                justifyContent: 'center',
                 opacity: selectedIds.length ? 1 : 0.5,
               }}
             >

@@ -1054,6 +1054,8 @@ export default function ProductDetailsPage() {
       >
         <Pressable
           onPress={() => navigation.goBack()}
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
           style={[
             styles.headerIconButton,
             { backgroundColor: palette.surface, borderColor: palette.divider },
@@ -1072,6 +1074,9 @@ export default function ProductDetailsPage() {
         <Pressable
           onPress={handleToggleWishlist}
           disabled={!product?.id || savingWishlist}
+          accessibilityRole="button"
+          accessibilityLabel={isSaved ? 'Remove from wishlist' : 'Add to wishlist'}
+          accessibilityState={{ selected: isSaved, disabled: !product?.id || savingWishlist }}
           style={[
             styles.headerIconButton,
             { backgroundColor: palette.surface, borderColor: palette.divider },
@@ -1154,6 +1159,9 @@ export default function ProductDetailsPage() {
                     <Pressable
                       key={`${uri}-${index}`}
                       onPress={() => setActiveImage(uri)}
+                      accessibilityRole="button"
+                      accessibilityLabel={`View image ${index + 1} of ${normalizedGallery.length}`}
+                      accessibilityState={{ selected: isActive }}
                       style={[
                         styles.thumbnail,
                         {
@@ -1738,6 +1746,9 @@ export default function ProductDetailsPage() {
             <Pressable
               onPress={() => changeQuantityBy(-1)}
               disabled={!canDecreaseQuantity}
+              accessibilityRole="button"
+              accessibilityLabel="Decrease quantity"
+              accessibilityState={{ disabled: !canDecreaseQuantity }}
               style={[
                 styles.quantityButton,
                 {
@@ -1768,6 +1779,9 @@ export default function ProductDetailsPage() {
             <Pressable
               onPress={() => changeQuantityBy(1)}
               disabled={!canIncreaseQuantity}
+              accessibilityRole="button"
+              accessibilityLabel="Increase quantity"
+              accessibilityState={{ disabled: !canIncreaseQuantity }}
               style={[
                 styles.quantityButton,
                 {
@@ -1932,8 +1946,8 @@ const makeStyles = (palette: ReturnType<typeof useKISTheme>['palette']) =>
       borderBottomWidth: 1,
     },
     headerIconButton: {
-      width: 42,
-      height: 42,
+      width: 44,
+      height: 44,
       borderRadius: 14,
       borderWidth: 1,
       alignItems: 'center',

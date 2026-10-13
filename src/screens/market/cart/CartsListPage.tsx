@@ -57,6 +57,7 @@ const CartsListPage = () => {
   const [shippingOptions, setShippingOptions] = useState<any[]>([]);
   const [selectedMethodId, setSelectedMethodId] = useState<string | null>(null);
   const [shippingOptionsLoading, setShippingOptionsLoading] = useState(false);
+  const [shippingOptionsError, setShippingOptionsError] = useState<string | null>(null);
 
   useEffect(() => {
     const unsubscribe = subscribeToShopCart(setCartState);
@@ -250,12 +251,14 @@ const CartsListPage = () => {
     setSelectedAddressId(null);
     setShippingOptions([]);
     setSelectedMethodId(null);
+    setShippingOptionsError(null);
   }, []);
 
   const loadShippingOptionsForAddress = useCallback(async (cart: ShopCart, addressId: string) => {
     setShippingOptionsLoading(true);
     setShippingOptions([]);
     setSelectedMethodId(null);
+    setShippingOptionsError(null);
     const response = await postRequest(ROUTES.commerce.shippingOptions, {
       shop_id: cart.shopId,
       address_id: addressId,
@@ -266,6 +269,13 @@ const CartsListPage = () => {
       const options = response.data?.options ?? [];
       setShippingOptions(options);
       if (options.length) setSelectedMethodId(options[0].shipping_method_id);
+    } else {
+      // This used to fail exactly like "shop hasn't configured shipping" —
+      // a real load error (network/server) and a shop genuinely having no
+      // shipping methods rendered the identical empty-options text, so the
+      // buyer had no way to tell "nothing to configure" from "something
+      // went wrong, try again."
+      setShippingOptionsError(response.message || 'Unable to load shipping options for this address.');
     }
   }, [buildNormalizedItems]);
 
@@ -443,7 +453,12 @@ const CartsListPage = () => {
             {orderFeedback[cart.shopId]?.message}
           </Text>
         ) : null}
-        {orderPlacedShops[cart.shopId] ? (
+        {orderPlacedShops[cart.shopId] && !orderFeedback[cart.shopId]?.message ? (
+          // Only shown as a fallback when, for some reason, submitOrder
+          // didn't leave its own feedback message behind — otherwise this
+          // duplicated/contradicted messages like "Redirecting to secure
+          // checkout to complete payment…", which reads as "payment still
+          // pending" and "order already placed" at the same time.
           <Text style={[styles.feedbackText, { color: palette.subtext }]}>
             Order placed—check My Orders for updates.
           </Text>
@@ -546,6 +561,10 @@ const CartsListPage = () => {
             </Text>
             {shippingOptionsLoading ? (
               <ActivityIndicator color={palette.primaryStrong} style={{ marginVertical: 12 }} />
+            ) : shippingOptionsError ? (
+              <Text style={{ color: palette.danger, fontSize: 12, marginBottom: 8 }}>
+                {shippingOptionsError} You can still place the order and arrange delivery directly, or go back and try again.
+              </Text>
             ) : shippingOptions.length ? (
               shippingOptions.map(option => (
                 <Pressable

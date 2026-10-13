@@ -281,7 +281,7 @@ export default function ChannelHomePage() {
             )}
             <View style={styles.heroShade} />
           </View>
-          <Pressable onPress={() => navigation.goBack()} style={[styles.backButton, { top: topInset + 8 }]}>
+          <Pressable onPress={() => navigation.goBack()} accessibilityRole="button" accessibilityLabel="Go back" style={[styles.backButton, { top: topInset + 8 }]}>
             <KISIcon name="arrow-left" size={20} color={palette.ivory} />
           </Pressable>
         </View>

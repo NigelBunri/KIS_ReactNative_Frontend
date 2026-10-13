@@ -77,26 +77,45 @@ function CommentItem({ comment, palette, contentId, isAdmin, currentUserId = '',
         onReplyPosted(result.comment);
         setReplyText('');
         setReplyOpen(false);
+      } else {
+        Alert.alert('Error', 'Could not post your reply. Please try again.');
       }
+    } catch {
+      Alert.alert('Error', 'Could not post your reply. Please try again.');
     } finally {
       setPostingReply(false);
     }
   };
 
+  // Each toggle applies the UI change optimistically, then rolls it back and
+  // tells the user if the request actually failed — previously these awaited
+  // the request with no try/catch at all, so a failed like/pin/heart left the
+  // UI silently showing the wrong state forever with no indication anything
+  // went wrong.
   const toggleLike = async () => {
     const nowLiked = !comment.is_liked;
     onOptimisticLike(comment.id, nowLiked);
-    if (nowLiked) {
-      await reactToChannelComment(comment.id);
-    } else {
-      await removeChannelCommentReaction(comment.id);
+    try {
+      if (nowLiked) {
+        await reactToChannelComment(comment.id);
+      } else {
+        await removeChannelCommentReaction(comment.id);
+      }
+    } catch {
+      onOptimisticLike(comment.id, !nowLiked);
+      Alert.alert('Error', 'Could not update like. Please try again.');
     }
   };
 
   const togglePin = async () => {
     const nowPinned = !comment.is_pinned;
     onOptimisticPin(comment.id, nowPinned);
-    await pinChannelComment(comment.id, nowPinned);
+    try {
+      await pinChannelComment(comment.id, nowPinned);
+    } catch {
+      onOptimisticPin(comment.id, !nowPinned);
+      Alert.alert('Error', 'Could not update pin. Please try again.');
+    }
   };
 
   const saveEdit = async () => {
@@ -107,6 +126,8 @@ function CommentItem({ comment, palette, contentId, isAdmin, currentUserId = '',
       await editChannelComment(comment.id, text);
       onOptimisticEdit(comment.id, text);
       setEditMode(false);
+    } catch {
+      Alert.alert('Error', 'Could not save your edit. Please try again.');
     } finally {
       setSavingEdit(false);
     }
@@ -119,8 +140,12 @@ function CommentItem({ comment, palette, contentId, isAdmin, currentUserId = '',
         text: 'Delete',
         style: 'destructive',
         onPress: async () => {
-          await deleteChannelComment(comment.id);
-          onDeleteComment(comment.id);
+          try {
+            await deleteChannelComment(comment.id);
+            onDeleteComment(comment.id);
+          } catch {
+            Alert.alert('Error', 'Could not delete comment. Please try again.');
+          }
         },
       },
     ]);
@@ -129,10 +154,15 @@ function CommentItem({ comment, palette, contentId, isAdmin, currentUserId = '',
   const toggleHeart = async () => {
     const nowHearted = !comment.has_creator_heart;
     onOptimisticHeart(comment.id, nowHearted);
-    if (nowHearted) {
-      await heartChannelComment(comment.id);
-    } else {
-      await unheartChannelComment(comment.id);
+    try {
+      if (nowHearted) {
+        await heartChannelComment(comment.id);
+      } else {
+        await unheartChannelComment(comment.id);
+      }
+    } catch {
+      onOptimisticHeart(comment.id, !nowHearted);
+      Alert.alert('Error', 'Could not update heart. Please try again.');
     }
   };
 
@@ -175,14 +205,27 @@ function CommentItem({ comment, palette, contentId, isAdmin, currentUserId = '',
         <Text style={[styles.body, { color: palette.subtext }]}>{comment.body}</Text>
       )}
       <View style={styles.commentActions}>
-        <Pressable onPress={toggleLike} style={styles.actionBtn} hitSlop={10}>
+        <Pressable
+          onPress={toggleLike}
+          style={styles.actionBtn}
+          hitSlop={10}
+          accessibilityRole="button"
+          accessibilityLabel={comment.is_liked ? 'Unlike comment' : 'Like comment'}
+          accessibilityState={{ selected: !!comment.is_liked }}
+        >
           <KISIcon name="heart" focused={comment.is_liked} size={14} color={comment.is_liked ? palette.danger : palette.subtext} />
           {(comment.like_count ?? 0) > 0 && (
             <Text style={[styles.actionCount, { color: palette.subtext }]}>{comment.like_count}</Text>
           )}
         </Pressable>
         {depth === 0 && (
-          <Pressable onPress={() => setReplyOpen(v => !v)} style={styles.actionBtn} hitSlop={10}>
+          <Pressable
+            onPress={() => setReplyOpen(v => !v)}
+            style={styles.actionBtn}
+            hitSlop={10}
+            accessibilityRole="button"
+            accessibilityLabel="Reply to comment"
+          >
             <KISIcon name="reply" size={13} color={palette.subtext} />
             <Text style={[styles.actionLabel, { color: palette.subtext }]}>Reply</Text>
             {(comment.reply_count ?? 0) > 0 && (
@@ -191,23 +234,49 @@ function CommentItem({ comment, palette, contentId, isAdmin, currentUserId = '',
           </Pressable>
         )}
         {isAdmin && depth === 0 && (
-          <Pressable onPress={togglePin} style={styles.actionBtn} hitSlop={10}>
+          <Pressable
+            onPress={togglePin}
+            style={styles.actionBtn}
+            hitSlop={10}
+            accessibilityRole="button"
+            accessibilityLabel={comment.is_pinned ? 'Unpin comment' : 'Pin comment'}
+            accessibilityState={{ selected: !!comment.is_pinned }}
+          >
             <KISIcon name="pin" size={13} color={comment.is_pinned ? palette.primaryStrong : palette.subtext} />
           </Pressable>
         )}
         {isAdmin && (
-          <Pressable onPress={toggleHeart} style={styles.actionBtn} hitSlop={10}>
+          <Pressable
+            onPress={toggleHeart}
+            style={styles.actionBtn}
+            hitSlop={10}
+            accessibilityRole="button"
+            accessibilityLabel={comment.has_creator_heart ? 'Remove creator heart' : 'Give comment a creator heart'}
+            accessibilityState={{ selected: !!comment.has_creator_heart }}
+          >
             <KISIcon name="heart" size={13} color={comment.has_creator_heart ? palette.danger : palette.subtext} />
             <KISIcon name="crown" size={11} color={comment.has_creator_heart ? palette.gold : palette.subtext} />
           </Pressable>
         )}
         {isOwnComment && !editMode && (
-          <Pressable onPress={() => { setEditMode(true); setEditText(comment.body); }} style={styles.actionBtn} hitSlop={10}>
+          <Pressable
+            onPress={() => { setEditMode(true); setEditText(comment.body); }}
+            style={styles.actionBtn}
+            hitSlop={10}
+            accessibilityRole="button"
+            accessibilityLabel="Edit comment"
+          >
             <KISIcon name="edit" size={13} color={palette.subtext} />
           </Pressable>
         )}
         {(isOwnComment || isAdmin) && (
-          <Pressable onPress={handleDelete} style={styles.actionBtn} hitSlop={10}>
+          <Pressable
+            onPress={handleDelete}
+            style={styles.actionBtn}
+            hitSlop={10}
+            accessibilityRole="button"
+            accessibilityLabel="Delete comment"
+          >
             <KISIcon name="trash" size={13} color={palette.subtext} />
           </Pressable>
         )}
@@ -219,14 +288,20 @@ function CommentItem({ comment, palette, contentId, isAdmin, currentUserId = '',
                 text: 'Report',
                 style: 'destructive',
                 onPress: async () => {
-                  await reportChannelComment(comment.id);
-                  Alert.alert('Reported', 'Thank you for helping keep the community safe.');
+                  try {
+                    await reportChannelComment(comment.id);
+                    Alert.alert('Reported', 'Thank you for helping keep the community safe.');
+                  } catch {
+                    Alert.alert('Error', 'Could not submit report. Please try again.');
+                  }
                 },
               },
             ]);
           }}
           style={styles.actionBtn}
           hitSlop={10}
+          accessibilityRole="button"
+          accessibilityLabel="Report comment"
         >
           <KISIcon name="report" size={13} color={palette.subtext} />
         </Pressable>
@@ -288,6 +363,11 @@ export default function ChannelCommentsPanel({ contentId, onCountChange, isAdmin
       const rows = await fetchChannelComments(contentId, sort);
       setFlatComments(rows);
       onCountChange?.(rows.length);
+    } catch {
+      // fetchChannelComments already returns [] on a handled API failure;
+      // this only catches a hard throw (e.g. network drop) so the list
+      // doesn't look like "zero comments" when it's actually "failed to load".
+      Alert.alert('Error', 'Could not load comments. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -308,7 +388,11 @@ export default function ChannelCommentsPanel({ contentId, onCountChange, isAdmin
           return updated;
         });
         setBody('');
+      } else {
+        Alert.alert('Error', 'Could not post your comment. Please try again.');
       }
+    } catch {
+      Alert.alert('Error', 'Could not post your comment. Please try again.');
     } finally {
       setPosting(false);
     }
@@ -371,6 +455,9 @@ export default function ChannelCommentsPanel({ contentId, onCountChange, isAdmin
               styles.sortPill,
               { borderColor: palette.border, backgroundColor: sort === option ? palette.primaryStrong : palette.bg },
             ]}
+            accessibilityRole="button"
+            accessibilityLabel={`Sort by ${option}`}
+            accessibilityState={{ selected: sort === option }}
           >
             <Text style={[styles.sortPillLabel, { color: sort === option ? palette.surface : palette.subtext }]}>
               {option.charAt(0).toUpperCase() + option.slice(1)}

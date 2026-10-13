@@ -79,12 +79,19 @@ export default function SubscriptionsScreen() {
   const [channels, setChannels] = useState<BroadcastChannelSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  // Without this, a failed fetch left channels at [] and rendered the exact
+  // same "No subscriptions yet" empty state as a user with zero
+  // subscriptions — no way to tell the difference or retry.
+  const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true); else setLoading(true);
+    setError(null);
     try {
       const rows = await fetchSubscribedChannels();
       setChannels(rows);
+    } catch {
+      setError('Could not load subscriptions. Tap to retry.');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -96,13 +103,17 @@ export default function SubscriptionsScreen() {
   const handleToggle = useCallback((channel: BroadcastChannelSummary) => {
     const nowSub = !channel.is_subscribed;
     setChannels(prev => prev.map(c => c.id === channel.id ? { ...c, is_subscribed: nowSub } : c));
-    void toggleChannelSubscription(channel.id, nowSub);
+    toggleChannelSubscription(channel.id, nowSub).catch(() => {
+      // Roll back — previously fire-and-forget, so a failed (un)subscribe
+      // left the button showing the wrong state forever with no error shown.
+      setChannels(prev => prev.map(c => c.id === channel.id ? { ...c, is_subscribed: !nowSub } : c));
+    });
   }, []);
 
   return (
     <SafeAreaView style={[styles.screen, { backgroundColor: palette.bg, }]} edges={['top']}>
       <View style={[styles.header, { borderBottomColor: palette.border, paddingHorizontal: pageGutter }]}>
-        <Pressable onPress={() => navigation.goBack()} hitSlop={12} style={{ minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' }}>
+        <Pressable onPress={() => navigation.goBack()} hitSlop={12} accessibilityRole="button" accessibilityLabel="Go back" style={{ minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' }}>
           <KISIcon name="arrow-left" size={20} color={palette.text} />
         </Pressable>
         <KISIcon name="people" size={18} color={palette.primaryStrong} />
@@ -113,6 +124,19 @@ export default function SubscriptionsScreen() {
       {loading ? (
         <View style={styles.centered}>
           <ActivityIndicator color={palette.primaryStrong} />
+        </View>
+      ) : error ? (
+        <View style={styles.centered}>
+          <KISIcon name="warning" size={36} color={palette.danger} />
+          <Text style={[styles.emptyTitle, { color: palette.danger }]}>{error}</Text>
+          <Pressable
+            onPress={() => load()}
+            accessibilityRole="button"
+            accessibilityLabel="Retry"
+            style={[styles.browseBtn, { backgroundColor: palette.primaryStrong }]}
+          >
+            <Text style={{ color: palette.onPrimary, fontWeight: '900' }}>Retry</Text>
+          </Pressable>
         </View>
       ) : channels.length === 0 ? (
         <View style={styles.centered}>

@@ -182,6 +182,7 @@ export default function VerseLadderGame({ gameKey, stageIndex, isReplay, onExit,
             onPlayAgain={resetGame}
             onBackToJourney={onExit}
             onViewStats={onOpenStats}
+            persisted={stageResult.persisted}
           />
         </View>
       </GameShell>

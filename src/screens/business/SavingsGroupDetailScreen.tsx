@@ -1,7 +1,6 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
-  FlatList,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -85,7 +84,7 @@ export default function SavingsGroupDetailScreen({ navigation, route }: Props) {
   if (!group) {
     return (
       <SafeAreaView style={styles.safe} edges={['top']}>
-        <Pressable style={styles.backBtn} onPress={() => navigation.goBack()} hitSlop={8}>
+        <Pressable style={styles.backBtn} onPress={() => navigation.goBack()} hitSlop={8} accessibilityRole="button" accessibilityLabel="Go back">
           <KISIcon name="arrow-back-outline" size={24} color={palette.text} />
         </Pressable>
         <View style={styles.empty}>
@@ -104,7 +103,7 @@ export default function SavingsGroupDetailScreen({ navigation, route }: Props) {
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <View style={styles.navBar}>
-        <Pressable style={styles.backBtnNav} onPress={() => navigation.goBack()} hitSlop={8}>
+        <Pressable style={styles.backBtnNav} onPress={() => navigation.goBack()} hitSlop={8} accessibilityRole="button" accessibilityLabel="Go back">
           <KISIcon name="arrow-back-outline" size={24} color={palette.text} />
         </Pressable>
         <Text style={styles.navTitle} numberOfLines={1}>{group.name}</Text>

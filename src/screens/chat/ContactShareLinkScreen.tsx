@@ -66,7 +66,14 @@ export default function ContactShareLinkScreen() {
             setBusy(true);
             try {
               const res = await postRequest(ROUTES.contactLinks.me, {}, { errorMessage: 'Unable to create a new link.' });
-              if (res?.success) setLink(res.data ?? null);
+              if (res?.success) {
+                setLink(res.data ?? null);
+              } else {
+                // Previously silent on failure — the user would believe
+                // their old (possibly-leaked) link was burned when it was
+                // actually still live and usable.
+                Alert.alert('Contact link', (res as any)?.message || 'Unable to create a new link. Please try again.');
+              }
             } finally {
               setBusy(false);
             }
@@ -82,7 +89,14 @@ export default function ContactShareLinkScreen() {
     try {
       if (link.is_active) {
         const res = await deleteRequest(ROUTES.contactLinks.me, { errorMessage: 'Unable to pause your link.' });
-        if (res?.success) setLink({ ...link, is_active: false });
+        if (res?.success) {
+          setLink({ ...link, is_active: false });
+        } else {
+          // Previously silent on failure — the user would believe their
+          // link was paused (stopping unwanted messages) when it was
+          // actually still live.
+          Alert.alert('Contact link', (res as any)?.message || 'Unable to pause your link. Please try again.');
+        }
       } else {
         // Reactivating is the same as regenerating (the backend's POST
         // handler always issues a fresh token, is_active=True - a paused
@@ -90,7 +104,11 @@ export default function ContactShareLinkScreen() {
         // community invite-link convention of "regenerate to get a
         // working link again").
         const regen = await postRequest(ROUTES.contactLinks.me, {}, { errorMessage: 'Unable to reactivate your link.' });
-        if (regen?.success) setLink(regen.data ?? null);
+        if (regen?.success) {
+          setLink(regen.data ?? null);
+        } else {
+          Alert.alert('Contact link', (regen as any)?.message || 'Unable to reactivate your link. Please try again.');
+        }
       }
     } finally {
       setBusy(false);

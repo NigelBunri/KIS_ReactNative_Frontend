@@ -83,7 +83,12 @@ export default function MembershipPerksEditor({ tierId, tierTitle, initialPerks 
         >
           <Text style={[styles.perkBullet, { color: palette.primaryStrong }]}>•</Text>
           <Text style={[styles.perkText, { color: palette.text, flex: 1 }]}>{perk}</Text>
-          <Pressable onPress={() => removePerk(idx)} style={styles.removeBtn}>
+          <Pressable
+            onPress={() => removePerk(idx)}
+            style={styles.removeBtn}
+            accessibilityRole="button"
+            accessibilityLabel={`Remove perk: ${perk}`}
+          >
             <Text style={[styles.removeBtnText, { color: palette.danger }]}>✕</Text>
           </Pressable>
         </View>

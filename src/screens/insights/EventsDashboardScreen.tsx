@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  FlatList,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -55,6 +54,13 @@ export default function EventsDashboardScreen() {
         `${ROUTES.events.list}?time_range=${timeRange}&ordering=-attendance_count`,
         { errorMessage: 'Unable to load events data.' },
       );
+      // getRequest resolves (never throws) on a failed HTTP response too, with
+      // `data` left undefined — without this check a 4xx/5xx response fell
+      // through to "No events found" as if there were genuinely no events,
+      // silently masking a real failure as a success/empty-state.
+      if (!res.success) {
+        throw new Error(res.message || 'Unable to load events data.');
+      }
       const items: EventItem[] = res.data?.results ?? res.data ?? [];
       setEvents(items.slice(0, 20));
 

@@ -202,19 +202,26 @@ const OrganizationAppFormScreen = () => {
 
     setSubmitting(true);
     try {
+      // postRequest/patchRequest resolve { success: false, message } on a
+      // backend rejection rather than throwing — this previously ignored
+      // the result entirely and showed "Updated"/"Created" + navigated
+      // back unconditionally, so a validation failure or permission
+      // error looked identical to a real save from the admin's seat.
       if (isEditing && app) {
-        await patchRequest(
+        const res = await patchRequest(
           ROUTES.partners.organizationApp(partnerId, app.id),
           { ...payload },
           { errorMessage: 'Unable to update the app.' },
         );
+        if (res?.success === false) throw new Error((res as any)?.message || 'Unable to update the app.');
         Alert.alert('Updated', `${app.name} was updated.`);
       } else {
-        await postRequest(
+        const res = await postRequest(
           ROUTES.partners.organizationApps(partnerId),
           { ...payload },
           { errorMessage: 'Unable to create the app.' },
         );
+        if (res?.success === false) throw new Error((res as any)?.message || 'Unable to create the app.');
         Alert.alert('Created', `${formState.name.trim()} was added to the catalog.`);
       }
       DeviceEventEmitter.emit(ORGANIZATION_APPS_UPDATED_EVENT, { partnerId });
@@ -244,6 +251,8 @@ const OrganizationAppFormScreen = () => {
         <Pressable
           onPress={() => navigation.goBack()}
           style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1 }, styles.backButton]}
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
         >
           <KISIcon name="chevron-left" size={20} color={palette.text} />
         </Pressable>

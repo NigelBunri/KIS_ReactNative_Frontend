@@ -63,18 +63,36 @@ export function FinancialPanel({ palette, profileId, organizationId, refreshKey 
       ]);
 
       // Apply each result independently — a single failing endpoint should not
-      // block the rest of the financial panel from rendering.
+      // block the rest of the financial panel from rendering. A failed
+      // endpoint must still be surfaced to the user (never silently treated
+      // as "nothing to show") since this panel displays real billing/claims
+      // data and a swallowed error here is indistinguishable from a
+      // legitimately empty state.
+      const errors: string[] = [];
+
       if (reconciliationsRes.success) {
         setReconciliations(unwrapList(reconciliationsRes.data));
+      } else {
+        errors.push(reconciliationsRes.message || 'Unable to load reconciliations.');
       }
       if (claimsRes.success) {
         setClaims(unwrapList(claimsRes.data));
+      } else {
+        errors.push(claimsRes.message || 'Unable to load claims.');
       }
       if (disputesRes.success) {
         setDisputes(unwrapList(disputesRes.data));
+      } else {
+        errors.push(disputesRes.message || 'Unable to load payment disputes.');
       }
       if (pricingRes.success) {
         setInsights(pricingRes.data);
+      } else {
+        errors.push(pricingRes.message || 'Unable to load pricing insights.');
+      }
+
+      if (errors.length) {
+        Alert.alert('Financial operations', errors.join('\n'));
       }
     } catch (error: any) {
       Alert.alert('Financial operations', error?.message || 'Unable to load finance data.');

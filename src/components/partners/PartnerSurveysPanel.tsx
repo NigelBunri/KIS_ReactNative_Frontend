@@ -93,12 +93,20 @@ export default function PartnerSurveysPanel({ isOpen, panelWidth, panelTranslate
   const [resultsLoading, setResultsLoading] = useState(false);
   const [showResults, setShowResults] = useState(false);
   const [answers, setAnswers] = useState<Record<number, any>>({});
+  const [error, setError] = useState<string | null>(null);
+  const [resultsError, setResultsError] = useState<string | null>(null);
 
   const backdropOpacity = panelTranslateX.interpolate({ inputRange: [0, panelWidth], outputRange: [1, 0], extrapolate: 'clamp' });
 
   const load = useCallback(async () => {
     if (!partnerId) return;
     const res = await getRequest(ROUTES.partners.surveys(partnerId), { errorMessage: 'Unable to load surveys.' });
+    if (!res?.success) {
+      setError(res?.message || "Couldn't load surveys. Tap to retry.");
+      setSurveys([]);
+      return;
+    }
+    setError(null);
     const payload = res?.data ?? [];
     setSurveys(Array.isArray(payload) ? payload : []);
   }, [partnerId]);
@@ -220,6 +228,13 @@ export default function PartnerSurveysPanel({ isOpen, panelWidth, panelTranslate
     const res = await getRequest(ROUTES.partners.surveyResults(partnerId, String(selectedSurvey.id)), {
       errorMessage: 'Unable to load results.',
     });
+    if (!res?.success) {
+      setResultsError(res?.message || "Couldn't load results. Tap to retry.");
+      setResults(null);
+      setResultsLoading(false);
+      return;
+    }
+    setResultsError(null);
     setResults(res?.data ?? null);
     setResultsLoading(false);
   };
@@ -275,6 +290,8 @@ export default function PartnerSurveysPanel({ isOpen, panelWidth, panelTranslate
         <View style={[styles.settingsPanelHeader, { borderBottomColor: palette.divider }]}>
           <Pressable
             onPress={() => (selectedSurveyId ? setSelectedSurveyId(null) : onClose())}
+            accessibilityRole="button"
+            accessibilityLabel={selectedSurveyId ? 'Back to surveys' : 'Close'}
             style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}
           >
             <Text style={{ color: palette.text, fontSize: 18 }}>‹</Text>
@@ -292,10 +309,46 @@ export default function PartnerSurveysPanel({ isOpen, panelWidth, panelTranslate
         <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.settingsPanelBody} showsVerticalScrollIndicator={false}>
           {loading ? (
             <ActivityIndicator size="small" color={palette.primary} />
+          ) : error ? (
+            <View
+              style={{
+                borderRadius: 10,
+                borderWidth: 1,
+                borderColor: palette.danger,
+                backgroundColor: palette.danger + '15',
+                padding: 12,
+              }}
+            >
+              <Text style={{ color: palette.danger, fontSize: 13, fontWeight: '600' }}>{error}</Text>
+              <Pressable
+                onPress={() => {
+                  setLoading(true);
+                  load().finally(() => setLoading(false));
+                }}
+                style={{ marginTop: 8 }}
+              >
+                <Text style={{ color: palette.primary, fontWeight: '700', fontSize: 13 }}>Tap to retry</Text>
+              </Pressable>
+            </View>
           ) : selectedSurvey ? (
             showResults ? (
               resultsLoading ? (
                 <ActivityIndicator size="small" color={palette.primary} />
+              ) : resultsError ? (
+                <View
+                  style={{
+                    borderRadius: 10,
+                    borderWidth: 1,
+                    borderColor: palette.danger,
+                    backgroundColor: palette.danger + '15',
+                    padding: 12,
+                  }}
+                >
+                  <Text style={{ color: palette.danger, fontSize: 13, fontWeight: '600' }}>{resultsError}</Text>
+                  <Pressable onPress={() => loadResults()} style={{ marginTop: 8 }}>
+                    <Text style={{ color: palette.primary, fontWeight: '700', fontSize: 13 }}>Tap to retry</Text>
+                  </Pressable>
+                </View>
               ) : !results ? (
                 <Text style={{ color: palette.subtext, fontSize: 13 }}>No results available.</Text>
               ) : (

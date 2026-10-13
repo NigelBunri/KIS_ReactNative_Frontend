@@ -47,6 +47,11 @@ type RegistrationResult = {
   registered: boolean;
   chatId?: string | null;
   userId?: string | number;
+  /** True when the registration check itself failed (network/server error),
+   * as opposed to succeeding and determining the contact isn't registered.
+   * Lets the UI avoid telling the user "they're not on KIS" when we
+   * actually just don't know. */
+  checkFailed?: boolean;
 };
 
 const saveContactToDevice = async (contact: StoredContact) => {
@@ -92,7 +97,7 @@ const checkContactRegistration = async (
         res.status,
         res.message,
       );
-      return { registered: false };
+      return { registered: false, checkFailed: true };
     }
 
     const data = res.data as any;
@@ -107,7 +112,7 @@ const checkContactRegistration = async (
     };
   } catch (err) {
     console.warn('Error while checking registration', err);
-    return { registered: false };
+    return { registered: false, checkFailed: true };
   }
 };
 
@@ -228,6 +233,13 @@ export const AddContactForm: React.FC<AddContactFormProps> = ({
         Alert.alert(
           'Contact saved',
           `This contact is on KIS.\nA chat has been added for:\n\nName: ${fullName}\nPhone: ${normalizedPhone}\nLabel: ${label}`,
+        );
+      } else if (registration.checkFailed) {
+        // Don't assert "not on KIS" when we actually just failed to check —
+        // that's a different, misleading claim about someone else's account.
+        Alert.alert(
+          'Contact saved',
+          `Contact saved locally.\nWe could not check their KIS status right now — try again later.\n\nName: ${fullName}\nPhone: ${normalizedPhone}\nLabel: ${label}`,
         );
       } else {
         Alert.alert(

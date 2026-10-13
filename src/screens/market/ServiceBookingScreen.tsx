@@ -327,6 +327,7 @@ const ServiceBookingScreen = () => {
   const [bookingLoading, setBookingLoading] = useState(false);
   const [bookingError, setBookingError] = useState<string | null>(null);
   const [bookingResult, setBookingResult] = useState<any>(null);
+  const [paymentOpening, setPaymentOpening] = useState(false);
 
   useEffect(() => {
     if (!serviceId) return;
@@ -797,6 +798,24 @@ const ServiceBookingScreen = () => {
     staffOnSite,
     termsAccepted,
   ]);
+
+  const handlePayNow = useCallback(async (paymentUrl: string) => {
+    if (paymentOpening) return;
+    setPaymentOpening(true);
+    try {
+      const opened = await openDirectPaymentUrl(paymentUrl);
+      if (!opened) {
+        throw new Error('Unable to open the secure checkout link on this device.');
+      }
+    } catch (error: any) {
+      // openDirectPaymentUrl can silently resolve false if the device has no
+      // handler for the URL — surface that instead of letting "Pay now" look
+      // like it did nothing.
+      Alert.alert('Checkout', error?.message || 'Unable to open checkout.');
+    } finally {
+      setPaymentOpening(false);
+    }
+  }, [paymentOpening]);
 
   const renderStepContent = () => {
     if (flowStep === FLOW_STEP.SELECT_SLOT) {
@@ -1432,8 +1451,10 @@ const ServiceBookingScreen = () => {
         {depositCents > 0 && directPayment.paymentUrl ? (
           <KISButton
             title="Pay now"
+            loading={paymentOpening}
+            disabled={paymentOpening}
             onPress={() => {
-              void openDirectPaymentUrl(directPayment.paymentUrl);
+              void handlePayNow(directPayment.paymentUrl);
             }}
           />
         ) : null}

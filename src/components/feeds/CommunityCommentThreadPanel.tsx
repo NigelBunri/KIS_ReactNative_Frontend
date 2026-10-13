@@ -136,7 +136,14 @@ export default function CommunityCommentThreadPanel({
           </View>
         ))
       )}
-      {error ? <Text style={[styles.error, { color: palette.danger }]}>{error}</Text> : null}
+      {error ? (
+        <View style={styles.errorRow}>
+          <Text style={[styles.error, { color: palette.danger }]}>{error}</Text>
+          <Pressable onPress={loadComments} accessibilityRole="button" accessibilityLabel="Retry loading comments">
+            <Text style={[styles.retryText, { color: palette.primary }]}>Retry</Text>
+          </Pressable>
+        </View>
+      ) : null}
       <View style={[styles.composer, { borderColor: palette.inputBorder }]}>
         <TextInput
           value={draft}
@@ -149,6 +156,8 @@ export default function CommunityCommentThreadPanel({
         <Pressable
           onPress={submit}
           disabled={!draft.trim() || sending}
+          accessibilityRole="button"
+          accessibilityLabel={sending ? 'Sending comment' : 'Post comment'}
           style={({ pressed }) => [
             styles.send,
             {
@@ -172,7 +181,9 @@ const styles = StyleSheet.create({
   comment: { borderRadius: 8, marginBottom: 7, padding: 10 },
   author: { fontSize: 12, fontWeight: '700', marginBottom: 3 },
   body: { fontSize: 14, lineHeight: 19 },
-  error: { fontSize: 12, marginBottom: 8 },
+  errorRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 8 },
+  error: { fontSize: 12, flex: 1 },
+  retryText: { fontSize: 12, fontWeight: '700' },
   composer: {
     alignItems: 'flex-end',
     borderRadius: 10,

@@ -140,7 +140,7 @@ export default function RevenueEvidenceAdminPanel() {
     }
   }, [areaIndex, ownerRole, privateMediaAssetId, redactedSummary, title]);
 
-  const runAction = useCallback(async (action: 'submit' | 'approve' | 'needs_changes' | 'reject' | 'revoke') => {
+  const performAction = useCallback(async (action: 'submit' | 'approve' | 'needs_changes' | 'reject' | 'revoke') => {
     if (!selected) return;
     setSaving(true);
     try {
@@ -161,6 +161,24 @@ export default function RevenueEvidenceAdminPanel() {
       setSaving(false);
     }
   }, [selected]);
+
+  const runAction = useCallback((action: 'submit' | 'approve' | 'needs_changes' | 'reject' | 'revoke') => {
+    if (!selected) return;
+    if (action === 'reject' || action === 'revoke') {
+      Alert.alert(
+        action === 'revoke' ? 'Revoke this evidence?' : 'Reject this evidence?',
+        action === 'revoke'
+          ? `This withdraws approval for "${selected.title}" and returns monetization readiness to blocked for this area. This cannot be undone from here.`
+          : `This marks "${selected.title}" as rejected and the reviewer will need to resubmit new evidence.`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: action === 'revoke' ? 'Revoke' : 'Reject', style: 'destructive', onPress: () => { void performAction(action); } },
+        ],
+      );
+      return;
+    }
+    void performAction(action);
+  }, [selected, performAction]);
 
   const applyWorkflowTemplate = useCallback((workflow: StagingProofWorkflow) => {
     const index = AREA_OPTIONS.indexOf(workflow.area);
@@ -456,7 +474,12 @@ export default function RevenueEvidenceAdminPanel() {
               },
             ]}
           >
-            <Text onPress={() => setSelectedId(record.id)} style={[styles.recordTitle, { color: palette.text }]}>
+            <Text
+              onPress={() => setSelectedId(record.id)}
+              accessibilityRole="button"
+              accessibilityLabel={`Select evidence record ${record.title}`}
+              style={[styles.recordTitle, { color: palette.text }]}
+            >
               {record.title}
             </Text>
             <Text style={[styles.recordMeta, { color: palette.subtext }]}>
@@ -477,8 +500,8 @@ export default function RevenueEvidenceAdminPanel() {
             <KISButton title="Submit" size="sm" variant="outline" onPress={() => runAction('submit')} disabled={saving} />
             <KISButton title="Approve" size="sm" variant="outline" onPress={() => runAction('approve')} disabled={saving} />
             <KISButton title="Changes" size="sm" variant="outline" onPress={() => runAction('needs_changes')} disabled={saving} />
-            <KISButton title="Reject" size="sm" variant="outline" onPress={() => runAction('reject')} disabled={saving} />
-            <KISButton title="Revoke" size="sm" variant="outline" onPress={() => runAction('revoke')} disabled={saving} />
+            <KISButton title="Reject" size="sm" variant="danger" onPress={() => runAction('reject')} disabled={saving} />
+            <KISButton title="Revoke" size="sm" variant="danger" onPress={() => runAction('revoke')} disabled={saving} />
           </View>
           <View style={[styles.auditBox, { borderColor: palette.divider, backgroundColor: palette.surface }]}>
             <Text style={[styles.sectionLabel, { color: palette.text }]}>Audit timeline</Text>

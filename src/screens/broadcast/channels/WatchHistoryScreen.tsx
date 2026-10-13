@@ -117,8 +117,12 @@ export default function WatchHistoryScreen() {
         text: 'Remove',
         style: 'destructive',
         onPress: async () => {
-          await removeFromWatchHistory(contentId);
-          setHistory(prev => prev.filter(e => e.content_id !== contentId));
+          try {
+            await removeFromWatchHistory(contentId);
+            setHistory(prev => prev.filter(e => e.content_id !== contentId));
+          } catch {
+            Alert.alert('Error', 'Could not remove this item. Please try again.');
+          }
         },
       },
     ]);
@@ -132,10 +136,24 @@ export default function WatchHistoryScreen() {
         text: 'Clear all',
         style: 'destructive',
         onPress: async () => {
+          // Removes entries one at a time and keeps whichever ones actually
+          // succeeded — previously a failure partway through the loop threw
+          // past `setHistory([])`, so the list kept showing items that had
+          // already been deleted server-side, with no error shown either way.
+          const remaining: HistoryEntry[] = [];
+          let failed = false;
           for (const entry of history) {
-            await removeFromWatchHistory(entry.content_id);
+            try {
+              await removeFromWatchHistory(entry.content_id);
+            } catch {
+              failed = true;
+              remaining.push(entry);
+            }
           }
-          setHistory([]);
+          setHistory(remaining);
+          if (failed) {
+            Alert.alert('Error', 'Some items could not be removed. Please try again.');
+          }
         },
       },
     ]);
@@ -144,13 +162,15 @@ export default function WatchHistoryScreen() {
   return (
     <SafeAreaView style={[styles.screen, { backgroundColor: palette.bg, }]} edges={['top']}>
       <View style={[styles.header, { borderBottomColor: palette.border, paddingHorizontal: pageGutter }]}>
-        <Pressable onPress={() => navigation.goBack()} hitSlop={12} style={[styles.backBtn, { minWidth: minTouchTarget, minHeight: minTouchTarget, alignItems: 'center', justifyContent: 'center' }]}>
+        <Pressable onPress={() => navigation.goBack()} hitSlop={12} accessibilityRole="button" accessibilityLabel="Go back" style={[styles.backBtn, { minWidth: minTouchTarget, minHeight: minTouchTarget, alignItems: 'center', justifyContent: 'center' }]}>
           <KISIcon name="arrow-left" size={20} color={palette.text} />
         </Pressable>
         <Text style={[styles.title, { color: palette.text, fontSize: headerTitleSize * 0.75 }]}>Watch History</Text>
         <Pressable
           onPress={handleTogglePause}
           disabled={pauseLoading}
+          accessibilityRole="button"
+          accessibilityLabel={isPaused ? 'Resume watch history tracking' : 'Pause watch history tracking'}
           style={[styles.pausePill, { backgroundColor: isPaused ? palette.primaryStrong : palette.surface, borderColor: isPaused ? palette.primaryStrong : palette.border }]}
         >
           <Text style={[styles.pausePillText, { color: isPaused ? palette.surface : palette.subtext }]}>
@@ -246,7 +266,7 @@ export default function WatchHistoryScreen() {
                   </View>
                 )}
               </View>
-              <Pressable onPress={() => handleRemove(item.content_id)} hitSlop={10} style={styles.removeBtn}>
+              <Pressable onPress={() => handleRemove(item.content_id)} hitSlop={10} accessibilityRole="button" accessibilityLabel="Remove from history" style={styles.removeBtn}>
                 <KISIcon name="close" size={16} color={palette.subtext} />
               </Pressable>
             </Pressable>

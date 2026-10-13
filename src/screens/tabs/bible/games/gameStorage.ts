@@ -80,12 +80,23 @@ async function readJson<T>(key: string, fallback: T): Promise<T> {
   }
 }
 
-async function writeJson(key: string, value: unknown): Promise<void> {
+/** Returns whether the write actually landed. Callers that only cache
+ * secondary/non-critical state (missed-word weights, the vault deck, best
+ * scores on their own) intentionally still don't surface this — gameplay
+ * never interrupts over it. finishStage's own three writes DO check it
+ * (see StageOutcome.persisted below), because that's the one place a UI
+ * shows an unconditional "Stage complete!" success screen immediately
+ * after writing — this is the one spot in the app where a write failure
+ * must not get papered over with a success screen the player has no way
+ * to know is fiction. */
+async function writeJson(key: string, value: unknown): Promise<boolean> {
   try {
     await AsyncStorage.setItem(key, JSON.stringify(value));
+    return true;
   } catch {
     // Best-effort — a failed write just means progress isn't saved this
     // round, not a reason to interrupt gameplay with an error.
+    return false;
   }
 }
 
@@ -95,7 +106,11 @@ export async function getBestScores(): Promise<BestScores> {
   return readJson<BestScores>(KEY_BEST_SCORES, {});
 }
 
-export async function recordScore(game: GameKey, score: number): Promise<BestScores> {
+/** Only ever called from finishStage below (verified: no other call site in
+ * the app) — the `ok` flag reports whether the write actually persisted, so
+ * finishStage can fold it into StageOutcome.persisted rather than show an
+ * unconditional success screen over a write that silently failed. */
+export async function recordScore(game: GameKey, score: number): Promise<{ scores: BestScores; ok: boolean }> {
   const current = await getBestScores();
   const existing = current[game];
   const next: BestScores = {
@@ -105,8 +120,8 @@ export async function recordScore(game: GameKey, score: number): Promise<BestSco
       playCount: (existing?.playCount ?? 0) + 1,
     },
   };
-  await writeJson(KEY_BEST_SCORES, next);
-  return next;
+  const ok = await writeJson(KEY_BEST_SCORES, next);
+  return { scores: next, ok };
 }
 
 // ─── Complete the Verse's light spaced-repetition weighting ───────────────
@@ -209,18 +224,20 @@ export function isGameCompleted(progress: GameStageProgress): boolean {
 }
 
 /** Called when the player finishes the stage they're currently on. Safe to
- * call again on an already-completed game (no-op past the final stage). */
-export async function completeCurrentStage(game: GameKey): Promise<GameStageProgress> {
+ * call again on an already-completed game (no-op past the final stage).
+ * Only ever called from finishStage below — `ok` reports whether the write
+ * actually persisted (see recordScore's docblock). */
+export async function completeCurrentStage(game: GameKey): Promise<{ progress: GameStageProgress; ok: boolean }> {
   const all = await readAllGameProgress();
   const current = all[game] ?? DEFAULT_GAME_STAGE_PROGRESS;
-  if (isGameCompleted(current)) return current;
+  if (isGameCompleted(current)) return { progress: current, ok: true };
   const stagesCompleted = current.stagesCompleted + 1;
   const next: GameStageProgress = {
     stagesCompleted,
     currentStage: Math.min(stagesCompleted, STAGES_PER_GAME - 1),
   };
-  await writeJson(KEY_GAME_PROGRESS, { ...all, [game]: next });
-  return next;
+  const ok = await writeJson(KEY_GAME_PROGRESS, { ...all, [game]: next });
+  return { progress: next, ok };
 }
 
 export async function areAllGamesCompleted(): Promise<boolean> {
@@ -272,12 +289,14 @@ export async function getStageScores(game: GameKey): Promise<Partial<Record<numb
   return all[game] ?? {};
 }
 
-export async function recordStageScore(game: GameKey, stageIndex: number, score: number): Promise<void> {
+/** Only ever called from finishStage below — `ok` reports whether the write
+ * actually persisted (see recordScore's docblock). */
+export async function recordStageScore(game: GameKey, stageIndex: number, score: number): Promise<boolean> {
   const all = await readAllStageScores();
   const gameScores = all[game] ?? {};
   const existing = gameScores[stageIndex];
   const next: StageScores = { ...all, [game]: { ...gameScores, [stageIndex]: Math.max(existing ?? 0, score) } };
-  await writeJson(KEY_STAGE_SCORES, next);
+  return writeJson(KEY_STAGE_SCORES, next);
 }
 
 // ─── Journey map data (one call per game's journey screen) ────────────────
@@ -327,6 +346,14 @@ export type StageOutcome = {
    * journey and deserves the "Stage complete!" progression framing instead
    * of a plain "nice score" one. */
   isNewCompletion: boolean;
+  /** False when one of this call's own writes (stage score, legacy best
+   * score, or progress advancement) failed to actually land in
+   * AsyncStorage - e.g. device storage full/unavailable. The stage-complete
+   * screen is built from this in-memory outcome regardless, so without this
+   * flag the player would see an unconditional "Stage complete!" success
+   * screen even when nothing durable was actually saved. True for the
+   * locked/no-op case, since nothing was attempted. */
+  persisted: boolean;
 };
 
 /** The ONE function every game screen calls when a round of `stageIndex`
@@ -347,19 +374,34 @@ export async function finishStage(game: GameKey, stageIndex: number, score: numb
   const progress = await getGameProgress(game);
   const isLocked = stageIndex > progress.currentStage;
   if (isLocked) {
-    return { stagesCompleted: progress.stagesCompleted, isFinalStage: isGameCompleted(progress), isNewCompletion: false };
+    return {
+      stagesCompleted: progress.stagesCompleted,
+      isFinalStage: isGameCompleted(progress),
+      isNewCompletion: false,
+      persisted: true, // nothing was attempted to write
+    };
   }
 
-  await recordStageScore(game, stageIndex, score);
+  const stageScoreOk = await recordStageScore(game, stageIndex, score);
 
   const isForwardPlay = stageIndex === progress.currentStage && !isGameCompleted(progress);
   if (!isForwardPlay) {
-    return { stagesCompleted: progress.stagesCompleted, isFinalStage: isGameCompleted(progress), isNewCompletion: false };
+    return {
+      stagesCompleted: progress.stagesCompleted,
+      isFinalStage: isGameCompleted(progress),
+      isNewCompletion: false,
+      persisted: stageScoreOk,
+    };
   }
 
-  await recordScore(game, score); // keep the legacy all-time best/playCount aggregate in sync
-  const next = await completeCurrentStage(game);
-  return { stagesCompleted: next.stagesCompleted, isFinalStage: isGameCompleted(next), isNewCompletion: true };
+  const { ok: legacyScoreOk } = await recordScore(game, score); // keep the legacy all-time best/playCount aggregate in sync
+  const { progress: next, ok: progressOk } = await completeCurrentStage(game);
+  return {
+    stagesCompleted: next.stagesCompleted,
+    isFinalStage: isGameCompleted(next),
+    isNewCompletion: true,
+    persisted: stageScoreOk && legacyScoreOk && progressOk,
+  };
 }
 
 // ─── Verse Vault deck (SM-2-lite state per verse) ──────────────────────────

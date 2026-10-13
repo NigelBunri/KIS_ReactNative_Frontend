@@ -83,6 +83,8 @@ export default function PartnerVerificationPanel({
   const [reviewNotes, setReviewNotes] = useState('');
   const [selectedBadges, setSelectedBadges] = useState<Record<string, boolean>>({});
   const [reviewBusy, setReviewBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [queueError, setQueueError] = useState<string | null>(null);
 
   const backdropOpacity = panelTranslateX.interpolate({
     inputRange: [0, panelWidth],
@@ -103,7 +105,13 @@ export default function PartnerVerificationPanel({
     // and for the wrapper alike, so this doesn't change any observable
     // behavior today — it only removes a latent landmine (e.g. a future
     // render path that checks `status !== null` directly).
-    const payload = (res?.success ? res?.data ?? null : null) as StatusPayload | null;
+    if (!res?.success) {
+      setError(res?.message || "Couldn't load verification status. Tap to retry.");
+      setStatus(null);
+      return;
+    }
+    setError(null);
+    const payload = (res?.data ?? null) as StatusPayload | null;
     setStatus(payload);
   }, [partnerId]);
 
@@ -114,7 +122,13 @@ export default function PartnerVerificationPanel({
       errorMessage: 'Unable to load the verification queue.',
     });
     setQueueLoading(false);
-    const payload = res?.data ?? res ?? {};
+    if (!res?.success) {
+      setQueueError(res?.message || "Couldn't load the review queue. Tap to retry.");
+      setQueue([]);
+      return;
+    }
+    setQueueError(null);
+    const payload = res?.data ?? {};
     setQueue(Array.isArray(payload.results) ? payload.results : []);
   }, [isGoStaff]);
 
@@ -196,7 +210,7 @@ export default function PartnerVerificationPanel({
         ]}
       >
         <View style={[styles.settingsPanelHeader, { borderBottomColor: palette.divider }]}>
-          <Pressable onPress={onClose} style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}>
+          <Pressable onPress={onClose} accessibilityRole="button" accessibilityLabel="Close" style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}>
             <Text style={{ color: palette.text, fontSize: 18 }}>‹</Text>
           </Pressable>
           <View style={{ flex: 1 }}>
@@ -210,6 +224,27 @@ export default function PartnerVerificationPanel({
         <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.settingsPanelBody} showsVerticalScrollIndicator={false}>
           {loading ? (
             <ActivityIndicator size="small" color={palette.primary} />
+          ) : error ? (
+            <View
+              style={{
+                borderRadius: 10,
+                borderWidth: 1,
+                borderColor: palette.danger,
+                backgroundColor: palette.danger + '15',
+                padding: 12,
+              }}
+            >
+              <Text style={{ color: palette.danger, fontSize: 13, fontWeight: '600' }}>{error}</Text>
+              <Pressable
+                onPress={() => {
+                  setLoading(true);
+                  Promise.all([loadStatus(), loadQueue()]).finally(() => setLoading(false));
+                }}
+                style={{ marginTop: 8 }}
+              >
+                <Text style={{ color: palette.primary, fontWeight: '700', fontSize: 13 }}>Tap to retry</Text>
+              </Pressable>
+            </View>
           ) : (
             <>
               <Text style={[styles.settingsSectionTitle, { color: palette.text }]}>Status</Text>
@@ -260,6 +295,22 @@ export default function PartnerVerificationPanel({
                   <Text style={[styles.settingsSectionTitle, { color: palette.text }]}>Review queue (GO)</Text>
                   {queueLoading ? (
                     <ActivityIndicator size="small" color={palette.primary} />
+                  ) : queueError ? (
+                    <View
+                      style={{
+                        borderRadius: 10,
+                        borderWidth: 1,
+                        borderColor: palette.danger,
+                        backgroundColor: palette.danger + '15',
+                        padding: 12,
+                        marginTop: 8,
+                      }}
+                    >
+                      <Text style={{ color: palette.danger, fontSize: 13, fontWeight: '600' }}>{queueError}</Text>
+                      <Pressable onPress={() => loadQueue()} style={{ marginTop: 8 }}>
+                        <Text style={{ color: palette.primary, fontWeight: '700', fontSize: 13 }}>Tap to retry</Text>
+                      </Pressable>
+                    </View>
                   ) : queue.length === 0 ? (
                     <Text style={{ color: palette.subtext, marginTop: 8 }}>No pending cases.</Text>
                   ) : (

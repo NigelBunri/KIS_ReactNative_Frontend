@@ -70,12 +70,20 @@ export default function PartnerVolunteerRosterPanel({ isOpen, panelWidth, panelT
   const [selectedShiftId, setSelectedShiftId] = useState<string | number | null>(null);
   const [roster, setRoster] = useState<RosterRow[]>([]);
   const [rosterLoading, setRosterLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [rosterError, setRosterError] = useState<string | null>(null);
 
   const backdropOpacity = panelTranslateX.interpolate({ inputRange: [0, panelWidth], outputRange: [1, 0], extrapolate: 'clamp' });
 
   const load = useCallback(async () => {
     if (!partnerId) return;
     const res = await getRequest(ROUTES.partners.volunteerShifts(partnerId), { errorMessage: 'Unable to load shifts.' });
+    if (!res?.success) {
+      setError(res?.message || "Couldn't load shifts. Tap to retry.");
+      setShifts([]);
+      return;
+    }
+    setError(null);
     const payload = res?.data ?? [];
     setShifts(Array.isArray(payload) ? payload : []);
   }, [partnerId]);
@@ -93,6 +101,13 @@ export default function PartnerVolunteerRosterPanel({ isOpen, panelWidth, panelT
       if (!partnerId) return;
       setRosterLoading(true);
       const res = await getRequest(ROUTES.partners.volunteerShiftRoster(partnerId, String(shiftId)), { errorMessage: 'Unable to load roster.' });
+      if (!res?.success) {
+        setRosterError(res?.message || "Couldn't load roster. Tap to retry.");
+        setRoster([]);
+        setRosterLoading(false);
+        return;
+      }
+      setRosterError(null);
       const payload = (res?.data ?? []) as RosterRow[];
       setRoster(Array.isArray(payload) ? payload : []);
       setRosterLoading(false);
@@ -206,6 +221,8 @@ export default function PartnerVolunteerRosterPanel({ isOpen, panelWidth, panelT
         <View style={[styles.settingsPanelHeader, { borderBottomColor: palette.divider }]}>
           <Pressable
             onPress={() => (selectedShiftId ? setSelectedShiftId(null) : onClose())}
+            accessibilityRole="button"
+            accessibilityLabel={selectedShiftId ? 'Back to shifts' : 'Close'}
             style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}
           >
             <Text style={{ color: palette.text, fontSize: 18 }}>‹</Text>
@@ -223,6 +240,27 @@ export default function PartnerVolunteerRosterPanel({ isOpen, panelWidth, panelT
         <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.settingsPanelBody} showsVerticalScrollIndicator={false}>
           {loading ? (
             <ActivityIndicator size="small" color={palette.primary} />
+          ) : error ? (
+            <View
+              style={{
+                borderRadius: 10,
+                borderWidth: 1,
+                borderColor: palette.danger,
+                backgroundColor: palette.danger + '15',
+                padding: 12,
+              }}
+            >
+              <Text style={{ color: palette.danger, fontSize: 13, fontWeight: '600' }}>{error}</Text>
+              <Pressable
+                onPress={() => {
+                  setLoading(true);
+                  load().finally(() => setLoading(false));
+                }}
+                style={{ marginTop: 8 }}
+              >
+                <Text style={{ color: palette.primary, fontWeight: '700', fontSize: 13 }}>Tap to retry</Text>
+              </Pressable>
+            </View>
           ) : selectedShift ? (
             <>
               {selectedShift.description ? (
@@ -261,6 +299,22 @@ export default function PartnerVolunteerRosterPanel({ isOpen, panelWidth, panelT
                   </Text>
                   {rosterLoading ? (
                     <ActivityIndicator size="small" color={palette.primary} />
+                  ) : rosterError ? (
+                    <View
+                      style={{
+                        borderRadius: 10,
+                        borderWidth: 1,
+                        borderColor: palette.danger,
+                        backgroundColor: palette.danger + '15',
+                        padding: 12,
+                        marginBottom: 16,
+                      }}
+                    >
+                      <Text style={{ color: palette.danger, fontSize: 13, fontWeight: '600' }}>{rosterError}</Text>
+                      <Pressable onPress={() => loadRoster(selectedShift.id)} style={{ marginTop: 8 }}>
+                        <Text style={{ color: palette.primary, fontWeight: '700', fontSize: 13 }}>Tap to retry</Text>
+                      </Pressable>
+                    </View>
                   ) : roster.length === 0 ? (
                     <Text style={{ color: palette.subtext, fontSize: 13, marginBottom: 16 }}>No signups yet.</Text>
                   ) : (

@@ -98,6 +98,8 @@ export default function DiscipleshipReadAloudSheet({
             <Pressable
               onPress={onClose}
               style={[styles.iconButton, { backgroundColor: palette.surface, borderColor: palette.divider }]}
+              accessibilityRole="button"
+              accessibilityLabel="Close read aloud"
             >
               <KISIcon name="close" size={18} color={palette.text} />
             </Pressable>
@@ -117,6 +119,8 @@ export default function DiscipleshipReadAloudSheet({
                   styles.transportBtn,
                   { backgroundColor: palette.surface, borderColor: palette.divider, opacity: canStop ? 1 : 0.4 },
                 ]}
+                accessibilityRole="button"
+                accessibilityLabel="Stop"
               >
                 <KISIcon name="stop" size={20} color={palette.text} />
               </Pressable>
@@ -127,6 +131,8 @@ export default function DiscipleshipReadAloudSheet({
                   styles.transportBtnPrimary,
                   { backgroundColor: palette.goldDeep, borderColor: palette.goldLight, opacity: canPlay || isPlaying ? 1 : 0.4 },
                 ]}
+                accessibilityRole="button"
+                accessibilityLabel={isPlaying ? 'Pause' : 'Play'}
               >
                 <KISIcon name={isPlaying ? 'pause' : 'play'} size={26} color={palette.ivory} />
               </Pressable>

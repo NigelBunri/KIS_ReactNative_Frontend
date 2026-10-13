@@ -1354,10 +1354,21 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
       if (!replyClientIdRef.current) {
         replyClientIdRef.current = `client_${Date.now()}_${Math.random().toString(36).slice(2)}`;
       }
-      await postRequest(ROUTES.statuses.reply(currentItem.id), {
+      const res = await postRequest(ROUTES.statuses.reply(currentItem.id), {
         text,
         client_id: replyClientIdRef.current,
-      });
+      }, { errorMessage: 'Unable to send your reply.' });
+      // postRequest resolves (never throws) on a failed request too — this
+      // previously cleared the typed text and reset the idempotency key
+      // unconditionally, so a failed send looked identical to a successful
+      // one: the reply box went empty, no error appeared, and the reply was
+      // just gone. Only clear on a confirmed success now; on failure, keep
+      // the text (nothing retyped) and the same client_id, so retrying
+      // reuses the same idempotency key instead of risking a duplicate.
+      if (!res?.success) {
+        Alert.alert('Reply', res?.message || 'Unable to send your reply.');
+        return;
+      }
       setViewerReplyText('');
       replyClientIdRef.current = null;
     } finally {
@@ -1950,6 +1961,8 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
                     onPress={() => openChannelDetail(ch)}
                     hitSlop={10}
                     style={{ padding: 6, marginLeft: 4 }}
+                    accessibilityRole="button"
+                    accessibilityLabel={`${ch.name} channel details`}
                   >
                     <KISIcon name="info" size={18} color={palette.subtext} />
                   </Pressable>
@@ -3416,6 +3429,8 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
                 onPress={handleSendReply}
                 disabled={sendingReply || !viewerReplyText.trim()}
                 style={[styles.viewerReplySend, { backgroundColor: palette.primary }]}
+                accessibilityRole="button"
+                accessibilityLabel="Send reply"
               >
                 <KISIcon name="send" size={16} color={palette.onPrimary} />
               </Pressable>

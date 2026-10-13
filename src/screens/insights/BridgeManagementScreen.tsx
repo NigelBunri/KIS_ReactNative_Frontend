@@ -285,7 +285,7 @@ function AccountsTab({ palette }: { palette: ReturnType<typeof useKISTheme>['pal
       />
 
       {/* FAB */}
-      <KISFab icon="add" onPress={() => setShowModal(true)} style={styles.fab} />
+      <KISFab icon="add" accessibilityLabel="Connect account" onPress={() => setShowModal(true)} style={styles.fab} />
 
       {/* Connect Modal */}
       <Modal visible={showModal} transparent animationType="slide" onRequestClose={() => setShowModal(false)}>
@@ -548,7 +548,7 @@ function AutomationsTab({ palette }: { palette: ReturnType<typeof useKISTheme>['
       />
 
       {/* Create button */}
-      <KISFab icon="add" onPress={() => setShowModal(true)} style={styles.fab} />
+      <KISFab icon="add" accessibilityLabel="Create automation" onPress={() => setShowModal(true)} style={styles.fab} />
 
       {/* Create Modal */}
       <Modal visible={showModal} transparent animationType="slide" onRequestClose={() => { setShowModal(false); resetForm(); }}>

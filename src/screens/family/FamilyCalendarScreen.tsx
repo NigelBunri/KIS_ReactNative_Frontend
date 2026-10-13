@@ -117,12 +117,25 @@ export default function FamilyCalendarScreen({}: Props) {
     }
     setSaving(true);
     try {
-      const newEvent = (await postRequest(ROUTES.family.events, {
+      // postRequest resolves to the ApiResult wrapper ({success, data,
+      // message}), not the created record directly — same bug class as
+      // FamilyAlbumScreen's create flow: casting the whole wrapper to
+      // FamilyEvent meant the new event's real fields (title/date/type)
+      // lived on `.data`, not on the object appended to state, so it
+      // silently failed to render in the day's event list, and a
+      // backend-rejected create (res.success === false) was still treated
+      // as if it had been added.
+      const res: any = await postRequest(ROUTES.family.events, {
         title: formTitle.trim(),
         event_type: formType,
         date: formDate.trim(),
         reminder: formReminder,
-      })) as unknown as FamilyEvent;
+      });
+      if (!res?.success) {
+        Alert.alert('Error', res?.message ?? 'Failed to add event');
+        return;
+      }
+      const newEvent = (res.data ?? res) as FamilyEvent;
       setEvents((prev) => [...prev, newEvent]);
       setShowForm(false);
       setFormTitle('');
@@ -147,13 +160,23 @@ export default function FamilyCalendarScreen({}: Props) {
       <ScrollView contentContainerStyle={{ paddingBottom: 80 }}>
         {/* Month nav */}
         <View style={[styles.monthNav, { paddingHorizontal: gutter }]}>
-          <TouchableOpacity onPress={prevMonth} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+          <TouchableOpacity
+            onPress={prevMonth}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            accessibilityRole="button"
+            accessibilityLabel="Previous month"
+          >
             <KISIcon name="chevron-back-outline" size={24} color={palette.text} />
           </TouchableOpacity>
           <Text style={[styles.monthTitle, { color: palette.text }]}>
             {MONTHS[month]} {year}
           </Text>
-          <TouchableOpacity onPress={nextMonth} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+          <TouchableOpacity
+            onPress={nextMonth}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            accessibilityRole="button"
+            accessibilityLabel="Next month"
+          >
             <KISIcon name="chevron-forward-outline" size={24} color={palette.text} />
           </TouchableOpacity>
         </View>

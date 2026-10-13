@@ -155,6 +155,7 @@ export default function CountChallengeGame({ gameKey, stageIndex, isReplay, onEx
             onPlayAgain={() => { setStageResult(null); loadRound(); }}
             onBackToJourney={onExit}
             onViewStats={onOpenStats}
+            persisted={stageResult.persisted}
           />
         </View>
       </GameShell>

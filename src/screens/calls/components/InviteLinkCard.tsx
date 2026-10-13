@@ -69,7 +69,12 @@ export default function InviteLinkCard({
           {/* Header */}
           <View style={styles.header}>
             <Text style={[styles.title, { color: palette.text }]}>Invite link</Text>
-            <Pressable onPress={onClose} hitSlop={10}>
+            <Pressable
+              onPress={onClose}
+              hitSlop={10}
+              accessibilityRole="button"
+              accessibilityLabel="Close"
+            >
               <KISIcon name="close" size={20} color={palette.subtext} />
             </Pressable>
           </View>

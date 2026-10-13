@@ -78,6 +78,8 @@ export default function PartnersLeftRail({
     >
       <Pressable
         onPress={onAddPartnerPress}
+        accessibilityRole="button"
+        accessibilityLabel="Add partner"
         style={({ pressed }) => [
           styles.addPartnerButton,
           {
@@ -118,6 +120,9 @@ export default function PartnersLeftRail({
           return (
             <Pressable
               onPress={() => onSelectPartner(item.id)}
+              accessibilityRole="button"
+              accessibilityLabel={item.name ? `Switch to ${item.name}` : 'Switch partner'}
+              accessibilityState={{ selected: isActive }}
               style={({ pressed }) => [
                 styles.partnerAvatarWrap,
                 {

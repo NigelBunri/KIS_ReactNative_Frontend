@@ -420,6 +420,8 @@ const BroadcastProductCard = ({
         <Pressable
           onPress={() => openFullScreen(activeImage)}
           style={styles.productImageWrapper}
+          accessibilityRole="button"
+          accessibilityLabel="View product image full screen"
         >
           {activeImage ? (
             <Image
@@ -452,6 +454,9 @@ const BroadcastProductCard = ({
               <Pressable
                 key={`${uri}-${index}`}
                 onPress={() => setActiveImage(uri)}
+                accessibilityRole="button"
+                accessibilityLabel={`View image ${index + 1} of ${gallery.length}`}
+                accessibilityState={{ selected: activeImage === uri }}
                 style={[
                   styles.thumbnailWrapper,
                   activeImage === uri
@@ -625,7 +630,7 @@ const BroadcastProductCard = ({
           />
           {!isProductInCart ? (
             <KISButton
-              title="Buy now"
+              title="View & buy"
               size="xs"
               style={styles.actionButton}
               onPress={handleAddToCart}
@@ -648,6 +653,8 @@ const BroadcastProductCard = ({
         <Pressable
           style={styles.fullscreenOverlay}
           onPress={() => setFullscreenImage(null)}
+          accessibilityRole="button"
+          accessibilityLabel="Close full screen image"
         >
           {fullscreenImage ? (
             <Image
@@ -664,7 +671,13 @@ const BroadcastProductCard = ({
             <Text style={{ color: palette.text, fontWeight: '900', fontSize: 17 }}>Rate this product</Text>
             <View style={{ flexDirection: 'row', gap: 6, justifyContent: 'center' }}>
               {[1, 2, 3, 4, 5].map(n => (
-                <Pressable key={n} onPress={() => setRatingScore(n)}>
+                <Pressable
+                  key={n}
+                  onPress={() => setRatingScore(n)}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Rate ${n} star${n === 1 ? '' : 's'}`}
+                  accessibilityState={{ selected: n <= ratingScore }}
+                >
                   <Text style={{ fontSize: 32, color: n <= ratingScore ? palette.gold : palette.divider }}>★</Text>
                 </Pressable>
               ))}
@@ -836,6 +849,8 @@ const BroadcastServiceCard = ({
         <Pressable
           onPress={() => openFullScreen(activeImage)}
           style={styles.productImageWrapper}
+          accessibilityRole="button"
+          accessibilityLabel="View product image full screen"
         >
           {activeImage ? (
             <Image
@@ -868,6 +883,9 @@ const BroadcastServiceCard = ({
               <Pressable
                 key={`${uri}-${index}`}
                 onPress={() => setActiveImage(uri)}
+                accessibilityRole="button"
+                accessibilityLabel={`View image ${index + 1} of ${gallery.length}`}
+                accessibilityState={{ selected: activeImage === uri }}
                 style={[
                   styles.thumbnailWrapper,
                   activeImage === uri
@@ -1050,6 +1068,8 @@ const BroadcastServiceCard = ({
         <Pressable
           style={styles.fullscreenOverlay}
           onPress={() => setFullscreenImage(null)}
+          accessibilityRole="button"
+          accessibilityLabel="Close full screen image"
         >
           {fullscreenImage ? (
             <Image
@@ -1071,6 +1091,7 @@ export default function BroadcastMarketPage({
   const { palette } = useKISTheme();
   const [marketItems, setMarketItems] = useState<MarketBroadcastItem[]>([]);
   const [loading, setLoading] = useState(false);
+  const [marketLoadError, setMarketLoadError] = useState(false);
   const [activeFilter, setActiveFilter] = useState(FILTERS[0].key);
   const [broadcastingServiceId, setBroadcastingServiceId] = useState<
     string | null
@@ -1252,6 +1273,7 @@ export default function BroadcastMarketPage({
 
   const loadMarketBroadcasts = useCallback(async () => {
     setLoading(true);
+    setMarketLoadError(false);
     try {
       const res = await getRequest(
         `${ROUTES.broadcasts.list}?source_type=market_all`,
@@ -1259,6 +1281,15 @@ export default function BroadcastMarketPage({
           errorMessage: 'Unable to load market broadcast.',
         },
       );
+      // getRequest resolves (never throws) on failure too, with `success:
+      // false` and no usable `data` — without this check, that failure
+      // response silently fell through to an empty items array and the
+      // page rendered "No broadcast products match the current filters",
+      // indistinguishable from a genuine empty marketplace.
+      if (res?.success === false) {
+        setMarketLoadError(true);
+        return;
+      }
       const records = res?.data?.results ?? res?.data ?? res ?? [];
       const itemsArray = Array.isArray(records) ? records : [];
       setMarketItems(itemsArray);
@@ -1292,6 +1323,7 @@ export default function BroadcastMarketPage({
         });
       }
     } catch {
+      setMarketLoadError(true);
       setMarketItems([]);
     } finally {
       setLoading(false);
@@ -1429,6 +1461,19 @@ export default function BroadcastMarketPage({
         {loading && !filteredProducts.length ? (
           <View style={styles.loader}>
             <ActivityIndicator color={palette.primaryStrong} />
+          </View>
+        ) : marketLoadError && !filteredProducts.length ? (
+          <View style={styles.emptyState}>
+            <Text style={[styles.emptyText, { color: palette.danger }]}>
+              Unable to load the marketplace. Check your connection and try again.
+            </Text>
+            <KISButton
+              title="Retry"
+              size="sm"
+              variant="outline"
+              style={{ marginTop: 12 }}
+              onPress={() => loadMarketBroadcasts()}
+            />
           </View>
         ) : filteredProducts.length ? (
           <ScrollView

@@ -96,8 +96,17 @@ export default function LikedVideosScreen() {
         text: 'Remove',
         style: 'destructive',
         onPress: async () => {
+          // Optimistic removal with rollback — previously this removed the
+          // row from the list before the request even started and never
+          // checked the result, so a failed unlike silently left the item
+          // gone from the UI while the server still had it liked.
           setItems(prev => prev.filter(i => i.id !== item.id));
-          await removeChannelContentReaction(item.id);
+          try {
+            await removeChannelContentReaction(item.id);
+          } catch {
+            setItems(prev => (prev.some(i => i.id === item.id) ? prev : [item, ...prev]));
+            Alert.alert('Error', 'Could not remove this like. Please try again.');
+          }
         },
       },
     ]);
@@ -106,7 +115,7 @@ export default function LikedVideosScreen() {
   return (
     <SafeAreaView style={[styles.screen, { backgroundColor: palette.bg, }]} edges={['top']}>
       <View style={[styles.header, { borderBottomColor: palette.border, paddingHorizontal: pageGutter }]}>
-        <Pressable onPress={() => navigation.goBack()} hitSlop={12} style={[styles.backBtn, { minWidth: minTouchTarget, minHeight: minTouchTarget, alignItems: 'center', justifyContent: 'center' }]}>
+        <Pressable onPress={() => navigation.goBack()} hitSlop={12} accessibilityRole="button" accessibilityLabel="Go back" style={[styles.backBtn, { minWidth: minTouchTarget, minHeight: minTouchTarget, alignItems: 'center', justifyContent: 'center' }]}>
           <KISIcon name="arrow-left" size={20} color={palette.text} />
         </Pressable>
         <KISIcon name="heart" size={18} color={palette.primaryStrong} />
@@ -174,6 +183,8 @@ export default function LikedVideosScreen() {
                 <Pressable
                   onPress={(e) => { e.stopPropagation?.(); handleUnlike(item); }}
                   hitSlop={10}
+                  accessibilityRole="button"
+                  accessibilityLabel="Remove like"
                   style={{ minWidth: minTouchTarget, minHeight: minTouchTarget, alignItems: 'center', justifyContent: 'center' }}
                 >
                   <KISIcon name="heart" size={18} color={palette.primaryStrong} />

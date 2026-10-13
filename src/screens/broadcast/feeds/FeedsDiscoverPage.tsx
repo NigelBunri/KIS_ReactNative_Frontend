@@ -408,7 +408,13 @@ export default function FeedsDiscoverPage({
         onLike: (it: BroadcastFeedItem) => { void handleLike(it); },
         onShare: (it: BroadcastFeedItem) => { void handleShare(it); },
         onComment: (it: BroadcastFeedItem) => handleOpenComments(it),
-        onSave: (it: BroadcastFeedItem) => { void toggleSaved(it.id, Boolean(it.viewer_saved)); },
+        onSave: (it: BroadcastFeedItem) => {
+          void toggleSaved(it.id, Boolean(it.viewer_saved)).then(result => {
+            if (!result?.ok) {
+              Alert.alert('Saved posts', 'Unable to update this saved post right now.');
+            }
+          });
+        },
         onSubscribe: (it: BroadcastFeedItem) => {
           void handleToggleSubscribe(it.source, Boolean(it.source?.is_subscribed));
         },
@@ -753,9 +759,15 @@ export default function FeedsDiscoverPage({
           }}
           onSave={item => {
             setSaveLoadingId(item.id);
-            void toggleSaved(item.id, Boolean(item.viewer_saved)).finally(() => {
-              setSaveLoadingId(null);
-            });
+            void toggleSaved(item.id, Boolean(item.viewer_saved))
+              .then(result => {
+                if (!result?.ok) {
+                  Alert.alert('Saved posts', 'Unable to update this saved post right now.');
+                }
+              })
+              .finally(() => {
+                setSaveLoadingId(null);
+              });
           }}
           onComment={item => {
             void handleOpenComments(item);

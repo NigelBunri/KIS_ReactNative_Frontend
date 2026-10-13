@@ -364,6 +364,12 @@ export const HoldToLockComposer: React.FC<Props> = ({
       setIsRecording(false);
       setVoiceMode('idle');
       stopRecordingAnimations();
+      // Permission is already confirmed granted by this point, so a failure
+      // here is a real device/hardware-level problem (mic busy, native
+      // module error) - without this the UI just silently snaps back to
+      // idle with no sign anything went wrong, which looks identical to
+      // "nothing happened because you didn't hold long enough".
+      Alert.alert('Could not start recording', 'Please try again.');
     }
   };
 
@@ -722,6 +728,8 @@ export const HoldToLockComposer: React.FC<Props> = ({
             onPress={togglePlayback}
             style={[s.playBtn, { backgroundColor: primaryColor }]}
             hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel={isPlayingPreview ? 'Pause voice preview' : 'Play voice preview'}
           >
             <KISIcon
               name={isPlayingPreview ? 'pause' : 'play'}
@@ -759,7 +767,13 @@ export const HoldToLockComposer: React.FC<Props> = ({
           </View>
 
           {/* Delete */}
-          <Pressable onPress={handleDeletePreview} style={s.previewIcon} hitSlop={10}>
+          <Pressable
+            onPress={handleDeletePreview}
+            style={s.previewIcon}
+            hitSlop={10}
+            accessibilityRole="button"
+            accessibilityLabel="Delete voice recording"
+          >
             <KISIcon name="trash" size={19} color={dangerColor} />
           </Pressable>
 
@@ -768,6 +782,8 @@ export const HoldToLockComposer: React.FC<Props> = ({
             onPress={handleSendPreview}
             style={[s.sendBtnSmall, { backgroundColor: primaryColor }]}
             hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel="Send voice message"
           >
             <KISIcon name="send" size={16} color={onPrimary} />
           </Pressable>
@@ -812,6 +828,10 @@ export const HoldToLockComposer: React.FC<Props> = ({
             ? panResponder.panHandlers
             : {})}
           style={s.micOuter}
+          accessible
+          accessibilityRole="button"
+          accessibilityLabel="Hold to record a voice message"
+          accessibilityHint="Slide up to lock recording, slide left to cancel"
         >
           {/* Pulse ring 1 */}
           {isRecordingActive && (
@@ -899,6 +919,8 @@ export const HoldToLockComposer: React.FC<Props> = ({
             onPress={handleCancelLocked}
             style={[s.lockedBtn, { borderColor: dangerColor + '55' }]}
             hitSlop={6}
+            accessibilityRole="button"
+            accessibilityLabel="Delete voice recording"
           >
             <KISIcon name="trash" size={17} color={dangerColor} />
             <Text style={[s.lockedBtnText, { color: dangerColor }]}>Delete</Text>
@@ -924,6 +946,8 @@ export const HoldToLockComposer: React.FC<Props> = ({
             onPress={handleSendLocked}
             style={[s.lockedBtn, s.lockedSendBtn, { backgroundColor: primaryColor }]}
             hitSlop={6}
+            accessibilityRole="button"
+            accessibilityLabel="Send voice message"
           >
             <KISIcon name="send" size={17} color={onPrimary} />
             <Text style={[s.lockedBtnText, { color: onPrimary }]}>Send</Text>

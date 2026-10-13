@@ -70,6 +70,9 @@ export default function AudioTrackSelector({
           <Pressable
             key={track.id}
             onPress={() => onSelectTrack(track)}
+            accessibilityRole="button"
+            accessibilityLabel={`Audio track: ${track.label}`}
+            accessibilityState={{ selected: isSelected }}
             style={[
               styles.pill,
               {

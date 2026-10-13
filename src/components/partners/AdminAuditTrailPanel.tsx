@@ -63,7 +63,13 @@ export default function AdminAuditTrailPanel({
           <Text style={[styles.headerTitle, { color: palette.text }]}>Audit Trail</Text>
           <Text style={[styles.headerSub, { color: palette.subtext }]}>Immutable log of all admin actions</Text>
         </View>
-        <Pressable onPress={onClose} style={styles.closeBtn}>
+        <Pressable
+          onPress={onClose}
+          style={styles.closeBtn}
+          accessibilityRole="button"
+          accessibilityLabel="Close"
+          hitSlop={8}
+        >
           <Text style={{ color: palette.subtext, fontSize: 20, lineHeight: 22 }}>✕</Text>
         </Pressable>
       </View>

@@ -136,7 +136,20 @@ export default function MyReturnsPage() {
           {canCancel ? (
             <KISButton
               title="Cancel request" size="xs" variant="ghost" loading={busyId === item.id}
-              onPress={() => runAction(item, ROUTES.commerce.returnCancel(item.id), 'Cancel return request')}
+              onPress={() =>
+                Alert.alert(
+                  'Cancel return request',
+                  'Are you sure you want to cancel this return request? This cannot be undone.',
+                  [
+                    { text: 'Keep request', style: 'cancel' },
+                    {
+                      text: 'Cancel request',
+                      style: 'destructive',
+                      onPress: () => runAction(item, ROUTES.commerce.returnCancel(item.id), 'Cancel return request'),
+                    },
+                  ],
+                )
+              }
               disabled={Boolean(busyId)}
             />
           ) : null}
@@ -148,7 +161,13 @@ export default function MyReturnsPage() {
   return (
     <View style={[styles.root, { backgroundColor: palette.bg, paddingTop: topInset }]}>
       <View style={[styles.header, { backgroundColor: palette.surface, borderColor: palette.divider }]}>
-        <Pressable onPress={() => navigation.goBack()} style={styles.backButton}>
+        <Pressable
+          onPress={() => navigation.goBack()}
+          style={styles.backButton}
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        >
           <KISIcon name="arrow-left" size={18} color={palette.text} />
         </Pressable>
         <Text style={[styles.title, { color: palette.text }]}>My returns</Text>

@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  Alert,
   Animated,
   Image,
   Modal,
@@ -246,6 +247,25 @@ export function EditProfileModal(props: EditProfileModalProps) {
     [closeLightbox, lightboxTranslateY],
   );
 
+  const confirmDeleteGalleryItem = useCallback(
+    (item: ProfileGalleryItem | undefined | null) => {
+      if (!item) return;
+      Alert.alert(
+        'Delete media',
+        'This permanently removes this item from your portfolio slideshow. This cannot be undone.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Delete',
+            style: 'destructive',
+            onPress: () => onDeleteGalleryItem?.(item),
+          },
+        ],
+      );
+    },
+    [onDeleteGalleryItem],
+  );
+
   const toggleLanguage = (label: string) => {
     setDraftProfile((prev: any) => {
       const current = normalizeModalLanguages(prev?.languages);
@@ -324,7 +344,26 @@ export function EditProfileModal(props: EditProfileModalProps) {
                 <KISIcon name="user" size={20} color={palette.subtext} />
               )}
             </View>
-            <View style={{ flex: 1, paddingBottom: 8, position: 'absolute', left: 100, right: 16, bottom: 16, justifyContent: 'center' }}>
+            <View
+              style={{
+                flex: 1,
+                paddingBottom: 8,
+                paddingHorizontal: 10,
+                paddingTop: 6,
+                position: 'absolute',
+                left: 100,
+                right: 16,
+                bottom: 16,
+                justifyContent: 'center',
+                borderRadius: 10,
+                // Guarantees the always-light preview text stays readable
+                // whether there's a cover photo behind it (any brightness)
+                // or no cover yet (the card's own light/dark surface) -
+                // without this scrim, "ivory" text on a light-theme card
+                // with no cover photo set was nearly invisible.
+                backgroundColor: `${palette.royalInk}55`,
+              }}
+            >
               <Text style={[styles.title, { color: palette.ivory, fontSize: responsive.headerTitleSize * 0.65 }]}>
                 {draftProfile?.display_name || 'Your name'}
               </Text>
@@ -577,7 +616,7 @@ export function EditProfileModal(props: EditProfileModalProps) {
                         size="xs"
                         title={deletingGalleryItemId === item.itemId ? '...' : 'Delete'}
                         disabled={deletingGalleryItemId === item.itemId}
-                        onPress={() => onDeleteGalleryItem?.(item)}
+                        onPress={() => confirmDeleteGalleryItem(item)}
                         style={{ position: 'absolute', top: 10, left: 10 }}
                       />
                     ) : null}
@@ -715,12 +754,12 @@ export function EditProfileModal(props: EditProfileModalProps) {
                 variant="ghost"
                 title={deletingGalleryItemId === gallery[lightboxIndex]?.itemId ? '...' : 'Delete'}
                 disabled={deletingGalleryItemId === gallery[lightboxIndex]?.itemId}
-                onPress={() => onDeleteGalleryItem?.(gallery[lightboxIndex])}
+                onPress={() => confirmDeleteGalleryItem(gallery[lightboxIndex])}
                 textStyle={{ color: palette.ivory }}
                 style={{ marginRight: 8 }}
               />
             ) : null}
-            <KISButton variant="ghost" onPress={closeLightbox}>
+            <KISButton variant="ghost" onPress={closeLightbox} accessibilityLabel="Close">
               <KISIcon name="close" size={20} color={palette.ivory} />
             </KISButton>
           </View>

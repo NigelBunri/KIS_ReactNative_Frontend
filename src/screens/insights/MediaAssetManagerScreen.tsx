@@ -403,6 +403,7 @@ export default function MediaAssetManagerScreen() {
                 </View>
                 <KISButton
                   variant="ghost"
+                  accessibilityLabel="Delete asset"
                   onPress={() => confirmDelete(item)}
                   style={styles.deleteIcon}
                 >
@@ -415,7 +416,7 @@ export default function MediaAssetManagerScreen() {
       )}
 
       {/* FAB – Upload */}
-      <KISFab icon="cloud-upload-outline" onPress={() => { if (!uploading) handleUpload(); }} style={styles.fab} />
+      <KISFab icon="cloud-upload-outline" accessibilityLabel="Upload media asset" onPress={() => { if (!uploading) handleUpload(); }} style={styles.fab} />
 
       {/* Asset Detail Modal */}
       <Modal

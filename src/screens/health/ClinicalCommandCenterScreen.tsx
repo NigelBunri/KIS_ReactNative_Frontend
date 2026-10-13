@@ -1235,35 +1235,30 @@ export default function ClinicalCommandCenterScreen({ route, navigation }: Props
               style={{ flex: 1 }}
               onPress={() => {
                 if (!selectedTriage?.id) return;
+                // Each option previously swallowed the patch result with
+                // `.catch(() => undefined)` and then unconditionally applied
+                // the optimistic update and closed the modal — on a failed
+                // request the clinician would see the level change and the
+                // modal close as if it worked, with the backend silently out
+                // of sync. Now the optimistic update only happens on success,
+                // with a clear alert and the modal staying open on failure.
+                const applyAcuityLevel = async (level: 'routine' | 'elevated' | 'urgent') => {
+                  try {
+                    const res = await patchRequest(ROUTES.clinical.triageDetail(String(selectedTriage.id)), { acuity_level: level });
+                    if (!res?.success) throw new Error(res?.message || 'Failed to update triage level.');
+                    setTriageQueue((prev: any[]) => prev.map((t) => t.id === selectedTriage.id ? { ...t, acuity_level: level } : t));
+                    setTriageModalVisible(false);
+                  } catch (e: any) {
+                    Alert.alert('Update triage level', e?.message || 'Failed to update triage level. Please try again.');
+                  }
+                };
                 Alert.alert(
                   'Update triage level',
                   'Select new acuity level:',
                   [
-                    {
-                      text: 'Routine',
-                      onPress: async () => {
-                        await patchRequest(ROUTES.clinical.triageDetail(String(selectedTriage.id)), { acuity_level: 'routine' }).catch(() => undefined);
-                        setTriageQueue((prev: any[]) => prev.map((t) => t.id === selectedTriage.id ? { ...t, acuity_level: 'routine' } : t));
-                        setTriageModalVisible(false);
-                      },
-                    },
-                    {
-                      text: 'Elevated',
-                      onPress: async () => {
-                        await patchRequest(ROUTES.clinical.triageDetail(String(selectedTriage.id)), { acuity_level: 'elevated' }).catch(() => undefined);
-                        setTriageQueue((prev: any[]) => prev.map((t) => t.id === selectedTriage.id ? { ...t, acuity_level: 'elevated' } : t));
-                        setTriageModalVisible(false);
-                      },
-                    },
-                    {
-                      text: 'Urgent',
-                      style: 'destructive',
-                      onPress: async () => {
-                        await patchRequest(ROUTES.clinical.triageDetail(String(selectedTriage.id)), { acuity_level: 'urgent' }).catch(() => undefined);
-                        setTriageQueue((prev: any[]) => prev.map((t) => t.id === selectedTriage.id ? { ...t, acuity_level: 'urgent' } : t));
-                        setTriageModalVisible(false);
-                      },
-                    },
+                    { text: 'Routine', onPress: () => applyAcuityLevel('routine') },
+                    { text: 'Elevated', onPress: () => applyAcuityLevel('elevated') },
+                    { text: 'Urgent', style: 'destructive', onPress: () => applyAcuityLevel('urgent') },
                     { text: 'Cancel', style: 'cancel' },
                   ],
                 );
@@ -1275,15 +1270,29 @@ export default function ClinicalCommandCenterScreen({ route, navigation }: Props
               style={{ flex: 1 }}
               onPress={() => {
                 if (!selectedTriage?.id) return;
+                // NOTE: Alert.prompt is iOS-only (undocumented/no-op on
+                // Android) — this is an existing app-wide pattern (also used
+                // in ChatRoomPage, ChannelContentDetailPage, AdminKISAppPanel,
+                // InstitutionOnboardingScreen), not something introduced
+                // here, and replacing it app-wide with a real cross-platform
+                // input modal is tracked separately rather than patched once
+                // in this one screen. What IS fixed here: the patch result
+                // was previously swallowed with `.catch(() => undefined)` and
+                // the optimistic update + modal close happened unconditionally.
                 Alert.prompt(
                   'Reassign clinician',
                   'Enter clinician name or ID:',
                   async (clinicianName: string) => {
                     if (!clinicianName?.trim()) return;
                     const meta = { ...(selectedTriage.metadata ?? {}), reassigned_to: clinicianName.trim() };
-                    await patchRequest(ROUTES.clinical.triageDetail(String(selectedTriage.id)), { metadata: meta }).catch(() => undefined);
-                    setTriageQueue((prev: any[]) => prev.map((t) => t.id === selectedTriage.id ? { ...t, metadata: meta } : t));
-                    setTriageModalVisible(false);
+                    try {
+                      const res = await patchRequest(ROUTES.clinical.triageDetail(String(selectedTriage.id)), { metadata: meta });
+                      if (!res?.success) throw new Error(res?.message || 'Failed to reassign clinician.');
+                      setTriageQueue((prev: any[]) => prev.map((t) => t.id === selectedTriage.id ? { ...t, metadata: meta } : t));
+                      setTriageModalVisible(false);
+                    } catch (e: any) {
+                      Alert.alert('Reassign clinician', e?.message || 'Failed to reassign clinician. Please try again.');
+                    }
                   },
                   'plain-text',
                 );

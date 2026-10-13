@@ -104,7 +104,7 @@ export default function PartnerComplaintsPanel({
     loadComplaints();
   }, [isOpen, loadComplaints]);
 
-  const resolveComplaint = useCallback(
+  const performResolve = useCallback(
     async (complaintId: string, action: 'release' | 'refund') => {
       setResolving({ id: complaintId, action });
       try {
@@ -126,6 +126,26 @@ export default function PartnerComplaintsPanel({
       }
     },
     [resolutionNotes, loadComplaints],
+  );
+
+  const resolveComplaint = useCallback(
+    (complaintId: string, action: 'release' | 'refund') => {
+      Alert.alert(
+        action === 'release' ? 'Release payment' : 'Refund payment',
+        action === 'release'
+          ? 'Release the held escrow payment to the provider? This cannot be undone.'
+          : 'Refund the held escrow payment to the customer? This cannot be undone.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: action === 'release' ? 'Release' : 'Refund',
+            style: 'destructive',
+            onPress: () => void performResolve(complaintId, action),
+          },
+        ],
+      );
+    },
+    [performResolve],
   );
 
   if (!isOpen) return null;

@@ -141,6 +141,9 @@ export default function SubscribeBellButton({
       <Pressable
         onPress={handleSubscribe}
         disabled={subPending}
+        accessibilityRole="button"
+        accessibilityLabel={subscribed ? 'Unsubscribe from channel' : 'Subscribe to channel'}
+        accessibilityState={{ selected: subscribed, busy: subPending }}
         style={[
           styles.subscribe,
           compact && styles.subscribeCompact,
@@ -182,7 +185,9 @@ export default function SubscribeBellButton({
               opacity:         bellPending ? 0.6 : 1,
             },
           ]}
+          accessibilityRole="button"
           accessibilityLabel={NOTIF_LABEL[notifLevel]}
+          accessibilityHint="Cycles notification level: all, mentions only, or off"
         >
           {bellPending ? (
             <ActivityIndicator size="small" color={bellColor} />

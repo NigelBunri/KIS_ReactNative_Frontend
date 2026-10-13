@@ -69,6 +69,7 @@ function HeaderIconButton({
       onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel={label}
+      hitSlop={4}
       style={{
         width: 40,
         height: 40,
@@ -216,6 +217,8 @@ export default function EducationHomeScreen() {
                 <Pressable
                   key={spotlight.id}
                   onPress={() => openInstitution(spotlight)}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Open ${spotlight.name}`}
                   style={{
                     width: 170,
                     borderRadius: 20,

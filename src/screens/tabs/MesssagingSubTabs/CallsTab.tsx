@@ -492,6 +492,8 @@ const CallsTab = forwardRef<ScrollableHandle, CallsTabProps>(function CallsTab({
             onPress={() => void handleCallback(item)}
             style={[styles.callbackBtn, { borderColor: palette.inputBorder }]}
             hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel={callType === 'video' || callType === 'video-group' ? 'Call back with video' : 'Call back'}
           >
             <KISIcon
               name={callType === 'video' || callType === 'video-group' ? 'video' : 'phone'}
@@ -588,7 +590,13 @@ const CallsTab = forwardRef<ScrollableHandle, CallsTabProps>(function CallsTab({
           </Text>
         </Pressable>
         <View style={styles.headerActions}>
-          <Pressable onPress={() => loadCalls()} style={styles.iconBtn} hitSlop={8}>
+          <Pressable
+            onPress={() => loadCalls()}
+            style={styles.iconBtn}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel="Refresh calls"
+          >
             <KISIcon name="refresh-cw" size={17} color={palette.text} />
           </Pressable>
           <KISButton

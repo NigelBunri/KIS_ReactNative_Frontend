@@ -46,6 +46,7 @@ import {
 import { SafeAreaProvider, initialWindowMetrics } from 'react-native-safe-area-context';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { startOfflineActionQueue, stopOfflineActionQueue } from '@/services/offlineActionQueue';
+import { runChatMediaMigrationIfNeeded } from '@/Module/ChatRoom/Storage/chatMediaMigration';
 import { startMediaTransferQueue, stopMediaTransferQueue } from '@/services/mediaTransferQueue';
 import { flushPendingMutations } from '@/services/pendingMutationsQueue';
 import { loadConsentPreferences } from '@/services/consentService';
@@ -668,6 +669,7 @@ function AppContent() {
     startOfflineActionQueue();
     startMediaTransferQueue();
     void loadConsentPreferences();
+    void runChatMediaMigrationIfNeeded();
 
     // Flush chat/mutation queue on reconnect regardless of which screen is active
     const netInfoUnsubscribe = NetInfo.addEventListener((state) => {

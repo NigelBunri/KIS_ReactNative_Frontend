@@ -15,7 +15,14 @@ type Props = {
 
 export default function ReactionsLayer({ reactions, width, height }: Props) {
   return (
-    <View style={[styles.layer, { width, height }]} pointerEvents="none">
+    <View
+      style={[styles.layer, { width, height }]}
+      pointerEvents="none"
+      // Purely decorative/ephemeral — keep screen readers from announcing
+      // each floating emoji as it drifts in and out.
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants"
+    >
       {reactions.map(r => (
         <FloatingEmoji key={r.id} reaction={r} width={width} height={height} />
       ))}

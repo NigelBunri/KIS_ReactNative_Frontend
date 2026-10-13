@@ -45,6 +45,14 @@ const FONT_COLORS = [
   '#B2DFDB', // teal-ish
 ];
 
+// Parallel names for FONT_COLORS, used only for accessibilityLabel below -
+// these swatches are bare color circles with no visible text, so without
+// this a screen reader announces nothing more useful than "button".
+const FONT_COLOR_NAMES = [
+  'Yellow', 'Light red', 'Pink', 'Light green',
+  'Light blue', 'Lavender', 'Light orange', 'Teal',
+];
+
 // Use fonts that exist on iOS & Android
 const FONT_FAMILIES = [
   { id: 'default', label: 'Default', value: undefined as string | undefined },
@@ -123,6 +131,8 @@ export const TextCardComposer: React.FC<TextCardComposerProps> = ({
           onPress={onClose}
           style={{ padding: 8, marginRight: 8 }}
           hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel="Close"
         >
           {/* use your actual back icon name here */}
           <KISIcon
@@ -198,6 +208,9 @@ export const TextCardComposer: React.FC<TextCardComposerProps> = ({
                   <Pressable
                     key={`fs-${size}`}
                     onPress={() => setFontSize(size)}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Font size ${size}`}
+                    accessibilityState={{ selected }}
                     style={{
                       paddingHorizontal: 10,
                       paddingVertical: 6,
@@ -243,12 +256,15 @@ export const TextCardComposer: React.FC<TextCardComposerProps> = ({
                 marginBottom: 8,
               }}
             >
-              {FONT_COLORS.map(color => {
+              {FONT_COLORS.map((color, colorIdx) => {
                 const selected = color === fontColor;
                 return (
                   <Pressable
                     key={`fc-${color}`}
                     onPress={() => setFontColor(color)}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Font color ${FONT_COLOR_NAMES[colorIdx] ?? color}`}
+                    accessibilityState={{ selected }}
                     style={{
                       width: 28,
                       height: 28,
@@ -284,6 +300,9 @@ export const TextCardComposer: React.FC<TextCardComposerProps> = ({
                   <Pressable
                     key={`ff-${ff.id}`}
                     onPress={() => setFontFamily(ff.value)}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Font ${ff.label}`}
+                    accessibilityState={{ selected }}
                     style={{
                       paddingHorizontal: 10,
                       paddingVertical: 6,

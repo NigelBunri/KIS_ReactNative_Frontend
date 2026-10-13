@@ -164,8 +164,11 @@ export const marketStyles = StyleSheet.create({
     flexWrap: 'wrap',
   },
   overflowButton: {
-    width: 34,
-    height: 34,
+    // Bumped from 34x34 to the ~44pt minimum recommended touch target for
+    // an icon-only control. Currently unused by any market screen, but
+    // left correct so a future consumer doesn't inherit a sub-minimum tap area.
+    width: 44,
+    height: 44,
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',

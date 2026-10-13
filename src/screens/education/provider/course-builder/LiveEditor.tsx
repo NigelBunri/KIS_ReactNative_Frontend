@@ -111,13 +111,30 @@ export default function LiveEditor({ institutionId, courseId, courseTitle }: Pro
     }
   }, [title, dayOffset, hourOfDay, minuteOfDay, durationMinutes, deliveryMode, meetingUrl, locationText, seatLimit, institutionId, courseId, sessions.length, load]);
 
-  const cancelSession = useCallback(async (sessionId: string) => {
-    const response = await patchRequest(
-      ROUTES.broadcasts.educationInstitutionClassSession(institutionId, sessionId),
-      { status: 'cancelled' },
-      { errorMessage: 'Unable to cancel session.' },
+  const cancelSession = useCallback((sessionId: string, sessionTitle: string) => {
+    // Cancelling a scheduled live class affects everyone already expecting
+    // to join it — confirm first, same as other destructive actions in this
+    // course-builder flow (deleting a lesson/material, deleting a module
+    // item), rather than cancelling on a single accidental tap.
+    Alert.alert(
+      'Cancel this session?',
+      `"${sessionTitle}" will be marked cancelled. Enrolled learners will no longer see it as scheduled.`,
+      [
+        { text: 'Keep session', style: 'cancel' },
+        {
+          text: 'Cancel session',
+          style: 'destructive',
+          onPress: async () => {
+            const response = await patchRequest(
+              ROUTES.broadcasts.educationInstitutionClassSession(institutionId, sessionId),
+              { status: 'cancelled' },
+              { errorMessage: 'Unable to cancel session.' },
+            );
+            if (response?.success) await load();
+          },
+        },
+      ],
     );
-    if (response?.success) await load();
   }, [institutionId, load]);
 
   // The course's one persistent group chat/call — see courseGroupChat.ts.
@@ -177,7 +194,7 @@ export default function LiveEditor({ institutionId, courseId, courseTitle }: Pro
             {session.starts_at ? new Date(session.starts_at).toLocaleString() : 'Unscheduled'} · {session.delivery_mode}
           </Text>
           {session.status !== 'cancelled' ? (
-            <KISButton title="Cancel session" size="sm" variant="ghost" onPress={() => void cancelSession(session.id)} />
+            <KISButton title="Cancel session" size="sm" variant="ghost" onPress={() => cancelSession(session.id, session.title)} />
           ) : null}
         </View>
       ))}

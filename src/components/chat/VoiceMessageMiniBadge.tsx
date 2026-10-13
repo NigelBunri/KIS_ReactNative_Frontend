@@ -118,7 +118,8 @@ export default function VoiceMessageMiniBadge() {
         onPress={togglePlay}
         style={[styles.playBtn, { backgroundColor: `${palette.primary}22` }]}
         accessibilityLabel={playing ? 'Pause voice message' : 'Play voice message'}
-        hitSlop={6}
+        accessibilityRole="button"
+        hitSlop={8}
       >
         {buffering ? (
           <ActivityIndicator size="small" color={palette.primary} />
@@ -131,7 +132,8 @@ export default function VoiceMessageMiniBadge() {
         onPress={stop}
         style={[styles.endBtn, { backgroundColor: palette.subtext + '33' }]}
         accessibilityLabel="Dismiss"
-        hitSlop={6}
+        accessibilityRole="button"
+        hitSlop={9}
       >
         <KISIcon name="close" size={14} color={palette.ivory} />
       </Pressable>

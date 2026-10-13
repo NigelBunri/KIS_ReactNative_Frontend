@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ActivityIndicator, Pressable, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, Text, View } from 'react-native';
 
 type Cv = {
   headline?: string;
@@ -54,6 +54,27 @@ export default function PartnerApplicationsReview({
     } finally {
       setBusyId(null);
     }
+  }
+
+  // Approving/rejecting a job application is a one-shot, no-undo decision
+  // about a real person's application — confirm before either action rather
+  // than letting a single mis-tap silently reject (or admit) someone.
+  function confirmDecide(app: Application, action: 'approve' | 'reject') {
+    const applicantName = app.user?.display_name || 'this applicant';
+    Alert.alert(
+      action === 'approve' ? 'Approve application?' : 'Reject application?',
+      action === 'approve'
+        ? `${applicantName} will be approved and onboarded. This cannot be undone from here.`
+        : `${applicantName}'s application will be rejected. This cannot be undone from here.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: action === 'approve' ? 'Approve' : 'Reject',
+          style: action === 'reject' ? 'destructive' : 'default',
+          onPress: () => decide(app, action),
+        },
+      ],
+    );
   }
 
   return (
@@ -137,8 +158,10 @@ export default function PartnerApplicationsReview({
             <View style={{ flexDirection: 'row', gap: 8, marginTop: 10 }}>
               <Pressable
                 style={{ flex: 1, backgroundColor: palette.primary, borderRadius: 8, paddingVertical: 8, alignItems: 'center' }}
-                onPress={() => decide(app, 'approve')}
+                onPress={() => confirmDecide(app, 'approve')}
                 disabled={busy}
+                accessibilityRole="button"
+                accessibilityLabel={`Approve ${app.user?.display_name || 'applicant'}'s application`}
               >
                 {busy ? <ActivityIndicator size="small" color={palette.onPrimary ?? '#fff'} /> : (
                   <Text style={{ color: palette.onPrimary ?? '#fff', fontSize: 12, fontWeight: '700' }}>Approve</Text>
@@ -146,8 +169,10 @@ export default function PartnerApplicationsReview({
               </Pressable>
               <Pressable
                 style={{ flex: 1, borderWidth: 1, borderColor: palette.border, borderRadius: 8, paddingVertical: 8, alignItems: 'center' }}
-                onPress={() => decide(app, 'reject')}
+                onPress={() => confirmDecide(app, 'reject')}
                 disabled={busy}
+                accessibilityRole="button"
+                accessibilityLabel={`Reject ${app.user?.display_name || 'applicant'}'s application`}
               >
                 <Text style={{ color: palette.subtext, fontSize: 12, fontWeight: '700' }}>Reject</Text>
               </Pressable>

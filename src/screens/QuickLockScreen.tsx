@@ -2,6 +2,7 @@
 // Full-screen PIN entry overlay shown when app resumes after timeout
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  Alert,
   Animated,
   Platform,
   Pressable,
@@ -129,9 +130,25 @@ export default function QuickLockScreen({ onDismiss }: Props) {
   }, []);
 
   const handleForgotPIN = useCallback(() => {
-    clearPIN().finally(() => {
-      setAuth(false);
-    });
+    // This clears the device's Quick Lock PIN and signs the user out of the
+    // app entirely — a single accidental tap just below the keypad
+    // shouldn't be able to do that silently, so confirm first.
+    Alert.alert(
+      'Log out and remove PIN?',
+      "You'll need to log back in with your password, then set up a new PIN.",
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Log Out',
+          style: 'destructive',
+          onPress: () => {
+            clearPIN().finally(() => {
+              setAuth(false);
+            });
+          },
+        },
+      ],
+    );
   }, [setAuth]);
 
   const dots = Array.from({ length: PIN_LENGTH }, (_, i) => i < pin.length);

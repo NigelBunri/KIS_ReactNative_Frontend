@@ -59,7 +59,12 @@ export default function PartnerBibleScreen({ partnerId, appId, tabId }: Props) {
     if (activeSubTab === 'bible') return;
     setLoading(true);
     try {
-      const res = await getRequest(blocksUrl);
+      const res = await getRequest(blocksUrl, { errorMessage: 'Unable to load content.' });
+      if (!res?.success) {
+        setBlockError(res?.message || "Couldn't load content. Tap to retry.");
+        setBlocks([]);
+        return;
+      }
       const all: ContentBlock[] = Array.isArray(res?.data?.results)
         ? res.data.results
         : Array.isArray(res?.data)
@@ -141,6 +146,22 @@ export default function PartnerBibleScreen({ partnerId, appId, tabId }: Props) {
         <View style={styles.center}>
           <ActivityIndicator color={palette.primary} />
         </View>
+      ) : blockError ? (
+        <View
+          style={{
+            margin: 16,
+            borderRadius: 10,
+            borderWidth: 1,
+            borderColor: palette.danger,
+            backgroundColor: palette.danger + '15',
+            padding: 12,
+          }}
+        >
+          <Text style={{ color: palette.danger, fontSize: 13, fontWeight: '600' }}>{blockError}</Text>
+          <Pressable onPress={() => loadBlocks()} style={{ marginTop: 8 }}>
+            <Text style={{ color: palette.primary, fontWeight: '700', fontSize: 13 }}>Tap to retry</Text>
+          </Pressable>
+        </View>
       ) : (
         <FlatList
           initialNumToRender={20}
@@ -155,17 +176,11 @@ export default function PartnerBibleScreen({ partnerId, appId, tabId }: Props) {
           }
           ListEmptyComponent={() => (
             <View style={styles.center}>
-              {blockError ? (
-                <Text style={[styles.empty, { color: palette.danger }]}>{blockError}</Text>
-              ) : (
-                <>
-                  <Text style={{ fontSize: 36 }}>{SUB_TABS.find((t) => t.key === activeSubTab)?.icon}</Text>
-                  <Text style={[styles.empty, { color: palette.subtext }]}>
-                    No {SUB_TABS.find((t) => t.key === activeSubTab)?.label.toLowerCase()} yet.{'\n'}
-                    Add them via the app manager.
-                  </Text>
-                </>
-              )}
+              <Text style={{ fontSize: 36 }}>{SUB_TABS.find((t) => t.key === activeSubTab)?.icon}</Text>
+              <Text style={[styles.empty, { color: palette.subtext }]}>
+                No {SUB_TABS.find((t) => t.key === activeSubTab)?.label.toLowerCase()} yet.{'\n'}
+                Add them via the app manager.
+              </Text>
             </View>
           )}
           renderItem={renderBlock}

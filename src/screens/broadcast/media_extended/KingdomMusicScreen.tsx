@@ -41,25 +41,28 @@ export default function KingdomMusicScreen({ navigation }: Props) {
 
   const [tracks, setTracks] = useState<MusicTrack[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [genre, setGenre] = useState('All');
   const [nowPlaying, setNowPlaying] = useState<MusicTrack | null>(null);
   const [playLoading, setPlayLoading] = useState<string | null>(null);
 
-  useFocusEffect(
-    useCallback(() => {
-      let active = true;
-      setLoading(true);
-      getRequest(ROUTES.mediaExtended.musicTracks)
-        .then((res: any) => {
-          // Same fix as KingdomNewsScreen — `tracks.filter(...)` below
-          // would crash on the leaked wrapper object.
-          if (active) setTracks(Array.isArray(res?.data) ? res.data : []);
-        })
-        .catch(() => {})
-        .finally(() => { if (active) setLoading(false); });
-      return () => { active = false; };
-    }, []),
-  );
+  const fetchTracks = useCallback(() => {
+    let active = true;
+    setLoading(true);
+    setLoadError(false);
+    getRequest(ROUTES.mediaExtended.musicTracks)
+      .then((res: any) => {
+        if (!active) return;
+        // Same fix as KingdomNewsScreen — `tracks.filter(...)` below
+        // would crash on the leaked wrapper object.
+        setTracks(Array.isArray(res?.data) ? res.data : []);
+      })
+      .catch(() => { if (active) setLoadError(true); })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, []);
+
+  useFocusEffect(useCallback(() => fetchTracks(), [fetchTracks]));
 
   const filtered = genre === 'All' ? tracks : tracks.filter((t) => t.genre === genre);
 
@@ -198,7 +201,13 @@ export default function KingdomMusicScreen({ navigation }: Props) {
   return (
     <SafeAreaView style={styles.safe}>
       <LinearGradient colors={[palette.gradientStart, palette.gradientEnd]} style={styles.header}>
-        <Pressable style={styles.backBtn} onPress={() => navigation.goBack()} hitSlop={8}>
+        <Pressable
+          style={styles.backBtn}
+          onPress={() => navigation.goBack()}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
+        >
           <KISIcon name="chevron-back-outline" size={22} color={palette.ivory} />
           <Text style={styles.backLabel}>Back</Text>
         </Pressable>
@@ -232,7 +241,15 @@ export default function KingdomMusicScreen({ navigation }: Props) {
       </ScrollView>
 
       <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
-        {filtered.length === 0 && (
+        {loadError && (
+          <View style={{ paddingHorizontal: sp, paddingTop: 10, gap: 8 }}>
+            <Text style={{ color: palette.danger, fontWeight: '700', textAlign: 'center' }}>
+              Unable to load tracks. Check your connection and try again.
+            </Text>
+            <KISButton title="Retry" size="sm" variant="outline" onPress={fetchTracks} />
+          </View>
+        )}
+        {filtered.length === 0 && !loadError && (
           <Text style={styles.empty}>No tracks found.</Text>
         )}
         {filtered.map((track) => {
@@ -256,6 +273,8 @@ export default function KingdomMusicScreen({ navigation }: Props) {
                   style={styles.actionBtn}
                   onPress={() => handleAddToPlaylist(track)}
                   hitSlop={4}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Add ${track.title} to playlist`}
                 >
                   <KISIcon name="add-circle-outline" size={24} color={palette.subtext} />
                 </Pressable>
@@ -264,6 +283,9 @@ export default function KingdomMusicScreen({ navigation }: Props) {
                   onPress={() => handlePlay(track)}
                   hitSlop={4}
                   disabled={playLoading === track.id}
+                  accessibilityRole="button"
+                  accessibilityLabel={isPlaying ? `Pause ${track.title}` : `Play ${track.title}`}
+                  accessibilityState={{ disabled: playLoading === track.id, selected: isPlaying }}
                 >
                   {playLoading === track.id ? (
                     <ActivityIndicator size="small" color={palette.primary} />
@@ -298,6 +320,8 @@ export default function KingdomMusicScreen({ navigation }: Props) {
               onPress={() => setNowPlaying(null)}
               style={styles.actionBtn}
               hitSlop={4}
+              accessibilityRole="button"
+              accessibilityLabel="Dismiss now playing"
             >
               <KISIcon name="close-circle-outline" size={24} color={palette.ivory} />
             </Pressable>

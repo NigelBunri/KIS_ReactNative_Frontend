@@ -62,6 +62,7 @@ export default function PartnerActivityPanel({ isOpen, panelWidth, panelTranslat
   const [items, setItems] = useState<InAppNotification[]>([]);
   const [partnerName, setPartnerName] = useState<string | null>(null);
   const [mainConversationId, setMainConversationId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const backdropOpacity = panelTranslateX.interpolate({ inputRange: [0, panelWidth], outputRange: [1, 0], extrapolate: 'clamp' });
 
@@ -72,6 +73,11 @@ export default function PartnerActivityPanel({ isOpen, panelWidth, panelTranslat
     }
     const [all, partnerRes] = await Promise.all(tasks);
     setItems((all as InAppNotification[]).filter(matchesPartnerTokens));
+    if (partnerId && !partnerRes?.success) {
+      setError(partnerRes?.message || "Couldn't load partner activity. Tap to retry.");
+      return;
+    }
+    setError(null);
     if (partnerRes?.data) {
       setPartnerName(partnerRes.data.name ?? null);
       setMainConversationId(partnerRes.data.main_conversation_id ?? null);
@@ -131,6 +137,27 @@ export default function PartnerActivityPanel({ isOpen, panelWidth, panelTranslat
         <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.settingsPanelBody} showsVerticalScrollIndicator={false}>
           {loading ? (
             <ActivityIndicator size="small" color={palette.primary} />
+          ) : error ? (
+            <View
+              style={{
+                borderRadius: 10,
+                borderWidth: 1,
+                borderColor: palette.danger,
+                backgroundColor: palette.danger + '15',
+                padding: 12,
+              }}
+            >
+              <Text style={{ color: palette.danger, fontSize: 13, fontWeight: '600' }}>{error}</Text>
+              <Pressable
+                onPress={() => {
+                  setLoading(true);
+                  load().finally(() => setLoading(false));
+                }}
+                style={{ marginTop: 8 }}
+              >
+                <Text style={{ color: palette.primary, fontWeight: '700', fontSize: 13 }}>Tap to retry</Text>
+              </Pressable>
+            </View>
           ) : (
             <>
               {hasAnnouncements ? (

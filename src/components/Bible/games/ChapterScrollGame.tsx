@@ -216,6 +216,7 @@ export default function ChapterScrollGame({ gameKey, stageIndex, isReplay, onExi
             }}
             onBackToJourney={onExit}
             onViewStats={onOpenStats}
+            persisted={stageResult.persisted}
           />
         </View>
       </GameShell>

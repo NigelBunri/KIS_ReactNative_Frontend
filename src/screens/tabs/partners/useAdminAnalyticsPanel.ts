@@ -64,8 +64,17 @@ export const useAdminAnalyticsPanel = (width: number) => {
         getRequest(`${(ROUTES as any).analytics?.engagement ?? ''}?${params}`, { errorMessage: '' }),
         getRequest((ROUTES as any).analytics?.adminDashboards ?? '', { errorMessage: '' }),
       ]);
-      if (rev.status === 'fulfilled' && rev.value?.success) setRevenue(rev.value.data);
-      if (eng.status === 'fulfilled' && eng.value?.success) setEngagement(eng.value.data);
+      // getRequest never rejects (it catches internally and resolves with
+      // { success: false }), so a Promise.allSettled entry is effectively
+      // always 'fulfilled' — checking `.status === 'rejected'` here was dead
+      // code that could never fire, meaning a real server/auth failure left
+      // `error` unset and the panel silently showed "—" placeholders with no
+      // indication anything had gone wrong. Checking `.value?.success`
+      // instead actually detects the failure.
+      const revOk = rev.status === 'fulfilled' && !!rev.value?.success;
+      const engOk = eng.status === 'fulfilled' && !!eng.value?.success;
+      if (revOk) setRevenue(rev.value.data);
+      if (engOk) setEngagement(eng.value.data);
       if (dash.status === 'fulfilled' && dash.value?.success) {
         const raw = dash.value.data;
         setDashboards(
@@ -73,7 +82,7 @@ export const useAdminAnalyticsPanel = (width: number) => {
           Array.isArray(raw) ? raw : [],
         );
       }
-      if (rev.status === 'rejected' && eng.status === 'rejected') {
+      if (!revOk && !engOk) {
         setError('Failed to load analytics data.');
       }
     } catch {

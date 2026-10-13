@@ -312,7 +312,7 @@ export default function PartnerFeedPage({ partner, onBack, hideHeader = false }:
     setCommentSheetVisible(true);
   };
 
-  const handleDelete = async (postId: string) => {
+  const performDelete = async (postId: string) => {
     const res = await postRequest(
       ROUTES.partners.postDelete(postId),
       {},
@@ -320,7 +320,20 @@ export default function PartnerFeedPage({ partner, onBack, hideHeader = false }:
     );
     if (res?.success) {
       setPosts(prev => prev.filter(p => p.id !== postId));
+    } else {
+      Alert.alert('Failed', res?.message || 'Unable to delete this post. Please try again.');
     }
+  };
+
+  const handleDelete = (postId: string) => {
+    Alert.alert(
+      'Delete post',
+      'This post will be permanently deleted. This cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Delete', style: 'destructive', onPress: () => void performDelete(postId) },
+      ],
+    );
   };
 
   const handleBroadcast = async (postId: string) => {
@@ -331,11 +344,12 @@ export default function PartnerFeedPage({ partner, onBack, hideHeader = false }:
     );
     if (res?.success) {
       Alert.alert('Broadcast', 'Post added to broadcast.');
+    } else {
+      Alert.alert('Failed', res?.message || 'Unable to broadcast this post. Please try again.');
     }
   };
 
-  const handleBlockUser = async (userId?: string) => {
-    if (!userId) return;
+  const performBlockUser = async (userId: string) => {
     const res = await postRequest(
       ROUTES.moderation.userBlocks,
       { blocked: userId, reason: 'feed_block' },
@@ -343,7 +357,21 @@ export default function PartnerFeedPage({ partner, onBack, hideHeader = false }:
     );
     if (res?.success) {
       setPosts(prev => prev.filter(p => p.author?.id !== userId));
+    } else {
+      Alert.alert('Failed', res?.message || 'Unable to block this user. Please try again.');
     }
+  };
+
+  const handleBlockUser = (userId?: string) => {
+    if (!userId) return;
+    Alert.alert(
+      'Block user',
+      'You will no longer see posts from this user. You can unblock them later from settings.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Block', style: 'destructive', onPress: () => void performBlockUser(userId) },
+      ],
+    );
   };
 
   const handleReport = async (postId: string) => {
@@ -360,6 +388,8 @@ export default function PartnerFeedPage({ partner, onBack, hideHeader = false }:
     );
     if (res?.success) {
       Alert.alert('Report', 'Thanks for letting us know.');
+    } else {
+      Alert.alert('Failed', res?.message || 'Unable to report this post. Please try again.');
     }
   };
 
@@ -401,7 +431,12 @@ export default function PartnerFeedPage({ partner, onBack, hideHeader = false }:
             { borderBottomColor: palette.divider, backgroundColor: palette.card },
           ]}
         >
-          <Pressable onPress={onBack} style={styles.headerButton}>
+          <Pressable
+            onPress={onBack}
+            style={styles.headerButton}
+            accessibilityRole="button"
+            accessibilityLabel="Back"
+          >
             <KISIcon name="arrow-left" size={20} color={palette.text} />
           </Pressable>
           <Text

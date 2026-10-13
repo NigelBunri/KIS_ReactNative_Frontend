@@ -141,7 +141,12 @@ export default function ScheduleCallSheet({ visible, onClose, onStart, onCreate 
           {/* Header */}
           <View style={styles.sheetHeader}>
             <Text style={[styles.sheetTitle, { color: palette.text }]}>New call</Text>
-            <Pressable onPress={onClose} hitSlop={10}>
+            <Pressable
+              onPress={onClose}
+              hitSlop={10}
+              accessibilityRole="button"
+              accessibilityLabel="Close"
+            >
               <KISIcon name="close" size={20} color={palette.subtext} />
             </Pressable>
           </View>
@@ -170,6 +175,9 @@ export default function ScheduleCallSheet({ visible, onClose, onStart, onCreate 
                   <Pressable
                     key={opt.type}
                     onPress={() => setSelectedType(opt.type)}
+                    accessibilityRole="radio"
+                    accessibilityState={{ selected }}
+                    accessibilityLabel={`${opt.label}, ${opt.desc}`}
                     style={[
                       styles.typeCard,
                       {

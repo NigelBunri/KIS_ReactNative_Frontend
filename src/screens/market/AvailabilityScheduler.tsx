@@ -16,6 +16,7 @@ import {
   getDayKey,
   normalizeDayAvailability,
   normalizeTimeToken,
+  parseDateKey,
   ServiceAvailability,
 } from "@/screens/market/availabilityUtils";
 
@@ -90,15 +91,10 @@ const AvailabilityScheduler = ({
   };
 
   useEffect(() => {
-    if (value.date_range?.start_date) {
-      const parts = value.date_range.start_date.split("-").map((item) => Number(item));
-      if (parts.length === 3 && parts.every((segment) => Number.isFinite(segment))) {
-        const parsed = new Date(parts[0], parts[1] - 1, parts[2]);
-        if (!Number.isNaN(parsed.getTime())) {
-          setReferenceDate(parsed);
-          setSelectedDate(parsed);
-        }
-      }
+    const parsed = parseDateKey(value.date_range?.start_date);
+    if (parsed) {
+      setReferenceDate(parsed);
+      setSelectedDate(parsed);
     }
   }, [value.date_range]);
 
@@ -241,6 +237,7 @@ const AvailabilityScheduler = ({
                 <Switch
                   value={entry.enabled}
                   onValueChange={() => toggleDayEnabled(date)}
+                  accessibilityLabel={`Available on ${formatDateLabel(date)}`}
                   style={{ marginTop: 2 }}
                   trackColor={{ true: palette.primarySoft, false: palette.dropzone }}
                   thumbColor={entry.enabled ? palette.primary : palette.surface}
@@ -283,6 +280,7 @@ const AvailabilityScheduler = ({
                 <Switch
                   value={entry.enabled}
                   onValueChange={() => toggleDayEnabled(date)}
+                  accessibilityLabel={`Available on ${formatDateLabel(date)}`}
                   trackColor={{ true: palette.primarySoft, false: palette.dropzone }}
                   thumbColor={entry.enabled ? palette.primary : palette.surface}
                 />
@@ -295,9 +293,7 @@ const AvailabilityScheduler = ({
   };
 
   const renderYearView = () => {
-    const activeMonthIndex = value.date_range?.start_date
-      ? new Date(value.date_range.start_date).getMonth()
-      : referenceDate.getMonth();
+    const activeMonthIndex = parseDateKey(value.date_range?.start_date)?.getMonth() ?? referenceDate.getMonth();
     const yearLabel = referenceDate.getFullYear();
     return (
       <View style={{ gap: 8 }}>
@@ -450,6 +446,9 @@ const AvailabilityScheduler = ({
                   <Pressable
                     key={slot}
                     onPress={() => handleRemoveTime(slot)}
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Remove time slot ${slot}`}
                     style={{
                       borderWidth: 1,
                       borderColor: palette.divider,

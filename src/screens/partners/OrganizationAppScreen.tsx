@@ -667,6 +667,8 @@ export default function OrganizationAppScreen() {
           onPress={() => navigation.goBack()}
           style={({ pressed }) => [{ opacity: pressed ? 0.6 : 1 }, styles.backButton]}
           hitSlop={{ top: 12, bottom: 12, left: 12, right: 8 }}
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
         >
           <Text style={{ color: brandPrimary, fontSize: 28, lineHeight: 32, fontWeight: '300' }}>‹</Text>
         </Pressable>

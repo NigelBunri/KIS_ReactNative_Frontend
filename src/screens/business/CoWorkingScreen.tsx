@@ -7,7 +7,6 @@ import {
   Platform,
   Pressable,
   RefreshControl,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -152,7 +151,7 @@ export default function CoWorkingScreen({ navigation }: Props) {
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <View style={styles.navBar}>
-        <Pressable style={styles.backBtn} onPress={() => navigation.goBack()} hitSlop={8}>
+        <Pressable style={styles.backBtn} onPress={() => navigation.goBack()} hitSlop={8} accessibilityRole="button" accessibilityLabel="Go back">
           <KISIcon name="arrow-back-outline" size={24} color={palette.text} />
         </Pressable>
         <Text style={styles.navTitle}>Co-Working Spaces</Text>

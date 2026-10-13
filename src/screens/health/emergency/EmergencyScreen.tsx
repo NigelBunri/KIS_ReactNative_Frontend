@@ -46,8 +46,10 @@ export default function EmergencyScreen({}: Props) {
 
   const [bloodRegistry, setBloodRegistry] = useState<BloodRegistry | null>(null);
   const [loadingRegistry, setLoadingRegistry] = useState(true);
+  const [registryError, setRegistryError] = useState<string | null>(null);
   const [sendingSOS, setSendingSOS] = useState(false);
   const [registeringBlood, setRegisteringBlood] = useState(false);
+  const [showRegisterPicker, setShowRegisterPicker] = useState(false);
   const [searchBloodType, setSearchBloodType] = useState('O+');
   const [searchCountry, setSearchCountry] = useState('');
   const [donors, setDonors] = useState<BloodDonor[]>([]);
@@ -56,40 +58,47 @@ export default function EmergencyScreen({}: Props) {
 
   const fetchRegistry = useCallback(async () => {
     setLoadingRegistry(true);
-    const res = await getRequest(ROUTES.healthExtended.bloodRegistry);
-    if (res.success && res.data) setBloodRegistry(res.data);
-    setLoadingRegistry(false);
+    setRegistryError(null);
+    try {
+      const res = await getRequest(ROUTES.healthExtended.bloodRegistry);
+      if (res.success) {
+        if (res.data) setBloodRegistry(res.data);
+      } else {
+        setRegistryError('Could not load your blood type registration. Please try again.');
+      }
+    } catch {
+      setRegistryError('Unable to check your blood type registration. Check your connection and try again.');
+    } finally {
+      setLoadingRegistry(false);
+    }
   }, []);
 
   useFocusEffect(useCallback(() => { fetchRegistry(); }, [fetchRegistry]));
 
-  const handleRegisterBlood = useCallback(() => {
-    Alert.alert(
-      'Register Blood Type',
-      'Select your blood type:',
-      [
-        ...BLOOD_TYPES.map(bt => ({
-          text: bt,
-          onPress: async () => {
-            setRegisteringBlood(true);
-            try {
-              const res = await postRequest(ROUTES.healthExtended.bloodRegistry, {
-                blood_type: bt,
-                is_donor: true,
-              });
-              if (res?.success || res?.data || res?.id) {
-                setBloodRegistry({ blood_type: bt, is_donor: true, ...(res?.data ?? {}) });
-              }
-            } catch {
-              Alert.alert('Error', 'Could not register blood type. Please try again.');
-            } finally {
-              setRegisteringBlood(false);
-            }
-          },
-        })),
-        { text: 'Cancel', style: 'cancel' },
-      ],
-    );
+  // Registering a blood type used to be driven by a 9-button Alert.alert
+  // (8 blood types + Cancel). React Native's Android Alert only renders up
+  // to 3 buttons reliably - a 9-button alert silently drops most of the
+  // options there, so most users on Android could never actually pick a
+  // blood type. An inline grid (same pattern as the donor-search picker
+  // below) works identically on both platforms.
+  const registerBloodType = useCallback(async (bt: string) => {
+    setRegisteringBlood(true);
+    try {
+      const res = await postRequest(ROUTES.healthExtended.bloodRegistry, {
+        blood_type: bt,
+        is_donor: true,
+      });
+      if (res?.success || res?.data || res?.id) {
+        setBloodRegistry({ blood_type: bt, is_donor: true, ...(res?.data ?? {}) });
+        setShowRegisterPicker(false);
+      } else {
+        Alert.alert('Error', 'Could not register blood type. Please try again.');
+      }
+    } catch {
+      Alert.alert('Error', 'Could not register blood type. Please try again.');
+    } finally {
+      setRegisteringBlood(false);
+    }
   }, []);
 
   const handleSOS = async () => {
@@ -154,7 +163,7 @@ export default function EmergencyScreen({}: Props) {
   return (
     <SafeAreaView style={styles.safe}>
       <LinearGradient
-        colors={[palette.danger, palette.gradientEnd]}
+        colors={[palette.gradientStart, palette.gradientEnd]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={styles.header}
@@ -174,6 +183,9 @@ export default function EmergencyScreen({}: Props) {
             onPress={handleSOS}
             disabled={sendingSOS}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            accessibilityRole="button"
+            accessibilityLabel="Send SOS alert"
+            accessibilityHint="Saves an emergency alert with your location to your account. Does not call emergency services."
           >
             {sendingSOS ? (
               <ActivityIndicator color={palette.ivory} size="large" />
@@ -192,6 +204,12 @@ export default function EmergencyScreen({}: Props) {
           <Text style={styles.cardTitle}>Blood Type Registry</Text>
           {loadingRegistry ? (
             <ActivityIndicator color={palette.primary} />
+          ) : registryError ? (
+            <View style={styles.noBloodType}>
+              <KISIcon name="warning" size={20} color={palette.danger} />
+              <Text style={[styles.noBloodTypeText, { color: palette.danger }]}>{registryError}</Text>
+              <KISButton title="Retry" size="sm" variant="outline" onPress={fetchRegistry} />
+            </View>
           ) : bloodRegistry ? (
             <View style={styles.bloodTypeDisplay}>
               <View style={styles.bloodTypeBadge}>
@@ -208,14 +226,31 @@ export default function EmergencyScreen({}: Props) {
             <View style={styles.noBloodType}>
               <KISIcon name="warning" size={20} color={palette.subtext} />
               <Text style={styles.noBloodTypeText}>Blood type not registered</Text>
-              <KISButton
-                title={registeringBlood ? 'Registering…' : 'Register Your Type'}
-                loading={registeringBlood}
-                variant="outline"
-                size="sm"
-                disabled={registeringBlood}
-                onPress={handleRegisterBlood}
-              />
+              {showRegisterPicker ? (
+                <View style={styles.bloodTypeGrid}>
+                  {BLOOD_TYPES.map((bt) => (
+                    <TouchableOpacity
+                      key={bt}
+                      style={styles.bloodTypeOption}
+                      onPress={() => registerBloodType(bt)}
+                      disabled={registeringBlood}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Register blood type ${bt}`}
+                      hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
+                    >
+                      <Text style={styles.bloodTypeOptionText}>{bt}</Text>
+                    </TouchableOpacity>
+                  ))}
+                  {registeringBlood ? <ActivityIndicator color={palette.primary} /> : null}
+                </View>
+              ) : (
+                <KISButton
+                  title="Register Your Type"
+                  variant="outline"
+                  size="sm"
+                  onPress={() => setShowRegisterPicker(true)}
+                />
+              )}
             </View>
           )}
         </View>
@@ -228,6 +263,9 @@ export default function EmergencyScreen({}: Props) {
           <TouchableOpacity
             style={styles.pickerBtn}
             onPress={() => setShowBloodTypePicker(!showBloodTypePicker)}
+            accessibilityRole="button"
+            accessibilityLabel={`Blood type filter, currently ${searchBloodType}`}
+            accessibilityHint="Opens a list of blood types to choose from"
           >
             <Text style={styles.pickerText}>{searchBloodType}</Text>
             <KISIcon name="chevron-down" size={16} color={palette.subtext} />
@@ -246,6 +284,9 @@ export default function EmergencyScreen({}: Props) {
                     setSearchBloodType(bt);
                     setShowBloodTypePicker(false);
                   }}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: searchBloodType === bt }}
+                  accessibilityLabel={bt}
                   hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
                 >
                   <Text style={[
@@ -355,7 +396,7 @@ function makeStyles(palette: any, sp: number) {
       width: 64,
       height: 64,
       borderRadius: 32,
-      backgroundColor: palette.danger,
+      backgroundColor: palette.primary,
       justifyContent: 'center',
       alignItems: 'center',
     },
@@ -394,11 +435,11 @@ function makeStyles(palette: any, sp: number) {
       justifyContent: 'center',
     },
     bloodTypeOptionActive: {
-      backgroundColor: palette.danger + '22',
-      borderColor: palette.danger,
+      backgroundColor: palette.primary + '22',
+      borderColor: palette.primary,
     },
     bloodTypeOptionText: { fontSize: 13, color: palette.subtext },
-    bloodTypeOptionTextActive: { color: palette.danger, fontWeight: '700' },
+    bloodTypeOptionTextActive: { color: palette.primary, fontWeight: '700' },
     input: {
       backgroundColor: palette.surface,
       borderRadius: 10,
@@ -422,11 +463,11 @@ function makeStyles(palette: any, sp: number) {
       width: 36,
       height: 36,
       borderRadius: 18,
-      backgroundColor: palette.danger + '22',
+      backgroundColor: palette.primary + '22',
       justifyContent: 'center',
       alignItems: 'center',
     },
-    donorBloodText: { fontSize: 11, fontWeight: '700', color: palette.danger },
+    donorBloodText: { fontSize: 11, fontWeight: '700', color: palette.primary },
     donorInfo: { flex: 1 },
     donorName: { fontSize: 13, fontWeight: '600', color: palette.text },
     donorCountry: { fontSize: 11, color: palette.subtext },

@@ -21,6 +21,11 @@ type Props = {
   panelTranslateX: Animated.Value;
   section?: PartnerSettingsSection;
   role: PartnerRole;
+  /** Set by usePartnerSettingsCatalog when the live catalog failed to load
+   *  and the panel is showing the bundled default list instead — surfaced
+   *  so that silently-stale/fallback data doesn't look identical to a
+   *  confirmed, role-accurate catalog from the server. */
+  catalogError?: string | null;
   onClose: () => void;
   onOpenRecruitment?: () => void;
   onOpenAudit?: () => void;
@@ -45,6 +50,7 @@ export default function PartnerSettingsPanel({
   panelTranslateX,
   section,
   role,
+  catalogError,
   onClose,
   onOpenRecruitment,
   onOpenAudit,
@@ -136,6 +142,25 @@ export default function PartnerSettingsPanel({
           contentContainerStyle={styles.settingsPanelBody}
           showsVerticalScrollIndicator={false}
         >
+          {catalogError ? (
+            <View
+              style={{
+                borderWidth: 1,
+                borderColor: palette.borderDanger ?? palette.danger,
+                backgroundColor: palette.dangerSoft ?? palette.surface,
+                borderRadius: 10,
+                padding: 10,
+                marginBottom: 10,
+              }}
+            >
+              <Text style={{ color: palette.danger, fontSize: 12, fontWeight: '700' }}>
+                Showing default settings — live data couldn't be loaded.
+              </Text>
+              <Text style={{ color: palette.subtext, fontSize: 11, marginTop: 2 }}>
+                {catalogError}
+              </Text>
+            </View>
+          ) : null}
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
             {section.features.map((feature) => {
               const allowed = feature.allowed ?? canAccessFeature(role, feature);

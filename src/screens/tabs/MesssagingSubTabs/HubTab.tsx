@@ -4,6 +4,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   KeyboardAvoidingView,
   Modal,
@@ -120,7 +121,7 @@ export default function HubTab({ searchTerm = '', onOpenChat }: HubTabProps) {
       const res = await postRequest(
         ROUTES.channels.subscribeChannel(channel.id),
         {},
-        { errorMessage: '' },
+        { errorMessage: 'Unable to follow this channel.' },
       );
       if (res?.success || res?.ok || (res as any)?.status === 'subscribed') {
         const updated = { ...channel, is_subscribed: true };
@@ -129,9 +130,14 @@ export default function HubTab({ searchTerm = '', onOpenChat }: HubTabProps) {
           const exists = prev.some(c => c.id === channel.id);
           return exists ? prev.map(c => c.id === channel.id ? updated : c) : [updated, ...prev];
         });
+      } else {
+        // Was previously swallowed with no signal at all — the Follow
+        // button just stopped spinning as if nothing happened, with no
+        // way to tell a real failure apart from "nothing to do".
+        Alert.alert('Follow', res?.message || 'Unable to follow this channel.');
       }
-    } catch {
-      // best-effort
+    } catch (error: any) {
+      Alert.alert('Follow', error?.message || 'Unable to follow this channel.');
     } finally {
       setSubscribing(null);
     }
@@ -141,15 +147,27 @@ export default function HubTab({ searchTerm = '', onOpenChat }: HubTabProps) {
     if (subscribing) return;
     setSubscribing(channel.id);
     try {
-      await postRequest(
-        `${ROUTES.channels.subscribeChannel(channel.id)}unsubscribe/`,
+      // Was previously built as `${subscribeChannel(id)}unsubscribe/`, which
+      // produces `.../subscribe/unsubscribe/` — not a real endpoint (see
+      // socialRoutes.ts, which defines unsubscribeChannel as its own sibling
+      // route, `.../unsubscribe/`). Combined with never checking the
+      // response here, every unfollow silently hit a 404 and this screen
+      // still removed the channel from the list and reported success —
+      // the exact fabricate-success-on-failure pattern: the user believes
+      // they unfollowed, the server never recorded it.
+      const res = await postRequest(
+        ROUTES.channels.unsubscribeChannel(channel.id),
         {},
-        { errorMessage: '' },
+        { errorMessage: 'Unable to unfollow this channel.' },
       );
+      if (!res?.success) {
+        Alert.alert('Unfollow', res?.message || 'Unable to unfollow this channel.');
+        return;
+      }
       setSubscribed(prev => prev.filter(c => c.id !== channel.id));
       setDiscoverResults(prev => prev.map(c => c.id === channel.id ? { ...c, is_subscribed: false } : c));
-    } catch {
-      // best-effort
+    } catch (error: any) {
+      Alert.alert('Unfollow', error?.message || 'Unable to unfollow this channel.');
     } finally {
       setSubscribing(null);
     }
@@ -219,6 +237,8 @@ export default function HubTab({ searchTerm = '', onOpenChat }: HubTabProps) {
           onPress={() => { setDiscoverVisible(true); void searchChannels(''); }}
           style={styles.headerBtn}
           hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel="Discover channels"
         >
           <KISIcon name="search" size={20} color={palette.text} />
         </Pressable>
@@ -273,7 +293,13 @@ export default function HubTab({ searchTerm = '', onOpenChat }: HubTabProps) {
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
         <View style={[styles.root, { backgroundColor: palette.bg, }]}>
           <View style={[styles.header, { borderBottomColor: palette.divider ?? palette.inputBorder }]}>
-            <Pressable onPress={() => setDiscoverVisible(false)} style={styles.headerBtn} hitSlop={8}>
+            <Pressable
+              onPress={() => setDiscoverVisible(false)}
+              style={styles.headerBtn}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel="Close"
+            >
               <KISIcon name="close" size={22} color={palette.text} />
             </Pressable>
             <View style={[styles.searchBar, { backgroundColor: palette.surface ?? palette.card, borderColor: palette.inputBorder }]}>
@@ -287,7 +313,12 @@ export default function HubTab({ searchTerm = '', onOpenChat }: HubTabProps) {
                 autoFocus
               />
               {discoverQuery.length > 0 && (
-                <Pressable onPress={() => setDiscoverQuery('')} hitSlop={8}>
+                <Pressable
+                  onPress={() => setDiscoverQuery('')}
+                  hitSlop={8}
+                  accessibilityRole="button"
+                  accessibilityLabel="Clear search"
+                >
                   <KISIcon name="close" size={14} color={palette.subtext} />
                 </Pressable>
               )}

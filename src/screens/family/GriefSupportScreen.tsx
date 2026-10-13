@@ -88,7 +88,17 @@ export default function GriefSupportScreen({ navigation }: Props) {
   async function submitJoin(groupId: string, anonymous: boolean) {
     setJoiningId(groupId);
     try {
-      await postRequest(ROUTES.family.griefGroupJoin(groupId), { anonymous });
+      // Previously: success was assumed as soon as the request didn't throw,
+      // so a backend-rejected join (res.success === false) still told
+      // someone grieving "You have joined the group. You are not alone,"
+      // and bumped the member count, when they were never actually added —
+      // the exact fabricate-success-on-failure pattern this audit hunts for,
+      // here landing on an emotionally sensitive support feature.
+      const res: any = await postRequest(ROUTES.family.griefGroupJoin(groupId), { anonymous });
+      if (!res?.success) {
+        Alert.alert('Error', res?.message ?? 'Failed to join group. Please try again.');
+        return;
+      }
       Alert.alert('Joined', 'You have joined the group. You are not alone.');
       setGroups((prev) =>
         prev.map((g) => g.id === groupId ? { ...g, member_count: g.member_count + 1 } : g),

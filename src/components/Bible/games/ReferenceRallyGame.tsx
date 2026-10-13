@@ -130,6 +130,7 @@ export default function ReferenceRallyGame({ gameKey, stageIndex, isReplay, onEx
             }}
             onBackToJourney={onExit}
             onViewStats={onOpenStats}
+            persisted={stageResult.persisted}
           />
         </View>
       </GameShell>

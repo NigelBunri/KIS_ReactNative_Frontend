@@ -254,6 +254,8 @@ export default function IncomingCallScreen({ session, onAnswer, onDecline }: Pro
               }
               style={[styles.snoozeBtn, { backgroundColor: `${palette.text}14` }]}
               hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel="Remind me later"
             >
               <Text style={[styles.snoozeText, { color: `${palette.text}80` }]}>Remind me</Text>
             </Pressable>
@@ -263,6 +265,8 @@ export default function IncomingCallScreen({ session, onAnswer, onDecline }: Pro
                 onPress={() => onAnswer({ videoOff: true })}
                 style={[styles.snoozeBtn, { backgroundColor: `${palette.text}14` }]}
                 hitSlop={8}
+                accessibilityRole="button"
+                accessibilityLabel="Answer without camera"
               >
                 <Text style={[styles.snoozeText, { color: `${palette.text}80` }]}>Answer (no cam)</Text>
               </Pressable>

@@ -14,6 +14,7 @@ import LinearGradient from 'react-native-linear-gradient';
 import { useKISTheme } from '@/theme/useTheme';
 import { useResponsiveLayout } from '@/theme/responsive';
 import { KISIcon } from '@/constants/kisIcons';
+import KISButton from '@/constants/KISButton';
 import { getRequest } from '@/network/get';
 import ROUTES from '@/network';
 import type { RootStackParamList } from '@/navigation/types';
@@ -64,20 +65,27 @@ export default function CreatorAnalyticsScreen({ navigation }: Props) {
 
   const [data, setData] = useState<AnalyticsData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
 
-  useFocusEffect(
-    useCallback(() => {
-      let active = true;
-      setLoading(true);
-      getRequest(ROUTES.mediaExtended.creatorAnalytics)
-        .then((res: any) => {
-          if (active) setData(res?.data ?? res ?? null);
-        })
-        .catch(() => {})
-        .finally(() => { if (active) setLoading(false); });
-      return () => { active = false; };
-    }, []),
-  );
+  const fetchAnalytics = useCallback(() => {
+    let active = true;
+    setLoading(true);
+    setLoadError(false);
+    getRequest(ROUTES.mediaExtended.creatorAnalytics)
+      .then((res: any) => {
+        if (!active) return;
+        if (res?.success === false) {
+          setLoadError(true);
+          return;
+        }
+        setData(res?.data ?? res ?? null);
+      })
+      .catch(() => { if (active) setLoadError(true); })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, []);
+
+  useFocusEffect(useCallback(() => fetchAnalytics(), [fetchAnalytics]));
 
   const trends: MonthlyTrend[] = (data?.monthly_trends ?? []).slice(-6);
   const maxPlays = Math.max(...trends.map((t) => t.plays), 1);
@@ -169,7 +177,13 @@ export default function CreatorAnalyticsScreen({ navigation }: Props) {
   return (
     <SafeAreaView style={styles.safe}>
       <LinearGradient colors={[palette.gradientStart, palette.gradientEnd]} style={styles.header}>
-        <Pressable style={styles.backBtn} onPress={() => navigation.goBack()} hitSlop={8}>
+        <Pressable
+          style={styles.backBtn}
+          onPress={() => navigation.goBack()}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
+        >
           <KISIcon name="chevron-back-outline" size={22} color={palette.ivory} />
           <Text style={styles.backLabel}>Back</Text>
         </Pressable>
@@ -177,6 +191,22 @@ export default function CreatorAnalyticsScreen({ navigation }: Props) {
       </LinearGradient>
 
       <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
+        {loadError && (
+          <View
+            style={{
+              backgroundColor: palette.dangerSoft ?? palette.card,
+              borderRadius: 12,
+              padding: 14,
+              marginBottom: 16,
+              gap: 8,
+            }}
+          >
+            <Text style={{ color: palette.danger, fontWeight: '700' }}>
+              Unable to load analytics. The figures below may be out of date.
+            </Text>
+            <KISButton title="Retry" size="sm" variant="outline" onPress={fetchAnalytics} />
+          </View>
+        )}
         {/* Stats Cards */}
         <View style={styles.statsRow}>
           <View style={styles.statCard}>
@@ -213,7 +243,12 @@ export default function CreatorAnalyticsScreen({ navigation }: Props) {
                 {trends.map((t, i) => {
                   const heightPct = maxPlays > 0 ? (t.plays / maxPlays) * 100 : 4;
                   return (
-                    <View key={i} style={styles.barWrap}>
+                    <View
+                      key={i}
+                      style={styles.barWrap}
+                      accessible
+                      accessibilityLabel={`${t.month ?? 'Month'}: ${formatCount(t.plays)} plays`}
+                    >
                       <View
                         style={[
                           styles.bar,

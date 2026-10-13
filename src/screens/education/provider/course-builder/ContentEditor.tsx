@@ -314,7 +314,7 @@ export default function ContentEditor({ institutionId, courseId }: Props) {
               >
                 <KISIcon name="book" size={16} color={palette.primary} />
                 <Text style={{ color: palette.text, fontWeight: '700', flex: 1 }} numberOfLines={1}>{lesson.title}</Text>
-                <KISButton variant="ghost" onPress={() => deleteLesson(lesson)}>
+                <KISButton variant="ghost" accessibilityLabel="Delete lesson" onPress={() => deleteLesson(lesson)}>
                   <KISIcon name="trash" size={15} color={palette.danger} />
                 </KISButton>
                 <KISIcon name={expanded ? 'chevron-down' : 'chevron-right'} size={16} color={palette.subtext} />
@@ -365,7 +365,7 @@ export default function ContentEditor({ institutionId, courseId }: Props) {
                 <KISIcon name="file" size={16} color={palette.primary} />
                 <Text style={{ color: palette.text, fontWeight: '700', flex: 1 }} numberOfLines={1}>{material.title}</Text>
                 <Text style={{ fontSize: 11, color: palette.subtext, textTransform: 'capitalize' }}>{material.kind}</Text>
-                <KISButton variant="ghost" onPress={() => deleteMaterial(material)}>
+                <KISButton variant="ghost" accessibilityLabel="Delete material" onPress={() => deleteMaterial(material)}>
                   <KISIcon name="trash" size={15} color={palette.danger} />
                 </KISButton>
               </View>

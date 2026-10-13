@@ -435,7 +435,15 @@ const ChatRow = memo(function ChatRow({
                 ? getStatusSymbol(meta.lastStatus)
                 : '';
             const statusColor =
-              meta?.lastStatus === 'read'
+              // 'failed' previously fell through to the same neutral
+              // palette.subtext used for a normal sent/pending message - the
+              // "!" glyph was the only signal anything went wrong, with no
+              // color to make it stand out in a quick glance down the chat
+              // list. Give it the same red used for failed-send state inside
+              // the chat room itself (MessageBubble's renderStatusIcon).
+              meta?.lastStatus === 'failed'
+                ? palette.danger ?? palette.subtext
+                : meta?.lastStatus === 'read'
                 ? palette.readStatus ?? palette.primary
                 : meta?.lastStatus === 'delivered'
                 ? palette.primary ?? palette.subtext

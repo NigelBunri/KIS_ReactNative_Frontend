@@ -37,7 +37,12 @@ export function PollComposerPage({
         />
       ))}
 
-      <Pressable onPress={() => setPollOptions((p) => [...p, ''])} style={[styles.secondaryButton, { borderColor: palette.divider }]}>
+      <Pressable
+        onPress={() => setPollOptions((p) => [...p, ''])}
+        accessibilityRole="button"
+        accessibilityLabel="Add poll option"
+        style={[styles.secondaryButton, { borderColor: palette.divider }]}
+      >
         <Text style={{ color: palette.text, fontWeight: '900' }}>Add option</Text>
       </Pressable>
     </View>

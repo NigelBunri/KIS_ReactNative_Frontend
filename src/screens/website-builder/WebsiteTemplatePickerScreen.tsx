@@ -24,12 +24,22 @@ export default function WebsiteTemplatePickerScreen({ navigation, route }: Props
 
   const [loading, setLoading] = useState(true);
   const [templates, setTemplates] = useState<Template[]>([]);
+  const [templatesError, setTemplatesError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
 
   useEffect(() => {
     (async () => {
       try {
         const res = await getRequest(ROUTES.websites.templates(ownerType));
+        // A failed request used to fall through `?? res` and render as "no
+        // templates" — indistinguishable from a deployment that genuinely
+        // has none. "Start From Blank" still works either way, so this is
+        // surfaced as an inline notice rather than blocking the screen.
+        if ((res as any)?.success === false) {
+          setTemplatesError((res as any)?.message || 'Unable to load templates.');
+          setTemplates([]);
+          return;
+        }
         const data = (res as any)?.data ?? res;
         setTemplates(Array.isArray(data) ? data : []);
       } finally {
@@ -66,6 +76,12 @@ export default function WebsiteTemplatePickerScreen({ navigation, route }: Props
         <Text style={{ ...typography.caption, color: palette.subtext, marginTop: 2 }}>
           Pick a starting point — you can change everything afterward.
         </Text>
+
+        {templatesError ? (
+          <Text style={{ ...typography.caption, color: '#B42318', marginTop: spacing.sm }}>
+            {templatesError} You can still start from blank below.
+          </Text>
+        ) : null}
 
         <View style={{ marginTop: spacing.md, gap: spacing.sm }}>
           {templates.map((template) => (

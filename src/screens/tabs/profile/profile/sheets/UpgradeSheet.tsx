@@ -1,6 +1,6 @@
 // src/screens/tabs/profile/profile/sheets/UpgradeSheet.tsx
 import React from 'react';
-import { Linking, Pressable, Text, View } from 'react-native';
+import { Alert, Linking, Pressable, Text, View } from 'react-native';
 import { useKISTheme } from '@/theme/useTheme';
 import KISButton from '@/constants/KISButton';
 import KISText from '@/components/common/KISText';
@@ -56,6 +56,18 @@ export default function UpgradeSheet(props: {
   // predicts or displays a discount amount itself.
   const [applyRewards, setApplyRewards] = React.useState(false);
   const hasRewardBalance = Number(rewardBalance ?? 0) > 0;
+
+  const confirmCancel = (immediate: boolean) =>
+    Alert.alert(
+      immediate ? 'Cancel immediately' : 'End this cycle',
+      immediate
+        ? 'Your subscription will be cancelled right away and your account will move back to the free tier immediately. This cannot be undone.'
+        : 'Your subscription will stop renewing and will end at the close of the current billing cycle. You can resume it any time before then.',
+      [
+        { text: 'Keep subscription', style: 'cancel' },
+        { text: immediate ? 'Cancel immediately' : 'End this cycle', style: 'destructive', onPress: () => onCancel?.(immediate) },
+      ],
+    );
 
   const currentKey = String(accountTier?.id ?? accountTier?.name ?? '');
   const currentMeta = tierMetaFor(accountTier || {});
@@ -245,14 +257,14 @@ export default function UpgradeSheet(props: {
             <KISButton
               title="End this cycle"
               variant="outline"
-              onPress={() => onCancel?.(false)}
+              onPress={() => confirmCancel(false)}
               disabled={saving}
             />
           )}
           <KISButton
             title="Cancel immediately"
             variant="outline"
-            onPress={() => onCancel?.(true)}
+            onPress={() => confirmCancel(true)}
             disabled={saving}
           />
         </View>
@@ -439,7 +451,11 @@ export default function UpgradeSheet(props: {
               size="xs"
               variant="outline"
               left={<KISIcon name="document" size={14} color={palette.text} />}
-              onPress={() => Linking.openURL(billingHistory.invoice_pdf_url as string)}
+              onPress={() =>
+                Linking.openURL(billingHistory.invoice_pdf_url as string).catch(() =>
+                  Alert.alert('Invoice', 'Unable to open the invoice.'),
+                )
+              }
             />
           ) : null}
         </View>
@@ -484,14 +500,22 @@ export default function UpgradeSheet(props: {
                     title="Receipt"
                     size="xs"
                     variant="outline"
-                    onPress={() => Linking.openURL(tx.receipt_pdf_url)}
+                    onPress={() =>
+                      Linking.openURL(tx.receipt_pdf_url).catch(() =>
+                        Alert.alert('Receipt', 'Unable to open the receipt.'),
+                      )
+                    }
                   />
                 ) : tx.status === 'success' && tx.receipt_url ? (
                   <KISButton
                     title="Receipt"
                     size="xs"
                     variant="outline"
-                    onPress={() => Linking.openURL(tx.receipt_url)}
+                    onPress={() =>
+                      Linking.openURL(tx.receipt_url).catch(() =>
+                        Alert.alert('Receipt', 'Unable to open the receipt.'),
+                      )
+                    }
                   />
                 ) : null}
                 {tx.status === 'failed' ? (

@@ -66,17 +66,28 @@ export default function PregnancyTrackerScreen({ navigation }: Props) {
 
   const [data, setData] = useState<PregnancyData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const [selectedSymptoms, setSelectedSymptoms] = useState<string[]>([]);
   const [savingSymptoms, setSavingSymptoms] = useState(false);
 
   const fetchPregnancy = useCallback(async () => {
     setLoading(true);
-    const res = await getRequest(ROUTES.healthExtended.pregnancy);
-    if (res.success && res.data) {
-      setData(res.data);
-      setSelectedSymptoms(res.data.symptoms ?? []);
+    setFetchError(null);
+    try {
+      const res = await getRequest(ROUTES.healthExtended.pregnancy);
+      if (res.success) {
+        if (res.data) {
+          setData(res.data);
+          setSelectedSymptoms(res.data.symptoms ?? []);
+        }
+      } else {
+        setFetchError('Could not load your pregnancy tracker. Please try again.');
+      }
+    } catch {
+      setFetchError('Unable to load your pregnancy tracker. Check your connection and try again.');
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }, []);
 
   useFocusEffect(useCallback(() => { fetchPregnancy(); }, [fetchPregnancy]));
@@ -128,6 +139,8 @@ export default function PregnancyTrackerScreen({ navigation }: Props) {
           onPress={() => navigation.goBack()}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           style={styles.backBtn}
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
         >
           <KISIcon name="arrow-left" size={22} color={palette.ivory} />
         </TouchableOpacity>
@@ -138,7 +151,12 @@ export default function PregnancyTrackerScreen({ navigation }: Props) {
         contentContainerStyle={[styles.content, { paddingBottom: 80 }]}
         showsVerticalScrollIndicator={false}
       >
-        {!data ? (
+        {fetchError ? (
+          <View style={{ alignItems: 'center', gap: 10, marginTop: 40 }}>
+            <Text style={[styles.emptyText, { color: palette.danger, marginTop: 0 }]}>{fetchError}</Text>
+            <KISButton title="Retry" size="sm" variant="outline" onPress={fetchPregnancy} />
+          </View>
+        ) : !data ? (
           <Text style={styles.emptyText}>No pregnancy profile found.</Text>
         ) : (
           <>

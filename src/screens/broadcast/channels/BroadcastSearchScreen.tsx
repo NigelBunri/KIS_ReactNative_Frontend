@@ -79,15 +79,22 @@ export default function BroadcastSearchScreen() {
   const [results, setResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [focused, setFocused] = useState(false);
+  // Distinguishes "searched and found nothing" from "the request failed" -
+  // without this, a network error silently rendered the same "No results
+  // for ..." empty state as a genuine zero-result search, with no way for
+  // the user to tell the difference or retry.
+  const [error, setError] = useState<string | null>(null);
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const runSearch = useCallback(async (q: string, type: ContentType, sort: SortOption) => {
     if (!q.trim()) {
       setResults([]);
+      setError(null);
       return;
     }
     setLoading(true);
+    setError(null);
     try {
       const typeParam = type !== 'all' ? `&type=${type}` : '';
       const res = await getRequest(
@@ -103,6 +110,7 @@ export default function BroadcastSearchScreen() {
       setResults(raw);
     } catch {
       setResults([]);
+      setError('Could not load search results. Tap to retry.');
     } finally {
       setLoading(false);
     }
@@ -195,7 +203,13 @@ export default function BroadcastSearchScreen() {
           autoCorrect={false}
         />
         {query.length > 0 && (
-          <Pressable onPress={() => setQuery('')} style={styles.clearButton} hitSlop={10}>
+          <Pressable
+            onPress={() => setQuery('')}
+            style={styles.clearButton}
+            hitSlop={10}
+            accessibilityRole="button"
+            accessibilityLabel="Clear search"
+          >
             <KISIcon name="close" size={16} color={palette.subtext} />
           </Pressable>
         )}
@@ -276,6 +290,19 @@ export default function BroadcastSearchScreen() {
         </View>
       ) : loading ? (
         renderSkeleton()
+      ) : error ? (
+        <View style={styles.emptyState}>
+          <KISIcon name="warning" size={32} color={palette.danger} />
+          <Text style={[styles.emptyTitle, { color: palette.danger }]}>{error}</Text>
+          <Pressable
+            onPress={() => runSearch(query, activeType, activeSort)}
+            accessibilityRole="button"
+            accessibilityLabel="Retry search"
+            style={{ marginTop: 4, paddingHorizontal: 18, paddingVertical: 10, borderRadius: 10, backgroundColor: palette.primary }}
+          >
+            <Text style={{ color: palette.onPrimary, fontWeight: '700', fontSize: 13 }}>Retry</Text>
+          </Pressable>
+        </View>
       ) : results.length === 0 ? (
         <View style={styles.emptyState}>
           <Text style={[styles.emptyTitle, { color: palette.subtext }]}>

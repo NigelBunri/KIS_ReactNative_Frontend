@@ -796,7 +796,7 @@ export default function EventsScreen() {
           style={[styles.infoBanner, { backgroundColor: palette.surface, borderColor: palette.border }]}
         >
           <Text style={{ color: palette.subtext, fontSize: 13, flex: 1 }}>{headerError}</Text>
-          <KISButton variant="ghost" onPress={() => setHeaderError('')}>
+          <KISButton variant="ghost" onPress={() => setHeaderError('')} accessibilityLabel="Dismiss">
             <KISIcon name="close" size={15} color={palette.subtext} />
           </KISButton>
         </View>
@@ -1073,7 +1073,7 @@ export default function EventsScreen() {
               <Text style={[styles.modalTitle, { color: palette.text, flex: 1 }]} numberOfLines={2}>
                 {detailEvent?.title}
               </Text>
-              <KISButton variant="ghost" onPress={() => setDetailVisible(false)}>
+              <KISButton variant="ghost" onPress={() => setDetailVisible(false)} accessibilityLabel="Close">
                 <KISIcon name="close" size={20} color={palette.subtext} />
               </KISButton>
             </View>
@@ -1371,7 +1371,7 @@ export default function EventsScreen() {
               <Text style={[styles.modalTitle, { color: palette.text, flex: 1 }]}>
                 Set Reminder
               </Text>
-              <KISButton variant="ghost" onPress={() => setReminderModalVisible(false)}>
+              <KISButton variant="ghost" onPress={() => setReminderModalVisible(false)} accessibilityLabel="Close">
                 <KISIcon name="close" size={20} color={palette.subtext} />
               </KISButton>
             </View>
@@ -1428,7 +1428,7 @@ export default function EventsScreen() {
               <Text style={[styles.modalTitle, { color: palette.text, flex: 1 }]}>
                 Attendees
               </Text>
-              <KISButton variant="ghost" onPress={() => setAttendeeModalVisible(false)}>
+              <KISButton variant="ghost" onPress={() => setAttendeeModalVisible(false)} accessibilityLabel="Close">
                 <KISIcon name="close" size={20} color={palette.subtext} />
               </KISButton>
             </View>

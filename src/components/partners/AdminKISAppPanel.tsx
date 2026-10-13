@@ -184,9 +184,13 @@ export default function AdminKISAppPanel({ isOpen, panelWidth, panelTranslateX, 
   const toggleFlag = useCallback(async (flag: FeatureFlag) => {
     setActionLoading(flag.key);
     try {
-      await postRequest(`/api/v1/admin/feature-flags/${flag.key}/toggle/`, {
+      const res: any = await postRequest(`/api/v1/admin/feature-flags/${flag.key}/toggle/`, {
         enabled: !flag.enabled,
       });
+      if (res?.success === false) {
+        Alert.alert('Error', res?.message || 'Could not toggle flag.');
+        return;
+      }
       setFlags(prev => prev.map(f => f.key === flag.key ? { ...f, enabled: !f.enabled } : f));
     } catch (e: any) {
       Alert.alert('Error', e?.message || 'Could not toggle flag.');
@@ -202,7 +206,11 @@ export default function AdminKISAppPanel({ isOpen, panelWidth, panelTranslateX, 
       async (message) => {
         if (!message?.trim()) return;
         try {
-          await postRequest('/api/v1/admin/notifications/broadcast/', { message: message.trim(), type: 'platform' });
+          const res: any = await postRequest('/api/v1/admin/notifications/broadcast/', { message: message.trim(), type: 'platform' });
+          if (res?.success === false) {
+            Alert.alert('Error', res?.message || 'Failed to send.');
+            return;
+          }
           Alert.alert('Sent', 'Platform notification queued.');
         } catch (e: any) {
           Alert.alert('Error', e?.message || 'Failed to send.');
@@ -244,7 +252,12 @@ export default function AdminKISAppPanel({ isOpen, panelWidth, panelTranslateX, 
       >
         {/* Header */}
         <View style={[styles.header, { borderBottomColor: palette.divider }]}>
-          <Pressable onPress={activeSection ? () => setActiveSection(null) : onClose} style={styles.backBtn}>
+          <Pressable
+            onPress={activeSection ? () => setActiveSection(null) : onClose}
+            style={styles.backBtn}
+            accessibilityRole="button"
+            accessibilityLabel={activeSection ? 'Back' : 'Close'}
+          >
             <Text style={{ color: palette.primary, fontSize: 28, lineHeight: 32, fontWeight: '300' }}>‹</Text>
           </Pressable>
           <View style={{ flex: 1 }}>

@@ -73,6 +73,8 @@ export default function WaitingForHostScreen({ visible, callTitle, onLeave }: Pr
 
           <Pressable
             onPress={onLeave}
+            accessibilityRole="button"
+            accessibilityLabel="Leave waiting room"
             style={[styles.leaveBtn, { borderColor: palette.danger }]}
           >
             <KISIcon name="phone-off" size={18} color={palette.danger} />

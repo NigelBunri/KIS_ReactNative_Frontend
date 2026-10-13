@@ -190,7 +190,13 @@ export default function AdminUserManagementScreen() {
     <SafeAreaView style={[styles.safeArea, { backgroundColor: palette.bg, }]} edges={['top']}>
       {/* Header */}
       <View style={[styles.header, { borderBottomColor: palette.divider }]}>
-        <Pressable onPress={() => navigation.goBack()} style={styles.backButton} hitSlop={12}>
+        <Pressable
+          onPress={() => navigation.goBack()}
+          style={styles.backButton}
+          hitSlop={12}
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
+        >
           <KISIcon name="arrow-back" size={22} color={palette.text} />
         </Pressable>
         <Text style={[styles.headerTitle, { color: palette.text }]}>User Management</Text>

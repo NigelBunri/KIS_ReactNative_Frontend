@@ -171,6 +171,9 @@ export default function AdminBiblePanel({ isOpen, panelWidth, panelTranslateX, o
           <Pressable
             onPress={activeSection ? () => setActiveSection(null) : onClose}
             style={styles.backBtn}
+            accessibilityRole="button"
+            accessibilityLabel={activeSection ? 'Back' : 'Close'}
+            hitSlop={8}
           >
             <Text style={{ color: palette.primary, fontSize: 28, lineHeight: 32, fontWeight: '300' }}>‹</Text>
           </Pressable>
@@ -505,7 +508,13 @@ function MeditationsSection({ palette }: { palette: any }) {
                     {item.status === 'published' ? 'Unpublish' : 'Publish'}
                   </Text>
                 </Pressable>
-                <Pressable onPress={() => handleDelete(item)} style={{ padding: 4 }}>
+                <Pressable
+                  onPress={() => handleDelete(item)}
+                  style={{ padding: 4 }}
+                  accessibilityRole="button"
+                  accessibilityLabel="Delete"
+                  hitSlop={8}
+                >
                   <Text style={{ color: palette.danger, fontWeight: '800', fontSize: 16 }}>×</Text>
                 </Pressable>
               </View>
@@ -672,7 +681,13 @@ function BooksSection({ palette }: { palette: any }) {
                     {item.status === 'published' ? 'Unpublish' : 'Publish'}
                   </Text>
                 </Pressable>
-                <Pressable onPress={() => handleDelete(item)} style={{ padding: 4 }}>
+                <Pressable
+                  onPress={() => handleDelete(item)}
+                  style={{ padding: 4 }}
+                  accessibilityRole="button"
+                  accessibilityLabel="Delete"
+                  hitSlop={8}
+                >
                   <Text style={{ color: palette.danger, fontWeight: '800', fontSize: 16 }}>×</Text>
                 </Pressable>
               </View>
@@ -830,7 +845,13 @@ function MinistersSection({ palette }: { palette: any }) {
                     {item.status === 'published' ? 'Unpublish' : 'Publish'}
                   </Text>
                 </Pressable>
-                <Pressable onPress={() => handleDelete(item)} style={{ padding: 4 }}>
+                <Pressable
+                  onPress={() => handleDelete(item)}
+                  style={{ padding: 4 }}
+                  accessibilityRole="button"
+                  accessibilityLabel="Delete"
+                  hitSlop={8}
+                >
                   <Text style={{ color: palette.danger, fontWeight: '800', fontSize: 16 }}>×</Text>
                 </Pressable>
               </View>
@@ -1098,7 +1119,13 @@ function DailyPassagesSection({ palette }: { palette: any }) {
                     </Text>
                   ) : null}
                 </View>
-                <Pressable onPress={() => handleDelete(item)} style={{ padding: 4 }}>
+                <Pressable
+                  onPress={() => handleDelete(item)}
+                  style={{ padding: 4 }}
+                  accessibilityRole="button"
+                  accessibilityLabel="Delete"
+                  hitSlop={8}
+                >
                   <Text style={{ color: palette.danger, fontWeight: '800', fontSize: 16 }}>×</Text>
                 </Pressable>
               </View>

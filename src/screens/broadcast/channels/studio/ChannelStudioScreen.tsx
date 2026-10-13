@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { KISIcon } from '@/constants/kisIcons';
@@ -380,6 +380,29 @@ export default function ChannelStudioScreen({ legacyFeeds, liveCount, expiresAt,
     }
   }, [channelBroadcasting, refresh, selectedChannel?.id, selectedChannel?.is_broadcast]);
 
+  // Turning broadcast ON is low-stakes (nothing changes for existing
+  // subscribers until there's something to see), but turning it OFF
+  // immediately hides the channel and all of its public content from
+  // subscribers — a channel-wide, high-visibility action with no prior
+  // confirmation. Gate only the "stop broadcasting" direction, matching
+  // the confirm-only-on-destructive pattern used for "End stream" in
+  // LiveControlRoom and "Remove" in ChannelModerationPanel.
+  const confirmToggleChannelBroadcast = useCallback(() => {
+    if (!selectedChannel) return;
+    if (!selectedChannel.is_broadcast) {
+      void handleToggleChannelBroadcast();
+      return;
+    }
+    Alert.alert(
+      'Stop broadcasting this channel?',
+      'Your channel and its public content will be hidden from subscribers until you broadcast again.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Stop broadcasting', style: 'destructive', onPress: () => void handleToggleChannelBroadcast() },
+      ],
+    );
+  }, [selectedChannel, handleToggleChannelBroadcast]);
+
   const handleToggleContentBroadcast = useCallback(async (content: BroadcastChannelContent, nextState: boolean) => {
     if (!content?.id) return;
     setContentBroadcastingId(content.id);
@@ -465,7 +488,12 @@ export default function ChannelStudioScreen({ legacyFeeds, liveCount, expiresAt,
           <Text style={[styles.successText, { color: palette.success, flex: 1 }]}>
             @{lastCreatedHandle} created! Fill in the form below to add another channel.
           </Text>
-          <KISButton variant="ghost" onPress={() => { setCreateFormVisible(false); setLastCreatedHandle(null); }} style={styles.smallIconButton}>
+          <KISButton
+            variant="ghost"
+            onPress={() => { setCreateFormVisible(false); setLastCreatedHandle(null); }}
+            style={styles.smallIconButton}
+            accessibilityLabel="Dismiss channel created notice"
+          >
             <KISIcon name="close" size={16} color={palette.subtext} />
           </KISButton>
         </View>
@@ -476,7 +504,12 @@ export default function ChannelStudioScreen({ legacyFeeds, liveCount, expiresAt,
           <Text style={[styles.sectionText, { color: palette.subtext }]}>Feeds, videos, lives, playlists, and embeds will live under this channel.</Text>
         </View>
         {channels.length || lastCreatedHandle ? (
-          <KISButton variant="ghost" onPress={() => { setCreateFormVisible(false); setLastCreatedHandle(null); }} style={styles.smallIconButton}>
+          <KISButton
+            variant="ghost"
+            onPress={() => { setCreateFormVisible(false); setLastCreatedHandle(null); }}
+            style={styles.smallIconButton}
+            accessibilityLabel="Close create channel form"
+          >
             <KISIcon name="close" size={18} color={palette.subtext} />
           </KISButton>
         ) : null}
@@ -727,7 +760,7 @@ export default function ChannelStudioScreen({ legacyFeeds, liveCount, expiresAt,
             <KISButton
               title={compact ? (selectedChannel.is_broadcast ? 'Stop broadcast' : 'Broadcast') : (selectedChannel.is_broadcast ? 'Stop broadcasting channel' : 'Broadcast channel')}
               variant={selectedChannel.is_broadcast ? 'danger' : 'outline'}
-              onPress={handleToggleChannelBroadcast}
+              onPress={confirmToggleChannelBroadcast}
               disabled={channelBroadcasting}
               loading={channelBroadcasting}
             />

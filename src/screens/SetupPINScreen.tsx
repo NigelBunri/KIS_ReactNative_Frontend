@@ -253,6 +253,8 @@ export default function SetupPINScreen() {
                   style={({ pressed }) => [styles.key, pressed && styles.keyPressed]}
                   onPress={pressDelete}
                   disabled={saving}
+                  accessibilityRole="button"
+                  accessibilityLabel="Delete digit"
                 >
                   <Text style={styles.keyTextSmall}>⌫</Text>
                 </Pressable>

@@ -209,17 +209,16 @@ export default function EmergencyDispatchManager({ institutionId, engineKey }: P
       role: "EMT",
     });
 
-    const newAmbulance: Ambulance =
-      res.success && res.data
-        ? normalizeAmbulance(res.data)
-        : {
-            id: Date.now().toString(),
-            driver: newDriver,
-            location: newLocation,
-            status: "Available",
-          };
+    // Previously: a failed POST silently fell through to a local-only fake
+    // ambulance entry with no indication the backend write failed — the
+    // dispatcher would believe a real unit was added to the fleet when it
+    // was not. Surface the failure instead of fabricating fleet data.
+    if (!res.success || !res.data) {
+      Alert.alert("Fleet", res?.message || "Unable to add ambulance. Please try again.");
+      return;
+    }
 
-    setFleet((prev) => [...prev, newAmbulance]);
+    setFleet((prev) => [...prev, normalizeAmbulance(res.data)]);
     setNewDriver("");
     setNewLocation("");
   }, [newDriver, newLocation]);
@@ -263,25 +262,18 @@ export default function EmergencyDispatchManager({ institutionId, engineKey }: P
 
     const res = await postRequest(ROUTES.healthOps.emergencySessionStart, payload);
 
-    const newRequest: EmergencyRequest =
-      res.success && res.data
-        ? normalizeRequest(res.data)
-        : {
-            id: Date.now().toString(),
-            patientName,
-            location,
-            type: emergencyType,
-            priority,
-            distanceKm: km,
-            assignedAmbulance:
-              autoAssign && availableAmbulance
-                ? availableAmbulance.id
-                : undefined,
-            status: "Requested",
-            price,
-          };
+    // Previously: a failed dispatch POST silently fell through to a
+    // local-only fake emergency request — the dispatcher would see the
+    // request on screen and believe an ambulance was on its way when
+    // nothing was actually created on the backend. For an emergency
+    // dispatch workflow that is a patient-safety risk, so surface the
+    // failure instead of fabricating the request.
+    if (!res.success || !res.data) {
+      Alert.alert("Emergency dispatch", res?.message || "Unable to create the emergency request. Please try again.");
+      return;
+    }
 
-    setRequests((prev) => [...prev, newRequest]);
+    setRequests((prev) => [...prev, normalizeRequest(res.data)]);
 
     if (autoAssign && availableAmbulance) {
       updateAmbulanceStatus(availableAmbulance.id, "En Route");

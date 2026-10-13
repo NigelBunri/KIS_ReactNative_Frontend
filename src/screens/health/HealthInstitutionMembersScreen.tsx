@@ -609,26 +609,42 @@ export default function HealthInstitutionMembersScreen({ route, navigation }: Pr
       return;
     }
 
-    setMembers((prev) => {
-      const target = prev.find((member) => member.id === memberId);
-      if (!target) return prev;
-      if (normalizeRole(target.role) === 'owner') {
-        Alert.alert('Members', 'Owner cannot be removed.');
-        return prev;
-      }
-      if (!isRoleAssignableByActor(target, normalizeRole(target.role))) {
-        Alert.alert('Members', 'You cannot remove this member.');
-        return prev;
-      }
+    const target = members.find((member) => member.id === memberId);
+    if (!target) return;
+    if (normalizeRole(target.role) === 'owner') {
+      Alert.alert('Members', 'Owner cannot be removed.');
+      return;
+    }
+    if (!isRoleAssignableByActor(target, normalizeRole(target.role))) {
+      Alert.alert('Members', 'You cannot remove this member.');
+      return;
+    }
 
-      appendAuditLog({
-        action: 'member.removed',
-        memberName: target.name,
-        fromRole: String(target.role || ''),
-      });
-      return prev.filter((member) => member.id !== memberId);
-    });
-  }, [appendAuditLog, canManageMembers, isRoleAssignableByActor]);
+    // Removing a member revokes their institution access immediately on
+    // save, so confirm before applying it — the rest of this screen's
+    // destructive paths ("Owner cannot be removed", single-owner enforcement)
+    // already guard with an Alert; this path previously removed on a single
+    // tap with no confirmation at all.
+    Alert.alert(
+      'Remove member',
+      `Remove ${target.name} from this institution? They will lose access once you save.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Remove',
+          style: 'destructive',
+          onPress: () => {
+            setMembers((prev) => prev.filter((member) => member.id !== memberId));
+            appendAuditLog({
+              action: 'member.removed',
+              memberName: target.name,
+              fromRole: String(target.role || ''),
+            });
+          },
+        },
+      ],
+    );
+  }, [appendAuditLog, canManageMembers, isRoleAssignableByActor, members]);
 
   if (loading) {
     return (

@@ -82,8 +82,19 @@ export default function MilestonesScreen({}: Props) {
       ])
         .then(([ms, mems]: any[]) => {
           if (!active) return;
-          setMilestones(Array.isArray(ms) ? ms : ms?.results ?? []);
-          const memberList = Array.isArray(mems) ? mems : mems?.results ?? [];
+          // getRequest resolves to the ApiResult wrapper ({success, data,
+          // message}) — the actual payload this dual-shape check was meant
+          // to inspect is `ms.data`/`mems.data`, not `ms`/`mems` themselves.
+          // Checking the wrapper directly meant Array.isArray(ms) and
+          // ms?.results could never be true, so this always fell through to
+          // `[]` on both — the milestone timeline was always empty and the
+          // "Family member" picker in the Add form always had no options,
+          // regardless of what the backend actually returned (same bug
+          // class already fixed in FamilyAlbumScreen/FamilyTreeScreen).
+          const msData = ms?.data;
+          setMilestones(Array.isArray(msData) ? msData : msData?.results ?? []);
+          const memsData = mems?.data;
+          const memberList = Array.isArray(memsData) ? memsData : memsData?.results ?? [];
           setMembers(memberList);
           if (memberList.length > 0) setFormMemberId(memberList[0].id);
         })
@@ -100,13 +111,24 @@ export default function MilestonesScreen({}: Props) {
     }
     setSaving(true);
     try {
-      const created = (await postRequest(ROUTES.family.milestones, {
+      // postRequest resolves to the ApiResult wrapper ({success, data,
+      // message}), not the created record directly — same bug class as
+      // FamilyAlbumScreen/FamilyCalendarScreen's create flows: casting the
+      // whole wrapper to Milestone meant the real fields lived on `.data`,
+      // and a backend-rejected create (res.success === false) was still
+      // silently treated as added.
+      const res: any = await postRequest(ROUTES.family.milestones, {
         title: formTitle.trim(),
         milestone_type: formType,
         date: formDate.trim(),
         description: formDesc.trim() || undefined,
         member_id: formMemberId || undefined,
-      })) as unknown as Milestone;
+      });
+      if (!res?.success) {
+        Alert.alert('Error', res?.message ?? 'Failed to add milestone');
+        return;
+      }
+      const created = (res.data ?? res) as Milestone;
       setMilestones((prev) => [created, ...prev]);
       setShowForm(false);
       setFormTitle('');

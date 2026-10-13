@@ -41,7 +41,13 @@ export default function CertificatesScreen() {
 
   const downloadCertificate = useCallback(
     async (contentId: string) => {
-      if (!Object.keys(mediaHeaders || {}).length) return null;
+      // Previously: if media headers weren't ready yet, this silently
+      // returned null and the caller just stopped — the "Loading…" button
+      // went back to "View"/"Share" with no explanation, as if nothing had
+      // been tapped at all. Surface it instead (see handleView/handleShare).
+      if (!Object.keys(mediaHeaders || {}).length) {
+        throw new Error('Still connecting — please try again in a moment.');
+      }
       const filePath = `${RNFS.DocumentDirectoryPath}/education-certificate-${contentId}.pdf`;
       await RNFS.downloadFile({
         fromUrl: ROUTES.education.certificate(contentId),

@@ -386,6 +386,8 @@ export default function VideoPlayer({
         <Text style={{ color: palette.subtext, textAlign: 'center' }}>Only http/https media can be played safely.</Text>
         <Pressable
           onPress={() => sourceUrl && Linking.openURL(sourceUrl)}
+          accessibilityRole="button"
+          accessibilityLabel="Open video in browser"
           style={[styles.retryButton, { borderColor: palette.primaryStrong }]}
         >
           <Text style={{ color: palette.primaryStrong }}>Open in browser</Text>
@@ -499,6 +501,8 @@ export default function VideoPlayer({
           <Text style={{ color: palette.subtext, marginBottom: 12 }}>{state.error}</Text>
           <Pressable
             onPress={handleRetry}
+            accessibilityRole="button"
+            accessibilityLabel="Retry playback"
             style={[styles.retryButton, { borderColor: palette.primaryStrong }]}
           >
             <Text style={{ color: palette.primaryStrong }}>Retry playback</Text>

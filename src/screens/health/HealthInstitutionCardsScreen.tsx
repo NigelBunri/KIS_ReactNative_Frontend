@@ -2517,6 +2517,9 @@ export default function HealthInstitutionCardsScreen({
                               }}
                               disabled={ratingServiceIdBusy === card.service.id}
                               hitSlop={{ top: 12, bottom: 12, left: 8, right: 8 }}
+                              accessibilityRole="button"
+                              accessibilityLabel={`Rate ${star} star${star > 1 ? 's' : ''}`}
+                              accessibilityState={{ selected: filled }}
                               style={{ marginRight: 6, minWidth: 28, minHeight: 28, alignItems: 'center', justifyContent: 'center' }}
                             >
                               <Text

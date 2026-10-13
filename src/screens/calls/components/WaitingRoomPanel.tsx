@@ -53,6 +53,8 @@ export default function WaitingRoomPanel({ knockingUsers, onAdmit, onDeny }: Pro
         <Pressable
           onPress={() => knockingUsers.forEach(u => onAdmit(u.userId))}
           style={[styles.admitAllBtn, { backgroundColor: `${palette.success}26`, borderColor: `${palette.success}60` }]}
+          accessibilityRole="button"
+          accessibilityLabel="Admit all"
         >
           <KISIcon name="check" size={14} color={palette.success} />
           <Text style={[styles.admitAllText, { color: palette.success }]}>Admit all</Text>
@@ -80,6 +82,7 @@ function KnockingUserRow({
           onPress={onDeny}
           style={[styles.denyBtn, { borderColor: `${palette.danger}60` }]}
           accessibilityLabel={`Deny ${user.displayName}`}
+          accessibilityRole="button"
           hitSlop={6}
         >
           <KISIcon name="close" size={14} color={palette.danger} />
@@ -88,6 +91,7 @@ function KnockingUserRow({
           onPress={onAdmit}
           style={[styles.admitBtn, { backgroundColor: palette.success }]}
           accessibilityLabel={`Admit ${user.displayName}`}
+          accessibilityRole="button"
           hitSlop={6}
         >
           <KISIcon name="check" size={14} color={palette.ivory} />

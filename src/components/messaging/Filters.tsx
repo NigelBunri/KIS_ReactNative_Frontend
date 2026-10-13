@@ -38,8 +38,12 @@ export function ToggleChip({
   return (
     <Pressable
       onPress={onPress}
+      // chip's shared minHeight (34) is below the 44pt touch-target
+      // minimum; overridden here rather than in the shared stylesheet
+      // since ToggleChip is also used by MessagesScreen.tsx.
       style={({ pressed }) => [
         styles.chip,
+        { minHeight: 44 },
         {
           backgroundColor: active ? palette.goldDeep : pressed ? palette.surface : palette.card,
           borderColor: active ? palette.goldLight : palette.inputBorder,
@@ -76,7 +80,16 @@ function Checkbox({
   label?: string;
 }) {
   return (
-    <Pressable onPress={onToggle} style={[styles.checkboxRow]}>
+    <Pressable
+      onPress={onToggle}
+      // checkboxRow has no minHeight and the visible box is only 20x20 —
+      // well under the 44pt touch-target minimum. Added here rather than
+      // in the shared stylesheet since checkboxRow/checkboxBox are shared.
+      style={[styles.checkboxRow, { minHeight: 44, paddingVertical: 10 }]}
+      accessibilityRole="checkbox"
+      accessibilityState={{ checked }}
+      accessibilityLabel={label}
+    >
       <View
         style={[
           styles.checkboxBox,
@@ -220,6 +233,7 @@ export function FilterManager({
               }
               style={[
                 styles.pillBtn,
+                { minHeight: 44, justifyContent: 'center' },
                 {
                   borderColor: palette.inputBorder,
                   backgroundColor: rules.includeGroups ? palette.primarySoft : palette.card,
@@ -238,6 +252,7 @@ export function FilterManager({
               }
               style={[
                 styles.pillBtn,
+                { minHeight: 44, justifyContent: 'center' },
                 {
                   borderColor: palette.inputBorder,
                   backgroundColor: rules.includeDMs ? palette.primarySoft : palette.card,
@@ -327,9 +342,16 @@ export function FilterManager({
                   >
                     <Text style={{ color: palette.text }}>{f.label}</Text>
                     <Pressable
-                      onPress={() => onDelete(f.id)}
-                      hitSlop={8}
+                      onPress={() => {
+                        Alert.alert('Delete filter', `Delete the "${f.label}" filter?`, [
+                          { text: 'Cancel', style: 'cancel' },
+                          { text: 'Delete', style: 'destructive', onPress: () => onDelete(f.id) },
+                        ]);
+                      }}
+                      hitSlop={13}
                       style={{ marginLeft: 8, paddingHorizontal: 4, paddingVertical: 2 }}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Delete ${f.label} filter`}
                     >
                       <KISIcon name="trash" size={18} color={palette.text} />
                     </Pressable>

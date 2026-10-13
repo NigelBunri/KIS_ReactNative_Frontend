@@ -189,6 +189,7 @@ export default function KeywordSortGame({ gameKey, stageIndex, isReplay, onExit,
             onPlayAgain={load}
             onBackToJourney={onExit}
             onViewStats={onOpenStats}
+            persisted={stageResult.persisted}
           />
         </View>
       </GameShell>

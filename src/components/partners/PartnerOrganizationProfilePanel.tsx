@@ -59,6 +59,7 @@ export default function PartnerOrganizationProfilePanel({
   const [instagram, setInstagram] = useState('');
   const [youtube, setYoutube] = useState('');
   const [publicFields, setPublicFields] = useState<Record<string, boolean>>({});
+  const [error, setError] = useState<string | null>(null);
 
   const fieldDefs: Array<{ key: keyof OrgProfile; label: string }> = useMemo(() => ([
     { key: 'display_name', label: 'Display name' },
@@ -94,7 +95,12 @@ export default function PartnerOrganizationProfilePanel({
     // the real profile fields (only the wrapper's own success/data/
     // message), so hitting Save right after a failed load could send an
     // incomplete/corrupt update to a real organization's profile.
-    const data = res?.success ? res?.data ?? {} : {};
+    if (!res?.success) {
+      setError(res?.message || "Couldn't load organization profile. Tap to retry.");
+      return;
+    }
+    setError(null);
+    const data = res?.data ?? {};
     setForm(data);
     setBrandColors((data.brand_colors || []).join(', '));
     const socials = data.social_links || {};
@@ -243,6 +249,27 @@ export default function PartnerOrganizationProfilePanel({
         >
           {loading ? (
             <ActivityIndicator size="small" color={palette.primary} />
+          ) : error ? (
+            <View
+              style={{
+                borderRadius: 10,
+                borderWidth: 1,
+                borderColor: palette.danger,
+                backgroundColor: palette.danger + '15',
+                padding: 12,
+              }}
+            >
+              <Text style={{ color: palette.danger, fontSize: 13, fontWeight: '600' }}>{error}</Text>
+              <Pressable
+                onPress={() => {
+                  setLoading(true);
+                  loadProfile().finally(() => setLoading(false));
+                }}
+                style={{ marginTop: 8 }}
+              >
+                <Text style={{ color: palette.primary, fontWeight: '700', fontSize: 13 }}>Tap to retry</Text>
+              </Pressable>
+            </View>
           ) : (
             <View
               style={[

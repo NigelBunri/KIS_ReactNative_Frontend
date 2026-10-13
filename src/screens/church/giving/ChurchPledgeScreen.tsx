@@ -74,16 +74,7 @@ export default function ChurchPledgeScreen({ navigation: _navigation }: Props) {
     }, []),
   );
 
-  async function handleCreate() {
-    const parsed = parseFloat(formAmount);
-    if (!Number.isFinite(parsed) || parsed <= 0) {
-      Alert.alert('Enter a valid pledge amount');
-      return;
-    }
-    if (!formStartDate.trim()) {
-      Alert.alert('A start date is required');
-      return;
-    }
+  async function performCreate(parsed: number) {
     setSaving(true);
     try {
       const createdResult = await postRequest(ROUTES.church.pledges, {
@@ -101,6 +92,27 @@ export default function ChurchPledgeScreen({ navigation: _navigation }: Props) {
     } finally {
       setSaving(false);
     }
+  }
+
+  function handleCreate() {
+    const parsed = parseFloat(formAmount);
+    if (!Number.isFinite(parsed) || parsed <= 0) {
+      Alert.alert('Enter a valid pledge amount');
+      return;
+    }
+    if (!formStartDate.trim()) {
+      Alert.alert('A start date is required');
+      return;
+    }
+    const periodLabel = PERIODS.find((p) => p.value === formPeriod)?.label ?? formPeriod;
+    Alert.alert(
+      'Confirm Your Pledge',
+      `You're about to pledge $${parsed.toFixed(2)} ${periodLabel.toLowerCase()}, starting ${formStartDate.trim()}. This will be submitted immediately.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: `Confirm $${parsed.toFixed(2)}`, onPress: () => { void performCreate(parsed); } },
+      ],
+    );
   }
 
   if (loading) {

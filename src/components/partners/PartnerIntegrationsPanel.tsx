@@ -246,7 +246,13 @@ export default function PartnerIntegrationsPanel({
             { borderBottomColor: palette.divider },
           ]}
         >
-          <Pressable onPress={onClose} style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}>
+          <Pressable
+            onPress={onClose}
+            style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}
+            accessibilityRole="button"
+            accessibilityLabel="Close"
+            hitSlop={8}
+          >
             <Text style={{ color: palette.text, fontSize: 18 }}>‹</Text>
           </Pressable>
           <View style={{ flex: 1 }}>

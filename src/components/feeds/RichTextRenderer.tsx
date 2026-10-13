@@ -63,7 +63,7 @@ const HEADING_SIZES: Record<number, number> = {
   6: 14,
 };
 
-const computeMarkStyle = (marks: RichTextMark[] = []): TextStyle => {
+const computeMarkStyle = (marks: RichTextMark[] = [], isDark?: boolean): TextStyle => {
   const style: TextStyle = {};
   let underline = false;
   let strikethrough = false;
@@ -83,7 +83,10 @@ const computeMarkStyle = (marks: RichTextMark[] = []): TextStyle => {
         break;
       case 'inline_code':
         style.fontFamily = 'Courier';
-        style.backgroundColor = '#F4F4F5';
+        // Theme-aware: a light-only background would leave light text on a
+        // light chip (or dark text on a dark chip) in the opposite theme.
+        style.backgroundColor = isDark ? '#2A2838' : '#F4F4F5';
+        style.color = isDark ? '#F0EBE1' : '#1F2024';
         style.paddingHorizontal = 4;
         style.borderRadius = 4;
         break;
@@ -122,7 +125,9 @@ const computeMarkStyle = (marks: RichTextMark[] = []): TextStyle => {
         style.fontVariant = ['small-caps'];
         break;
       case 'badge':
-        style.backgroundColor = '#E0E7FF';
+        // Same theme-awareness concern as inline_code above.
+        style.backgroundColor = isDark ? '#2E2A4A' : '#E0E7FF';
+        style.color = isDark ? '#D9D4FF' : '#312E81';
         style.paddingHorizontal = 8;
         style.borderRadius = 12;
         break;
@@ -145,11 +150,12 @@ const renderInline = (
   options: {
     openProfileByHandle: (handle: string) => Promise<boolean>;
     linkColor: string;
+    isDark?: boolean;
   },
 ) =>
   nodes.map((node, index) => {
     if (node.type === 'text') {
-      const markStyle = computeMarkStyle(node.marks);
+      const markStyle = computeMarkStyle(node.marks, options.isDark);
       const text = String(node.text ?? '');
       const segments = splitTextByKisHandles(text);
       return (
@@ -164,6 +170,8 @@ const renderInline = (
                   fontWeight: '700',
                   textDecorationLine: 'underline',
                 }}
+                accessibilityRole="link"
+                accessibilityLabel={`Open profile ${segment.value}`}
                 suppressHighlighting
                 onPress={() => {
                   void options.openProfileByHandle(segment.handle);
@@ -353,6 +361,7 @@ export default function RichTextRenderer({
   const rendererOptions = {
     openProfileByHandle,
     linkColor: theme.palette.primaryStrong,
+    isDark: theme.isDark,
   };
   if (!normalizedDoc || !normalizedDoc.content?.length) {
     if (!fallbackText) {
@@ -371,6 +380,8 @@ export default function RichTextRenderer({
                 fontWeight: '700',
                 textDecorationLine: 'underline',
               }}
+              accessibilityRole="link"
+              accessibilityLabel={`Open profile ${segment.value}`}
               suppressHighlighting
               onPress={() => {
                 void openProfileByHandle(segment.handle);

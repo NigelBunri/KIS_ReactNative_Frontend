@@ -98,6 +98,22 @@ export default function AddictionRecoveryScreen({ navigation }: Props) {
         <Text style={styles.headerSub}>Find support groups and start your journey</Text>
       </LinearGradient>
 
+      {/* This and the Sobriety Tracker were two isolated siblings with no
+          link between them — someone joining a support group had no
+          obvious way to reach their personal streak/milestones, and vice
+          versa. Cross-linking them ties the two halves of the same journey
+          together. */}
+      <TouchableOpacity
+        style={styles.trackerLink}
+        onPress={() => navigation.navigate('SobrietyTracker')}
+        accessibilityRole="button"
+        accessibilityLabel="View my sobriety tracker"
+      >
+        <KISIcon name="flame" size={16} color={palette.primary} />
+        <Text style={styles.trackerLinkText}>View my sobriety tracker and milestones</Text>
+        <KISIcon name="chevron-right" size={16} color={palette.subtext} />
+      </TouchableOpacity>
+
       {/* Filter Tabs */}
       <ScrollView
         horizontal
@@ -110,6 +126,9 @@ export default function AddictionRecoveryScreen({ navigation }: Props) {
             style={[styles.filterTab, selectedType === t && styles.filterTabActive]}
             onPress={() => handleTypeChange(t)}
             hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
+            accessibilityRole="button"
+            accessibilityLabel={t}
+            accessibilityState={{ selected: selectedType === t }}
           >
             <Text style={[styles.filterTabText, selectedType === t && styles.filterTabTextActive]}>
               {t}
@@ -172,6 +191,7 @@ export default function AddictionRecoveryScreen({ navigation }: Props) {
                     onValueChange={() => toggleAnonymous(group.id)}
                     trackColor={{ false: palette.divider, true: palette.primarySoft }}
                     thumbColor={anonymousMap[group.id] ? palette.primary : palette.subtext}
+                    accessibilityLabel="Join anonymously"
                   />
                 </View>
                 <KISButton
@@ -201,6 +221,20 @@ function makeStyles(palette: any, sp: number) {
     },
     headerTitle: { fontSize: 26, fontWeight: '700', color: palette.ivory },
     headerSub: { fontSize: 13, color: palette.ivory, opacity: 0.8, marginTop: 2 },
+    trackerLink: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      marginHorizontal: sp,
+      marginTop: 12,
+      padding: 12,
+      minHeight: 44,
+      borderRadius: 10,
+      backgroundColor: palette.primarySoft,
+      borderWidth: 1,
+      borderColor: palette.primary + '44',
+    },
+    trackerLinkText: { flex: 1, fontSize: 13, color: palette.text, fontWeight: '500' },
     filterRow: {
       paddingHorizontal: sp,
       paddingVertical: 10,

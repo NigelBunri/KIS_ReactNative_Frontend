@@ -169,18 +169,18 @@ function ShortCard({ item, isVisible, shouldPreload, onLike, onDislike, onShare,
         </View>
 
         <View style={styles.actionsCol}>
-          <Pressable style={styles.actionBtn} onPress={() => onLike(item.id)}>
+          <Pressable style={styles.actionBtn} onPress={() => onLike(item.id)} accessibilityRole="button" accessibilityLabel={liked ? 'Unlike' : 'Like'}>
             <KISIcon name="heart" size={26} color={liked ? palette.danger : palette.ivory} />
             {likeCount > 0 && <Text style={[styles.actionCount, { color: palette.ivory }]}>{likeCount}</Text>}
           </Pressable>
-          <Pressable style={styles.actionBtn} onPress={() => onDislike(item.id)}>
+          <Pressable style={styles.actionBtn} onPress={() => onDislike(item.id)} accessibilityRole="button" accessibilityLabel="Dislike">
             <KISIcon name="close" size={24} color={palette.ivory} />
           </Pressable>
-          <Pressable style={styles.actionBtn} onPress={() => onCommentPress(item.id)}>
+          <Pressable style={styles.actionBtn} onPress={() => onCommentPress(item.id)} accessibilityRole="button" accessibilityLabel="View comments">
             <KISIcon name="comment" size={24} color={palette.ivory} />
             <Text style={[styles.actionCount, { color: palette.ivory }]}>{item.engagement_counts?.comments ?? ''}</Text>
           </Pressable>
-          <Pressable style={styles.actionBtn} onPress={() => onShare(item)}>
+          <Pressable style={styles.actionBtn} onPress={() => onShare(item)} accessibilityRole="button" accessibilityLabel="Share">
             <KISIcon name="share" size={24} color={palette.ivory} />
           </Pressable>
         </View>
@@ -238,7 +238,14 @@ export default function ShortsScreen() {
       if (it.id !== id) return it;
       const nowLiked = !it.localLiked;
       const base = it.localLikeCount ?? it.engagement_counts?.reactions ?? 0;
-      void reactToChannelContent(id);
+      reactToChannelContent(id).catch(() => {
+        // Roll back the optimistic like on failure — previously this fired
+        // and forgot the request, leaving a permanently-wrong local count
+        // with no error shown if the server call failed.
+        setItems(cur => cur.map(c => c.id === id
+          ? { ...c, localLiked: !nowLiked, localLikeCount: Math.max(0, (c.localLikeCount ?? 0) - (nowLiked ? 1 : -1)) }
+          : c));
+      });
       return { ...it, localLiked: nowLiked, localLikeCount: Math.max(0, base + (nowLiked ? 1 : -1)) };
     }));
   }, []);
@@ -250,16 +257,26 @@ export default function ShortsScreen() {
   }, []);
 
   const handleSubscribe = useCallback((channelId: string) => {
+    let nowSubscribed = false;
     setSubscribedChannels(prev => {
       const next = new Set(prev);
-      const nowSubscribed = !next.has(channelId);
+      nowSubscribed = !next.has(channelId);
       if (nowSubscribed) {
         next.add(channelId);
       } else {
         next.delete(channelId);
       }
-      void toggleChannelSubscription(channelId, nowSubscribed);
       return next;
+    });
+    toggleChannelSubscription(channelId, nowSubscribed).catch(() => {
+      // Roll back on failure — previously fire-and-forget, so a failed
+      // subscribe/unsubscribe left the follow pill showing the wrong state
+      // forever with no error shown.
+      setSubscribedChannels(prev => {
+        const next = new Set(prev);
+        if (nowSubscribed) next.delete(channelId); else next.add(channelId);
+        return next;
+      });
     });
   }, []);
 
@@ -292,7 +309,7 @@ export default function ShortsScreen() {
   if (!items.length) {
     return (
       <SafeAreaView style={[styles.centered, { backgroundColor: palette.royalInk }]} edges={['top']}>
-        <Pressable onPress={() => navigation.goBack()} style={styles.closeBtn}>
+        <Pressable onPress={() => navigation.goBack()} style={styles.closeBtn} accessibilityRole="button" accessibilityLabel="Close">
           <KISIcon name="close" size={22} color={palette.ivory} />
         </Pressable>
         <KISIcon name="play" size={48} color={palette.divider} />
@@ -304,7 +321,7 @@ export default function ShortsScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: palette.royalInk }}>
       <SafeAreaView style={styles.header} edges={['top']}>
-        <Pressable onPress={() => navigation.goBack()} hitSlop={12}>
+        <Pressable onPress={() => navigation.goBack()} hitSlop={12} accessibilityRole="button" accessibilityLabel="Go back">
           <KISIcon name="arrow-left" size={22} color={palette.ivory} />
         </Pressable>
         <Text style={[styles.headerTitle, { color: palette.ivory }]}>Shorts</Text>
@@ -382,7 +399,7 @@ export default function ShortsScreen() {
             </View>
             <View style={[styles.sheetHeader, { borderBottomColor: palette.border }]}>
               <Text style={[styles.sheetTitle, { color: palette.text }]}>Comments</Text>
-              <Pressable onPress={closeComments} hitSlop={12}>
+              <Pressable onPress={closeComments} hitSlop={12} accessibilityRole="button" accessibilityLabel="Close comments">
                 <KISIcon name="close" size={20} color={palette.subtext} />
               </Pressable>
             </View>

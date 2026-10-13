@@ -97,10 +97,12 @@ export default function LibraryScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [continueItems, setContinueItems] = useState<ContinueItem[]>([]);
   const [continueLoading, setContinueLoading] = useState(true);
+  const [continueError, setContinueError] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [trending, setTrending] = useState<any[]>([]);
 
   const loadContinue = useCallback(async () => {
+    setContinueError(false);
     try {
       const raw = await fetchContinueWatchingItems();
       // Enrich with metadata in parallel (first 6 only for performance)
@@ -120,6 +122,12 @@ export default function LibraryScreen() {
         }),
       );
       setContinueItems(enriched);
+    } catch {
+      // Previously an outer failure (fetchContinueWatchingItems itself
+      // throwing) left continueItems at [] and rendered the exact same
+      // "No videos in progress" empty card as a user with genuinely no
+      // in-progress videos — no way to tell the difference or retry.
+      setContinueError(true);
     } finally {
       setContinueLoading(false);
       setRefreshing(false);
@@ -195,6 +203,16 @@ export default function LibraryScreen() {
           </View>
           {continueLoading ? (
             <ActivityIndicator color={palette.primaryStrong} style={{ marginVertical: 16 }} />
+          ) : continueError ? (
+            <Pressable
+              onPress={loadContinue}
+              accessibilityRole="button"
+              accessibilityLabel="Retry loading continue watching"
+              style={[styles.emptyCard, { backgroundColor: palette.surface, borderColor: palette.border, marginHorizontal: pageGutter }]}
+            >
+              <KISIcon name="warning" size={28} color={palette.danger} />
+              <Text style={[styles.emptyCardText, { color: palette.danger, fontSize: labelFontSize + 1 }]}>Couldn't load — tap to retry</Text>
+            </Pressable>
           ) : continueItems.length === 0 ? (
             <View style={[styles.emptyCard, { backgroundColor: palette.surface, borderColor: palette.border, marginHorizontal: pageGutter }]}>
               <KISIcon name="play" size={28} color={palette.border} />

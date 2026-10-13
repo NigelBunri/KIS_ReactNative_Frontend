@@ -353,6 +353,8 @@ export const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({
           <Pressable
             onPress={onClose}
             hitSlop={12}
+            accessibilityRole="button"
+            accessibilityLabel="Close"
             style={({ pressed }) => [
               styles.headerIconButton,
               { backgroundColor: palette.surface },
@@ -373,6 +375,8 @@ export const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({
 
           <Pressable
             onPress={openGallery}
+            accessibilityRole="button"
+            accessibilityLabel="Choose from gallery"
             style={({ pressed }) => [
               styles.headerIconButton,
               { backgroundColor: palette.surface },
@@ -536,6 +540,8 @@ export const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({
                     {/* EDIT */}
                     <Pressable
                       style={styles.thumbEditButton}
+                      accessibilityRole="button"
+                      accessibilityLabel="Edit this item"
                       onPress={() => {
                         const base = previewSource;
                         const idxInBase = base.findIndex(a => a.uri === asset.uri);
@@ -551,6 +557,8 @@ export const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({
                     {/* REMOVE */}
                     <Pressable
                       style={styles.thumbRemoveButton}
+                      accessibilityRole="button"
+                      accessibilityLabel="Remove this item"
                       onPress={() => removeAsset(asset.uri!)}
                     >
                       <KISIcon name="close" size={13} color="#fff" />
@@ -611,6 +619,8 @@ export const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({
             <Pressable
               onPress={() => openSystemCamera('photo')}
               disabled={isOpeningCamera}
+              accessibilityRole="button"
+              accessibilityLabel="Take photo"
               style={({ pressed }) => [
                 styles.shutterWrap,
                 pressed && { transform: [{ scale: 0.95 }] },

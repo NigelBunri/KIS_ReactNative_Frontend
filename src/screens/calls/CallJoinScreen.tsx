@@ -166,6 +166,7 @@ export default function CallJoinScreen({ route, navigation }: Props) {
                 styles.joinBtn,
                 { backgroundColor: palette.success, opacity: pressed ? 0.85 : 1 },
               ]}
+              accessibilityRole="button"
               accessibilityLabel="Join call"
             >
               <KISIcon name="phone" size={20} color={palette.ivory} />
@@ -175,6 +176,8 @@ export default function CallJoinScreen({ route, navigation }: Props) {
             <Pressable
               onPress={() => navigation.replace('MainTabs')}
               style={({ pressed }) => [styles.cancelBtn, { opacity: pressed ? 0.6 : 1 }]}
+              accessibilityRole="button"
+              accessibilityLabel="Not now"
             >
               <Text style={[styles.cancelText, { color: palette.subtext }]}>Not now</Text>
             </Pressable>
@@ -200,6 +203,8 @@ export default function CallJoinScreen({ route, navigation }: Props) {
                 styles.joinBtn,
                 { backgroundColor: palette.surface, borderWidth: 1, borderColor: palette.inputBorder, opacity: pressed ? 0.7 : 1 },
               ]}
+              accessibilityRole="button"
+              accessibilityLabel="Go home"
             >
               <Text style={[styles.joinText, { color: palette.text }]}>Go Home</Text>
             </Pressable>

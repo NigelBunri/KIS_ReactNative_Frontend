@@ -388,6 +388,12 @@ const CommunitiesTab = forwardRef<ScrollableHandle, CommunitiesTabProps>(functio
           ...items.filter((item) => item.id !== created.id),
         ]);
         resetCreateForm();
+      } else {
+        // postRequest resolves (never throws) on a failed request, so a
+        // validation error (e.g. duplicate name) previously fell through
+        // here with zero feedback — the modal just stopped loading as if
+        // nothing happened.
+        Alert.alert('Create community', res?.message || 'Failed to create community.');
       }
     } catch {
       const netState = await NetInfo.fetch().catch(() => ({ isConnected: false }));
@@ -432,8 +438,11 @@ const CommunitiesTab = forwardRef<ScrollableHandle, CommunitiesTabProps>(functio
         // Replace the optimistic post with the real one
         setPosts((prev) => prev.map((p) => (p.id === optimisticPost.id ? (res.data as Post) : p)));
       } else {
-        // Remove optimistic post on server error
+        // Remove optimistic post on server error. This previously gave no
+        // feedback at all — the post the user just typed simply vanished
+        // from the feed a moment after appearing, with no indication why.
         setPosts((prev) => prev.filter((p) => p.id !== optimisticPost.id));
+        Alert.alert('Post', res?.message || 'Failed to post. Please try again.');
       }
     } catch {
       const netState = await NetInfo.fetch().catch(() => ({ isConnected: false }));
@@ -459,6 +468,11 @@ const CommunitiesTab = forwardRef<ScrollableHandle, CommunitiesTabProps>(functio
           items.map((item) => item.id === joined.id ? joined : item),
         );
         loadCommunityDetail(joined);
+      } else {
+        // Previously silent when online but rejected (e.g. invite-only,
+        // already full) — nothing happened and the user had no idea why
+        // tapping "Join" didn't do anything.
+        Alert.alert('Join community', res?.message || 'Failed to join community.');
       }
     } catch {
       const netState = await NetInfo.fetch().catch(() => ({ isConnected: false }));
@@ -482,6 +496,10 @@ const CommunitiesTab = forwardRef<ScrollableHandle, CommunitiesTabProps>(functio
         ? res.data
         : [];
       setDiscoverResults(list as Community[]);
+    } catch {
+      // Previously had no catch at all — an unexpected throw here would
+      // have been an unhandled rejection with discoverResults left stale.
+      setDiscoverResults([]);
     } finally {
       setDiscoverLoading(false);
     }
@@ -707,10 +725,20 @@ const CommunitiesTab = forwardRef<ScrollableHandle, CommunitiesTabProps>(functio
         <View style={styles.headerRow}>
           <Text style={[styles.title, { color: palette.text, fontSize: responsive.headerTitleSize }]}>Communities</Text>
           <View style={{ flexDirection: 'row', gap: 8 }}>
-            <Pressable onPress={() => { setDiscoverVisible(true); void searchPublicCommunities(''); }} style={styles.iconBtn}>
+            <Pressable
+              onPress={() => { setDiscoverVisible(true); void searchPublicCommunities(''); }}
+              style={styles.iconBtn}
+              accessibilityRole="button"
+              accessibilityLabel="Discover communities"
+            >
               <KISIcon name="search" size={18} color={palette.text} />
             </Pressable>
-            <Pressable onPress={() => setCreateVisible(true)} style={styles.iconBtn}>
+            <Pressable
+              onPress={() => setCreateVisible(true)}
+              style={styles.iconBtn}
+              accessibilityRole="button"
+              accessibilityLabel="Create community"
+            >
               <KISIcon name="add" size={18} color={palette.text} />
             </Pressable>
           </View>
@@ -719,7 +747,12 @@ const CommunitiesTab = forwardRef<ScrollableHandle, CommunitiesTabProps>(functio
     }
     return (
       <View style={styles.headerRow}>
-        <Pressable onPress={() => setSelected(null)} style={styles.iconBtn}>
+        <Pressable
+          onPress={() => setSelected(null)}
+          style={styles.iconBtn}
+          accessibilityRole="button"
+          accessibilityLabel="Back to communities"
+        >
           <KISIcon name="back" size={18} color={palette.text} />
         </Pressable>
         <Text style={[styles.title, { color: palette.text, fontSize: responsive.headerTitleSize }]} numberOfLines={1}>{selected.name}</Text>
@@ -794,6 +827,8 @@ const CommunitiesTab = forwardRef<ScrollableHandle, CommunitiesTabProps>(functio
                   disabled={!composerText.trim()}
                   style={[styles.composerSend, { backgroundColor: composerText.trim() ? palette.gold : 'transparent' }]}
                   hitSlop={6}
+                  accessibilityRole="button"
+                  accessibilityLabel="Post"
                 >
                   <KISIcon name="send" size={16} color={composerText.trim() ? palette.royalInk : palette.subtext} />
                 </Pressable>
@@ -1237,7 +1272,12 @@ const CommunitiesTab = forwardRef<ScrollableHandle, CommunitiesTabProps>(functio
       <Modal visible={discoverVisible} animationType="slide" onRequestClose={() => setDiscoverVisible(false)}>
         <View style={{ flex: 1, backgroundColor: palette.bg, }}>
           <View style={[styles.headerRow, { borderBottomWidth: 1, borderBottomColor: palette.divider ?? palette.inputBorder, paddingTop: topInset }]}>
-            <Pressable onPress={() => setDiscoverVisible(false)} style={styles.iconBtn}>
+            <Pressable
+              onPress={() => setDiscoverVisible(false)}
+              style={styles.iconBtn}
+              accessibilityRole="button"
+              accessibilityLabel="Close"
+            >
               <KISIcon name="close" size={20} color={palette.text} />
             </Pressable>
             <Text style={[styles.title, { color: palette.text, fontSize: responsive.headerTitleSize }]}>Discover Communities</Text>

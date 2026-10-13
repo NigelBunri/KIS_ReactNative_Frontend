@@ -4,7 +4,6 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TouchableOpacity,
   View,
 } from 'react-native';
 import { SafeAreaView } from '@/components/common/SafeAreaViewWithTopPadding';
@@ -46,24 +45,28 @@ export default function GivingDashboardScreen({ navigation }: Props) {
 
   const styles = useMemo(() => makeStyles(palette, layout), [palette, layout]);
 
+  const loadGivingData = useCallback(() => {
+    setLoading(true);
+    setError(null);
+    Promise.all([
+      getRequest(ROUTES.church.givingStats),
+      getRequest(ROUTES.church.campaigns),
+    ])
+      .then(([statsRes, campaignsRes]) => {
+        if (statsRes?.success) setStats(statsRes.data ?? {});
+        if (campaignsRes?.success) {
+          const raw = campaignsRes.data;
+          setCampaigns(Array.isArray(raw) ? raw : raw?.results ?? []);
+        }
+      })
+      .catch(() => setError('Failed to load giving data.'))
+      .finally(() => setLoading(false));
+  }, []);
+
   useFocusEffect(
     useCallback(() => {
-      setLoading(true);
-      setError(null);
-      Promise.all([
-        getRequest(ROUTES.church.givingStats),
-        getRequest(ROUTES.church.campaigns),
-      ])
-        .then(([statsRes, campaignsRes]) => {
-          if (statsRes?.success) setStats(statsRes.data ?? {});
-          if (campaignsRes?.success) {
-            const raw = campaignsRes.data;
-            setCampaigns(Array.isArray(raw) ? raw : raw?.results ?? []);
-          }
-        })
-        .catch(() => setError('Failed to load giving data.'))
-        .finally(() => setLoading(false));
-    }, []),
+      loadGivingData();
+    }, [loadGivingData]),
   );
 
   const formatCurrency = (val?: number) =>
@@ -86,7 +89,7 @@ export default function GivingDashboardScreen({ navigation }: Props) {
     return (
       <SafeAreaView style={[styles.safe, styles.center]}>
         <Text style={styles.errorText}>{error}</Text>
-        <KISButton title="Retry" onPress={() => setLoading(true)} style={{ marginTop: 16 }} />
+        <KISButton title="Retry" onPress={loadGivingData} style={{ marginTop: 16 }} />
       </SafeAreaView>
     );
   }

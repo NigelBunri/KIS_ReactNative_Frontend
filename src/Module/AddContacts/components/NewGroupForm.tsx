@@ -212,6 +212,8 @@ export const NewGroupForm: React.FC<NewGroupFormProps> = ({
       <View style={{ alignItems: 'center', marginBottom: 20 }}>
         <Pressable
           onPress={handlePickAvatar}
+          accessibilityRole="button"
+          accessibilityLabel={avatarPreview ? 'Change group photo' : 'Add group photo'}
           style={({ pressed }) => ({
             width: 84,
             height: 84,

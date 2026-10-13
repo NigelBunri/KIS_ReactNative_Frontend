@@ -58,7 +58,7 @@ export default function AdminAnalyticsPanel({
         </View>
         <View style={styles.headerActions}>
           <KISButton title="Refresh" variant="outline" size="xs" onPress={onRefresh} />
-          <KISButton variant="ghost" onPress={onClose}>
+          <KISButton variant="ghost" onPress={onClose} accessibilityLabel="Close">
             <Text style={{ color: palette.subtext, fontSize: 20, lineHeight: 22 }}>✕</Text>
           </KISButton>
         </View>

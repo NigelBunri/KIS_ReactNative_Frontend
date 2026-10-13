@@ -59,8 +59,12 @@ export default function SymptomCheckerScreen({ navigation }: Props) {
   const [result, setResult] = useState<CheckResult | null>(null);
 
   const triageColor = (level: string): string => {
+    // Each tier gets its own token so "urgent" (see a doctor today) and
+    // "moderate" (schedule soon) are visually distinguishable — previously
+    // both mapped to `gold`, making two different urgency levels look
+    // identical despite the label text differing.
     if (level === 'emergency') return palette.danger;
-    if (level === 'urgent') return palette.gold;
+    if (level === 'urgent') return palette.warning;
     if (level === 'moderate') return palette.gold;
     return palette.primary;
   };
@@ -104,7 +108,12 @@ export default function SymptomCheckerScreen({ navigation }: Props) {
         end={{ x: 1, y: 1 }}
         style={styles.header}
       >
-        <KISButton variant="ghost" onPress={() => navigation.goBack()} style={styles.backBtn}>
+        <KISButton
+          variant="ghost"
+          onPress={() => navigation.goBack()}
+          style={styles.backBtn}
+          accessibilityLabel="Go back"
+        >
           <KISIcon name="arrow-left" size={22} color={palette.ivory} />
         </KISButton>
         <View style={styles.headerText}>

@@ -969,20 +969,37 @@ export default function ChannelContentDetailPage() {
   const handleReact = useCallback(async () => {
     if (!content?.id) return;
     setCounts(prev => ({ ...prev, reactions: Number(prev.reactions || 0) + 1 }));
-    applyCounts(await reactToChannelContent(content.id));
+    try {
+      applyCounts(await reactToChannelContent(content.id));
+    } catch {
+      // Roll back — previously an unawaited/unchecked failure here left the
+      // optimistic reaction count permanently off by one with no feedback.
+      setCounts(prev => ({ ...prev, reactions: Math.max(0, Number(prev.reactions || 0) - 1) }));
+    }
   }, [applyCounts, content?.id]);
 
   const handleDislike = useCallback(async () => {
     if (!content?.id) return;
     setCounts(prev => ({ ...prev, dislikes: Number(prev.dislikes || 0) + 1 }));
-    applyCounts(await reactToChannelContent(content.id, 'dislike'));
+    try {
+      applyCounts(await reactToChannelContent(content.id, 'dislike'));
+    } catch {
+      setCounts(prev => ({ ...prev, dislikes: Math.max(0, Number(prev.dislikes || 0) - 1) }));
+    }
   }, [applyCounts, content?.id]);
 
   const handleSave = useCallback(async () => {
     if (!content?.id) return;
     const next = !saved;
     setSaved(next);
-    applyCounts(next ? await saveChannelContent(content.id) : await removeSavedChannelContent(content.id));
+    try {
+      applyCounts(next ? await saveChannelContent(content.id) : await removeSavedChannelContent(content.id));
+    } catch {
+      // Roll back — previously an unchecked failure left the bookmark
+      // state flipped in the UI even though the server call never applied.
+      setSaved(!next);
+      Alert.alert('Error', 'Could not update saved status. Please try again.');
+    }
   }, [applyCounts, content?.id, saved]);
 
   const handleShare = useCallback(async () => {

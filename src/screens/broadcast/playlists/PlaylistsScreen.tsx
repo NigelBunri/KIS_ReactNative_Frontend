@@ -101,7 +101,13 @@ export default function PlaylistsScreen() {
     <SafeAreaView style={[styles.root, { backgroundColor: palette.bg, }]} edges={['top', 'bottom']}>
       {/* Header */}
       <View style={[styles.header, { borderBottomColor: palette.divider }]}>
-        <Pressable onPress={() => navigation.goBack()} hitSlop={12} style={styles.backBtn}>
+        <Pressable
+          onPress={() => navigation.goBack()}
+          hitSlop={12}
+          style={styles.backBtn}
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
+        >
           <KISIcon name="chevron-left" size={22} color={palette.text} />
         </Pressable>
         <Text style={[styles.headerTitle, { color: palette.text }]}>My Playlists</Text>
@@ -112,6 +118,8 @@ export default function PlaylistsScreen() {
           }}
           hitSlop={12}
           style={styles.headerAction}
+          accessibilityRole="button"
+          accessibilityLabel="Create new playlist"
         >
           <KISIcon name="plus" size={22} color={palette.primaryStrong} />
         </Pressable>
@@ -145,6 +153,9 @@ export default function PlaylistsScreen() {
             <Pressable
               onPress={handleCreate}
               disabled={!newName.trim()}
+              accessibilityRole="button"
+              accessibilityLabel="Confirm new playlist name"
+              accessibilityState={{ disabled: !newName.trim() }}
               style={[
                 styles.createConfirmBtn,
                 { backgroundColor: newName.trim() ? palette.primaryStrong : palette.surface },
@@ -163,6 +174,8 @@ export default function PlaylistsScreen() {
               }}
               style={styles.createCancelBtn}
               hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel="Cancel"
             >
               <KISIcon name="close" size={16} color={palette.subtext} />
             </Pressable>
@@ -262,6 +275,8 @@ export default function PlaylistsScreen() {
                 onPress={() => handleDelete(pl)}
                 hitSlop={10}
                 style={styles.deleteBtn}
+                accessibilityRole="button"
+                accessibilityLabel={`Delete playlist "${pl.name}"`}
               >
                 <KISIcon name="trash" size={17} color={palette.subtext} />
               </Pressable>

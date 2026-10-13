@@ -209,10 +209,24 @@ export default function AssessmentsEditor({ institutionId, courseId }: Props) {
                     <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 8 }}>
                       <Text style={{ fontWeight: '700', color: palette.text, flex: 1 }}>{qIndex + 1}. {question.prompt}</Text>
                       <View style={{ flexDirection: 'row', gap: 4 }}>
-                        <Pressable disabled={qIndex === 0 || reorderingId === question.id} onPress={() => void moveQuestion(assessment.id, qIndex, -1)} style={{ padding: 4, opacity: qIndex === 0 ? 0.3 : 1 }}>
+                        <Pressable
+                          accessibilityRole="button"
+                          accessibilityLabel="Move question up"
+                          disabled={qIndex === 0 || reorderingId === question.id}
+                          onPress={() => void moveQuestion(assessment.id, qIndex, -1)}
+                          hitSlop={8}
+                          style={{ padding: 4, opacity: qIndex === 0 ? 0.3 : 1 }}
+                        >
                           <KISIcon name="chevron-right" size={14} color={palette.subtext} style={{ transform: [{ rotate: '-90deg' }] } as any} />
                         </Pressable>
-                        <Pressable disabled={qIndex === questions.length - 1 || reorderingId === question.id} onPress={() => void moveQuestion(assessment.id, qIndex, 1)} style={{ padding: 4, opacity: qIndex === questions.length - 1 ? 0.3 : 1 }}>
+                        <Pressable
+                          accessibilityRole="button"
+                          accessibilityLabel="Move question down"
+                          disabled={qIndex === questions.length - 1 || reorderingId === question.id}
+                          onPress={() => void moveQuestion(assessment.id, qIndex, 1)}
+                          hitSlop={8}
+                          style={{ padding: 4, opacity: qIndex === questions.length - 1 ? 0.3 : 1 }}
+                        >
                           <KISIcon name="chevron-right" size={14} color={palette.subtext} style={{ transform: [{ rotate: '90deg' }] } as any} />
                         </Pressable>
                       </View>

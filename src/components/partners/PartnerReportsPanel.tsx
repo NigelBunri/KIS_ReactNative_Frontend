@@ -63,6 +63,7 @@ export default function PartnerReportsPanel({
   const [scheduleKind, setScheduleKind] = useState('summary');
   const [scheduleFormat, setScheduleFormat] = useState('csv');
   const [scheduleFrequency, setScheduleFrequency] = useState('weekly');
+  const [error, setError] = useState<string | null>(null);
 
   const backdropOpacity = panelTranslateX.interpolate({
     inputRange: [0, panelWidth],
@@ -81,7 +82,13 @@ export default function PartnerReportsPanel({
     // rendered as fake metrics (its primitive-value filter lets `success`
     // and `message` straight through), and which was also passed directly
     // into <PartnerAnalyticsCharts summary={summary} />.
-    setSummary(res?.success ? res?.data ?? null : null);
+    if (!res?.success) {
+      setError(res?.message || "Couldn't load reports. Tap to retry.");
+      setSummary(null);
+      return;
+    }
+    setError(null);
+    setSummary(res?.data ?? null);
   }, [partnerId]);
 
   const loadExports = useCallback(async () => {
@@ -89,7 +96,11 @@ export default function PartnerReportsPanel({
     const res = await getRequest(ROUTES.partners.exports(partnerId), {
       errorMessage: 'Unable to load exports.',
     });
-    const list = (res?.data ?? res ?? []) as ExportJob[];
+    if (!res?.success) {
+      setExports([]);
+      return;
+    }
+    const list = (res?.data ?? []) as ExportJob[];
     setExports(Array.isArray(list) ? list : []);
   }, [partnerId]);
 
@@ -98,7 +109,11 @@ export default function PartnerReportsPanel({
     const res = await getRequest(ROUTES.partners.exportSchedules(partnerId), {
       errorMessage: 'Unable to load export schedules.',
     });
-    const list = (res?.data ?? res ?? []) as ExportSchedule[];
+    if (!res?.success) {
+      setSchedules([]);
+      return;
+    }
+    const list = (res?.data ?? []) as ExportSchedule[];
     setSchedules(Array.isArray(list) ? list : []);
   }, [partnerId]);
 
@@ -206,7 +221,7 @@ export default function PartnerReportsPanel({
             { borderBottomColor: palette.divider },
           ]}
         >
-          <Pressable onPress={onClose} style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}>
+          <Pressable onPress={onClose} accessibilityRole="button" accessibilityLabel="Close" style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}>
             <Text style={{ color: palette.text, fontSize: 18 }}>‹</Text>
           </Pressable>
           <View style={{ flex: 1 }}>
@@ -226,6 +241,27 @@ export default function PartnerReportsPanel({
         >
           {loading ? (
             <ActivityIndicator size="small" color={palette.primary} />
+          ) : error ? (
+            <View
+              style={{
+                borderRadius: 10,
+                borderWidth: 1,
+                borderColor: palette.danger,
+                backgroundColor: palette.danger + '15',
+                padding: 12,
+              }}
+            >
+              <Text style={{ color: palette.danger, fontSize: 13, fontWeight: '600' }}>{error}</Text>
+              <Pressable
+                onPress={() => {
+                  setLoading(true);
+                  reloadAll().finally(() => setLoading(false));
+                }}
+                style={{ marginTop: 8 }}
+              >
+                <Text style={{ color: palette.primary, fontWeight: '700', fontSize: 13 }}>Tap to retry</Text>
+              </Pressable>
+            </View>
           ) : (
             <>
               <Text style={[styles.settingsSectionTitle, { color: palette.text }]}>

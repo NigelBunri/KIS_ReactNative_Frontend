@@ -66,11 +66,16 @@ type Tab = 'queue' | 'users' | 'audit';
 
 function SeverityBadge({ severity }: { severity: Flag['severity'] }) {
   const { palette } = useKISTheme();
+  // CRITICAL used palette.primaryStrong (the brand gold/coffee color) while
+  // HIGH used palette.danger (red) - since CRITICAL is the more severe of
+  // the two, a moderator scanning the queue saw the *more* urgent flag in a
+  // calmer brand color than the less urgent one. Both now read as danger;
+  // the text label still distinguishes HIGH from CRITICAL.
   const colors: Record<Flag['severity'], string> = {
     LOW: palette.success,
     MEDIUM: palette.gold,
     HIGH: palette.danger,
-    CRITICAL: palette.primaryStrong,
+    CRITICAL: palette.danger,
   };
   return (
     <View style={[badgeStyles.root, { backgroundColor: colors[severity] + '22', borderColor: colors[severity] }]}>
@@ -155,6 +160,24 @@ function FlagActionSheet({
     }
   }, [flag, onDone, onClose]);
 
+  // WARN/SUSPEND/BAN/DELETE below used to fire straight from a single tap on
+  // these buttons with no confirmation at all, even though BAN and DELETE are
+  // irreversible-in-practice actions against real user accounts/content -
+  // inconsistent with handleSuspend in UserManagementTab further down this
+  // same file, which already confirms before suspending a user. This wraps
+  // every moderation action in the same confirm-then-act pattern.
+  const confirmModAction = useCallback((action: string, label: string, destructive: boolean) => {
+    if (!flag) return;
+    Alert.alert(
+      label,
+      `${label} this ${flag.target_type.toLowerCase()}? This action will be recorded in the audit log.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: label, style: destructive ? 'destructive' : 'default', onPress: () => doModAction(action) },
+      ],
+    );
+  }, [flag, doModAction]);
+
   if (!flag) return null;
 
   return (
@@ -180,16 +203,16 @@ function FlagActionSheet({
             )}
             {(flag.status === 'PENDING' || flag.status === 'REVIEWED') && (
               <>
-                <TouchableOpacity style={[sheet.btn, { backgroundColor: palette.goldHighlight, borderColor: palette.gold }]} onPress={() => doModAction('WARN')}>
+                <TouchableOpacity style={[sheet.btn, { backgroundColor: palette.goldHighlight, borderColor: palette.gold }]} onPress={() => confirmModAction('WARN', 'Warn user', false)}>
                   <Text style={[sheet.btnTxt, { color: palette.gold }]}>Warn user</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={[sheet.btn, { backgroundColor: palette.dangerSoft, borderColor: palette.danger }]} onPress={() => doModAction('SUSPEND')}>
+                <TouchableOpacity style={[sheet.btn, { backgroundColor: palette.dangerSoft, borderColor: palette.danger }]} onPress={() => confirmModAction('SUSPEND', 'Suspend user', true)}>
                   <Text style={[sheet.btnTxt, { color: palette.danger }]}>Suspend</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={[sheet.btn, { backgroundColor: palette.primarySoft, borderColor: palette.primaryStrong }]} onPress={() => doModAction('BAN')}>
+                <TouchableOpacity style={[sheet.btn, { backgroundColor: palette.primarySoft, borderColor: palette.primaryStrong }]} onPress={() => confirmModAction('BAN', 'Ban user', true)}>
                   <Text style={[sheet.btnTxt, { color: palette.primaryStrong }]}>Ban user</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={[sheet.btn, { backgroundColor: palette.dangerSoft, borderColor: palette.danger }]} onPress={() => doModAction('DELETE')}>
+                <TouchableOpacity style={[sheet.btn, { backgroundColor: palette.dangerSoft, borderColor: palette.danger }]} onPress={() => confirmModAction('DELETE', 'Delete content', true)}>
                   <Text style={[sheet.btnTxt, { color: palette.danger }]}>Delete content</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={[sheet.btn, { backgroundColor: palette.successSoft, borderColor: palette.success }]} onPress={() => doAction('resolve')}>
@@ -229,9 +252,11 @@ function ModerationQueueTab() {
   const [refreshing, setRefreshing] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string>('PENDING');
   const [selectedFlag, setSelectedFlag] = useState<Flag | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
+    setError(null);
     try {
       const url = `${ROUTES.moderation.flags}?status=${statusFilter}&ordering=-created_at`;
       const res = await getRequest(url);
@@ -241,8 +266,13 @@ function ModerationQueueTab() {
         ? res.data
         : [];
       setFlags(items);
-    } catch {
+    } catch (e: any) {
+      // Was a bare `catch { setFlags([]) }` with no error state at all - a
+      // failed fetch rendered the same "No PENDING flags" empty state as a
+      // genuinely-empty queue, so a moderator had no way to tell a real
+      // report backlog from a broken request.
       setFlags([]);
+      setError(e?.message || 'Unable to load the moderation queue.');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -272,6 +302,16 @@ function ModerationQueueTab() {
 
       {loading ? (
         <ActivityIndicator color={palette.primaryStrong} style={{ marginTop: 40 }} />
+      ) : error ? (
+        <View style={{ alignItems: 'center', marginTop: 40, gap: 12, paddingHorizontal: 24 }}>
+          <Text style={{ color: palette.danger, textAlign: 'center' }}>{error}</Text>
+          <TouchableOpacity
+            onPress={() => load()}
+            style={{ paddingHorizontal: 20, paddingVertical: 10, borderRadius: 10, backgroundColor: palette.primaryStrong }}
+          >
+            <Text style={{ color: palette.onPrimary, fontWeight: '700' }}>Retry</Text>
+          </TouchableOpacity>
+        </View>
       ) : (
         <FlatList
           initialNumToRender={20}
@@ -340,10 +380,12 @@ function UserManagementTab() {
   const [users, setUsers] = useState<KISUser[]>([]);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const search = useCallback(async (q: string, silent = false) => {
     if (!silent) setLoading(true);
+    setError(null);
     try {
       const url = q.trim()
         ? `${ROUTES.adminUsers.list}?search=${encodeURIComponent(q)}&ordering=-created_at`
@@ -355,8 +397,12 @@ function UserManagementTab() {
         ? res.data
         : [];
       setUsers(items);
-    } catch {
+    } catch (e: any) {
+      // Same silent-swallow issue as the queue tab above - a failed search
+      // rendered "No users found" indistinguishably from a real empty
+      // result set.
       setUsers([]);
+      setError(e?.message || 'Unable to load users.');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -405,6 +451,16 @@ function UserManagementTab() {
       </View>
       {loading ? (
         <ActivityIndicator color={palette.primaryStrong} style={{ marginTop: 40 }} />
+      ) : error ? (
+        <View style={{ alignItems: 'center', marginTop: 40, gap: 12, paddingHorizontal: 24 }}>
+          <Text style={{ color: palette.danger, textAlign: 'center' }}>{error}</Text>
+          <TouchableOpacity
+            onPress={() => search(query)}
+            style={{ paddingHorizontal: 20, paddingVertical: 10, borderRadius: 10, backgroundColor: palette.primaryStrong }}
+          >
+            <Text style={{ color: palette.onPrimary, fontWeight: '700' }}>Retry</Text>
+          </TouchableOpacity>
+        </View>
       ) : (
         <FlatList
           initialNumToRender={20}
@@ -473,9 +529,11 @@ function AuditLogTab() {
   const [entries, setEntries] = useState<AuditEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
+    setError(null);
     try {
       const res = await getRequest(`${ROUTES.moderation.auditLogs}?ordering=-created_at`);
       const items: AuditEntry[] = Array.isArray(res.data?.results)
@@ -484,8 +542,12 @@ function AuditLogTab() {
         ? res.data
         : [];
       setEntries(items);
-    } catch {
+    } catch (e: any) {
+      // Same silent-swallow issue as the other two tabs - a failed fetch
+      // rendered "No audit entries" indistinguishably from a genuinely
+      // empty audit log.
       setEntries([]);
+      setError(e?.message || 'Unable to load the audit log.');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -496,6 +558,16 @@ function AuditLogTab() {
 
   return loading ? (
     <ActivityIndicator color={palette.primaryStrong} style={{ marginTop: 40 }} />
+  ) : error ? (
+    <View style={{ alignItems: 'center', marginTop: 40, gap: 12, paddingHorizontal: 24 }}>
+      <Text style={{ color: palette.danger, textAlign: 'center' }}>{error}</Text>
+      <TouchableOpacity
+        onPress={() => load()}
+        style={{ paddingHorizontal: 20, paddingVertical: 10, borderRadius: 10, backgroundColor: palette.primaryStrong }}
+      >
+        <Text style={{ color: palette.onPrimary, fontWeight: '700' }}>Retry</Text>
+      </TouchableOpacity>
+    </View>
   ) : (
     <FlatList
       initialNumToRender={20}

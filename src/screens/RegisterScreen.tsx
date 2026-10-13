@@ -648,6 +648,9 @@ export default function RegisterScreen({ navigation, route }: any) {
             onPress={() => setTermsAgreed(v => !v)}
             style={styles.termsRow}
             hitSlop={8}
+            accessibilityRole="checkbox"
+            accessibilityState={{ checked: termsAgreed }}
+            accessibilityLabel="I have read and agree to the Terms & Conditions and Privacy Policy"
           >
             <View
               style={[

@@ -63,6 +63,13 @@ export default function MediaDashboardScreen() {
       const res = await getRequest(ROUTES.mediaAssets.assets, {
         errorMessage: 'Unable to load media assets.',
       });
+      // getRequest resolves (never throws) on a failed HTTP response too, with
+      // `data` left undefined — without this check a 4xx/5xx response fell
+      // through to "No media files found" as if the library were genuinely
+      // empty, silently masking a real failure as a success/empty-state.
+      if (!res.success) {
+        throw new Error(res.message || 'Unable to load media assets.');
+      }
       const items: MediaAsset[] = res.data?.results ?? res.data ?? [];
       setAssets(items.slice(0, 30));
 

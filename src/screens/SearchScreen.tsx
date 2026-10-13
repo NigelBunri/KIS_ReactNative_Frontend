@@ -273,6 +273,8 @@ export default function SearchScreen({ onClose, onSelectResult }: Props) {
               onPress={() => { setQuery(''); setResults([]); inputRef.current?.focus(); }}
               hitSlop={8}
               style={[styles.clearBtn, { backgroundColor: palette.surfaceElevated }]}
+              accessibilityRole="button"
+              accessibilityLabel="Clear search"
             >
               <KISIcon name="close" size={12} color={palette.subtext} />
             </Pressable>
@@ -354,7 +356,13 @@ export default function SearchScreen({ onClose, onSelectResult }: Props) {
                   <KISIcon name="call-history" size={14} color={palette.subtext} />
                 </View>
                 <Text style={[styles.recentText, { color: palette.text }]} numberOfLines={1}>{term}</Text>
-                <Pressable onPress={() => removeRecentSearch(term)} hitSlop={8} style={styles.recentRemoveBtn}>
+                <Pressable
+                  onPress={() => removeRecentSearch(term)}
+                  hitSlop={8}
+                  style={styles.recentRemoveBtn}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Remove "${term}" from recent searches`}
+                >
                   <KISIcon name="close" size={13} color={palette.subtext} />
                 </Pressable>
               </Pressable>

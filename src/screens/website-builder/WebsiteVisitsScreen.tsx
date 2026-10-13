@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, ScrollView, Text, View } from 'react-native';
 import { getRequest } from '@/network/get';
 import ROUTES from '@/network';
+import KISButton from '@/constants/KISButton';
 import {
   getHealthThemeColors,
   HEALTH_THEME_SPACING,
@@ -43,10 +44,12 @@ export default function WebsiteVisitsScreen({ route }: Props) {
   const typography = HEALTH_THEME_TYPOGRAPHY;
 
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [summary, setSummary] = useState<Summary | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
+    setError(null);
     try {
       const res: any = await getRequest(ROUTES.websites.analyticsSummary(websiteId, 30));
       // On a genuine network-level failure, res.data is undefined, so the
@@ -55,8 +58,13 @@ export default function WebsiteVisitsScreen({ route }: Props) {
       // and bypassed whatever "no summary yet" rendering this screen has
       // for a genuine null summary. `summary.daily.map(...)` below then
       // threw on the wrapper's missing `daily` field, crashing the screen.
-      const data = res?.success ? res?.data : null;
+      if (!res?.success) {
+        throw new Error(res?.message || 'Unable to load website visits.');
+      }
+      const data = res?.data;
       setSummary(data && typeof data === 'object' ? data : null);
+    } catch (e: any) {
+      setError(e?.message || 'Unable to load website visits.');
     } finally {
       setLoading(false);
     }
@@ -66,7 +74,26 @@ export default function WebsiteVisitsScreen({ route }: Props) {
     load().catch(() => {});
   }, [load]);
 
-  if (loading || !summary) {
+  if (loading) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg, alignItems: 'center', justifyContent: 'center' }}>
+        <ActivityIndicator color={palette.accentPrimary} />
+      </SafeAreaView>
+    );
+  }
+
+  if (error) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg, alignItems: 'center', justifyContent: 'center', padding: spacing.md }}>
+        <Text style={{ ...typography.body, color: palette.text, textAlign: 'center', marginBottom: spacing.md }}>
+          {error}
+        </Text>
+        <KISButton title="Retry" onPress={() => { load().catch(() => {}); }} />
+      </SafeAreaView>
+    );
+  }
+
+  if (!summary) {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg, alignItems: 'center', justifyContent: 'center' }}>
         <ActivityIndicator color={palette.accentPrimary} />

@@ -78,14 +78,22 @@ export default function PetitionsScreen({ navigation }: Props) {
     }
     setSigning(id);
     try {
-      await postRequest(ROUTES.government.petitionSign(id), { is_anonymous: false });
+      // postRequest resolves (never throws) on a failed request too, with
+      // `success: false` — the previous code ignored that flag and always
+      // marked the petition as signed locally, even when the backend
+      // rejected the signature. Checking `success` routes a genuine
+      // failure to the error alert below instead.
+      const res = await postRequest(ROUTES.government.petitionSign(id), { is_anonymous: false });
+      if (!res?.success) {
+        throw new Error(res?.message || 'Could not sign petition. Please try again.');
+      }
       setPetitions((prev) =>
         prev.map((p) =>
           p.id === id ? { ...p, signature_count: p.signature_count + 1, user_signed: true } : p,
         ),
       );
-    } catch {
-      Alert.alert('Error', 'Could not sign petition. Please try again.');
+    } catch (e: any) {
+      Alert.alert('Error', e?.message || 'Could not sign petition. Please try again.');
     } finally {
       setSigning(null);
     }

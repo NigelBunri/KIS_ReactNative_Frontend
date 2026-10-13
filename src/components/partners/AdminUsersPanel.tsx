@@ -77,12 +77,18 @@ export default function AdminUsersPanel({
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Suspend (temp)',
-          onPress: () => void onBan(user.id, 'Policy violation', false),
+          onPress: async () => {
+            const ok = await onBan(user.id, 'Policy violation', false);
+            if (!ok) Alert.alert('Failed', 'Unable to suspend this user. Please try again.');
+          },
         },
         {
           text: 'Ban (permanent)',
           style: 'destructive',
-          onPress: () => void onBan(user.id, 'Policy violation', true),
+          onPress: async () => {
+            const ok = await onBan(user.id, 'Policy violation', true);
+            if (!ok) Alert.alert('Failed', 'Unable to ban this user. Please try again.');
+          },
         },
       ],
     );
@@ -94,7 +100,14 @@ export default function AdminUsersPanel({
       `Block ${user.display_name ?? user.email}? They will be signed out everywhere and unable to sign back in until restored.`,
       [
         { text: 'Cancel', style: 'cancel' },
-        { text: 'Block', style: 'destructive', onPress: () => void onBlock(user.id) },
+        {
+          text: 'Block',
+          style: 'destructive',
+          onPress: async () => {
+            const ok = await onBlock(user.id);
+            if (!ok) Alert.alert('Failed', 'Unable to block this account. Please try again.');
+          },
+        },
       ],
     );
   };
@@ -105,7 +118,14 @@ export default function AdminUsersPanel({
       `Delete ${user.display_name ?? user.email}? Deactivated immediately, permanently deleted after the grace period unless restored before then.`,
       [
         { text: 'Cancel', style: 'cancel' },
-        { text: 'Delete', style: 'destructive', onPress: () => void onDelete(user.id) },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            const ok = await onDelete(user.id);
+            if (!ok) Alert.alert('Failed', 'Unable to delete this account. Please try again.');
+          },
+        },
       ],
     );
   };
@@ -119,7 +139,10 @@ export default function AdminUsersPanel({
         {
           text: 'Reset devices',
           style: 'destructive',
-          onPress: () => void onWipeDevices(user.id),
+          onPress: async () => {
+            const result = await onWipeDevices(user.id);
+            if (result === false) Alert.alert('Failed', 'Unable to reset devices for this user. Please try again.');
+          },
         },
       ],
     );
@@ -132,7 +155,10 @@ export default function AdminUsersPanel({
       [
         ...TIERS.map(tier => ({
           text: tier === user.tier ? `✓ ${tier}` : tier,
-          onPress: () => void onSetTier(user.id, tier),
+          onPress: async () => {
+            const ok = await onSetTier(user.id, tier);
+            if (!ok) Alert.alert('Failed', 'Unable to change this user’s tier. Please try again.');
+          },
         })),
         { text: 'Cancel', style: 'cancel' },
       ],
@@ -154,7 +180,7 @@ export default function AdminUsersPanel({
       {/* Header */}
       <View style={[styles.header, { borderBottomColor: palette.border }]}>
         <Text style={[styles.title, { color: palette.text }]}>User Management</Text>
-        <Pressable onPress={onClose}>
+        <Pressable onPress={onClose} accessibilityRole="button" accessibilityLabel="Close" hitSlop={10}>
           <Text style={{ color: palette.subtext, fontSize: 20 }}>✕</Text>
         </Pressable>
       </View>
@@ -221,10 +247,16 @@ export default function AdminUsersPanel({
               palette={palette}
               isActioning={actionLoading === item.id}
               onBan={() => handleBan(item)}
-              onUnban={() => void onUnban(item.id)}
+              onUnban={async () => {
+                const ok = await onUnban(item.id);
+                if (!ok) Alert.alert('Failed', 'Unable to unban this user. Please try again.');
+              }}
               onBlock={() => handleBlock(item)}
               onDelete={() => handleDelete(item)}
-              onRestore={() => void onRestore(item.id)}
+              onRestore={async () => {
+                const ok = await onRestore(item.id);
+                if (!ok) Alert.alert('Failed', 'Unable to restore this account. Please try again.');
+              }}
               onChangeTier={() => handleTierChange(item)}
               onWipeDevices={() => handleWipeDevices(item)}
               onSelect={() => setSelectedUser(selectedUser?.id === item.id ? null : item)}

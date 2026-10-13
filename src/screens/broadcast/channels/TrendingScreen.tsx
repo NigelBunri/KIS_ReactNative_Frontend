@@ -4,7 +4,6 @@
 
 import React, { useCallback, useEffect, useState } from 'react';
 import {
-  ActivityIndicator,
   FlatList,
   Image,
   Pressable,
@@ -49,9 +48,8 @@ const PERIODS: Array<{ value: Period; label: string }> = [
   { value: 'all', label: 'All Time' },
 ];
 
-// Rank medal colors are resolved at render time using palette tokens.
-// Rank 1 → palette.gold, rank 2 → palette.divider (silver-grey), rank 3 → palette.primaryWeak
-// Call getRankMedalColor(rank, palette) instead of indexing this object directly.
+// Rank medal colors are resolved inline at render time using palette tokens:
+// rank 1 → palette.gold, rank 2 → palette.divider (silver-grey), rank 3 → palette.primaryWeak.
 
 const SKELETON_KEYS = ['s1', 's2', 's3', 's4', 's5', 's6'];
 
@@ -189,6 +187,9 @@ export default function TrendingScreen({ onPressContent }: Props) {
             <Pressable
               key={p.value}
               onPress={() => handlePeriodChange(p.value)}
+              accessibilityRole="button"
+              accessibilityLabel={`Show trending for ${p.label}`}
+              accessibilityState={{ selected: active }}
               style={[
                 styles.pill,
                 {
@@ -213,6 +214,8 @@ export default function TrendingScreen({ onPressContent }: Props) {
           <Text style={[styles.emptyText, { color: palette.danger }]}>{error}</Text>
           <Pressable
             onPress={() => fetchTrending(period)}
+            accessibilityRole="button"
+            accessibilityLabel="Retry loading trending content"
             style={{ marginTop: 12, paddingHorizontal: 20, paddingVertical: 10, borderRadius: 10, backgroundColor: palette.primary }}
           >
             <Text style={{ color: palette.onPrimary, fontWeight: '700', fontSize: 14 }}>Retry</Text>
@@ -238,13 +241,6 @@ export default function TrendingScreen({ onPressContent }: Props) {
           renderItem={renderCard}
           contentContainerStyle={[styles.listContent, { gap: cardGap }]}
           showsVerticalScrollIndicator={false}
-          ListEmptyComponent={
-            <View style={{ alignItems: 'center', justifyContent: 'center', paddingVertical: 48 }}>
-              <Text style={{ color: palette.subtext, fontSize: 14, textAlign: 'center' }}>
-                Nothing trending right now
-              </Text>
-            </View>
-          }
         />
       )}
     </View>

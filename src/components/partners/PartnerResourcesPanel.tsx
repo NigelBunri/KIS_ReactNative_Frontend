@@ -49,6 +49,7 @@ export default function PartnerResourcesPanel({ isOpen, panelWidth, panelTransla
   const [loading, setLoading] = useState(false);
   const [resources, setResources] = useState<Resource[]>([]);
   const [kindFilter, setKindFilter] = useState<ResourceKind | 'all'>('all');
+  const [error, setError] = useState<string | null>(null);
 
   const [showCreate, setShowCreate] = useState(false);
   const [newKind, setNewKind] = useState<ResourceKind>('article');
@@ -67,6 +68,11 @@ export default function PartnerResourcesPanel({ isOpen, panelWidth, panelTransla
       ROUTES.partners.resources(partnerId, kindFilter === 'all' ? undefined : { kind: kindFilter }),
       { errorMessage: 'Unable to load resources.' },
     );
+    if (!res?.success) {
+      setError(res?.message || "Couldn't load resources. Tap to retry.");
+      return;
+    }
+    setError(null);
     const payload = (res?.data ?? res ?? []) as Resource[];
     setResources(Array.isArray(payload) ? payload : []);
   }, [partnerId, kindFilter]);
@@ -167,7 +173,7 @@ export default function PartnerResourcesPanel({ isOpen, panelWidth, panelTransla
         ]}
       >
         <View style={[styles.settingsPanelHeader, { borderBottomColor: palette.divider }]}>
-          <Pressable onPress={onClose} style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}>
+          <Pressable onPress={onClose} accessibilityRole="button" accessibilityLabel="Close" style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}>
             <Text style={{ color: palette.text, fontSize: 18 }}>‹</Text>
           </Pressable>
           <View style={{ flex: 1 }}>
@@ -265,6 +271,13 @@ export default function PartnerResourcesPanel({ isOpen, panelWidth, panelTransla
 
           {loading ? (
             <ActivityIndicator size="small" color={palette.primary} />
+          ) : error ? (
+            <View style={[styles.settingsFeatureRow, { borderColor: palette.danger, backgroundColor: palette.danger + '15' }]}>
+              <Text style={{ color: palette.danger, fontSize: 13, fontWeight: '600' }}>{error}</Text>
+              <Pressable onPress={() => { setLoading(true); load().finally(() => setLoading(false)); }} style={{ marginTop: 8 }}>
+                <Text style={{ color: palette.primary, fontWeight: '700', fontSize: 13 }}>Tap to retry</Text>
+              </Pressable>
+            </View>
           ) : resources.length === 0 ? (
             <Text style={{ color: palette.subtext, fontSize: 13, textAlign: 'center', marginTop: 20 }}>Nothing here yet.</Text>
           ) : (

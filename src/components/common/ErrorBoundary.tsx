@@ -40,7 +40,12 @@ export class ErrorBoundary extends React.Component<Props, State> {
         <Text style={styles.message}>
           {translateString(this.props.fallbackLabel ?? 'This section encountered an error.')}
         </Text>
-        <Pressable style={styles.button} onPress={this.reset}>
+        <Pressable
+          style={styles.button}
+          onPress={this.reset}
+          accessibilityRole="button"
+          accessibilityLabel={translateString('Try again')}
+        >
           <Text style={styles.buttonText}>{translateString('Try again')}</Text>
         </Pressable>
       </View>

@@ -41,20 +41,30 @@ export default function WebsiteCustomDomainScreen({ route }: Props) {
   const typography = HEALTH_THEME_TYPOGRAPHY;
 
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [state, setState] = useState<DomainState | null>(null);
   const [domainInput, setDomainInput] = useState('');
   const [saving, setSaving] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
+    setError(null);
     try {
       const res: any = await getRequest(ROUTES.websites.customDomain(websiteId));
       // Same fix as WebsiteVisitsScreen — on a network-level failure the
       // old fallback set `state` to the wrapper object, which is truthy
       // and passed the typeof check, so `!state.enabled` rendered as a
       // confident "custom domain not enabled" instead of a genuine error.
-      const data = res?.success ? res?.data : null;
-      setState(data && typeof data === 'object' ? data : null);
+      if (!res?.success) throw new Error(res?.message || 'Unable to load custom domain settings.');
+      const data = res?.data;
+      if (!data || typeof data !== 'object') throw new Error('Unable to load custom domain settings.');
+      setState(data);
+    } catch (e: any) {
+      // Previously this fell through to `state` staying null with no error
+      // recorded, which — combined with the `loading || !state` render guard
+      // below — left the screen spinning forever on a genuine failure, with
+      // no message and no way to retry.
+      setError(e?.message || 'Unable to load custom domain settings.');
     } finally {
       setLoading(false);
     }
@@ -89,17 +99,32 @@ export default function WebsiteCustomDomainScreen({ route }: Props) {
         text: 'Disconnect',
         style: 'destructive',
         onPress: async () => {
-          await deleteRequest(ROUTES.websites.customDomain(websiteId), { errorMessage: 'Unable to disconnect this domain.' });
+          const res = await deleteRequest(ROUTES.websites.customDomain(websiteId), { errorMessage: 'Unable to disconnect this domain.' });
+          if (!res?.success) {
+            Alert.alert('Custom Domain', (res as any)?.message || 'Unable to disconnect this domain.');
+            return;
+          }
           await load();
         },
       },
     ]);
   }, [websiteId, state, load]);
 
-  if (loading || !state) {
+  if (loading) {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg, alignItems: 'center', justifyContent: 'center' }}>
         <ActivityIndicator color={palette.accentPrimary} />
+      </SafeAreaView>
+    );
+  }
+
+  if (error || !state) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg, alignItems: 'center', justifyContent: 'center', padding: spacing.md }}>
+        <Text style={{ ...typography.body, color: palette.text, textAlign: 'center', marginBottom: spacing.md }}>
+          {error || 'Unable to load custom domain settings.'}
+        </Text>
+        <KISButton title="Retry" onPress={() => { load().catch(() => {}); }} />
       </SafeAreaView>
     );
   }

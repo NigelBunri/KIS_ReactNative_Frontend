@@ -86,7 +86,7 @@ export const WallpaperPickerSheet: React.FC<Props> = ({
         <View style={[styles.handle, { backgroundColor: palette.divider }]} />
         <View style={[styles.header, { borderBottomColor: palette.divider }]}>
           <Text style={[styles.title, { color: palette.text }]}>Chat Wallpaper</Text>
-          <Pressable onPress={onClose} hitSlop={8}>
+          <Pressable onPress={onClose} hitSlop={8} accessibilityRole="button" accessibilityLabel="Close">
             <KISIcon name="close" size={22} color={palette.text} />
           </Pressable>
         </View>

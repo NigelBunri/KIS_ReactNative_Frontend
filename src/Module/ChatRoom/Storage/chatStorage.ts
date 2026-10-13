@@ -446,7 +446,18 @@ const messageCacheScore = (message: ChatMessage): number => {
   );
 };
 
-const CACHE_STATUS_ORDER: Record<string, number> = { failed: -1, pending: 0, sending: 0, local_only: 0, sent: 1, delivered: 2, read: 3 };
+// 'failed' sits above pending/sending/local_only (not below, as a naive
+// "progress order" table would have it) so a merge with a stale cached
+// 'pending'/'sending' copy of the same message can never silently erase a
+// definitive send failure the user still needs to see and retry — while
+// still correctly losing to sent/delivered/read if the message really did
+// go through on a later attempt. Previously ranked at -1 (below pending),
+// which meant any merge against a stale pending/sending/local_only copy of
+// the same message silently discarded the failed status - a message the
+// user was shown as needing retry could flip back to looking like it was
+// still trying to send after a reload/cache merge. Keep in sync with
+// MESSAGE_STATUS_RANK in hooks/useChatPersistence.ts.
+const CACHE_STATUS_ORDER: Record<string, number> = { pending: 0, sending: 0, local_only: 0, failed: 0.5, sent: 1, delivered: 2, read: 3 };
 
 const mergeCachedMessage = (prev: ChatMessage, next: ChatMessage): ChatMessage => {
   const p = prev as any;

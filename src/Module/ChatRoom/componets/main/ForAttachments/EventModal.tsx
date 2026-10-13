@@ -383,10 +383,21 @@ export const EventModal: React.FC<EventModalProps> = ({
               marginTop: KIS_TOKENS.spacing.sm,
             }}
           >
-            <Pressable onPress={onClose}>
+            <Pressable
+              onPress={onClose}
+              accessibilityRole="button"
+              accessibilityLabel="Cancel"
+              style={{ paddingHorizontal: 14, paddingVertical: 12, minHeight: 44, justifyContent: 'center' }}
+            >
               <Text style={{ color: palette.subtext }}>Cancel</Text>
             </Pressable>
-            <Pressable onPress={handleCreate} disabled={!canSave}>
+            <Pressable
+              onPress={handleCreate}
+              disabled={!canSave}
+              accessibilityRole="button"
+              accessibilityLabel="Save event"
+              style={{ paddingHorizontal: 14, paddingVertical: 12, minHeight: 44, justifyContent: 'center' }}
+            >
               <Text
                 style={{
                   color: canSave ? palette.primary : palette.subtext,

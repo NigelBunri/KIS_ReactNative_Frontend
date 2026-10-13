@@ -465,6 +465,8 @@ export default function DeviceManagementScreen() {
             <Pressable
               style={styles.iconBtn}
               onPress={() => { setRenamingId(item.id); setRenameValue(item.nickname || item.device_name || item.name || ''); }}
+              accessibilityRole="button"
+              accessibilityLabel={`Rename ${label}`}
             >
               <KISIcon name="edit" size={16} color={palette.subtext} />
             </Pressable>
@@ -476,6 +478,8 @@ export default function DeviceManagementScreen() {
               style={styles.iconBtn}
               onPress={() => { handleTransferParent(item); }}
               disabled={transferring}
+              accessibilityRole="button"
+              accessibilityLabel={`Make ${label} the primary device`}
             >
               <KISIcon name="arrow-left" size={16} color={palette.primary} style={{ transform: [{ rotate: '180deg' }] }} />
             </Pressable>
@@ -511,7 +515,12 @@ export default function DeviceManagementScreen() {
     <SafeAreaView style={[styles.root, { backgroundColor: palette.bg, }]} edges={['top']}>
       {/* Header */}
       <View style={[styles.header, { borderBottomColor: palette.divider }]}>
-        <Pressable onPress={() => navigation.goBack()} style={styles.backBtn}>
+        <Pressable
+          onPress={() => navigation.goBack()}
+          style={styles.backBtn}
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
+        >
           <KISIcon name="arrow-left" size={22} color={palette.text} />
         </Pressable>
         <Text style={[styles.headerTitle, { color: palette.text }]}>Manage Devices</Text>

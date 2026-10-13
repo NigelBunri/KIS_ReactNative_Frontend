@@ -329,11 +329,23 @@ export default function MyOrdersPage() {
               size="xs"
               variant="outline"
               onPress={() =>
-                handleAction(
-                  item.id,
-                  ROUTES.commerce.marketplaceOrderCancel(item.id),
-                  'cancel',
-                  'Unable to cancel order.',
+                Alert.alert(
+                  'Cancel order',
+                  'Are you sure you want to cancel this order? This cannot be undone.',
+                  [
+                    { text: 'Keep order', style: 'cancel' },
+                    {
+                      text: 'Cancel order',
+                      style: 'destructive',
+                      onPress: () =>
+                        handleAction(
+                          item.id,
+                          ROUTES.commerce.marketplaceOrderCancel(item.id),
+                          'cancel',
+                          'Unable to cancel order.',
+                        ),
+                    },
+                  ],
                 )
               }
               disabled={Boolean(loadingKey)}
@@ -368,18 +380,30 @@ export default function MyOrdersPage() {
               size="xs"
               variant="ghost"
               onPress={() =>
-                (async () => {
-                  await handleAction(
-                    item.id,
-                    ROUTES.commerce.marketplaceOrderDelete(item.id),
-                    'delete',
-                    'Unable to delete order.',
-                    'delete',
-                  );
-                  if (item.shop_info?.id) {
-                    await deleteShopCart(item.shop_info.id);
-                  }
-                })()
+                Alert.alert(
+                  'Delete order',
+                  'This will permanently remove this order from your history. This cannot be undone.',
+                  [
+                    { text: 'Keep order', style: 'cancel' },
+                    {
+                      text: 'Delete',
+                      style: 'destructive',
+                      onPress: () =>
+                        (async () => {
+                          await handleAction(
+                            item.id,
+                            ROUTES.commerce.marketplaceOrderDelete(item.id),
+                            'delete',
+                            'Unable to delete order.',
+                            'delete',
+                          );
+                          if (item.shop_info?.id) {
+                            await deleteShopCart(item.shop_info.id);
+                          }
+                        })(),
+                    },
+                  ],
+                )
               }
               disabled={Boolean(loadingKey)}
             />

@@ -42,8 +42,6 @@ type Petition = {
   signatories?: Signatory[];
 };
 
-const STATUS_COLORS: Record<string, string> = {};
-
 export default function PetitionDetailScreen({ route }: Props) {
   const { petitionId } = route.params;
   const { palette } = useKISTheme();
@@ -82,15 +80,23 @@ export default function PetitionDetailScreen({ route }: Props) {
     if (!petition) return;
     setSigning(true);
     try {
-      await postRequest(ROUTES.government.petitionSign(petitionId), {
+      // postRequest resolves (never throws) on a failed request too, with
+      // `success: false` — the previous code ignored that flag and always
+      // incremented the local signature count and showed "Success", even
+      // when the backend rejected the signature. Checking `success` routes
+      // a genuine failure to the error alert below instead.
+      const res = await postRequest(ROUTES.government.petitionSign(petitionId), {
         is_anonymous: anonymous,
       });
+      if (!res?.success) {
+        throw new Error(res?.message || 'Could not sign the petition. Please try again.');
+      }
       setPetition((prev) =>
         prev ? { ...prev, signature_count: prev.signature_count + 1 } : prev,
       );
       Alert.alert('Success', 'Your signature has been recorded.');
-    } catch {
-      Alert.alert('Error', 'Could not sign the petition. Please try again.');
+    } catch (e: any) {
+      Alert.alert('Error', e?.message || 'Could not sign the petition. Please try again.');
     } finally {
       setSigning(false);
     }

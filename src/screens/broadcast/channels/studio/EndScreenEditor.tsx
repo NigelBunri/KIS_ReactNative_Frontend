@@ -80,8 +80,13 @@ export default function EndScreenEditor({ contentId }: Props) {
         ROUTES.broadcasts.contentEndScreen(contentId),
         { errorMessage: '' },
       );
-      const data = res?.data ?? res;
-      setEndScreen(data ?? { elements: [] });
+      // getRequest resolves (never throws) on failure too — without this
+      // check, a failed load's error body (e.g. `{detail: "..."}`) passed
+      // straight through as `data`, rendering "No end screen elements
+      // configured" on a load failure with zero indication anything went
+      // wrong.
+      if (!res?.success) throw new Error('Could not load end screen configuration.');
+      setEndScreen(res.data ?? { elements: [] });
     } catch {
       setError('Could not load end screen configuration.');
     } finally {

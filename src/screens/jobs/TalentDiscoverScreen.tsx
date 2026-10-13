@@ -114,7 +114,14 @@ export default function TalentDiscoverScreen() {
     const userId = profile.user_id ?? profile.id;
     setActionLoadingId(userId);
     try {
-      await postRequest(ROUTES.connections.list, { user_id: userId });
+      // postRequest resolves { success: false, message } on failure rather
+      // than throwing — this previously marked the connection "Pending"
+      // locally regardless of whether the request actually reached the
+      // other person.
+      const res = await postRequest(ROUTES.connections.list, { user_id: userId }, { errorMessage: 'Could not send connection request.' });
+      if (res?.success === false) {
+        throw new Error((res as any)?.message || 'Could not send connection request.');
+      }
       setPendingConnections(prev => new Set(prev).add(userId));
     } catch (e: any) {
       Alert.alert('Failed', e?.message ?? 'Please try again.');
@@ -199,7 +206,7 @@ export default function TalentDiscoverScreen() {
     <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg, }} edges={['top']}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
       <View style={[styles.header, { borderBottomColor: palette.divider }]}>
-        <Pressable onPress={() => navigation.goBack()} style={styles.backBtn}>
+        <Pressable onPress={() => navigation.goBack()} style={styles.backBtn} accessibilityRole="button" accessibilityLabel="Go back">
           <KISIcon name="arrow-left" size={22} color={palette.text} />
         </Pressable>
         <Text style={[styles.headerTitle, { color: palette.text }]}>Find Talent</Text>

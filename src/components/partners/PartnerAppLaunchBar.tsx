@@ -101,6 +101,8 @@ export default function PartnerAppLaunchBar({
           <Pressable
             key={app.id}
             onPress={() => handleLaunchApp(app)}
+            accessibilityRole="button"
+            accessibilityLabel={app.name ? `Open ${app.name}` : 'Open app'}
             style={({ pressed }) => [
               styles.appLaunchButton,
               {
@@ -164,6 +166,8 @@ export default function PartnerAppLaunchBar({
       {showMore && !loading ? (
         <Pressable
           onPress={openMore}
+          accessibilityRole="button"
+          accessibilityLabel="More apps"
           style={({ pressed }) => [
             styles.appLaunchButton,
             {

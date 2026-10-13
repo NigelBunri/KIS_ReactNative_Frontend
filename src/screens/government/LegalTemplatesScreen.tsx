@@ -253,6 +253,8 @@ export default function LegalTemplatesScreen(_props: Props) {
               activeOpacity={0.75}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               onPress={() => setSelectedTemplate(null)}
+              accessibilityRole="button"
+              accessibilityLabel="Close template detail"
             >
               <KISIcon name="close-outline" size={24} color={palette.text} />
             </TouchableOpacity>

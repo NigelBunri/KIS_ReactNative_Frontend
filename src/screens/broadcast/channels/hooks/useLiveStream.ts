@@ -283,8 +283,12 @@ export function useLiveStream(
         prev.map(m => m.id === optimisticId ? saved : m),
       );
     } else {
-      // Remove optimistic on failure
+      // Remove optimistic on failure, and throw so the caller (LiveChatPanel)
+      // can tell the viewer their message didn't actually go out and restore
+      // the draft text — previously this failed silently: the bubble just
+      // disappeared with no error and no way to tell it needed retrying.
       setChatMessages(prev => prev.filter(m => m.id !== optimisticId));
+      throw new Error(res?.message || 'Unable to send message.');
     }
   }, [streamId, currentUserId]);
 

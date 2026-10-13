@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
+  Image,
   Modal,
   ScrollView,
   StyleSheet,
@@ -59,6 +60,7 @@ export default function BabyMilestonesScreen({ navigation }: Props) {
 
   const [milestones, setMilestones] = useState<Milestone[]>([]);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [selectedType, setSelectedType] = useState(MILESTONE_TYPES[0].key);
   const [milestoneDate, setMilestoneDate] = useState('');
@@ -68,11 +70,19 @@ export default function BabyMilestonesScreen({ navigation }: Props) {
 
   const fetchMilestones = useCallback(async () => {
     setLoading(true);
-    const res = await getRequest(ROUTES.healthExtended.babyMilestones);
-    if (res.success) {
-      setMilestones(Array.isArray(res.data?.results ?? res.data) ? (res.data?.results ?? res.data) : []);
+    setFetchError(null);
+    try {
+      const res = await getRequest(ROUTES.healthExtended.babyMilestones);
+      if (res.success) {
+        setMilestones(Array.isArray(res.data?.results ?? res.data) ? (res.data?.results ?? res.data) : []);
+      } else {
+        setFetchError('Could not load milestones. Please try again.');
+      }
+    } catch {
+      setFetchError('Unable to load milestones. Check your connection and try again.');
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }, []);
 
   useFocusEffect(useCallback(() => { fetchMilestones(); }, [fetchMilestones]));
@@ -119,6 +129,8 @@ export default function BabyMilestonesScreen({ navigation }: Props) {
           onPress={() => navigation.goBack()}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           style={styles.backBtn}
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
         >
           <KISIcon name="arrow-left" size={22} color={palette.ivory} />
         </TouchableOpacity>
@@ -139,11 +151,19 @@ export default function BabyMilestonesScreen({ navigation }: Props) {
           keyExtractor={(m) => m.id}
           contentContainerStyle={[styles.list, { paddingBottom: 100 }]}
           ListEmptyComponent={
-            <View style={styles.emptyContainer}>
-              <KISIcon name="heart" size={48} color={palette.subtext} />
-              <Text style={styles.emptyText}>No milestones yet.</Text>
-              <Text style={styles.emptySubtext}>Capture your baby's first moments!</Text>
-            </View>
+            fetchError ? (
+              <View style={styles.emptyContainer}>
+                <KISIcon name="heart" size={48} color={palette.danger} />
+                <Text style={[styles.emptyText, { color: palette.danger }]}>{fetchError}</Text>
+                <KISButton title="Retry" size="sm" variant="outline" onPress={fetchMilestones} />
+              </View>
+            ) : (
+              <View style={styles.emptyContainer}>
+                <KISIcon name="heart" size={48} color={palette.subtext} />
+                <Text style={styles.emptyText}>No milestones yet.</Text>
+                <Text style={styles.emptySubtext}>Capture your baby's first moments!</Text>
+              </View>
+            )
           }
           renderItem={({ item, index }) => (
             <View style={styles.timelineItem}>
@@ -165,9 +185,12 @@ export default function BabyMilestonesScreen({ navigation }: Props) {
                     </Text>
                   </View>
                   {item.photo_url ? (
-                    <View style={styles.photoPlaceholder}>
-                      <KISIcon name="image" size={20} color={palette.subtext} />
-                    </View>
+                    <Image
+                      source={{ uri: item.photo_url }}
+                      style={styles.photoPlaceholder}
+                      resizeMode="cover"
+                      accessibilityLabel={`Photo for ${item.title || item.type.replace(/_/g, ' ')}`}
+                    />
                   ) : null}
                 </View>
                 {item.notes ? (
@@ -179,7 +202,12 @@ export default function BabyMilestonesScreen({ navigation }: Props) {
         />
       )}
 
-      <KISFab icon="add" onPress={() => setShowForm(true)} style={styles.fab} />
+      <KISFab
+        icon="add"
+        onPress={() => setShowForm(true)}
+        style={styles.fab}
+        accessibilityLabel="Add milestone"
+      />
 
       {/* Add Milestone Modal */}
       <Modal visible={showForm} animationType="slide" presentationStyle="pageSheet">
@@ -190,6 +218,8 @@ export default function BabyMilestonesScreen({ navigation }: Props) {
               onPress={() => setShowForm(false)}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               style={styles.closeBtn}
+              accessibilityRole="button"
+              accessibilityLabel="Close"
             >
               <KISIcon name="close" size={22} color={palette.text} />
             </TouchableOpacity>
@@ -206,6 +236,9 @@ export default function BabyMilestonesScreen({ navigation }: Props) {
                     selectedType === t.key && styles.typeChipActive,
                   ]}
                   onPress={() => setSelectedType(t.key)}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: selectedType === t.key }}
+                  accessibilityLabel={t.label}
                 >
                   <KISIcon
                     name={t.icon}

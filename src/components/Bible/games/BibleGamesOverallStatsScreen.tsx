@@ -126,6 +126,8 @@ export default function BibleGamesOverallStatsScreen({ onBack, onReset }: { onBa
           onPress={() => setShareVisible(true)}
           disabled={sharing}
           hitSlop={10}
+          accessibilityRole="button"
+          accessibilityLabel="Share overall progress to chat"
           style={[styles.backBtn, { backgroundColor: palette.selectedBg, borderColor: palette.inputBorder }]}
         >
           {sharing ? <ActivityIndicator size="small" color={palette.primary} /> : <KISIcon name="share" size={18} color={palette.primary} />}

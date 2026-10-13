@@ -173,6 +173,7 @@ export default function NamePlaceMatchGame({ gameKey, stageIndex, isReplay, onEx
             onPlayAgain={load}
             onBackToJourney={onExit}
             onViewStats={onOpenStats}
+            persisted={stageResult.persisted}
           />
         </View>
       </GameShell>

@@ -131,7 +131,7 @@ export default function SuperThanksSheet({
             <Text style={[styles.title, { color: palette.text }]}>
               Super Thanks{contentTitle ? ` — ${contentTitle}` : ''}
             </Text>
-            <Pressable onPress={onClose}>
+            <Pressable onPress={onClose} accessibilityRole="button" accessibilityLabel="Close Super Thanks">
               <Text style={[styles.closeTxt, { color: palette.subtext }]}>✕</Text>
             </Pressable>
           </View>

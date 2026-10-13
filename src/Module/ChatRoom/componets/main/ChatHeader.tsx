@@ -137,6 +137,8 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
         {/* Back / cancel selection */}
         <Pressable
           onPress={onCancelSelection ?? onBack}
+          accessibilityRole="button"
+          accessibilityLabel="Cancel selection"
           style={({ pressed }) => [
             styles.headerBackButton,
             { opacity: pressed ? 0.6 : 1 },
@@ -170,6 +172,8 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
           <Pressable
             style={styles.headerIconButton}
             onPress={() => onPinSelected?.()}
+            accessibilityRole="button"
+            accessibilityLabel="Pin selected messages"
           >
             <KISIcon
               name="pin"
@@ -182,6 +186,8 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
           <Pressable
             style={styles.headerIconButton}
             onPress={() => onDeleteSelected?.()}
+            accessibilityRole="button"
+            accessibilityLabel="Delete selected messages"
           >
             <KISIcon
               name="trash"
@@ -194,6 +200,8 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
           <Pressable
             style={styles.headerIconButton}
             onPress={() => onForwardSelected?.()}
+            accessibilityRole="button"
+            accessibilityLabel="Forward selected messages"
           >
             <KISIcon
               name="forward"
@@ -206,6 +214,8 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
           <Pressable
             style={styles.headerIconButton}
             onPress={() => onCopySelected?.()}
+            accessibilityRole="button"
+            accessibilityLabel="Copy selected messages"
           >
             <KISIcon
               name="copy"
@@ -219,6 +229,8 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
             <Pressable
               style={styles.headerIconButton}
               onPress={() => onContinueInSubRoom?.()}
+              accessibilityRole="button"
+              accessibilityLabel="Continue in sub-room"
             >
               {/* NOTE: adjust icon name if needed to match your KISIcon set */}
               <KISIcon
@@ -233,6 +245,8 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
           <Pressable
             style={styles.headerIconButton}
             onPress={() => onMoreSelected?.()}
+            accessibilityRole="button"
+            accessibilityLabel="More actions"
           >
             <KISIcon
               name="more-vert"
@@ -301,6 +315,8 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
       >
         <Pressable
           onPress={onBack}
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
           style={({ pressed }) => [
             styles.headerBackButton,
             { opacity: pressed ? 0.6 : 1 },
@@ -400,7 +416,12 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
         {/* Call actions */}
         <View style={styles.headerActions}>
           {onStartBroadcast && (
-            <Pressable style={styles.headerIconButton} onPress={onStartBroadcast}>
+            <Pressable
+              style={styles.headerIconButton}
+              onPress={onStartBroadcast}
+              accessibilityRole="button"
+              accessibilityLabel="Start broadcast"
+            >
               <KISIcon
                 name="radio"
                 size={20}
@@ -409,7 +430,12 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
             </Pressable>
           )}
           {onOpenTasks && (
-            <Pressable style={styles.headerIconButton} onPress={onOpenTasks}>
+            <Pressable
+              style={styles.headerIconButton}
+              onPress={onOpenTasks}
+              accessibilityRole="button"
+              accessibilityLabel="Open tasks"
+            >
               <Text style={{ fontSize: 18, color: palette.onHeader ?? palette.text }}>✓</Text>
             </Pressable>
           )}
@@ -417,6 +443,8 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
             style={styles.headerIconButton}
             onPress={onStartVideoCall}
             disabled={!!callPlacingMedia}
+            accessibilityRole="button"
+            accessibilityLabel="Start video call"
           >
             {callPlacingMedia === 'video' ? (
               <ActivityIndicator size="small" color={palette.onHeader ?? palette.text} />
@@ -432,6 +460,8 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
             style={styles.headerIconButton}
             onPress={onStartVoiceCall}
             disabled={!!callPlacingMedia}
+            accessibilityRole="button"
+            accessibilityLabel="Start voice call"
           >
             {callPlacingMedia === 'voice' ? (
               <ActivityIndicator size="small" color={palette.onHeader ?? palette.text} />
@@ -446,6 +476,8 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
           <Pressable
             style={styles.headerIconButton}
             onPress={() => onMoreSelected?.()}
+            accessibilityRole="button"
+            accessibilityLabel="More options"
           >
             <KISIcon
               name="menu"

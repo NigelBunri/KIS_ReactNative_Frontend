@@ -1,7 +1,7 @@
 // src/screens/chat/components/FroCamer/useImageEditor.ts
 
 import { useMemo, useRef, useState } from 'react';
-import { LayoutChangeEvent, PanResponder } from 'react-native';
+import { Alert, LayoutChangeEvent, PanResponder } from 'react-native';
 import ViewShot from 'react-native-view-shot';
 import {
   CropRect,
@@ -187,6 +187,15 @@ export const useImageEditor = ({
         tag.id === activeTextId ? { ...tag, ...patch } : tag,
       ),
     );
+  };
+
+  // ---- TEXT: clear only the text overlays (does not touch rotation,
+  // flip, scale, filter, brush strokes, mosaic blocks, or crop). Exists
+  // so ImageEditor.tsx's "Clear text" button can't silently fall back to
+  // handleReset() and wipe the whole edit session.
+  const handleClearText = () => {
+    setTextTags([]);
+    setActiveTextId(null);
   };
 
   // ---- RESET ----
@@ -419,6 +428,10 @@ export const useImageEditor = ({
     } catch (e) {
       console.warn('[ImageEditor] Failed to capture edited image', e);
       setIsCapturing(false);
+      Alert.alert(
+        'Could not save edits',
+        'Your edits could not be applied. The original photo will be used instead.',
+      );
       return asset;
     }
   };
@@ -454,6 +467,7 @@ export const useImageEditor = ({
     handleAddMosaicBlock,
     handleClearBrush,
     handleAddTextTag,
+    handleClearText,
     handleReset,
     buildEditedAsset,
     initCropRect,

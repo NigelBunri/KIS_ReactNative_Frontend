@@ -107,8 +107,13 @@ export default function PaymentBillingManager({ institutionId }: Props) {
       },
       { errorMessage: "Unable to start billing session." },
     );
-    if (res?.id) {
-      Alert.alert("Billing started", `Session ${res.id.slice(0, 8)}… created.`);
+    // postRequest resolves to the ApiResult wrapper ({success, data, message})
+    // — the created session's id lives at res.data.id, not res.id. Reading
+    // res.id directly always failed this check, so every successful billing
+    // session still showed the "Unable to start session" failure alert.
+    const createdId = res?.data?.id;
+    if (res?.success && createdId) {
+      Alert.alert("Billing started", `Session ${String(createdId).slice(0, 8)}… created.`);
       setNewBill({ patientName: "", serviceCode: "", amount: "", currency: "USD", notes: "" });
       loadSessions();
     } else {

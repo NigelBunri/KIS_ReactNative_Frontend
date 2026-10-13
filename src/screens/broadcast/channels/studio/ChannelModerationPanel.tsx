@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { KISIcon } from '@/constants/kisIcons';
 import { useKISTheme } from '@/theme/useTheme';
 import type { ChannelModerationRecord } from '@/screens/broadcast/channels/api/channels.types';
@@ -32,7 +32,7 @@ export default function ChannelModerationPanel({ channelId }: Props) {
 
   useEffect(() => { void load(); }, [load]);
 
-  const act = useCallback(async (recordId: string, action: string) => {
+  const runAction = useCallback(async (recordId: string, action: string) => {
     setBusyId(recordId);
     try {
       await actionChannelModerationRecord(recordId, action, `Studio action: ${action}`);
@@ -41,6 +41,25 @@ export default function ChannelModerationPanel({ channelId }: Props) {
       setBusyId(null);
     }
   }, [load]);
+
+  // "Remove" deletes the reported content/comment outright — unlike Keep,
+  // Hide, and Restrict (all reversible via another tap here), this is the
+  // one destructive, hard-to-undo action in this queue, so it gets a
+  // confirmation while the other three stay single-tap for fast triage.
+  const act = useCallback((recordId: string, action: string) => {
+    if (action !== 'remove') {
+      void runAction(recordId, action);
+      return;
+    }
+    Alert.alert(
+      'Remove this content?',
+      'This will remove the reported content or comment. This cannot be undone from here.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Remove', style: 'destructive', onPress: () => void runAction(recordId, action) },
+      ],
+    );
+  }, [runAction]);
 
   return (
     <View style={[styles.shell, { backgroundColor: palette.surface, borderColor: palette.border }]}> 

@@ -202,6 +202,10 @@ export default function VideoConsultationManager({ institutionId, engineKey }: P
       setActiveSession(session);
       setSessionSeconds(0);
       setWaitingList((prev) => prev.filter((p) => p.id !== session.id));
+    } else {
+      // Previously silent: tapping "Admit" did nothing visible on failure,
+      // leaving the clinician unsure whether the patient was admitted.
+      Alert.alert("Video consultation", res?.message || "Unable to admit this patient. Please try again.");
     }
   }, []);
 
@@ -209,6 +213,8 @@ export default function VideoConsultationManager({ institutionId, engineKey }: P
     const res = await patchRequest(ROUTES.telemedicine.session(id), { status: "cancelled" });
     if (res.success) {
       setWaitingList((prev) => prev.filter((p) => p.id !== id));
+    } else {
+      Alert.alert("Video consultation", res?.message || "Unable to remove this patient. Please try again.");
     }
   }, []);
 
@@ -231,6 +237,10 @@ export default function VideoConsultationManager({ institutionId, engineKey }: P
       }));
       setActiveSession(null);
       setSessionSeconds(0);
+    } else {
+      // Previously silent: tapping "End Session" did nothing on failure,
+      // leaving a live, billable session stuck on screen with no feedback.
+      Alert.alert("Video consultation", res?.message || "Unable to end the session. Please try again.");
     }
   }, [activeSession, sessionSeconds, minDuration, pricePerMinute]);
 

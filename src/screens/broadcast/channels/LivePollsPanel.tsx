@@ -58,6 +58,7 @@ export default function LivePollsPanel({ streamId, isManager, palette }: Props) 
   useEffect(() => { void load(); }, [load]);
 
   const handleVote = useCallback(async (pollId: string, optionIndex: number) => {
+    const previous = polls;
     setPolls(prev => prev.map(p => {
       if (p.id !== pollId) return p;
       const opts = p.options.map((o, i) => ({
@@ -66,12 +67,23 @@ export default function LivePollsPanel({ streamId, isManager, palette }: Props) 
       }));
       return { ...p, options: opts, user_vote_index: optionIndex, total_votes: (p.total_votes ?? 0) + 1 };
     }));
-    await voteLivePoll(pollId, optionIndex);
-  }, []);
+    try {
+      await voteLivePoll(pollId, optionIndex);
+    } catch {
+      // Roll back the optimistic tally — previously a failed vote silently
+      // kept the local increment forever with no error shown.
+      setPolls(previous);
+      Alert.alert('Vote failed', 'Could not submit your vote. Please try again.');
+    }
+  }, [polls]);
 
   const handleEndPoll = useCallback(async (pollId: string) => {
-    await endLivePoll(pollId);
-    setPolls(prev => prev.map(p => p.id === pollId ? { ...p, is_active: false } : p));
+    try {
+      await endLivePoll(pollId);
+      setPolls(prev => prev.map(p => p.id === pollId ? { ...p, is_active: false } : p));
+    } catch {
+      Alert.alert('Error', 'Could not end the poll. Please try again.');
+    }
   }, []);
 
   const handleCreate = useCallback(async () => {

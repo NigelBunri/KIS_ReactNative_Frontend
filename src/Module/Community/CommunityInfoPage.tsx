@@ -615,6 +615,8 @@ export const CommunityInfoPage: React.FC<CommunityInfoPageProps> = ({
                     <Pressable
                       onPress={() => handleMemberAction(m)}
                       hitSlop={8}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Actions for ${label}`}
                       style={styles.memberActionBtn}
                     >
                       <KISIcon name="menu" size={18} color={palette.subtext} />
@@ -652,6 +654,8 @@ export const CommunityInfoPage: React.FC<CommunityInfoPageProps> = ({
                   <Pressable
                     onPress={() => handleDeletePost(post)}
                     hitSlop={8}
+                    accessibilityRole="button"
+                    accessibilityLabel="Delete post"
                     style={styles.memberActionBtn}
                   >
                     <KISIcon name="trash" size={18} color={palette.danger} />

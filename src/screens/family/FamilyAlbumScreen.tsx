@@ -123,7 +123,12 @@ export default function FamilyAlbumScreen({ navigation: _navigation }: Props) {
     return (
       <SafeAreaView style={[styles.flex, { backgroundColor: palette.bg, }]}>
         <View style={[styles.albumHeader, { paddingHorizontal: gutter }]}>
-          <TouchableOpacity onPress={() => setSelectedAlbum(null)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+          <TouchableOpacity
+            onPress={() => setSelectedAlbum(null)}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            accessibilityRole="button"
+            accessibilityLabel="Back to albums"
+          >
             <KISIcon name="arrow-back-outline" size={24} color={palette.text} />
           </TouchableOpacity>
           <Text style={[styles.albumTitle, { color: palette.text }]}>{selectedAlbum.name}</Text>

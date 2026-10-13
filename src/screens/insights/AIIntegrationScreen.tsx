@@ -454,7 +454,7 @@ function QnASessionsTab({ palette }: { palette: any }) {
       />
 
       {/* FAB – New Session */}
-      <KISFab icon="add" onPress={() => setShowNew(true)} style={styles.fab} />
+      <KISFab icon="add" accessibilityLabel="New QnA session" onPress={() => setShowNew(true)} style={styles.fab} />
 
       {/* New Session Modal */}
       <Modal

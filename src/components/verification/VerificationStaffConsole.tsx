@@ -220,7 +220,12 @@ export function VerificationStaffConsole({
               <Text style={[styles.title, { color: palette.text }]}>Verification console</Text>
               <Text style={[styles.subtitle, { color: palette.subtext }]}>Review queue, expiry visibility, and audit events. Evidence payloads stay summarized.</Text>
             </View>
-            <Pressable onPress={onClose} style={[styles.iconButton, { backgroundColor: palette.surface }]}> 
+            <Pressable
+              onPress={onClose}
+              style={[styles.iconButton, { backgroundColor: palette.surface }]}
+              accessibilityRole="button"
+              accessibilityLabel="Close"
+            >
               <KISIcon name="close" size={18} color={palette.text} />
             </Pressable>
           </View>

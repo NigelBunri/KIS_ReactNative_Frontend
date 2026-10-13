@@ -65,6 +65,7 @@ export default function PartnerEventsCalendarPanel({ isOpen, panelWidth, panelTr
   const [loading, setLoading] = useState(false);
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const [selectedEventId, setSelectedEventId] = useState<string | number | null>(null);
   const [attendees, setAttendees] = useState<Attendee[]>([]);
@@ -84,6 +85,11 @@ export default function PartnerEventsCalendarPanel({ isOpen, panelWidth, panelTr
   const load = useCallback(async () => {
     if (!partnerId) return;
     const res = await getRequest(ROUTES.partners.calendarEvents(partnerId), { errorMessage: 'Unable to load events.' });
+    if (!res?.success) {
+      setError(res?.message || "Couldn't load events. Tap to retry.");
+      return;
+    }
+    setError(null);
     const payload = res?.data ?? [];
     setEvents(Array.isArray(payload) ? payload : []);
   }, [partnerId]);
@@ -228,6 +234,13 @@ export default function PartnerEventsCalendarPanel({ isOpen, panelWidth, panelTr
         <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.settingsPanelBody} showsVerticalScrollIndicator={false}>
           {loading ? (
             <ActivityIndicator size="small" color={palette.primary} />
+          ) : error ? (
+            <View style={[styles.settingsFeatureRow, { borderColor: palette.danger, backgroundColor: palette.danger + '15' }]}>
+              <Text style={{ color: palette.danger, fontSize: 13, fontWeight: '600' }}>{error}</Text>
+              <Pressable onPress={() => { setLoading(true); load().finally(() => setLoading(false)); }} style={{ marginTop: 8 }}>
+                <Text style={{ color: palette.primary, fontWeight: '700', fontSize: 13 }}>Tap to retry</Text>
+              </Pressable>
+            </View>
           ) : selectedEvent ? (
             <>
               {selectedEvent.description ? (

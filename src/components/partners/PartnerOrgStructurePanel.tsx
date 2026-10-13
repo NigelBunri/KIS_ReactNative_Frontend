@@ -58,6 +58,7 @@ export default function PartnerOrgStructurePanel({ isOpen, panelWidth, panelTran
   const [locations, setLocations] = useState<Location[]>([]);
   const [members, setMembers] = useState<MemberOption[]>([]);
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const [showCreate, setShowCreate] = useState(false);
   const [depName, setDepName] = useState('');
@@ -78,11 +79,18 @@ export default function PartnerOrgStructurePanel({ isOpen, panelWidth, panelTran
       getRequest(ROUTES.partners.locations(partnerId), { errorMessage: 'Unable to load locations.' }),
       getRequest(`${ROUTES.partners.members(partnerId)}?page=1`, { errorMessage: 'Unable to load members.' }),
     ]);
-    const depList = (depRes?.data ?? depRes ?? []) as Department[];
+    if (!depRes?.success || !locRes?.success) {
+      setError(depRes?.message || locRes?.message || "Couldn't load organization setup. Tap to retry.");
+      setDepartments([]);
+      setLocations([]);
+      return;
+    }
+    setError(null);
+    const depList = (depRes?.data ?? []) as Department[];
     setDepartments(Array.isArray(depList) ? depList : []);
-    const locList = (locRes?.data ?? locRes ?? []) as Location[];
+    const locList = (locRes?.data ?? []) as Location[];
     setLocations(Array.isArray(locList) ? locList : []);
-    const memberPayload = memberRes?.data ?? memberRes ?? {};
+    const memberPayload = memberRes?.success ? memberRes?.data ?? {} : {};
     const memberList = (memberPayload.results ?? memberPayload.members ?? []) as MemberOption[];
     setMembers(Array.isArray(memberList) ? memberList : []);
   }, [partnerId]);
@@ -246,6 +254,27 @@ export default function PartnerOrgStructurePanel({ isOpen, panelWidth, panelTran
         <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.settingsPanelBody} showsVerticalScrollIndicator={false}>
           {loading ? (
             <ActivityIndicator size="small" color={palette.primary} />
+          ) : error ? (
+            <View
+              style={{
+                borderRadius: 10,
+                borderWidth: 1,
+                borderColor: palette.danger,
+                backgroundColor: palette.danger + '15',
+                padding: 12,
+              }}
+            >
+              <Text style={{ color: palette.danger, fontSize: 13, fontWeight: '600' }}>{error}</Text>
+              <Pressable
+                onPress={() => {
+                  setLoading(true);
+                  load().finally(() => setLoading(false));
+                }}
+                style={{ marginTop: 8 }}
+              >
+                <Text style={{ color: palette.primary, fontWeight: '700', fontSize: 13 }}>Tap to retry</Text>
+              </Pressable>
+            </View>
           ) : tab === 'departments' ? (
             <>
               <Pressable onPress={() => setShowCreate((v) => !v)}>

@@ -72,9 +72,12 @@ export default function AdCampaignPanel({ channelId }: Props) {
         ROUTES.broadcasts.channelAdCampaigns(channelId),
         { errorMessage: '' },
       );
-      // getRequest resolves to the ApiResult wrapper — the final
-      // `res?.results` fallback checked the wrapper instead of
-      // `res.data.results`, so a paginated response always fell through to [].
+      // getRequest resolves (never throws) on failure too — without this
+      // check, a failed load fell through to the same `res?.data?.results`
+      // fallback used for a genuinely empty list, rendering "No ad
+      // campaigns yet" on a load failure with zero indication anything
+      // went wrong.
+      if (!res?.success) throw new Error('Could not load campaigns.');
       const raw: Campaign[] = Array.isArray(res?.data)
         ? res.data
         : res?.data?.results ?? [];

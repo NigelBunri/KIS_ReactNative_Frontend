@@ -400,7 +400,12 @@ export const StickerBackgroundRemovalScreen: React.FC<
             marginTop: 50,
           }}
         >
-          <Pressable onPress={handleCancel} style={{ padding: 8, marginRight: 8 }}>
+          <Pressable
+            onPress={handleCancel}
+            accessibilityRole="button"
+            accessibilityLabel="Close background removal"
+            style={{ padding: 8, marginRight: 8 }}
+          >
             <KISIcon name="back" size={22} color={palette.primary} />
           </Pressable>
 

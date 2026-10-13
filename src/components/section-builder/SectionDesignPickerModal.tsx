@@ -154,6 +154,9 @@ export default function SectionDesignPickerModal({ visible, sectionType, selecte
                     { borderColor: isSelected ? palette.primaryStrong : palette.divider, backgroundColor: isSelected ? `${palette.primary}12` : palette.card },
                   ]}
                   onPress={() => onSelect(option.key)}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${option.label} design`}
+                  accessibilityState={{ selected: isSelected }}
                 >
                   <VariantThumbnail shape={option.preview} palette={palette} />
                   <View style={{ flex: 1, marginLeft: 12 }}>

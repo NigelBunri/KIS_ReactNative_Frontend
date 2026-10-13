@@ -28,14 +28,20 @@ export type BlockedContact = {
 
 const BLOCKED_KEY = 'KIS_BLOCKED_CONTACTS';
 
-export async function blockContact(contact: BlockedContact): Promise<void> {
+// Returns whether the backend sync succeeded (local state below is always
+// applied regardless — blocking is deliberately offline-tolerant — but
+// callers need a way to tell the user when the sync itself failed instead
+// of silently reporting success either way).
+export async function blockContact(contact: BlockedContact): Promise<boolean> {
+  let backendOk = false;
   try {
     // Sync to backend first (best-effort — don't block local state on network)
-    await postRequest(
+    const res = await postRequest(
       ROUTES.moderation.userBlocks,
       { blocked: contact.userId, action: 'block' },
       { errorMessage: '' },
-    ).catch(() => {});
+    ).catch(() => null);
+    backendOk = Boolean(res?.success);
 
     const raw = await AsyncStorage.getItem(BLOCKED_KEY);
     const list: BlockedContact[] = raw ? JSON.parse(raw) : [];
@@ -50,10 +56,12 @@ export async function blockContact(contact: BlockedContact): Promise<void> {
     // itself updated correctly. Was previously only emitted from the
     // in-chat block action (ChatRoomHandlers.tsx), never from here.
     DeviceEventEmitter.emit('blocked.contacts.refresh');
-  } catch { /* silent */ }
+  } catch { /* silent — local list is still the source of truth for the UI */ }
+  return backendOk;
 }
 
-export async function unblockContact(userId: string, conversationId?: string): Promise<void> {
+export async function unblockContact(userId: string, conversationId?: string): Promise<boolean> {
+  let backendOk = false;
   try {
     // Sync to backend first (best-effort — don't block local state on network).
     // blockContact (above) sets three separate things when blocking someone
@@ -64,32 +72,43 @@ export async function unblockContact(userId: string, conversationId?: string): P
     // locked, so a contact removed from this list still couldn't actually
     // exchange messages again — this contact left "unblocked" here but the
     // chat they had with the user stayed blocked.
-    await postRequest(
+    //
+    // None of these three calls' results used to be checked at all — this
+    // function always reported success (local list updated, event emitted)
+    // even when every one of them failed, which is exactly the
+    // fabricate-success-on-failure pattern: the user sees "unblocked" while
+    // the backend still considers them blocked and the chat stays locked.
+    // `backendOk` now tracks whether the calls that actually ran all
+    // succeeded, so the screen can tell the user when the sync didn't land.
+    const userRes = await postRequest(
       ROUTES.moderation.userBlocks,
       { blocked: userId, action: 'unblock' },
       { errorMessage: '' },
-    ).catch(() => {});
+    ).catch(() => null);
+    backendOk = Boolean(userRes?.success);
 
     if (conversationId) {
-      await postRequest(
+      const blockRes = await postRequest(
         ROUTES.moderation.block,
         { conversationId, blocked: false },
         { errorMessage: '' },
-      ).catch(() => {});
-      await postRequest(
+      ).catch(() => null);
+      const lockRes = await postRequest(
         `${ROUTES.chat.listConversations}${conversationId}/lock/`,
         { locked: false },
         { errorMessage: '' },
-      ).catch(() => {});
+      ).catch(() => null);
+      backendOk = backendOk && Boolean(blockRes?.success) && Boolean(lockRes?.success);
     }
 
     const raw = await AsyncStorage.getItem(BLOCKED_KEY);
-    if (!raw) return;
+    if (!raw) return backendOk;
     const list: BlockedContact[] = JSON.parse(raw);
     const next = list.filter((c) => c.userId !== userId);
     await AsyncStorage.setItem(BLOCKED_KEY, JSON.stringify(next));
     DeviceEventEmitter.emit('blocked.contacts.refresh');
-  } catch { /* silent */ }
+  } catch { /* silent — local list is still the source of truth for the UI */ }
+  return backendOk;
 }
 
 export async function isContactBlocked(userId: string): Promise<boolean> {
@@ -144,8 +163,18 @@ export default function BlockedContactsScreen({ onBack }: Props) {
           text: 'Unblock',
           style: 'destructive',
           onPress: async () => {
-            await unblockContact(contact.userId, contact.conversationId);
+            const synced = await unblockContact(contact.userId, contact.conversationId);
             await loadBlocked();
+            // The contact is always removed from this list (offline-tolerant
+            // by design), but the user still needs to know if the backend
+            // sync failed — otherwise they're left thinking messaging is
+            // restored when the server may still consider them blocked.
+            if (!synced) {
+              Alert.alert(
+                'Unblock',
+                `${contact.displayName || 'This contact'} was removed from your blocked list, but we couldn't confirm the change with the server. If messages still don't go through, try again.`,
+              );
+            }
           },
         },
       ],
@@ -204,7 +233,13 @@ export default function BlockedContactsScreen({ onBack }: Props) {
         ]}
       >
         {onBack ? (
-          <Pressable onPress={onBack} style={localStyles.backBtn} hitSlop={10}>
+          <Pressable
+            onPress={onBack}
+            style={localStyles.backBtn}
+            hitSlop={10}
+            accessibilityRole="button"
+            accessibilityLabel="Go back"
+          >
             <KISIcon name="arrow-left" size={22} color={palette.primary} />
           </Pressable>
         ) : null}

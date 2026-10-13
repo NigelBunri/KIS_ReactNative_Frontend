@@ -91,14 +91,25 @@ export default function ConnectionsScreen() {
   const [searching, setSearching] = useState(false);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [listError, setListError] = useState<string | null>(null);
+  const [searchError, setSearchError] = useState<string | null>(null);
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
   const [pendingConnections, setPendingConnections] = useState<Set<string>>(new Set());
 
+  // Each fetch* used to end its fallback chain with `?? res` — on a failed
+  // request (getRequest never throws; it resolves { success: false,
+  // message }), that wrapper object is truthy and not an array, so
+  // Array.isArray(list) silently became `false` and rendered as "No
+  // connections yet" / "No pending requests" / "No suggestions right now".
+  // There was no error state anywhere in this screen, so a real backend or
+  // auth failure was indistinguishable from a genuinely empty network —
+  // the user had no way to know a retry might help.
   const fetchMyConnections = useCallback(async () => {
     const res = await getRequest(`${ROUTES.connections.list}?status=accepted`, {
       errorMessage: 'Unable to load connections.',
     });
-    const list = res?.data?.results ?? res?.data ?? res?.results ?? res ?? [];
+    if (res?.success === false) throw new Error(res?.message || 'Unable to load connections.');
+    const list = res?.data?.results ?? res?.data ?? res?.results ?? [];
     setMyConnections(Array.isArray(list) ? list : []);
   }, []);
 
@@ -106,7 +117,8 @@ export default function ConnectionsScreen() {
     const res = await getRequest(`${ROUTES.connections.list}?status=pending`, {
       errorMessage: 'Unable to load requests.',
     });
-    const list = res?.data?.results ?? res?.data ?? res?.results ?? res ?? [];
+    if (res?.success === false) throw new Error(res?.message || 'Unable to load requests.');
+    const list = res?.data?.results ?? res?.data ?? res?.results ?? [];
     setRequests(Array.isArray(list) ? list : []);
   }, []);
 
@@ -114,16 +126,19 @@ export default function ConnectionsScreen() {
     const res = await getRequest(ROUTES.connections.peopleYouMayKnow, {
       errorMessage: 'Unable to load suggestions.',
     });
-    const list = res?.data?.results ?? res?.data ?? res?.results ?? res ?? [];
+    if (res?.success === false) throw new Error(res?.message || 'Unable to load suggestions.');
+    const list = res?.data?.results ?? res?.data ?? res?.results ?? [];
     setSuggestions(Array.isArray(list) ? list : []);
   }, []);
 
   const runSearch = useCallback(async (name: string, job: string) => {
     if (!name.trim() && !job.trim()) {
       setSearchResults(null);
+      setSearchError(null);
       return;
     }
     setSearching(true);
+    setSearchError(null);
     try {
       const params = new URLSearchParams();
       if (name.trim()) params.set('q', name.trim());
@@ -131,8 +146,11 @@ export default function ConnectionsScreen() {
       const res = await getRequest(`${ROUTES.connections.search}?${params.toString()}`, {
         errorMessage: 'Unable to search people.',
       });
-      const list = res?.data ?? res ?? [];
+      if (res?.success === false) throw new Error(res?.message || 'Unable to search people.');
+      const list = res?.data ?? [];
       setSearchResults(Array.isArray(list) ? list : []);
+    } catch (e: any) {
+      setSearchError(e?.message || 'Unable to search people.');
     } finally {
       setSearching(false);
     }
@@ -147,10 +165,13 @@ export default function ConnectionsScreen() {
   const loadTab = useCallback(async (tab: TabKey, isRefresh = false) => {
     if (isRefresh) setRefreshing(true);
     else setLoading(true);
+    setListError(null);
     try {
       if (tab === 'mine') await fetchMyConnections();
       else if (tab === 'requests') await fetchRequests();
       else await fetchSuggestions();
+    } catch (e: any) {
+      setListError(e?.message || 'Unable to load this list. Please try again.');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -158,7 +179,7 @@ export default function ConnectionsScreen() {
   }, [fetchMyConnections, fetchRequests, fetchSuggestions]);
 
   useEffect(() => {
-    loadTab(activeTab);
+    loadTab(activeTab).catch(() => {});
   }, [activeTab, loadTab]);
 
   const handleRemove = useCallback((connection: Connection) => {
@@ -169,9 +190,15 @@ export default function ConnectionsScreen() {
         onPress: async () => {
           setActionLoadingId(connection.id);
           try {
-            await deleteRequest(ROUTES.connections.detail(connection.id), {
+            const res = await deleteRequest(ROUTES.connections.detail(connection.id), {
               errorMessage: 'Could not remove connection.',
             });
+            // deleteRequest resolves { success: false, message } on failure
+            // rather than throwing, so this catch block never ran on a real
+            // backend failure — the connection was removed from the list
+            // optimistically regardless of whether the server actually
+            // removed it.
+            if (res?.success === false) throw new Error(res?.message || 'Could not remove connection.');
             setMyConnections(prev => prev.filter(c => c.id !== connection.id));
           } catch (e: any) {
             Alert.alert('Failed', e?.message ?? 'Please try again.');
@@ -184,10 +211,17 @@ export default function ConnectionsScreen() {
     ]);
   }, []);
 
+  // patchRequest/postRequest resolve { success: false, message } on failure
+  // instead of throwing (see src/network/patch, src/network/post) — these
+  // three handlers' try/catch blocks were therefore dead code on a genuine
+  // backend failure, and the request/suggestion was optimistically marked
+  // accepted/declined/connected in the UI regardless of what the server
+  // actually did. Each now checks res.success before updating local state.
   const handleAccept = useCallback(async (connection: Connection) => {
     setActionLoadingId(connection.id);
     try {
-      await patchRequest(ROUTES.connections.detail(connection.id), { status: 'accepted' });
+      const res = await patchRequest(ROUTES.connections.detail(connection.id), { status: 'accepted' }, { errorMessage: 'Could not accept this request.' });
+      if (res?.success === false) throw new Error(res?.message || 'Could not accept this request.');
       setRequests(prev => prev.filter(c => c.id !== connection.id));
     } catch (e: any) {
       Alert.alert('Failed', e?.message ?? 'Please try again.');
@@ -199,7 +233,8 @@ export default function ConnectionsScreen() {
   const handleDecline = useCallback(async (connection: Connection) => {
     setActionLoadingId(connection.id);
     try {
-      await patchRequest(ROUTES.connections.detail(connection.id), { status: 'rejected' });
+      const res = await patchRequest(ROUTES.connections.detail(connection.id), { status: 'rejected' }, { errorMessage: 'Could not decline this request.' });
+      if (res?.success === false) throw new Error(res?.message || 'Could not decline this request.');
       setRequests(prev => prev.filter(c => c.id !== connection.id));
     } catch (e: any) {
       Alert.alert('Failed', e?.message ?? 'Please try again.');
@@ -211,7 +246,8 @@ export default function ConnectionsScreen() {
   const handleConnect = useCallback(async (user: SuggestedUser) => {
     setActionLoadingId(user.id);
     try {
-      await postRequest(ROUTES.connections.list, { user_id: user.id });
+      const res = await postRequest(ROUTES.connections.list, { user_id: user.id }, { errorMessage: 'Could not send connection request.' });
+      if (res?.success === false) throw new Error(res?.message || 'Could not send connection request.');
       setPendingConnections(prev => new Set(prev).add(user.id));
     } catch (e: any) {
       Alert.alert('Failed', e?.message ?? 'Please try again.');
@@ -393,6 +429,8 @@ export default function ConnectionsScreen() {
         <Pressable
           onPress={() => navigation.goBack()}
           style={[styles.backBtn, { width: responsive.minTouchTarget, height: responsive.minTouchTarget }]}
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
         >
           <KISIcon name="arrow-left" size={22} color={palette.text} />
         </Pressable>
@@ -445,9 +483,27 @@ export default function ConnectionsScreen() {
         </View>
       ) : null}
 
+      {activeTab === 'discover' && searchError ? (
+        <Text style={{ color: palette.danger ?? '#EF4444', fontSize: 12, paddingHorizontal: 16, paddingTop: 8 }}>
+          {searchError}
+        </Text>
+      ) : null}
+
       {loading ? (
         <View style={styles.center}>
           <ActivityIndicator color={palette.primary} />
+        </View>
+      ) : listError ? (
+        <View style={styles.center}>
+          <Text style={{ color: palette.danger ?? '#EF4444', fontSize: 14, textAlign: 'center', paddingHorizontal: 24 }}>
+            {listError}
+          </Text>
+          <Pressable
+            onPress={() => loadTab(activeTab)}
+            style={[styles.smallBtn, { backgroundColor: palette.primary, marginTop: 14, paddingHorizontal: 20 }]}
+          >
+            <Text style={[styles.smallBtnText, { color: palette.onPrimary }]}>Retry</Text>
+          </Pressable>
         </View>
       ) : (
         <FlatList

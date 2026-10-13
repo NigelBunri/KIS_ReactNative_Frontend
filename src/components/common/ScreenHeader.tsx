@@ -65,7 +65,13 @@ export function ScreenHeader({
     >
       <View style={styles.row}>
         {onBack ? (
-          <Pressable onPress={onBack} style={styles.sideSlot} hitSlop={12}>
+          <Pressable
+            onPress={onBack}
+            style={styles.sideSlot}
+            hitSlop={12}
+            accessibilityRole="button"
+            accessibilityLabel="Back"
+          >
             <Animated.View style={{ transform: [{ translateX: hintOffset }] }}>
               <KISIcon name="arrow-left" size={22} color={palette.text} />
             </Animated.View>

@@ -129,6 +129,12 @@ export default React.memo(function ParticipantTile({
     <Pressable
       onPress={onPress}
       onLongPress={onLongPress}
+      accessibilityRole={onPress || onLongPress ? 'button' : undefined}
+      accessibilityLabel={
+        onPress || onLongPress
+          ? `${participant.isLocal ? 'You' : participant.displayName}${isPinned ? ', pinned' : ''}`
+          : undefined
+      }
       style={[
         styles.tile,
         {

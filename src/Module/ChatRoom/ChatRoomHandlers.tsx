@@ -723,10 +723,22 @@ export const handleBlockRequest = async (
   notifyConversationRefresh();
 };
 
+// postRequest (see src/network/post) never throws on a normal HTTP/network
+// failure - it always resolves to { success: false, message, ... } instead.
+// This function previously ignored that result entirely: the "Archive chat"
+// menu item would appear to succeed (menu just closes) even when the
+// request failed, with the chat silently staying un-archived and no
+// indication to the user anything went wrong. Surface failures the same
+// way the rest of this screen's actions already do (see handleAddGroupMember
+// etc.) instead of fabricating success.
 export const handleArchiveRequest = async (conversationId?: string, archived?: boolean) => {
   if (!conversationId) return;
   const url = `${ROUTES.chat.listConversations}${conversationId}/archive/`;
-  await postRequest(url, { archived: archived ?? true });
+  const res = await postRequest(url, { archived: archived ?? true });
+  if (res?.success === false) {
+    Alert.alert('Error', res?.message || `Could not ${archived === false ? 'unarchive' : 'archive'} this chat. Please try again.`);
+    return;
+  }
   await postRequest(ROUTES.conversations.broadcast, {
     conversationId,
     type: 'archived',
@@ -737,7 +749,11 @@ export const handleArchiveRequest = async (conversationId?: string, archived?: b
 export const handleLockConversation = async (conversationId?: string, locked?: boolean) => {
   if (!conversationId) return;
   const url = `${ROUTES.chat.listConversations}${conversationId}/lock/`;
-  await postRequest(url, { locked: locked ?? true });
+  const res = await postRequest(url, { locked: locked ?? true });
+  if (res?.success === false) {
+    Alert.alert('Error', res?.message || 'Could not update the conversation lock. Please try again.');
+    return;
+  }
   await postRequest(ROUTES.conversations.broadcast, {
     conversationId,
     type: 'locked',
@@ -763,10 +779,13 @@ export const handleAddGroupMember = async ({
 }) => {
   if (!conversationId || !userId) return;
   const url = `${ROUTES.chat.listConversations}${conversationId}/members/`;
-  await postRequest(url, {
+  const res = await postRequest(url, {
     user_id: userId,
     base_role: baseRole ?? 'member',
   });
+  if (res?.success === false) {
+    Alert.alert('Add member', res?.message || 'Unable to add member. Check the user ID.');
+  }
 };
 
 export const handleRemoveGroupMember = async ({
@@ -778,7 +797,10 @@ export const handleRemoveGroupMember = async ({
 }) => {
   if (!conversationId || !userId) return;
   const url = `${ROUTES.chat.listConversations}${conversationId}/members/remove/`;
-  await postRequest(url, { user_id: userId });
+  const res = await postRequest(url, { user_id: userId });
+  if (res?.success === false) {
+    Alert.alert('Remove member', res?.message || 'Unable to remove member. Please try again.');
+  }
 };
 
 export const handleSetGroupMemberRole = async ({
@@ -792,7 +814,10 @@ export const handleSetGroupMemberRole = async ({
 }) => {
   if (!conversationId || !userId || !baseRole) return;
   const url = `${ROUTES.chat.listConversations}${conversationId}/members/role/`;
-  await postRequest(url, { user_id: userId, base_role: baseRole });
+  const res = await postRequest(url, { user_id: userId, base_role: baseRole });
+  if (res?.success === false) {
+    Alert.alert('Set member role', res?.message || 'Unable to change member role. Please try again.');
+  }
 };
 
 export const handleSetPinned = async ({
@@ -820,14 +845,19 @@ export const handleMuteConversation = async ({
   conversationId?: string;
   muted: boolean;
   untilMs?: number;
-}) => {
-  if (!conversationId) return;
-  await postRequest(ROUTES.moderation.mute, {
+}): Promise<boolean> => {
+  if (!conversationId) return false;
+  const res = await postRequest(ROUTES.moderation.mute, {
     conversationId,
     muted,
     untilMs,
   });
+  if (res?.success === false) {
+    Alert.alert('Error', res?.message || `Could not ${muted ? 'mute' : 'unmute'} notifications for this chat.`);
+    return false;
+  }
   notifyConversationRefresh();
+  return true;
 };
 
 export const handleReportMessage = async ({

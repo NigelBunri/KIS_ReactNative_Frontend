@@ -88,8 +88,10 @@ export default function CategoryPickerModal({
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <View style={styles.wrapper} pointerEvents={visible ? 'auto' : 'none'}>
         <Pressable
-          style={[styles.overlay, { backgroundColor: palette.bg, }]}
+          style={[styles.overlay, { backgroundColor: palette.overlay }]}
           onPress={onClose}
+          accessibilityLabel="Close category picker"
+          accessibilityRole="button"
         />
         <View style={[styles.card, { backgroundColor: palette.surface, borderColor: palette.divider }]}
         >
@@ -108,24 +110,30 @@ export default function CategoryPickerModal({
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
           >
-            {topLevelCategories.map((category) => {
-              const children = childMap.get(category.id) ?? [];
-              if (!children.length) {
-                return renderOption(category);
-              }
-              return (
-                <View key={category.id} style={styles.group}>
-                  <Text style={[styles.groupTitle, { color: palette.text }]}>{category.name}</Text>
-                  {category.description ? (
-                    <Text style={[styles.groupDescription, { color: palette.subtext }]}>
-                      {category.description}
-                    </Text>
-                  ) : null}
-                  {renderOption(category)}
-                  {children.map((child) => renderOption(child, true))}
-                </View>
-              );
-            })}
+            {topLevelCategories.length === 0 ? (
+              <Text style={[styles.optionHint, { color: palette.subtext, textAlign: 'center', marginTop: 8 }]}>
+                No categories available right now. Pull down to refresh or try again shortly.
+              </Text>
+            ) : (
+              topLevelCategories.map((category) => {
+                const children = childMap.get(category.id) ?? [];
+                if (!children.length) {
+                  return renderOption(category);
+                }
+                return (
+                  <View key={category.id} style={styles.group}>
+                    <Text style={[styles.groupTitle, { color: palette.text }]}>{category.name}</Text>
+                    {category.description ? (
+                      <Text style={[styles.groupDescription, { color: palette.subtext }]}>
+                        {category.description}
+                      </Text>
+                    ) : null}
+                    {renderOption(category)}
+                    {children.map((child) => renderOption(child, true))}
+                  </View>
+                );
+              })
+            )}
           </ScrollView>
           <View style={styles.actions}>
             <KISButton title="Close" size="sm" variant="ghost" onPress={onClose} />
@@ -145,7 +153,6 @@ const styles = StyleSheet.create({
   },
   overlay: {
     ...StyleSheet.absoluteFillObject,
-    opacity: 0.85,
   },
   card: {
     borderRadius: 20,

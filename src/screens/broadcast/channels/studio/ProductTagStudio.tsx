@@ -51,6 +51,7 @@ export default function ProductTagStudio({ contentId }: Props) {
   const { palette } = useKISTheme();
   const [tags, setTags] = useState<ProductTag[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [saving, setSaving] = useState(false);
   const [removingId, setRemovingId] = useState<string | null>(null);
 
@@ -104,20 +105,25 @@ export default function ProductTagStudio({ contentId }: Props) {
   const fetchTags = useCallback(async () => {
     if (!contentId) return;
     setLoading(true);
+    setLoadError(false);
     try {
       const res = await getRequest(
         ROUTES.broadcasts.contentProducts(contentId),
         { errorMessage: '' },
       );
-      // getRequest resolves to the ApiResult wrapper — the final
-      // `res?.results` fallback checked the wrapper instead of
-      // `res.data.results`, so a paginated response always fell through to [].
+      // getRequest resolves (never throws) on failure too — this used to
+      // swallow that into the same "No product tags yet" empty state as a
+      // genuinely empty list, with zero indication a load failed.
+      if (!res?.success) {
+        setLoadError(true);
+        return;
+      }
       const raw: ProductTag[] = Array.isArray(res?.data)
         ? res.data
         : res?.data?.results ?? [];
       setTags(raw);
     } catch {
-      // silently fail
+      setLoadError(true);
     } finally {
       setLoading(false);
     }
@@ -184,12 +190,23 @@ export default function ProductTagStudio({ contentId }: Props) {
         onPress: async () => {
           setRemovingId(tag.id);
           try {
-            await postRequest(
+            // postRequest resolves (never throws) on failure too — the
+            // trailing `.catch(() => {})` here used to swallow that, so a
+            // failed removal still re-fetched and looked like nothing
+            // happened (the tag just silently stayed in the list with no
+            // explanation why).
+            const res = await postRequest(
               `${ROUTES.broadcasts.contentProducts(contentId)}${tag.id}/remove/`,
               {},
               { errorMessage: '' },
-            ).catch(() => {});
+            );
+            if (!res?.success) {
+              Alert.alert('Error', 'Could not remove product tag. Please try again.');
+              return;
+            }
             await fetchTags();
+          } catch {
+            Alert.alert('Error', 'Could not remove product tag. Please try again.');
           } finally {
             setRemovingId(null);
           }
@@ -229,7 +246,13 @@ export default function ProductTagStudio({ contentId }: Props) {
             <Pressable onPress={pickThumbnail} style={styles.thumbPreviewBtn} disabled={thumbUploading}>
               <Text style={{ color: palette.primaryStrong, fontWeight: '700', fontSize: 12 }}>Change</Text>
             </Pressable>
-            <Pressable onPress={() => setFormThumb('')} style={styles.thumbPreviewBtn} disabled={thumbUploading}>
+            <Pressable
+              onPress={() => setFormThumb('')}
+              style={styles.thumbPreviewBtn}
+              disabled={thumbUploading}
+              accessibilityRole="button"
+              accessibilityLabel="Remove selected thumbnail"
+            >
               <KISIcon name="close" size={16} color={palette.subtext} />
             </Pressable>
           </View>
@@ -285,6 +308,12 @@ export default function ProductTagStudio({ contentId }: Props) {
 
       {loading ? (
         <ActivityIndicator color={palette.primaryStrong} style={{ alignSelf: 'center' }} />
+      ) : loadError ? (
+        <View style={[styles.emptyState, { borderColor: palette.border, backgroundColor: palette.card }]}>
+          <Text style={[styles.emptyText, { color: palette.danger }]}>
+            Could not load product tags. Reopen this panel to retry.
+          </Text>
+        </View>
       ) : tags.length === 0 ? (
         <View style={[styles.emptyState, { borderColor: palette.border, backgroundColor: palette.card }]}>
           <Text style={[styles.emptyText, { color: palette.subtext }]}>

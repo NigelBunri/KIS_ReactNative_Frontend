@@ -100,7 +100,12 @@ export default function VirtualBackgroundSheet({
     >
       <View style={styles.header}>
         <Text style={[styles.title, { color: palette.ivory }]}>Background</Text>
-        <Pressable onPress={onClose} hitSlop={10}>
+        <Pressable
+          onPress={onClose}
+          hitSlop={10}
+          accessibilityRole="button"
+          accessibilityLabel="Close background picker"
+        >
           <KISIcon name="close" size={20} color={palette.subtext} />
         </Pressable>
       </View>

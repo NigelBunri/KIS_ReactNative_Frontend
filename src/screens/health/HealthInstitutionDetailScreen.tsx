@@ -58,6 +58,7 @@ export default function HealthInstitutionDetailScreen({ route, navigation }: Pro
   const palette = getHealthThemeColors(scheme === 'light' ? 'light' : 'dark');
 
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const institutionName = routeInstitutionName || 'Health Institution';
   const [timeRange, setTimeRange] = useState<TimeRange>('30d');
   const [analytics, setAnalytics] = useState<InstitutionDashboardAnalyticsResult | null>(null);
@@ -90,6 +91,7 @@ export default function HealthInstitutionDetailScreen({ route, navigation }: Pro
     }
 
     setLoading(true);
+    setLoadError(null);
     try {
       const bootstrap = await ensureInstitutionDashboardExists(institutionId, dashboardType);
       if (!bootstrap?.success) {
@@ -140,6 +142,14 @@ export default function HealthInstitutionDetailScreen({ route, navigation }: Pro
       setAccessControls(rolePermissions[actorRole] || rolePermissions.unassigned);
       setAnalytics(analyticsRes);
     } catch (error: any) {
+      // Previously this only showed a transient Alert and left `analytics`
+      // null — InstitutionDashboardShell null-coalesces every field to 0/
+      // empty, so the screen rendered a dashboard that *looked* like a
+      // legitimately quiet institution (zero bookings, zero completed
+      // consultations) instead of a failed load. That's a real trust
+      // problem in a clinical-ops context. Now a load failure renders a
+      // distinct retry state instead of a misleadingly empty dashboard.
+      setLoadError(error?.message || 'Unable to load dashboard data.');
       Alert.alert('Institution dashboard', error?.message || 'Unable to load dashboard data.');
     } finally {
       setLoading(false);
@@ -263,6 +273,42 @@ export default function HealthInstitutionDetailScreen({ route, navigation }: Pro
           >
             Loading dashboard...
           </Text>
+        </LinearGradient>
+      </SafeAreaView>
+    );
+  }
+
+  if (loadError && !analytics) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg, }}>
+        <LinearGradient colors={[palette.gradientStart, palette.gradientEnd]} style={{ flex: 1, padding: HEALTH_THEME_SPACING.lg }}>
+          <View style={{ alignItems: 'flex-end' }}>
+            <TouchableOpacity
+              onPress={() => navigation.goBack()}
+              style={{
+                borderWidth: 1,
+                borderColor: palette.divider,
+                borderRadius: 12,
+                padding: HEALTH_THEME_SPACING.xs,
+                backgroundColor: palette.card,
+              }}
+              accessibilityLabel="Close dashboard"
+              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+            >
+              <KISIcon name="close" size={18} color={palette.text} />
+            </TouchableOpacity>
+          </View>
+          <View style={{ flex: 1, justifyContent: 'center' }}>
+            <Text style={{ ...HEALTH_THEME_TYPOGRAPHY.h2, color: palette.text }}>
+              Couldn't load this dashboard
+            </Text>
+            <Text style={{ ...HEALTH_THEME_TYPOGRAPHY.body, color: palette.subtext, marginTop: HEALTH_THEME_SPACING.sm }}>
+              {loadError}
+            </Text>
+            <View style={{ marginTop: HEALTH_THEME_SPACING.lg }}>
+              <KISButton title="Try again" onPress={() => loadDashboard()} />
+            </View>
+          </View>
         </LinearGradient>
       </SafeAreaView>
     );

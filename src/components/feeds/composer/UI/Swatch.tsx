@@ -16,6 +16,10 @@ export function Swatch({
   return (
     <Pressable
       onPress={onPress}
+      hitSlop={8}
+      accessibilityRole="button"
+      accessibilityLabel={`Color ${color}`}
+      accessibilityState={{ selected }}
       style={{
         width: 28,
         height: 28,

@@ -150,6 +150,7 @@ export default function ScriptureTriviaGame({ gameKey, stageIndex, isReplay, onE
             }}
             onBackToJourney={onExit}
             onViewStats={onOpenStats}
+            persisted={stageResult.persisted}
           />
         </View>
       </GameShell>

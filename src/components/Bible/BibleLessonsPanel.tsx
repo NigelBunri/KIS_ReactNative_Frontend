@@ -115,6 +115,8 @@ export default function BibleLessonsPanel() {
   const [selectedLesson, setSelectedLesson] = useState<Lesson | null>(null);
   const [loadingCourses, setLoadingCourses] = useState(false);
   const [loadingContent, setLoadingContent] = useState(false);
+  const [coursesError, setCoursesError] = useState(false);
+  const [contentError, setContentError] = useState(false);
   const [message, setMessage] = useState('');
   const [quizAnswers, setQuizAnswers] = useState<Record<string, string>>({});
   const [quizSubmitting, setQuizSubmitting] = useState(false);

@@ -50,12 +50,18 @@ export default function PartnerWorkspaceBrandingPanel({ isOpen, panelWidth, pane
   const [saving, setSaving] = useState(false);
   const [logoUrl, setLogoUrl] = useState('');
   const [colors, setColors] = useState<string[]>(['', '', '']);
+  const [error, setError] = useState<string | null>(null);
 
   const backdropOpacity = panelTranslateX.interpolate({ inputRange: [0, panelWidth], outputRange: [1, 0], extrapolate: 'clamp' });
 
   const load = useCallback(async () => {
     if (!partnerId) return;
     const res = await getRequest(ROUTES.partners.organizationProfile(partnerId), { errorMessage: 'Unable to load branding.' });
+    if (!res?.success) {
+      setError(res?.message || "Couldn't load branding. Tap to retry.");
+      return;
+    }
+    setError(null);
     const data = res?.data ?? {};
     setLogoUrl(data.logo_url ?? '');
     const existing: string[] = Array.isArray(data.brand_colors) ? data.brand_colors : [];
@@ -116,7 +122,7 @@ export default function PartnerWorkspaceBrandingPanel({ isOpen, panelWidth, pane
         ]}
       >
         <View style={[styles.settingsPanelHeader, { borderBottomColor: palette.divider }]}>
-          <Pressable onPress={onClose} style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}>
+          <Pressable onPress={onClose} accessibilityRole="button" accessibilityLabel="Close" style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}>
             <Text style={{ color: palette.text, fontSize: 18 }}>‹</Text>
           </Pressable>
           <View style={{ flex: 1 }}>
@@ -128,6 +134,27 @@ export default function PartnerWorkspaceBrandingPanel({ isOpen, panelWidth, pane
         <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.settingsPanelBody} showsVerticalScrollIndicator={false}>
           {loading ? (
             <ActivityIndicator size="small" color={palette.primary} />
+          ) : error ? (
+            <View
+              style={{
+                borderRadius: 10,
+                borderWidth: 1,
+                borderColor: palette.danger,
+                backgroundColor: palette.danger + '15',
+                padding: 12,
+              }}
+            >
+              <Text style={{ color: palette.danger, fontSize: 13, fontWeight: '600' }}>{error}</Text>
+              <Pressable
+                onPress={() => {
+                  setLoading(true);
+                  load().finally(() => setLoading(false));
+                }}
+                style={{ marginTop: 8 }}
+              >
+                <Text style={{ color: palette.primary, fontWeight: '700', fontSize: 13 }}>Tap to retry</Text>
+              </Pressable>
+            </View>
           ) : (
             <>
               <Text style={{ color: palette.text, fontSize: 14, fontWeight: '800', marginBottom: 8 }}>Logo</Text>

@@ -128,16 +128,20 @@ export default function ChapterEditorPanel({ contentId }: Props) {
         getRequest(ROUTES.broadcasts.contentChapters(contentId), { errorMessage: '' }),
         getRequest(ROUTES.broadcasts.contentAutoChapters(contentId), { errorMessage: '' }),
       ]);
-      const chapList: Chapter[] = Array.isArray(chapRes)
-        ? chapRes
-        : Array.isArray(chapRes?.data)
+      // getRequest resolves (never throws) on failure too — without this
+      // check, a failed load fell through to the same empty-array fallback
+      // used for a genuinely empty chapter list, rendering "No chapters
+      // added yet" on a load failure with zero indication anything went
+      // wrong.
+      if (!chapRes?.success || !autoRes?.success) {
+        throw new Error('Could not load chapters.');
+      }
+      const chapList: Chapter[] = Array.isArray(chapRes?.data)
         ? chapRes.data
-        : chapRes?.results ?? [];
-      const autoList: AutoChapter[] = Array.isArray(autoRes)
-        ? autoRes
-        : Array.isArray(autoRes?.data)
+        : chapRes?.data?.results ?? [];
+      const autoList: AutoChapter[] = Array.isArray(autoRes?.data)
         ? autoRes.data
-        : autoRes?.results ?? [];
+        : autoRes?.data?.results ?? [];
       setChapters(chapList.sort((a, b) => (a.sort_order ?? a.start_seconds) - (b.sort_order ?? b.start_seconds)));
       setAutoChapters(autoList);
     } catch {

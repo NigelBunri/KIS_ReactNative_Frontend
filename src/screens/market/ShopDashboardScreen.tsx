@@ -598,6 +598,8 @@ const ProductCard = ({
             ]}
             onPress={() => setRatingModalVisible(true)}
             hitSlop={6}
+            accessibilityRole="button"
+            accessibilityLabel={isService ? 'Rate this service' : 'Rate this product'}
           >
             <KISIcon name="add" size={16} color={palette.primaryStrong} />
           </Pressable>
@@ -1300,6 +1302,25 @@ export default function ShopDashboardScreen({ route, navigation }: Props) {
       }
     },
     [canManageMembers, loadShopMembers, shopId],
+  );
+
+  const confirmRemoveMember = useCallback(
+    (memberId: string, memberName?: string) => {
+      if (!memberId) return;
+      Alert.alert(
+        'Remove member',
+        `Remove ${memberName ? `"${memberName}"` : 'this member'} from the shop? They will lose access immediately.`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Remove',
+            style: 'destructive',
+            onPress: () => handleRemoveMember(memberId),
+          },
+        ],
+      );
+    },
+    [handleRemoveMember],
   );
 
   const toggleMembershipVisibility = useCallback(async () => {
@@ -2807,7 +2828,9 @@ export default function ShopDashboardScreen({ route, navigation }: Props) {
                       title="Remove"
                       size="xs"
                       variant="danger"
-                      onPress={() => handleRemoveMember(memberId)}
+                      onPress={() =>
+                        confirmRemoveMember(memberId, user.display_name)
+                      }
                       loading={removingMemberId === memberId}
                     />
                   )}

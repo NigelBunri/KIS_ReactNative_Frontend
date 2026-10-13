@@ -470,7 +470,14 @@ export default function BroadcastFeedCard({
   const engagementBlock = (
     <View style={[styles.engagementRow, { borderTopColor: withAlpha(palette.divider, 0.5) }, compact && { flexWrap: 'wrap', rowGap: 8 }]}>
       {onSave ? (
-        <Pressable onPress={onSave} disabled={savesLoading} style={styles.engItem} hitSlop={10}>
+        <Pressable
+          onPress={onSave}
+          disabled={savesLoading}
+          style={styles.engItem}
+          hitSlop={10}
+          accessibilityRole="button"
+          accessibilityLabel={item.viewer_saved ? 'Remove from saved' : 'Save'}
+        >
           {savesLoading ? (
             <ActivityIndicator size="small" color={palette.subtext} />
           ) : (
@@ -491,7 +498,13 @@ export default function BroadcastFeedCard({
         </Pressable>
       ) : null}
 
-      <Pressable onPress={onLike} style={styles.engItem} hitSlop={10}>
+      <Pressable
+        onPress={onLike}
+        style={styles.engItem}
+        hitSlop={10}
+        accessibilityRole="button"
+        accessibilityLabel={item.viewer_reaction ? 'Remove like' : 'Like'}
+      >
         <KISIcon
           name="heart"
           size={18}
@@ -513,6 +526,8 @@ export default function BroadcastFeedCard({
           disabled={commentsLoading}
           style={styles.engItem}
           hitSlop={10}
+          accessibilityRole="button"
+          accessibilityLabel="Comments"
         >
           {commentsLoading ? (
             <ActivityIndicator size="small" color={palette.subtext} />
@@ -529,7 +544,14 @@ export default function BroadcastFeedCard({
         </Pressable>
       ) : null}
 
-      <Pressable onPress={onShare} disabled={shareLoading} style={styles.engItem} hitSlop={10}>
+      <Pressable
+        onPress={onShare}
+        disabled={shareLoading}
+        style={styles.engItem}
+        hitSlop={10}
+        accessibilityRole="button"
+        accessibilityLabel="Share"
+      >
         {shareLoading ? (
           <ActivityIndicator size="small" color={palette.subtext} />
         ) : (
@@ -1029,7 +1051,14 @@ export default function BroadcastFeedCard({
       {/* ───── Engagement row (icons + counts like mockup bottom bar) ───── */}
       <View style={[styles.engagementRow, { borderTopColor: withAlpha(palette.divider, 0.5) }, compact && { flexWrap: 'wrap', rowGap: 8 }]}>
         {onSave ? (
-          <Pressable onPress={onSave} disabled={savesLoading} style={styles.engItem} hitSlop={10}>
+          <Pressable
+            onPress={onSave}
+            disabled={savesLoading}
+            style={styles.engItem}
+            hitSlop={10}
+            accessibilityRole="button"
+            accessibilityLabel={item.viewer_saved ? 'Remove from saved' : 'Save'}
+          >
             {savesLoading ? (
               <ActivityIndicator size="small" color={palette.subtext} />
             ) : (
@@ -1056,7 +1085,13 @@ export default function BroadcastFeedCard({
           </Pressable>
         ) : null}
 
-        <Pressable onPress={onLike} style={styles.engItem} hitSlop={10}>
+        <Pressable
+          onPress={onLike}
+          style={styles.engItem}
+          hitSlop={10}
+          accessibilityRole="button"
+          accessibilityLabel={item.viewer_reaction ? 'Remove like' : 'Like'}
+        >
           <KISIcon
             name="heart"
             size={18}
@@ -1084,6 +1119,8 @@ export default function BroadcastFeedCard({
             disabled={commentsLoading}
             style={styles.engItem}
             hitSlop={10}
+            accessibilityRole="button"
+            accessibilityLabel="Comments"
           >
             {commentsLoading ? (
               <ActivityIndicator size="small" color={palette.subtext} />
@@ -1100,7 +1137,14 @@ export default function BroadcastFeedCard({
           </Pressable>
         ) : null}
 
-        <Pressable onPress={onShare} disabled={shareLoading} style={styles.engItem} hitSlop={10}>
+        <Pressable
+          onPress={onShare}
+          disabled={shareLoading}
+          style={styles.engItem}
+          hitSlop={10}
+          accessibilityRole="button"
+          accessibilityLabel="Share"
+        >
           {shareLoading ? (
             <ActivityIndicator size="small" color={palette.subtext} />
           ) : (

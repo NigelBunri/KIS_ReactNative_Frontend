@@ -240,6 +240,7 @@ export default function LetterFillGame({ gameKey, stageIndex, isReplay, onExit, 
             onPlayAgain={resetGame}
             onBackToJourney={onExit}
             onViewStats={onOpenStats}
+            persisted={stageResult.persisted}
           />
         </View>
       </GameShell>

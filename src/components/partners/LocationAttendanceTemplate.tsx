@@ -82,7 +82,8 @@ export default function LocationAttendanceTemplate({ partnerId, brandColors, the
   }, [geo]);
 
   const handleGrantConsent = useCallback(async () => {
-    await geo.setConsented(true);
+    const ok = await geo.setConsented(true);
+    if (!ok) Alert.alert('Failed', 'Unable to grant location consent. Please try again.');
   }, [geo]);
 
   const handleRevokeConsent = useCallback(() => {

@@ -54,7 +54,7 @@ export default function CallDiagnosticsModal({ visible, onClose }: { visible: bo
       <View style={[styles.wrap, { backgroundColor: palette.bg }]}>
         <View style={styles.header}>
           <Text style={[styles.title, { color: palette.text }]}>Call Diagnostics</Text>
-          <Pressable onPress={onClose} hitSlop={10}>
+          <Pressable onPress={onClose} hitSlop={10} accessibilityRole="button" accessibilityLabel="Close">
             <Text style={{ color: palette.primary, fontWeight: '700' }}>Close</Text>
           </Pressable>
         </View>
@@ -76,7 +76,12 @@ export default function CallDiagnosticsModal({ visible, onClose }: { visible: bo
 
           <View style={styles.sectionHeaderRow}>
             <Text style={[styles.section, { color: palette.subtext }]}>RECENT CALL EVENTS (newest first)</Text>
-            <Pressable onPress={async () => { await clearCallDiagnostics(); void refresh(); }}>
+            <Pressable
+              onPress={async () => { await clearCallDiagnostics(); void refresh(); }}
+              accessibilityRole="button"
+              accessibilityLabel="Clear recent call events"
+              hitSlop={8}
+            >
               <Text style={{ color: palette.danger, fontSize: 12, fontWeight: '700' }}>Clear</Text>
             </Pressable>
           </View>
@@ -97,7 +102,12 @@ export default function CallDiagnosticsModal({ visible, onClose }: { visible: bo
             ))
           )}
 
-          <Pressable onPress={refresh} style={[styles.refreshBtn, { borderColor: palette.inputBorder }]}>
+          <Pressable
+            onPress={refresh}
+            style={[styles.refreshBtn, { borderColor: palette.inputBorder }]}
+            accessibilityRole="button"
+            accessibilityLabel="Refresh diagnostics"
+          >
             <Text style={{ color: palette.primary, fontWeight: '700' }}>Refresh</Text>
           </Pressable>
 
@@ -114,6 +124,8 @@ export default function CallDiagnosticsModal({ visible, onClose }: { visible: bo
               <Pressable
                 onPress={() => openSettings().catch(() => {})}
                 style={[styles.refreshBtn, { borderColor: palette.inputBorder, marginTop: 8 }]}
+                accessibilityRole="button"
+                accessibilityLabel="Open app settings"
               >
                 <Text style={{ color: palette.primary, fontWeight: '700' }}>Open App Settings</Text>
               </Pressable>

@@ -78,6 +78,8 @@ const StickerPicker = ({
       {/* CREATE STICKER BUTTON */}
       <Pressable
         onPress={onCreateStickerPress}
+        accessibilityRole="button"
+        accessibilityLabel="Create new sticker"
         style={{
           marginBottom: 12,
           backgroundColor: palette.primary,
@@ -104,6 +106,8 @@ const StickerPicker = ({
           <Pressable
             key={sticker.id}
             onPress={() => onSelectSticker(sticker)}
+            accessibilityRole="button"
+            accessibilityLabel={sticker.text ? `Sticker: ${sticker.text}` : 'Sticker'}
             style={{
               width: 80,
               height: 80,
@@ -683,7 +687,12 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
                 onSubmitEditing={() => fetchGifs(gifQuery)}
               />
               {gifQuery.length > 0 && (
-                <Pressable onPress={() => { setGifQuery(''); fetchGifs(''); }} hitSlop={8}>
+                <Pressable
+                  onPress={() => { setGifQuery(''); fetchGifs(''); }}
+                  hitSlop={8}
+                  accessibilityRole="button"
+                  accessibilityLabel="Clear GIF search"
+                >
                   <Text style={{ color: palette.subtext, fontSize: 16 }}>✕</Text>
                 </Pressable>
               )}
@@ -713,6 +722,8 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
                         setKeyboardMode(true);
                         textInputRef.current?.focus();
                       }}
+                      accessibilityRole="button"
+                      accessibilityLabel={item.title ? `Send GIF: ${item.title}` : 'Send GIF'}
                     >
                       <Image source={{ uri: item.previewUrl }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
                     </Pressable>
@@ -839,7 +850,7 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
             )}
           </View>
           {onCancelEditing && (
-            <Pressable onPress={onCancelEditing}>
+            <Pressable onPress={onCancelEditing} accessibilityRole="button" accessibilityLabel="Cancel editing">
               <KISIcon
                 name="close"
                 size={16}
@@ -903,7 +914,7 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
             )}
           </View>
           {onClearReply && (
-            <Pressable onPress={onClearReply}>
+            <Pressable onPress={onClearReply} accessibilityRole="button" accessibilityLabel="Cancel reply">
               <KISIcon
                 name="close"
                 size={16}
@@ -1045,6 +1056,8 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
             onPress={dismissLinkPreview}
             hitSlop={8}
             style={{ padding: 8 }}
+            accessibilityRole="button"
+            accessibilityLabel="Dismiss link preview"
           >
             <KISIcon name="close" size={16} color={palette.subtext} />
           </Pressable>
@@ -1057,6 +1070,8 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
           <>
             <Pressable
               onPress={toggleEmojiKeyboard}
+              accessibilityRole="button"
+              accessibilityLabel={keyboardMode ? 'Open emoji and sticker panel' : 'Show keyboard'}
               style={[styles.iconTextButton, { width: composerIconSize, height: composerIconSize, borderRadius: composerIconSize / 2 }]}
             >
               <KISIcon
@@ -1104,6 +1119,8 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
               style={[styles.iconTextButton, { width: composerIconSize, height: composerIconSize, borderRadius: composerIconSize / 2 }]}
               disabled={!!disabled}
               onPress={openAttachmentMenu}
+              accessibilityRole="button"
+              accessibilityLabel="Add attachment"
             >
               <KISIcon
                 name="add"
@@ -1117,6 +1134,8 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
               style={[styles.iconTextButton, { width: composerIconSize, height: composerIconSize, borderRadius: composerIconSize / 2, display: isTinyDevice && value.trim().length > 0 ? 'none' : 'flex' }]}
               disabled={!!disabled}
               onPress={openCameraModal}
+              accessibilityRole="button"
+              accessibilityLabel="Open camera"
             >
               <KISIcon name="camera" size={composerIconGlyph} color={palette.subtext} />
             </Pressable>
@@ -1134,6 +1153,9 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
                 },
               ]}
               onPress={toggleViewOnce}
+              accessibilityRole="button"
+              accessibilityLabel={viewOnce ? 'View-once mode on. Tap to turn off.' : 'Turn on view-once mode'}
+              accessibilityState={{ selected: viewOnce }}
             >
               <KISIcon
                 name={viewOnce ? 'eye-closed' : 'eye'}
@@ -1152,6 +1174,9 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
             onLongPress={() => onScheduleSend && setScheduleSheetVisible(true)}
             delayLongPress={400}
             disabled={!canSend || !!disabled || isSending}
+            accessibilityRole="button"
+            accessibilityLabel="Send message"
+            accessibilityHint={onScheduleSend ? 'Long press to schedule this message for later' : undefined}
             style={[
               styles.composerActionButton,
               {
@@ -1360,15 +1385,31 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
                   Alert.alert('Currency required', 'Please enter a currency code.');
                   return;
                 }
-                onSendPayment?.({
-                  amount,
-                  currency: paymentCurrency.trim().toUpperCase(),
-                  note: paymentNote.trim() || undefined,
-                });
-                setPaymentAmount('');
-                setPaymentCurrency('USD');
-                setPaymentNote('');
-                setPaymentModalVisible(false);
+                const currency = paymentCurrency.trim().toUpperCase();
+                const note = paymentNote.trim() || undefined;
+                // This moves real money - unlike every other attachment type
+                // in this sheet, it had no confirmation step at all between
+                // tapping "Send payment" and the transfer actually firing,
+                // so a mis-tap (or a pocket-tap landing on this button while
+                // the sheet happened to be open) sent money with no chance
+                // to review the amount first.
+                Alert.alert(
+                  'Send payment?',
+                  `Send ${currency} ${amount.toFixed(2)}${note ? ` — "${note}"` : ''} to this chat?`,
+                  [
+                    { text: 'Cancel', style: 'cancel' },
+                    {
+                      text: 'Send',
+                      onPress: () => {
+                        onSendPayment?.({ amount, currency, note });
+                        setPaymentAmount('');
+                        setPaymentCurrency('USD');
+                        setPaymentNote('');
+                        setPaymentModalVisible(false);
+                      },
+                    },
+                  ],
+                );
               }}
               style={({ pressed }) => ({
                 backgroundColor: palette.primary,

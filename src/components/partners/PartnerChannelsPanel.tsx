@@ -47,6 +47,7 @@ export default function PartnerChannelsPanel({ isOpen, panelWidth, panelTranslat
   const [newChannelType, setNewChannelType] = useState<ChannelRow['channel_type']>('text');
   const [newChannelCategory, setNewChannelCategory] = useState<string | number | null>(null);
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const backdropOpacity = panelTranslateX.interpolate({
     inputRange: [0, panelWidth],
@@ -59,6 +60,11 @@ export default function PartnerChannelsPanel({ isOpen, panelWidth, panelTranslat
     const res = await getRequest(ROUTES.partners.serverLayout(partnerId), {
       errorMessage: 'Unable to load channels.',
     });
+    if (!res?.success) {
+      setError(res?.message || "Couldn't load channels. Tap to retry.");
+      return;
+    }
+    setError(null);
     const payload = res?.data ?? res ?? {};
     setCategories(Array.isArray(payload.categories) ? payload.categories : []);
     setChannels(Array.isArray(payload.channels) ? payload.channels : []);
@@ -226,6 +232,13 @@ export default function PartnerChannelsPanel({ isOpen, panelWidth, panelTranslat
         <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.settingsPanelBody} showsVerticalScrollIndicator={false}>
           {loading ? (
             <ActivityIndicator size="small" color={palette.primary} />
+          ) : error ? (
+            <View style={[styles.settingsFeatureRow, { borderColor: palette.danger, backgroundColor: palette.danger + '15' }]}>
+              <Text style={[styles.settingsFeatureDescription, { color: palette.danger }]}>{error}</Text>
+              <Pressable onPress={() => { setLoading(true); load().finally(() => setLoading(false)); }} style={{ marginTop: 8 }}>
+                <Text style={{ color: palette.primary, fontWeight: '700', fontSize: 13 }}>Tap to retry</Text>
+              </Pressable>
+            </View>
           ) : (
             <>
               <Text style={[styles.settingsSectionTitle, { color: palette.text }]}>New category</Text>

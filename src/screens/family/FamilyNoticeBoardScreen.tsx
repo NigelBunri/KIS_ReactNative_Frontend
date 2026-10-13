@@ -70,12 +70,22 @@ export default function FamilyNoticeBoardScreen({ navigation }: Props) {
     }
     setSaving(true);
     try {
-      const newNotice = await postRequest(ROUTES.family.notices, {
+      // Same unwrapped-ApiResult bug as FamilyAlbumScreen/FamilyCalendarScreen:
+      // postRequest resolves to {success, data, message}, not the record
+      // itself, so casting the wrapper straight to Notice both hid a
+      // backend-rejected post behind a fake "success" and rendered a blank
+      // card (real fields live on `.data`).
+      const res: any = await postRequest(ROUTES.family.notices, {
         title: formTitle.trim(),
         content: formContent.trim(),
         pinned: formPinned,
         expiry: formExpiry.trim() || undefined,
-      }) as unknown as Notice;
+      });
+      if (!res?.success) {
+        Alert.alert('Error', res?.message ?? 'Failed to post notice');
+        return;
+      }
+      const newNotice = (res.data ?? res) as Notice;
       setNotices((prev) => [newNotice, ...prev]);
       setShowForm(false);
       setFormTitle('');

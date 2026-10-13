@@ -686,6 +686,8 @@ export const AddContactsPage: React.FC<AddContactsPageProps> = ({
           {hasSearch && (
             <Pressable
               onPress={() => setSearchTerm('')}
+              accessibilityRole="button"
+              accessibilityLabel="Clear search"
               style={({ pressed }) => ({ padding: 4, opacity: pressed ? KIS_TOKENS.opacity.pressed : 1 })}
             >
               <KISIcon name="close" size={14} color={palette.subtext} />
@@ -717,6 +719,13 @@ export const AddContactsPage: React.FC<AddContactsPageProps> = ({
             </Text>
             <Pressable
               onPress={handleRequestPermission}
+              accessibilityRole="button"
+              accessibilityLabel={
+                permissionStatus === 'never_ask_again' ||
+                (Platform.OS === 'ios' && permissionStatus === 'denied')
+                  ? 'Open Settings'
+                  : 'Allow contacts access'
+              }
               style={({ pressed }) => ({
                 marginTop: 8,
                 paddingHorizontal: 28,
@@ -812,6 +821,8 @@ export const AddContactsPage: React.FC<AddContactsPageProps> = ({
       <View style={[styles.header, { borderBottomColor: palette.divider, backgroundColor: palette.card }]}>
         <Pressable
           onPress={mode === 'list' ? onClose : onCloseDetailPage}
+          accessibilityRole="button"
+          accessibilityLabel={mode === 'list' ? 'Close' : 'Back'}
           style={({ pressed }) => [styles.headerButton, { opacity: pressed ? KIS_TOKENS.opacity.pressed : 1 }]}
         >
           <KISIcon name={mode === 'list' ? 'close' : 'arrow-left'} size={20} color={palette.text} />

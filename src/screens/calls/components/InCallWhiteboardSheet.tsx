@@ -150,7 +150,12 @@ export default function InCallWhiteboardSheet({
 
           {/* Header */}
           <View style={[styles.header, { borderBottomColor: `${palette.gold}30` }]}>
-            <Pressable onPress={onClose} style={styles.closeBtn} accessibilityLabel="Close whiteboard">
+            <Pressable
+              onPress={onClose}
+              style={styles.closeBtn}
+              accessibilityRole="button"
+              accessibilityLabel="Close whiteboard"
+            >
               <KISIcon name="chevron-down" size={22} color={palette.ivory} />
             </Pressable>
             <Text style={[styles.headerTitle, { color: palette.ivory }]}>Whiteboard</Text>
@@ -159,6 +164,8 @@ export default function InCallWhiteboardSheet({
                 <Pressable
                   onPress={() => onUndo(lastLocalStroke.id)}
                   style={[styles.toolBtn, { borderColor: `${palette.gold}40` }]}
+                  accessibilityRole="button"
+                  accessibilityLabel="Undo last stroke"
                   hitSlop={8}
                 >
                   <KISIcon name="corner-up-left" size={16} color={palette.ivory} />
@@ -168,6 +175,8 @@ export default function InCallWhiteboardSheet({
                 <Pressable
                   onPress={onClear}
                   style={[styles.toolBtn, { borderColor: `${palette.danger}60` }]}
+                  accessibilityRole="button"
+                  accessibilityLabel="Clear whiteboard for everyone"
                   hitSlop={8}
                 >
                   <KISIcon name="trash" size={16} color={palette.danger} />
@@ -249,6 +258,9 @@ export default function InCallWhiteboardSheet({
                 <Pressable
                   key={c}
                   onPress={() => { setColor(c); setIsEraser(false); }}
+                  accessibilityRole="radio"
+                  accessibilityState={{ selected: color === c && !isEraser }}
+                  accessibilityLabel={`Pen color ${c}`}
                   style={[
                     styles.colorDot,
                     { backgroundColor: c, borderColor: color === c && !isEraser ? palette.gold : 'rgba(255,255,255,0.2)' },
@@ -259,6 +271,9 @@ export default function InCallWhiteboardSheet({
               {/* Eraser */}
               <Pressable
                 onPress={() => setIsEraser(v => !v)}
+                accessibilityRole="button"
+                accessibilityLabel="Eraser"
+                accessibilityState={{ selected: isEraser }}
                 style={[
                   styles.toolBtn,
                   { borderColor: isEraser ? palette.gold : 'rgba(255,255,255,0.2)', marginLeft: 8 },
@@ -274,6 +289,9 @@ export default function InCallWhiteboardSheet({
                 <Pressable
                   key={w}
                   onPress={() => { setWidth(w); setIsEraser(false); }}
+                  accessibilityRole="radio"
+                  accessibilityState={{ selected: width === w && !isEraser }}
+                  accessibilityLabel={`Stroke width ${w}`}
                   style={[
                     styles.widthBtn,
                     { borderColor: width === w && !isEraser ? palette.gold : 'transparent' },

@@ -35,12 +35,27 @@ export default function BridgeDashboardScreen({ navigation }: Props) {
         getRequest(ROUTES.bridge.threads, { errorMessage: 'Unable to load bridge threads.' }),
         getRequest(ROUTES.bridge.analytics, { errorMessage: 'Unable to load bridge analytics.' }),
       ]);
+      // Promise.allSettled never throws, so a rejected/unsuccessful request
+      // here used to fall straight through to the empty-list branch below
+      // with no error at all - the screen rendered "No bridge threads
+      // found" (a legitimate-looking empty state) when the real cause was a
+      // failed request. Surface an explicit error for the primary (threads)
+      // fetch so a genuine failure isn't presented as "there's just no data".
       if (threadsRes.status === 'fulfilled' && threadsRes.value.success) {
         const items: BridgeThread[] = threadsRes.value.data?.results ?? threadsRes.value.data ?? [];
         setThreads(items);
+      } else {
+        setThreads([]);
+        setError(
+          threadsRes.status === 'fulfilled'
+            ? threadsRes.value.message || 'Unable to load bridge threads.'
+            : threadsRes.reason?.message || 'Unable to load bridge threads.',
+        );
       }
       if (analyticsRes.status === 'fulfilled' && analyticsRes.value.success) {
         setAnalytics(analyticsRes.value.data ?? null);
+      } else {
+        setAnalytics(null);
       }
     } catch (e: any) {
       setError(e?.message || 'Unable to load bridge data.');

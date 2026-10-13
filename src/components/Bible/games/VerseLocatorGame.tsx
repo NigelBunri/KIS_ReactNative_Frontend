@@ -119,6 +119,7 @@ export default function VerseLocatorGame({ gameKey, stageIndex, isReplay, onExit
             onPlayAgain={() => { setStageResult(null); loadRound(); }}
             onBackToJourney={onExit}
             onViewStats={onOpenStats}
+            persisted={stageResult.persisted}
           />
         </View>
       </GameShell>

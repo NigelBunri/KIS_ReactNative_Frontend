@@ -44,7 +44,12 @@ export default function HealthActionModal({ palette, visible, title, onClose, ch
             >
               {title}
             </Text>
-            <TouchableOpacity onPress={onClose} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+            <TouchableOpacity
+              onPress={onClose}
+              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+              accessibilityRole="button"
+              accessibilityLabel={`Close ${title}`}
+            >
               <KISIcon name="close" size={22} color={palette.text} />
             </TouchableOpacity>
           </View>

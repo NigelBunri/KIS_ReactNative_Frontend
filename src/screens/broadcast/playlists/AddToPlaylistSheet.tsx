@@ -141,7 +141,13 @@ export default function AddToPlaylistSheet({ item, visible, onClose }: Props) {
             <Text style={[styles.title, { color: palette.text }]}>
               Add to Playlist
             </Text>
-            <Pressable onPress={onClose} hitSlop={12} style={styles.closeBtn}>
+            <Pressable
+              onPress={onClose}
+              hitSlop={12}
+              style={styles.closeBtn}
+              accessibilityRole="button"
+              accessibilityLabel="Close"
+            >
               <KISIcon name="close" size={20} color={palette.subtext} />
             </Pressable>
           </View>

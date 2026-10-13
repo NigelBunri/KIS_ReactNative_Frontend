@@ -390,7 +390,7 @@ export default function LiveWatchPage() {
 
         <View style={styles.topRow}>
           {/* Back */}
-          <Pressable onPress={() => navigation.goBack()} style={styles.iconBtn} hitSlop={12}>
+          <Pressable onPress={() => navigation.goBack()} style={styles.iconBtn} hitSlop={12} accessibilityRole="button" accessibilityLabel="Go back">
             <KISIcon name="arrow-left" size={20} color={palette.ivory} />
           </Pressable>
 
@@ -445,6 +445,8 @@ export default function LiveWatchPage() {
           style={styles.playPauseCenter}
           onPress={() => { setPaused(p => !p); showControls(); }}
           hitSlop={20}
+          accessibilityRole="button"
+          accessibilityLabel={paused ? 'Resume playback' : 'Pause playback'}
         >
           {paused ? (
             <View style={styles.playPauseCircle}>
@@ -462,12 +464,12 @@ export default function LiveWatchPage() {
         ]}
         pointerEvents="box-none"
       >
-        <Pressable style={styles.actionBtn} onPress={handleShare}>
+        <Pressable style={styles.actionBtn} onPress={handleShare} accessibilityRole="button" accessibilityLabel="Share stream">
           <KISIcon name="share" size={22} color={palette.ivory} />
           <Text style={styles.actionLabel}>Share</Text>
         </Pressable>
         {isLive && streamId ? (
-          <Pressable style={styles.actionBtn} onPress={() => setSuperChatOpen(true)}>
+          <Pressable style={styles.actionBtn} onPress={() => setSuperChatOpen(true)} accessibilityRole="button" accessibilityLabel="Send Super Chat">
             <KISIcon name="star" size={22} color={palette.gold} />
             <Text style={[styles.actionLabel, { color: palette.gold }]}>Super Chat</Text>
           </Pressable>
@@ -531,6 +533,8 @@ export default function LiveWatchPage() {
                 key={emoji}
                 style={styles.reactionPill}
                 onPress={() => sendReaction(emoji)}
+                accessibilityRole="button"
+                accessibilityLabel={`React with ${emoji}`}
               >
                 <Text style={styles.reactionEmoji}>{emoji}</Text>
               </Pressable>

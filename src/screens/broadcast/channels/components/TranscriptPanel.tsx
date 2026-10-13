@@ -241,11 +241,16 @@ export default function TranscriptPanel({ contentId, visible, onClose }: Props) 
             <Text style={[styles.panelTitle, { color: palette.text }]}>Transcript</Text>
             <View style={styles.headerActions}>
               {status === 'ready' && (
-                <Pressable onPress={handleCopy} style={styles.copyBtn}>
+                <Pressable
+                  onPress={handleCopy}
+                  style={styles.copyBtn}
+                  accessibilityRole="button"
+                  accessibilityLabel="Copy transcript to clipboard"
+                >
                   <Text style={[styles.copyText, { color: palette.gold }]}>Copy</Text>
                 </Pressable>
               )}
-              <Pressable onPress={onClose}>
+              <Pressable onPress={onClose} accessibilityRole="button" accessibilityLabel="Close transcript">
                 <Text style={[styles.closeTxt, { color: palette.subtext }]}>✕</Text>
               </Pressable>
             </View>

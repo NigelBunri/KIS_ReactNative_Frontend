@@ -134,7 +134,7 @@ export default function FeedEditSheet({ visible, post, editEndpoint, onClose, on
 
         <View style={styles.titleRow}>
           <Text style={[styles.title, { color: palette.text }]}>Edit post</Text>
-          <Pressable onPress={closeSheet} hitSlop={10}>
+          <Pressable onPress={closeSheet} hitSlop={10} accessibilityRole="button" accessibilityLabel="Close">
             <KISIcon name="close" size={20} color={palette.subtext} />
           </Pressable>
         </View>
@@ -178,12 +178,16 @@ export default function FeedEditSheet({ visible, post, editEndpoint, onClose, on
                   <Pressable
                     onPress={pickThumbnail}
                     style={[styles.changeBtn, { borderColor: palette.inputBorder }]}
+                    accessibilityRole="button"
+                    accessibilityLabel="Change thumbnail"
                   >
                     <Ionicons name="image-outline" size={18} color={palette.primary} />
                   </Pressable>
                   <Pressable
                     onPress={() => setThumbUri(null)}
                     style={[styles.changeBtn, { borderColor: palette.inputBorder, marginLeft: 6 }]}
+                    accessibilityRole="button"
+                    accessibilityLabel="Remove thumbnail"
                   >
                     <KISIcon name="close" size={16} color={palette.subtext} />
                   </Pressable>

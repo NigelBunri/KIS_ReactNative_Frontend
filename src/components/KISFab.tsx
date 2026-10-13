@@ -34,12 +34,17 @@ export default function KISFab({
   // KISButton's primary variant, whose white/ivory icon or text needs that
   // contrast either way.
   const goldGradient = [...getAccentGradients('dark', accentId).tabSelected];
+  // Fallback so an icon-only FAB is never left completely unlabeled for
+  // screen readers when a caller forgets to pass accessibilityLabel (true
+  // of roughly two-thirds of this component's existing call sites) - derived
+  // from the icon name itself, e.g. "add-circle" -> "add circle button".
+  const fallbackLabel = String(icon || '').replace(/[-_]+/g, ' ').trim();
 
   return (
     <Pressable
       onPress={onPress}
       accessibilityRole="button"
-      accessibilityLabel={accessibilityLabel}
+      accessibilityLabel={accessibilityLabel || (fallbackLabel ? `${fallbackLabel} button` : 'Action button')}
       style={({ pressed }) => [
         {
           width: size,

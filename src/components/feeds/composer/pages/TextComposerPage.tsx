@@ -415,7 +415,12 @@ export function TextComposerPage({
                       ? 'Font size'
                       : 'Colors'}
           </Text>
-          <Pressable onPress={() => setOpenMenu(null)} style={{ padding: 6 }}>
+          <Pressable
+            onPress={() => setOpenMenu(null)}
+            accessibilityRole="button"
+            accessibilityLabel="Close menu"
+            style={{ padding: 6 }}
+          >
             <KISIcon name="close" size={18} color={palette.text} />
           </Pressable>
         </View>
@@ -475,6 +480,8 @@ export function TextComposerPage({
                     setTextPadding(next);
                     setPaddingDraft(String(next));
                   }}
+                  accessibilityRole="button"
+                  accessibilityLabel="Decrease text padding"
                   style={[styles.smallBtn, { borderColor: palette.divider }]}
                 >
                   <Text style={{ color: palette.text, fontWeight: '900' }}>−</Text>
@@ -503,6 +510,8 @@ export function TextComposerPage({
                     setTextPadding(next);
                     setPaddingDraft(String(next));
                   }}
+                  accessibilityRole="button"
+                  accessibilityLabel="Increase text padding"
                   style={[styles.smallBtn, { borderColor: palette.divider }]}
                 >
                   <Text style={{ color: palette.text, fontWeight: '900' }}>+</Text>
@@ -523,6 +532,8 @@ export function TextComposerPage({
                     setFontSizeDraft(String(next));
                     onApplyFontSizeToText(next); // apply to selection (or all)
                   }}
+                  accessibilityRole="button"
+                  accessibilityLabel="Decrease font size"
                   style={[styles.smallBtn, { borderColor: palette.divider }]}
                 >
                   <Text style={{ color: palette.text, fontWeight: '900' }}>−</Text>
@@ -553,6 +564,8 @@ export function TextComposerPage({
                     setFontSizeDraft(String(next));
                     onApplyFontSizeToText(next);
                   }}
+                  accessibilityRole="button"
+                  accessibilityLabel="Increase font size"
                   style={[styles.smallBtn, { borderColor: palette.divider }]}
                 >
                   <Text style={{ color: palette.text, fontWeight: '900' }}>+</Text>
@@ -655,6 +668,8 @@ export function TextComposerPage({
             <Pressable
               key={user.id}
               onPress={() => insertMention(user)}
+              accessibilityRole="button"
+              accessibilityLabel={`Mention ${user.display_name}`}
               style={[mentionStyles.row, { borderBottomColor: palette.divider }]}
             >
               <View style={[mentionStyles.avatar, { backgroundColor: palette.primary }]}>

@@ -259,7 +259,12 @@ function FeedFullScreenCard({
             </View>
 
             <View style={styles.actionsCol}>
-              <Pressable style={styles.actionBtn} onPress={() => navigation.navigate('ViewProfile' as any, { userId: item.author?.id, displayName } as any)}>
+              <Pressable
+                style={styles.actionBtn}
+                onPress={() => navigation.navigate('ViewProfile' as any, { userId: item.author?.id, displayName } as any)}
+                accessibilityRole="button"
+                accessibilityLabel={displayName ? `View ${displayName}'s profile` : 'View profile'}
+              >
                 <Image
                   source={authorAvatarUri ? { uri: authorAvatarUri } : fallbackAvatar}
                   style={[styles.avatar, { borderColor: palette.ivory }]}
@@ -268,18 +273,32 @@ function FeedFullScreenCard({
                   <Pressable
                     onPress={() => onSubscribe?.(item)}
                     style={[styles.followDot, { backgroundColor: isSubscribed ? palette.success : palette.danger }]}
+                    hitSlop={14}
+                    accessibilityRole="button"
+                    accessibilityLabel={isSubscribed ? 'Unsubscribe' : 'Subscribe'}
                   >
                     <KISIcon name={isSubscribed ? 'check' : 'plus'} size={10} color={palette.ivory} />
                   </Pressable>
                 ) : null}
               </Pressable>
 
-              <Pressable style={styles.actionBtn} onPress={() => onLike?.(item)}>
+              <Pressable
+                style={styles.actionBtn}
+                onPress={() => onLike?.(item)}
+                accessibilityRole="button"
+                accessibilityLabel={item.viewer_reaction ? 'Remove like' : 'Like'}
+              >
                 <KISIcon name="heart" size={26} color={item.viewer_reaction ? palette.danger : palette.ivory} />
                 <Text style={[styles.actionCount, { color: palette.ivory }]}>{item.reaction_count ?? 0}</Text>
               </Pressable>
 
-              <Pressable style={styles.actionBtn} onPress={handlePressComment} disabled={commentsLoading}>
+              <Pressable
+                style={styles.actionBtn}
+                onPress={handlePressComment}
+                disabled={commentsLoading}
+                accessibilityRole="button"
+                accessibilityLabel="Comments"
+              >
                 {commentsLoading ? (
                   <ActivityIndicator size="small" color={palette.ivory} />
                 ) : (
@@ -288,16 +307,26 @@ function FeedFullScreenCard({
                 <Text style={[styles.actionCount, { color: palette.ivory }]}>{item.comment_count ?? 0}</Text>
               </Pressable>
 
-              <Pressable style={styles.actionBtn} onPress={() => onShare?.(item)}>
+              <Pressable
+                style={styles.actionBtn}
+                onPress={() => onShare?.(item)}
+                accessibilityRole="button"
+                accessibilityLabel="Share"
+              >
                 <KISIcon name="share" size={24} color={palette.ivory} />
                 <Text style={[styles.actionCount, { color: palette.ivory }]}>{item.share_count ?? 0}</Text>
               </Pressable>
 
-              <Pressable style={styles.actionBtn} onPress={() => onSave?.(item)}>
+              <Pressable
+                style={styles.actionBtn}
+                onPress={() => onSave?.(item)}
+                accessibilityRole="button"
+                accessibilityLabel={item.viewer_saved ? 'Remove from saved' : 'Save'}
+              >
                 <KISIcon name="bookmark" size={24} color={item.viewer_saved ? palette.gold : palette.ivory} />
               </Pressable>
 
-              <Pressable style={styles.actionBtn} onPress={onEnterTrueFullView} accessibilityLabel="Full View">
+              <Pressable style={styles.actionBtn} onPress={onEnterTrueFullView} accessibilityRole="button" accessibilityLabel="Full View">
                 <KISIcon name="fullscreen" size={22} color={palette.ivory} />
               </Pressable>
             </View>

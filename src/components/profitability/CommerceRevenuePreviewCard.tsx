@@ -1,4 +1,7 @@
+import { StyleSheet, View } from 'react-native';
 import type { KISPalette } from '@/theme/constants';
+import { useKISTheme } from '@/theme/useTheme';
+import KISText from '@/components/common/KISText';
 
 type Props = {
   palette?: KISPalette | Record<string, any>;
@@ -9,6 +12,49 @@ type Props = {
   icon?: string;
 };
 
-export default function CommerceRevenuePreviewCard(_props: Props) {
-  return null;
+// This card intentionally does not display revenue figures: no monetization
+// backend exists yet for commerce/marketplace preview surfaces. It replaces a
+// silent `return null` with an honest "not live yet" notice instead of
+// pretending this data exists.
+export default function CommerceRevenuePreviewCard({ palette: paletteProp, title, subtitle, label, icon }: Props) {
+  const { palette: themePalette } = useKISTheme();
+  const palette = (paletteProp as KISPalette) ?? themePalette;
+
+  return (
+    <View style={[styles.card, { borderColor: palette.borderMuted, backgroundColor: palette.surface }]}>
+      <KISText preset="label" weight="800" style={[styles.eyebrow, { color: palette.subtext }]}>
+        {icon ? `${icon} ` : ''}
+        {label ?? 'Preview only'}
+      </KISText>
+      <KISText preset="body" weight="800" style={[styles.title, { color: palette.text }]}>
+        {title ?? 'Profitability insights'}
+      </KISText>
+      <KISText preset="caption" style={[styles.subtitle, { color: palette.subtext }]}>
+        {subtitle ?? 'Coming soon — this monetization data is not available yet.'}
+      </KISText>
+    </View>
+  );
 }
+
+const styles = StyleSheet.create({
+  card: {
+    borderWidth: 1,
+    borderRadius: 10,
+    padding: 14,
+    marginBottom: 14,
+  },
+  eyebrow: {
+    fontSize: 10,
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+    marginBottom: 4,
+  },
+  title: {
+    fontSize: 15,
+    marginBottom: 4,
+  },
+  subtitle: {
+    fontSize: 12,
+    lineHeight: 18,
+  },
+});

@@ -118,10 +118,22 @@ export default function MiniPlayer() {
       </Pressable>
 
       {/* Controls */}
-      <Pressable onPress={togglePlay} style={styles.control} hitSlop={8}>
+      <Pressable
+        onPress={togglePlay}
+        style={styles.control}
+        hitSlop={8}
+        accessibilityRole="button"
+        accessibilityLabel={playing ? 'Pause' : 'Play'}
+      >
         <KISIcon name={playing ? 'pause' : 'play'} size={22} color={palette.text} />
       </Pressable>
-      <Pressable onPress={dismiss} style={styles.control} hitSlop={8}>
+      <Pressable
+        onPress={dismiss}
+        style={styles.control}
+        hitSlop={8}
+        accessibilityRole="button"
+        accessibilityLabel="Close mini player"
+      >
         <KISIcon name="close" size={20} color={palette.subtext} />
       </Pressable>
     </Animated.View>

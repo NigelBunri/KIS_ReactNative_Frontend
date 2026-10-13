@@ -17,6 +17,10 @@ export default function PartnerCoursesSection({ partner }: { partner: Partner })
   const [partnerCourses, setPartnerCourses] = useState<any[]>([]);
   const [selectedCourse, setSelectedCourse] = useState<any | null>(null);
   const [detailVisible, setDetailVisible] = useState(false);
+  // Distinguishes "the partner genuinely has no courses" from "the request
+  // failed" — without this, a network/server error silently rendered the
+  // exact same empty state as a partner with no published courses.
+  const [loadError, setLoadError] = useState<string | null>(null);
   const isCcPartner = (partner?.name ?? '').toLowerCase().includes('christian community');
 
   const normalizeCourse = useCallback((course: any) => ({
@@ -31,9 +35,13 @@ export default function PartnerCoursesSection({ partner }: { partner: Partner })
 
   const loadCourses = useCallback(async () => {
     if (!partner?.id) return;
+    setLoadError(null);
     const partnerRes = await getRequest(`${ROUTES.bible.courses}?partner=${partner.id}&scope=partner`, {
       errorMessage: 'Unable to load partner courses.',
     });
+    if (!partnerRes?.success) {
+      setLoadError(partnerRes?.message || 'Unable to load partner courses.');
+    }
     const partnerPayload = partnerRes?.data?.results ?? partnerRes?.data ?? [];
     const partnerList = Array.isArray(partnerPayload) ? partnerPayload : [];
     setPartnerCourses(partnerList.map(normalizeCourse));
@@ -42,6 +50,9 @@ export default function PartnerCoursesSection({ partner }: { partner: Partner })
       const bibleRes = await getRequest(`${ROUTES.bible.courses}?scope=bible`, {
         errorMessage: 'Unable to load Bible courses.',
       });
+      if (!bibleRes?.success) {
+        setLoadError((prev) => prev || bibleRes?.message || 'Unable to load Bible courses.');
+      }
       const biblePayload = bibleRes?.data?.results ?? bibleRes?.data ?? [];
       const bibleList = Array.isArray(biblePayload) ? biblePayload : [];
       setBibleCourses(bibleList.map(normalizeCourse));
@@ -188,7 +199,15 @@ export default function PartnerCoursesSection({ partner }: { partner: Partner })
         </>
       ) : null}
 
-      {!hasCourses ? (
+      {!hasCourses && loadError ? (
+        <Pressable
+          onPress={loadCourses}
+          style={[styles.groupRow, { borderColor: palette.borderDanger ?? palette.danger, backgroundColor: palette.surface }]}
+        >
+          <Text style={{ color: palette.danger, fontSize: 12, fontWeight: '700' }}>{loadError}</Text>
+          <Text style={{ color: palette.subtext, fontSize: 11, marginTop: 2 }}>Tap to retry.</Text>
+        </Pressable>
+      ) : !hasCourses ? (
         <Pressable style={[styles.groupRow, { borderColor: palette.borderMuted, backgroundColor: palette.surface }]}
         >
           <Text style={{ color: palette.subtext, fontSize: 12 }}>{emptyMessage}</Text>

@@ -388,6 +388,9 @@ export const ImageEditor: React.FC<ImageEditorProps> = ({
                 <Pressable
                   key={color}
                   onPress={() => handleTextColorChange(color)}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Text color ${color}`}
+                  accessibilityState={{ selected: activeText.color === color }}
                   style={[
                     editorStyles.colorDot,
                     {

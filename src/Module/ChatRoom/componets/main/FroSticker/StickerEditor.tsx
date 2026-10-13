@@ -12,6 +12,7 @@ import {
   Image,
   Modal,
   PanResponder,
+  Alert,
 } from 'react-native';
 
 import { launchImageLibrary } from 'react-native-image-picker';
@@ -174,6 +175,7 @@ export const StickerEditor: React.FC<StickerEditorProps> = ({
 
       if (!uri) {
         console.warn('No usable uri for selected image', asset);
+        Alert.alert('Could not use this image', 'Please try choosing a different photo.');
         return;
       }
 
@@ -191,6 +193,7 @@ export const StickerEditor: React.FC<StickerEditorProps> = ({
       setBgRemoved(false);
     } catch (err) {
       console.warn('Image pick error', err);
+      Alert.alert('Could not open photos', 'Please try again.');
     }
   };
 
@@ -269,11 +272,13 @@ export const StickerEditor: React.FC<StickerEditorProps> = ({
 
       if (!viewShotRef.current) {
         setSaving(false);
+        Alert.alert('Could not save sticker', 'Please try again.');
         return;
       }
       const capture = (viewShotRef.current as any).capture;
       if (typeof capture !== 'function') {
         setSaving(false);
+        Alert.alert('Could not save sticker', 'Please try again.');
         return;
       }
 
@@ -285,6 +290,7 @@ export const StickerEditor: React.FC<StickerEditorProps> = ({
 
       if (!captureUri) {
         setSaving(false);
+        Alert.alert('Could not save sticker', 'Please try again.');
         return;
       }
 
@@ -337,6 +343,7 @@ export const StickerEditor: React.FC<StickerEditorProps> = ({
       onClose();
     } catch (err) {
       console.warn('Sticker capture error', err);
+      Alert.alert('Could not save sticker', 'Please try again.');
     } finally {
       setSaving(false);
     }
@@ -370,7 +377,12 @@ export const StickerEditor: React.FC<StickerEditorProps> = ({
           backgroundColor: palette.card,
         }}
       >
-        <Pressable onPress={onClose} style={{ padding: 8, marginRight: 8 }}>
+        <Pressable
+          onPress={onClose}
+          accessibilityRole="button"
+          accessibilityLabel="Close sticker editor"
+          style={{ padding: 8, marginRight: 8 }}
+        >
           <KISIcon name="back" size={22} color={palette.primary} />
         </Pressable>
 
@@ -539,6 +551,9 @@ export const StickerEditor: React.FC<StickerEditorProps> = ({
                 <Pressable
                   key={c}
                   onPress={() => setTextColor(c)}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Text color ${c}`}
+                  accessibilityState={{ selected }}
                   style={{
                     width: 26,
                     height: 26,

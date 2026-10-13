@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -71,6 +71,14 @@ export default function TitheStatementScreen({ navigation }: Props) {
     },
     [fetchStatement],
   );
+
+  // Load the current year's statement automatically on first visit — without
+  // this, the screen opened on an empty "select a year" hint even though the
+  // current year chip already appears selected, forcing a redundant tap.
+  useEffect(() => {
+    fetchStatement(CURRENT_YEAR);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const formatCurrency = (val: number) =>
     `$${val.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;

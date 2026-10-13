@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { View, LayoutChangeEvent } from 'react-native';
 import { Path, Svg } from 'react-native-svg';
 import type { InsightSeries } from '@/api/insights/types';
+import { useKISTheme } from '@/theme/useTheme';
 
 type Props = {
   series: InsightSeries[];
@@ -16,8 +17,14 @@ export default function LineChart({
   width: widthProp,
   height = 160,
   strokeWidth = 3,
-  color = '#3B82F6',
+  color,
 }: Props) {
+  const { palette } = useKISTheme();
+  // Theme-aware fallback (was a hardcoded blue hex) so the trend line matches
+  // the active accent/dark mode when no explicit color is passed in - every
+  // current call site (InsightLayout) omits it, so this is the color that
+  // actually renders in practice.
+  const strokeColor = color ?? palette.primary;
   // When no explicit width is given, measure the chart's own rendered
   // container via onLayout instead of assuming it fills the raw device
   // width. Every call site places this chart inside a padded card/column
@@ -61,7 +68,7 @@ export default function LineChart({
         <Svg width={width} height={height}>
           <Path
             d={path}
-            stroke={color}
+            stroke={strokeColor}
             strokeWidth={strokeWidth}
             fill="none"
             strokeLinecap="round"

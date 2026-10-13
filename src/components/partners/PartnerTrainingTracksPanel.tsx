@@ -99,6 +99,8 @@ export default function PartnerTrainingTracksPanel({ isOpen, panelWidth, panelTr
 
   const [assignDeptId, setAssignDeptId] = useState<string | null>(null);
   const [assignUserIds, setAssignUserIds] = useState<string[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [rosterError, setRosterError] = useState<string | null>(null);
 
   const backdropOpacity = panelTranslateX.interpolate({ inputRange: [0, panelWidth], outputRange: [1, 0], extrapolate: 'clamp' });
 
@@ -110,13 +112,20 @@ export default function PartnerTrainingTracksPanel({ isOpen, panelWidth, panelTr
       getRequest(ROUTES.partners.departments(partnerId), { errorMessage: 'Unable to load departments.' }),
       getRequest(`${ROUTES.partners.members(partnerId)}?page=1`, { errorMessage: 'Unable to load members.' }),
     ]);
+    if (!trackRes?.success || !courseRes?.success) {
+      setError(trackRes?.message || courseRes?.message || "Couldn't load training tracks. Tap to retry.");
+      setTracks([]);
+      setCourses([]);
+      return;
+    }
+    setError(null);
     const trackPayload = trackRes?.data?.results ?? trackRes?.data ?? [];
     setTracks(Array.isArray(trackPayload) ? trackPayload : []);
     const coursePayload = courseRes?.data?.results ?? courseRes?.data ?? [];
     setCourses(Array.isArray(coursePayload) ? coursePayload : []);
-    const depPayload = depRes?.data ?? depRes ?? [];
+    const depPayload = depRes?.success ? depRes?.data ?? [] : [];
     setDepartments(Array.isArray(depPayload) ? depPayload : []);
-    const memberPayload = memberRes?.data ?? memberRes ?? {};
+    const memberPayload = memberRes?.success ? memberRes?.data ?? {} : {};
     const memberList = (memberPayload.results ?? memberPayload.members ?? []) as MemberOption[];
     setMembers(Array.isArray(memberList) ? memberList : []);
   }, [partnerId]);
@@ -135,6 +144,13 @@ export default function PartnerTrainingTracksPanel({ isOpen, panelWidth, panelTr
   const loadRoster = useCallback(async (trackId: string | number) => {
     setRosterLoading(true);
     const res = await getRequest(ROUTES.bible.courseTrackRoster(trackId), { errorMessage: 'Unable to load roster.' });
+    if (!res?.success) {
+      setRosterError(res?.message || "Couldn't load roster. Tap to retry.");
+      setRoster([]);
+      setRosterLoading(false);
+      return;
+    }
+    setRosterError(null);
     const payload = (res?.data ?? []) as RosterRow[];
     setRoster(Array.isArray(payload) ? payload : []);
     setRosterLoading(false);
@@ -269,6 +285,8 @@ export default function PartnerTrainingTracksPanel({ isOpen, panelWidth, panelTr
         <View style={[styles.settingsPanelHeader, { borderBottomColor: palette.divider }]}>
           <Pressable
             onPress={() => (selectedTrackId ? setSelectedTrackId(null) : onClose())}
+            accessibilityRole="button"
+            accessibilityLabel={selectedTrackId ? 'Back to training tracks' : 'Close'}
             style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}
           >
             <Text style={{ color: palette.text, fontSize: 18 }}>‹</Text>
@@ -286,6 +304,27 @@ export default function PartnerTrainingTracksPanel({ isOpen, panelWidth, panelTr
         <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.settingsPanelBody} showsVerticalScrollIndicator={false}>
           {loading ? (
             <ActivityIndicator size="small" color={palette.primary} />
+          ) : error ? (
+            <View
+              style={{
+                borderRadius: 10,
+                borderWidth: 1,
+                borderColor: palette.danger,
+                backgroundColor: palette.danger + '15',
+                padding: 12,
+              }}
+            >
+              <Text style={{ color: palette.danger, fontSize: 13, fontWeight: '600' }}>{error}</Text>
+              <Pressable
+                onPress={() => {
+                  setLoading(true);
+                  load().finally(() => setLoading(false));
+                }}
+                style={{ marginTop: 8 }}
+              >
+                <Text style={{ color: palette.primary, fontWeight: '700', fontSize: 13 }}>Tap to retry</Text>
+              </Pressable>
+            </View>
           ) : selectedTrack ? (
             <>
               {selectedTrack.description ? (
@@ -399,6 +438,21 @@ export default function PartnerTrainingTracksPanel({ isOpen, panelWidth, panelTr
               </Text>
               {rosterLoading ? (
                 <ActivityIndicator size="small" color={palette.primary} />
+              ) : rosterError ? (
+                <View
+                  style={{
+                    borderRadius: 10,
+                    borderWidth: 1,
+                    borderColor: palette.danger,
+                    backgroundColor: palette.danger + '15',
+                    padding: 12,
+                  }}
+                >
+                  <Text style={{ color: palette.danger, fontSize: 13, fontWeight: '600' }}>{rosterError}</Text>
+                  <Pressable onPress={() => loadRoster(selectedTrack.id)} style={{ marginTop: 8 }}>
+                    <Text style={{ color: palette.primary, fontWeight: '700', fontSize: 13 }}>Tap to retry</Text>
+                  </Pressable>
+                </View>
               ) : roster.length === 0 ? (
                 <Text style={{ color: palette.subtext, fontSize: 13 }}>Not assigned to anyone yet.</Text>
               ) : (

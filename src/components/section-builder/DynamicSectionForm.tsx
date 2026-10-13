@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Text, TouchableOpacity, View } from 'react-native';
+import { Alert, Text, TouchableOpacity, View } from 'react-native';
 
 import KISButton from '@/constants/KISButton';
 import KISTextInput from '@/constants/KISTextInput';
@@ -818,7 +818,27 @@ export default function DynamicSectionForm({
         disabled={hasSectionBackgroundImage}
       />
       <TouchableOpacity
-        onPress={() => onDataChange({} as SectionDataByType[SectionType])}
+        onPress={() => {
+          // This clears every field for the section currently being
+          // edited with no way back — previously a single tap with no
+          // confirmation, matching the destructive-action-without-
+          // confirmation pattern flagged elsewhere in this audit.
+          Alert.alert(
+            'Reset this section?',
+            'This clears everything you’ve entered for this section type. This cannot be undone.',
+            [
+              { text: 'Cancel', style: 'cancel' },
+              {
+                text: 'Reset',
+                style: 'destructive',
+                onPress: () => onDataChange({} as SectionDataByType[SectionType]),
+              },
+            ],
+          );
+        }}
+        accessibilityRole="button"
+        accessibilityLabel="Reset form for selected section type"
+        hitSlop={8}
         style={{ marginTop: spacing.sm, alignSelf: 'flex-start' }}
       >
         <Text style={{ ...typography.caption, color: palette.subtext }}>Reset Form For Selected Type</Text>

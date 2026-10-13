@@ -110,14 +110,21 @@ export default function ComplianceTrackerScreen(_props: Props) {
     try {
       // postRequest resolves to the ApiResult wrapper ({success, data,
       // message}), not the created record directly - the previous
-      // whole-wrapper cast was a real bug, not just a type nuisance.
+      // whole-wrapper cast was a real bug, not just a type nuisance. It also
+      // never checked `success`, so a rejected save (e.g. invalid date,
+      // server error) still fell through to the wrapper-as-record cast and
+      // inserted a bogus row into the list while silently closing the modal
+      // as if the deadline had actually been saved.
       const apiResult = await postRequest(ROUTES.government.compliance, {
         title: formTitle.trim(),
         type: formType.trim(),
         due_date: formDueDate.trim(),
         notes: formNotes.trim() || undefined,
       });
-      const result = (apiResult?.data ?? apiResult) as ComplianceItem;
+      if (!apiResult?.success || !apiResult?.data) {
+        throw new Error(apiResult?.message || 'Could not save deadline. Please try again.');
+      }
+      const result = apiResult.data as ComplianceItem;
       setItems((prev) => {
         const updated = [result, ...prev];
         updated.sort(
@@ -131,8 +138,8 @@ export default function ComplianceTrackerScreen(_props: Props) {
       setFormDueDate('');
       setFormNotes('');
       setShowAddModal(false);
-    } catch {
-      Alert.alert('Error', 'Could not save deadline. Please try again.');
+    } catch (e: any) {
+      Alert.alert('Error', e?.message || 'Could not save deadline. Please try again.');
     } finally {
       setSaving(false);
     }
@@ -298,6 +305,8 @@ export default function ComplianceTrackerScreen(_props: Props) {
                 activeOpacity={0.75}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 onPress={() => setShowAddModal(false)}
+                accessibilityRole="button"
+                accessibilityLabel="Close add deadline"
               >
                 <KISIcon name="close-outline" size={24} color={palette.text} />
               </TouchableOpacity>

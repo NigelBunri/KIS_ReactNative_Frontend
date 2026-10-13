@@ -89,7 +89,7 @@ export default function CreateCampaignScreen({ navigation }: Props) {
     <SafeAreaView style={styles.safe} edges={['top']}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
         <View style={styles.navBar}>
-          <Pressable style={styles.backBtn} onPress={() => navigation.goBack()} hitSlop={8}>
+          <Pressable style={styles.backBtn} onPress={() => navigation.goBack()} hitSlop={8} accessibilityRole="button" accessibilityLabel="Go back">
             <KISIcon name="arrow-back-outline" size={24} color={palette.text} />
           </Pressable>
           <Text style={styles.navTitle}>Create Campaign</Text>

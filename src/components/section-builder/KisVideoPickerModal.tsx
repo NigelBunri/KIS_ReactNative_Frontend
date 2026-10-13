@@ -34,14 +34,25 @@ export default function KisVideoPickerModal({ visible, ownerType, ownerId, selec
   const [query, setQuery] = useState('');
   const [items, setItems] = useState<KisVideoResult[]>([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!ownerType || !ownerId) return;
     setLoading(true);
+    setError(null);
     try {
       const res = await getRequest(ROUTES.websites.kisVideoSearch, {
         params: { owner_type: ownerType, owner_id: ownerId, q: query },
+        errorMessage: 'Unable to search videos.',
       });
+      // See KisContentPickerModal.tsx for why the `success` check matters
+      // here: without it, a failed search rendered identically to a
+      // genuine "no videos found" result.
+      if (!(res as any)?.success) {
+        setItems([]);
+        setError((res as any)?.message || 'Unable to search videos.');
+        return;
+      }
       const results = (res as any)?.data?.results ?? (res as any)?.results ?? [];
       setItems(Array.isArray(results) ? results : []);
     } finally {
@@ -80,6 +91,11 @@ export default function KisVideoPickerModal({ visible, ownerType, ownerId, selec
               />
               {loading ? (
                 <ActivityIndicator style={{ marginTop: 16 }} color={palette.primaryStrong} />
+              ) : error ? (
+                <View style={{ alignItems: 'center', gap: 8, paddingVertical: 16 }}>
+                  <Text style={[styles.empty, { color: palette.danger }]}>{error}</Text>
+                  <KISButton title="Retry" size="sm" variant="outline" onPress={load} />
+                </View>
               ) : (
                 <ScrollView style={styles.list} keyboardShouldPersistTaps="handled">
                   {items.length === 0 ? (

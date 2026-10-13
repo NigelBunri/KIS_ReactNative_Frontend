@@ -1,6 +1,6 @@
 // src/components/composer/docConversion.ts
 import { RichComposerState, Span } from './types';
-import { splitParagraphs } from './richUtils';
+import { splitParagraphs } from './richTextUtils';
 
 export function stateToDoc(state: RichComposerState) {
   const { text, spans, blocks, defaultAlign, styledBg } = state;

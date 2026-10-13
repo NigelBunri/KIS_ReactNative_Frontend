@@ -135,9 +135,11 @@ export default function ContentCardsEditor({ contentId }: Props) {
         ROUTES.broadcasts.contentCards(contentId),
         { errorMessage: '' },
       );
-      // getRequest resolves to the ApiResult wrapper — the final
-      // `res?.results` fallback checked the wrapper instead of
-      // `res.data.results`, so a paginated response always fell through to [].
+      // getRequest resolves (never throws) on failure too — without this
+      // check, a failed load fell through to the same `res?.data?.results`
+      // fallback used for a genuinely empty list, rendering "No cards added
+      // yet" on a load failure with zero indication anything went wrong.
+      if (!res?.success) throw new Error('Could not load content cards.');
       const raw: ContentCard[] = Array.isArray(res?.data)
         ? res.data
         : res?.data?.results ?? [];

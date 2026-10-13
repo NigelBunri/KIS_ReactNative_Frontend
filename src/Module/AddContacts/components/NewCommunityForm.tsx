@@ -241,6 +241,8 @@ export const NewCommunityForm: React.FC<NewCommunityFormProps> = ({
       <View style={{ alignItems: 'center', marginBottom: 20 }}>
         <Pressable
           onPress={handlePickAvatar}
+          accessibilityRole="button"
+          accessibilityLabel={avatarPreview ? 'Change community photo' : 'Add community photo'}
           style={({ pressed }) => ({
             width: 84,
             height: 84,

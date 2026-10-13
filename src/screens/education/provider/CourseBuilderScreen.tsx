@@ -497,7 +497,13 @@ export default function CourseBuilderScreen() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: responsive.pageGutter, paddingTop: 10 }}>
-        <Pressable onPress={() => navigation.goBack()} style={{ padding: 4, marginLeft: -4 }}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Back"
+          onPress={() => navigation.goBack()}
+          hitSlop={12}
+          style={{ padding: 4, marginLeft: -4 }}
+        >
           <KISIcon name="back" size={20} color={palette.text} />
         </Pressable>
         <Text style={{ fontSize: 20, fontWeight: '900', color: palette.text }} numberOfLines={1}>
@@ -736,7 +742,13 @@ export default function CourseBuilderScreen() {
                         {itemIndex + 1}. {item.title_override || item.item_type}
                       </Text>
                       <Text style={{ fontSize: 11, color: palette.subtext, textTransform: 'capitalize' }}>{item.item_type?.replace('_', ' ')}</Text>
-                      <Pressable onPress={() => deleteModuleItem(item)} hitSlop={8} style={{ padding: 2 }}>
+                      <Pressable
+                        accessibilityRole="button"
+                        accessibilityLabel={`Delete ${String(item.item_type || 'item').replace('_', ' ')}`}
+                        onPress={() => deleteModuleItem(item)}
+                        hitSlop={8}
+                        style={{ padding: 2 }}
+                      >
                         <KISIcon name="trash" size={15} color={palette.danger} />
                       </Pressable>
                     </View>

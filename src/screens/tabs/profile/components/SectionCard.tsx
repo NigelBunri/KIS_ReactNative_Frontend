@@ -1,6 +1,6 @@
 // src/screens/tabs/profile/components/SectionCard.tsx
 import React from 'react';
-import { Image, Pressable, Text, View } from 'react-native';
+import { Alert, Image, Pressable, Text, View } from 'react-native';
 import { useKISTheme } from '@/theme/useTheme';
 import { KISIcon } from '@/constants/kisIcons';
 import { ItemType } from '../profile.types';
@@ -23,6 +23,17 @@ export default function SectionCard({
 }) {
   const { palette } = useKISTheme();
 
+  const confirmDelete = (item: any) => {
+    Alert.alert(
+      'Delete this item?',
+      'This cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Delete', style: 'destructive', onPress: () => onDelete(item.id) },
+      ],
+    );
+  };
+
   return (
     <View style={[styles.sectionCard, { backgroundColor: palette.card, borderColor: palette.divider }]}>
       <View style={styles.headerRow}>
@@ -30,6 +41,8 @@ export default function SectionCard({
         <Pressable
           onPress={onAdd}
           style={{ minHeight: 44, minWidth: 44, alignItems: 'center', justifyContent: 'center' }}
+          accessibilityRole="button"
+          accessibilityLabel={`Add ${title}`}
         >
           <KISIcon name="add" size={20} color={palette.primaryStrong} />
         </Pressable>
@@ -52,10 +65,22 @@ export default function SectionCard({
             </View>
 
             <View style={styles.rowActions}>
-              <Pressable onPress={() => onEdit(item)} hitSlop={8} style={styles.iconBtn}>
+              <Pressable
+                onPress={() => onEdit(item)}
+                hitSlop={8}
+                style={styles.iconBtn}
+                accessibilityRole="button"
+                accessibilityLabel="Edit item"
+              >
                 <KISIcon name="edit" size={18} color={palette.subtext} />
               </Pressable>
-              <Pressable onPress={() => onDelete(item.id)} hitSlop={8} style={styles.iconBtn}>
+              <Pressable
+                onPress={() => confirmDelete(item)}
+                hitSlop={8}
+                style={styles.iconBtn}
+                accessibilityRole="button"
+                accessibilityLabel="Delete item"
+              >
                 <KISIcon name="trash" size={18} color={palette.danger} />
               </Pressable>
             </View>

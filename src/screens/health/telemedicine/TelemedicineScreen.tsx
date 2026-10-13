@@ -95,6 +95,8 @@ export default function TelemedicineScreen({ navigation }: Props) {
           style={styles.quickBtn}
           onPress={() => navigation.navigate('DoctorDirectory', { mode: 'instant' })}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          accessibilityRole="button"
+          accessibilityLabel="Instant Consult"
         >
           <KISIcon name="bolt" size={22} color={palette.primary} />
           <Text style={styles.quickLabel}>Instant Consult</Text>
@@ -103,6 +105,8 @@ export default function TelemedicineScreen({ navigation }: Props) {
           style={styles.quickBtn}
           onPress={() => navigation.navigate('DoctorDirectory', { mode: 'book' })}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          accessibilityRole="button"
+          accessibilityLabel="Book Appointment"
         >
           <KISIcon name="calendar" size={22} color={palette.primary} />
           <Text style={styles.quickLabel}>Book Appointment</Text>
@@ -111,6 +115,8 @@ export default function TelemedicineScreen({ navigation }: Props) {
           style={styles.quickBtn}
           onPress={() => navigation.navigate('DoctorDirectory', { mode: 'browse' })}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          accessibilityRole="button"
+          accessibilityLabel="Doctor Directory"
         >
           <KISIcon name="person" size={22} color={palette.primary} />
           <Text style={styles.quickLabel}>Doctor Directory</Text>

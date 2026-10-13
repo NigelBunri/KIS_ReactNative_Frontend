@@ -58,29 +58,36 @@ export default function AdminContentPanel({
 
   if (!isOpen) return null;
 
+  const runAction = async (flag: ContentFlag, action: ContentAction) => {
+    const result = await onTakeAction(flag.id, action);
+    if (!result?.success) {
+      Alert.alert('Failed', result?.message || 'Unable to apply this action. Please try again.');
+    }
+  };
+
   const handleAction = (flag: ContentFlag) => {
     Alert.alert(
       `Moderate ${flag.target_type}`,
       `Severity: ${flag.severity.toUpperCase()}\nReporter: ${flag.reporter_email ?? 'System'}\nReason: ${flag.reason || 'No reason given'}`,
       [
         { text: 'Cancel', style: 'cancel' },
-        { text: 'Dismiss', onPress: () => void onTakeAction(flag.id, 'dismiss') },
-        { text: 'Warn creator', onPress: () => void onTakeAction(flag.id, 'warn') },
-        { text: 'Restrict creator', onPress: () => void onTakeAction(flag.id, 'restrict') },
+        { text: 'Dismiss', onPress: () => void runAction(flag, 'dismiss') },
+        { text: 'Warn creator', onPress: () => void runAction(flag, 'warn') },
+        { text: 'Restrict creator', onPress: () => void runAction(flag, 'restrict') },
         {
           text: 'Takedown content',
           style: 'destructive',
-          onPress: () => void onTakeAction(flag.id, 'takedown'),
+          onPress: () => void runAction(flag, 'takedown'),
         },
         {
           text: 'Suspend creator',
           style: 'destructive',
-          onPress: () => void onTakeAction(flag.id, 'suspend'),
+          onPress: () => void runAction(flag, 'suspend'),
         },
         {
           text: 'Ban creator',
           style: 'destructive',
-          onPress: () => void onTakeAction(flag.id, 'ban'),
+          onPress: () => void runAction(flag, 'ban'),
         },
       ],
     );
@@ -101,7 +108,7 @@ export default function AdminContentPanel({
       {/* Header */}
       <View style={[styles.header, { borderBottomColor: palette.border }]}>
         <Text style={[styles.title, { color: palette.text }]}>Content Moderation</Text>
-        <Pressable onPress={onClose}>
+        <Pressable onPress={onClose} accessibilityRole="button" accessibilityLabel="Close" hitSlop={10}>
           <Text style={{ color: palette.subtext, fontSize: 20 }}>✕</Text>
         </Pressable>
       </View>

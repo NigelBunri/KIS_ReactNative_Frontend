@@ -148,6 +148,19 @@ export default function QRScanLoginScreen() {
         includeBase64: false,
       });
       if (result.didCancel) return;
+      if (result.errorCode) {
+        // Distinguish "camera denied/unavailable" from a successful capture —
+        // silently falling into the same "paste the token" prompt either way
+        // left a permission problem looking identical to the happy path.
+        Alert.alert(
+          'Camera unavailable',
+          result.errorCode === 'permission'
+            ? "KIS doesn't have permission to use the camera. Enable it in your device Settings, or enter the token manually."
+            : (result.errorMessage || 'Could not open the camera. You can enter the token manually instead.'),
+          [{ text: 'Enter manually', onPress: () => setStep('manual') }],
+        );
+        return;
+      }
       // After capturing, prompt user to switch to manual entry
       // (full jsQR decode requires adding the jsqr package)
       Alert.alert(
@@ -170,6 +183,8 @@ export default function QRScanLoginScreen() {
           }}
           style={styles.backBtn}
           hitSlop={12}
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
         >
           <KISIcon name="arrow-left" size={22} color={palette.text} />
         </Pressable>

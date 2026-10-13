@@ -598,6 +598,7 @@ export const useProfileController = (opts: {
         };
       }
 
+      console.warn('[useProfileController] Unable to load KIS wallet:', res?.message);
       const cents = Number(
         fallbackWalletBalanceCents ??
           profile?.account?.wallet_balance_cents ??
@@ -655,6 +656,7 @@ export const useProfileController = (opts: {
       setWalletLedger(mapped);
       return;
     }
+    console.warn('[useProfileController] Unable to load wallet ledger:', res?.message);
     setWalletLedger([]);
   }, []);
 
@@ -669,6 +671,8 @@ export const useProfileController = (opts: {
         invoice_url: res.data?.invoice_url,
         invoice_pdf_url: res.data?.invoice_pdf_url,
       });
+    } else {
+      console.warn('[useProfileController] Unable to load billing history:', res?.message);
     }
   }, []);
 
@@ -680,6 +684,10 @@ export const useProfileController = (opts: {
       setRewardBalance(Number(res?.data?.available ?? 0));
       return;
     }
+    // Falls back to 0 rather than leaving the previous balance on screen —
+    // logged so a failed fetch is at least distinguishable from a genuine
+    // zero balance in diagnostics, even though the UI can't tell them apart.
+    console.warn('[useProfileController] Unable to load reward balance:', res?.message);
     setRewardBalance(0);
   }, []);
 
@@ -687,6 +695,8 @@ export const useProfileController = (opts: {
     const res = await getRequest(ROUTES.broadcasts.createProfile);
     if (res?.success) {
       setBroadcastProfiles(res.data?.profiles ?? {});
+    } else {
+      console.warn('[useProfileController] Unable to load broadcast profiles:', res?.message);
     }
   }, []);
 
@@ -1699,36 +1709,71 @@ export const useProfileController = (opts: {
   };
 
   const deleteItem = async (type: ItemType, itemId: string) => {
-    if (type === 'language') {
-      await deleteRequest(ROUTES.profileLanguages.detail(itemId));
+    // Permanently removes a profile item (experience, education, project,
+    // skill, article, showcase item, or language) — confirm first, since
+    // every call site (the section-item trash action and the gallery
+    // Delete button in EditProfileModal.tsx) fires this immediately with no
+    // confirmation of its own. Modeled as a promise around Alert.alert so
+    // this function's signature/call sites stay unchanged.
+    const confirmed = await new Promise<boolean>(resolve => {
+      Alert.alert(
+        'Delete item',
+        'This will permanently remove this item from your profile. This cannot be undone.',
+        [
+          { text: 'Cancel', style: 'cancel', onPress: () => resolve(false) },
+          { text: 'Delete', style: 'destructive', onPress: () => resolve(true) },
+        ],
+        { cancelable: true, onDismiss: () => resolve(false) },
+      );
+    });
+    if (!confirmed) return;
+
+    try {
+      if (type === 'language') {
+        const res = await deleteRequest(ROUTES.profileLanguages.detail(itemId));
+        if (!res?.success) {
+          throw new Error(res?.message || 'Unable to delete this item.');
+        }
+        loadProfile();
+        return;
+      }
+      const baseMap: Record<ItemType, string | null> = {
+        experience: ROUTES.profileItems.experiences,
+        education: ROUTES.profileItems.educations,
+        project: ROUTES.profileItems.projects,
+        skill: ROUTES.profileItems.skills,
+        article: ROUTES.profileArticles.list,
+        portfolio: ROUTES.profileShowcases.list,
+        case_study: ROUTES.profileShowcases.list,
+        testimonial: ROUTES.profileShowcases.list,
+        certification: ROUTES.profileShowcases.list,
+        intro_video: ROUTES.profileShowcases.list,
+        highlight: ROUTES.profileShowcases.list,
+        service: null,
+        availability: null,
+        language: null,
+        location: null,
+        compensation: null,
+        ask_tag: null,
+        social_proof: null,
+        skill_badge: null,
+      };
+      const baseUrl = baseMap[type];
+      if (!baseUrl) return;
+      // deleteRequest resolves (never throws) on a failed request too — see
+      // the identical fix note on saveItem above. Without checking
+      // res.success here, a rejected delete (auth failure, server error)
+      // silently reloaded the profile as if nothing happened: the item
+      // never disappears, no error is shown, and the user has no idea the
+      // delete failed.
+      const res = await deleteRequest(`${baseUrl}${itemId}/`);
+      if (!res?.success) {
+        throw new Error(res?.message || 'Unable to delete this item.');
+      }
       loadProfile();
-      return;
+    } catch (error: any) {
+      Alert.alert('Delete failed', error?.message || 'Unable to delete this item.');
     }
-    const baseMap: Record<ItemType, string | null> = {
-      experience: ROUTES.profileItems.experiences,
-      education: ROUTES.profileItems.educations,
-      project: ROUTES.profileItems.projects,
-      skill: ROUTES.profileItems.skills,
-      article: ROUTES.profileArticles.list,
-      portfolio: ROUTES.profileShowcases.list,
-      case_study: ROUTES.profileShowcases.list,
-      testimonial: ROUTES.profileShowcases.list,
-      certification: ROUTES.profileShowcases.list,
-      intro_video: ROUTES.profileShowcases.list,
-      highlight: ROUTES.profileShowcases.list,
-      service: null,
-      availability: null,
-      language: null,
-      location: null,
-      compensation: null,
-      ask_tag: null,
-      social_proof: null,
-      skill_badge: null,
-    };
-    const baseUrl = baseMap[type];
-    if (!baseUrl) return;
-    await deleteRequest(`${baseUrl}${itemId}/`);
-    loadProfile();
   };
 
   const upgradeTier = async (tierId: string, applyRewards = false) => {

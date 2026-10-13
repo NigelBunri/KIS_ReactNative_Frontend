@@ -251,6 +251,7 @@ export default function VerseRaceGame({ gameKey, stageIndex, isReplay, onExit, o
             }}
             onBackToJourney={onExit}
             onViewStats={onOpenStats}
+            persisted={stageResult.persisted}
           />
         </View>
       </GameShell>

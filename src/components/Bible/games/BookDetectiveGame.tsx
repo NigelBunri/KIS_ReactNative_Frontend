@@ -112,6 +112,7 @@ export default function BookDetectiveGame({ gameKey, stageIndex, isReplay, onExi
             onPlayAgain={() => { setStageResult(null); loadRound(); }}
             onBackToJourney={onExit}
             onViewStats={onOpenStats}
+            persisted={stageResult.persisted}
           />
         </View>
       </GameShell>

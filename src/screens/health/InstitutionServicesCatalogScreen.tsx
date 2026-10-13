@@ -1715,7 +1715,23 @@ export default function InstitutionServicesCatalogScreen({
                       title="Delete"
                       size="sm"
                       variant="outline"
-                      onPress={() => deleteCustomService(service.id)}
+                      onPress={() => {
+                        // This previously deleted the service on a single
+                        // tap with no confirmation — a live, bookable
+                        // service could vanish from the catalog by accident.
+                        Alert.alert(
+                          'Delete service',
+                          `Delete "${service.name}"? Patients will no longer be able to book it.`,
+                          [
+                            { text: 'Cancel', style: 'cancel' },
+                            {
+                              text: 'Delete',
+                              style: 'destructive',
+                              onPress: () => deleteCustomService(service.id),
+                            },
+                          ],
+                        );
+                      }}
                       disabled={saving}
                     />
                   ) : null}

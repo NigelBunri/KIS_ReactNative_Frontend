@@ -151,6 +151,23 @@ export const formatDateKey = (date: Date): string => {
   return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 };
 
+// Parses a "YYYY-MM-DD" key into a Date using LOCAL calendar components
+// (new Date(year, monthIndex, day)), deliberately avoiding `new Date(str)`.
+// A bare date-only ISO string is parsed by the JS spec as UTC midnight, so
+// `new Date("2026-10-01")` can render as Sep 30 in any timezone behind UTC -
+// an off-by-one that would misreport which month/day a provider's
+// availability range actually starts on. Returns null for an unparsable key.
+export const parseDateKey = (key?: string | null): Date | null => {
+  if (!key) return null;
+  const parts = key.split("-").map((item) => Number(item));
+  if (parts.length !== 3 || !parts.every((segment) => Number.isFinite(segment))) {
+    return null;
+  }
+  const [year, month, day] = parts;
+  const parsed = new Date(year, month - 1, day);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+};
+
 export const getDayKey = (date: Date): DayKey => {
   const mapping: DayKey[] = [
     "sunday",

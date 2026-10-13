@@ -91,7 +91,12 @@ export default function InCallPollSheet({
               <Text style={[styles.createText, { color: palette.gold }]}>New poll</Text>
             </Pressable>
           )}
-          <Pressable onPress={onClose} hitSlop={10}>
+          <Pressable
+            onPress={onClose}
+            hitSlop={10}
+            accessibilityRole="button"
+            accessibilityLabel="Close polls"
+          >
             <KISIcon name="close" size={20} color={palette.subtext} />
           </Pressable>
         </View>
@@ -122,7 +127,12 @@ export default function InCallPollSheet({
                   maxLength={100}
                 />
                 {options.length > 2 && (
-                  <Pressable onPress={() => setOptions(prev => prev.filter(o => o.id !== opt.id))} hitSlop={8}>
+                  <Pressable
+                    onPress={() => setOptions(prev => prev.filter(o => o.id !== opt.id))}
+                    hitSlop={8}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Remove option ${i + 1}`}
+                  >
                     <KISIcon name="close" size={16} color={palette.danger} />
                   </Pressable>
                 )}

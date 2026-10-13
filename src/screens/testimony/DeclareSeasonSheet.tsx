@@ -20,32 +20,7 @@ import { postRequest } from '@/network/post';
 import { patchRequest } from '@/network/patch';
 import ROUTES from '@/network';
 import type { RootStackParamList } from '@/navigation/types';
-
-const CATEGORY_LABELS: Record<string, string> = {
-  health: 'Health & Medical',
-  finances: 'Financial Hardship',
-  relationships: 'Relationships & Marriage',
-  faith: 'Faith & Spirituality',
-  business: 'Business & Career',
-  grief: 'Loss & Grief',
-  addiction: 'Addiction & Recovery',
-  family: 'Family & Parenting',
-  mental_health: 'Mental Health',
-  other: 'Other',
-};
-const CATEGORIES = Object.keys(CATEGORY_LABELS);
-const CATEGORY_EMOJI: Record<string, string> = {
-  health: '🏥',
-  finances: '💰',
-  relationships: '💑',
-  faith: '🙏',
-  business: '💼',
-  grief: '🕊️',
-  addiction: '🌱',
-  family: '👨‍👩‍👧',
-  mental_health: '🧠',
-  other: '💙',
-};
+import { CATEGORIES, CATEGORY_EMOJI, CATEGORY_LABELS } from './testimonyCategories';
 
 type Visibility = 'public' | 'testimony_holders' | 'private';
 
@@ -122,7 +97,11 @@ export default function DeclareSeasonSheet() {
         {
           text: 'Resolve',
           onPress: async () => {
-            await patchRequest(ROUTES.testimony.seasonDetail(editId), { is_active: false });
+            const res = await patchRequest(ROUTES.testimony.seasonDetail(editId), { is_active: false }, { errorMessage: 'Unable to resolve this season.' });
+            if (res?.success === false) {
+              Alert.alert('Error', (res as any)?.message || 'Unable to resolve this season.');
+              return;
+            }
             navigation.goBack();
           },
         },
@@ -142,7 +121,7 @@ export default function DeclareSeasonSheet() {
           <Text style={[styles.headerTitle, { color: palette.text }]}>
             {isEdit ? 'Edit Season' : "I'm Going Through..."}
           </Text>
-          <Pressable onPress={() => navigation.goBack()} hitSlop={12}>
+          <Pressable onPress={() => navigation.goBack()} hitSlop={12} accessibilityRole="button" accessibilityLabel="Close">
             <KISIcon name="close" size={22} color={palette.text} />
           </Pressable>
         </View>

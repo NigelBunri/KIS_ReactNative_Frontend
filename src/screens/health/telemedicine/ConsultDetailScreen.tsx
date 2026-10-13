@@ -52,6 +52,9 @@ function StarRating({
           onPress={() => onRate(s)}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           style={{ minWidth: 44, minHeight: 44, justifyContent: 'center', alignItems: 'center' }}
+          accessibilityRole="button"
+          accessibilityLabel={`Rate ${s} out of 5 stars`}
+          accessibilityState={{ selected: s <= rating }}
         >
           <KISIcon
             name="star"
@@ -151,7 +154,12 @@ export default function ConsultDetailScreen({ route, navigation }: Props) {
     );
   }
 
-  const canJoin = consult.status === 'in_progress' || !!consult.call_url;
+  // Guard against a stale `call_url` on a consult that's already completed
+  // or cancelled — without the status check, a finished/cancelled consult
+  // that still carries an old call_url from the backend would show a
+  // misleading "Join Video Call" button that can never actually connect.
+  const canJoin =
+    (consult.status === 'in_progress' || consult.status === 'scheduled') && !!consult.call_url;
   const isCompleted = consult.status === 'completed';
 
   return (
@@ -166,6 +174,8 @@ export default function ConsultDetailScreen({ route, navigation }: Props) {
           onPress={() => navigation.goBack()}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           style={styles.backBtn}
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
         >
           <KISIcon name="arrow-left" size={22} color={palette.ivory} />
         </TouchableOpacity>

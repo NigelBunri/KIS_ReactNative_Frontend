@@ -23,7 +23,7 @@ export default function GiftMembershipRedeemScreen({ route, navigation }: Props)
   return (
     <SafeAreaView style={[styles.screen, { backgroundColor: palette.bg }]} edges={['top']}>
       <View style={[styles.header, { borderBottomColor: palette.border }]}>
-        <Pressable onPress={() => navigation.goBack()} hitSlop={12} style={styles.backBtn}>
+        <Pressable onPress={() => navigation.goBack()} hitSlop={12} accessibilityRole="button" accessibilityLabel="Go back" style={styles.backBtn}>
           <KISIcon name="arrow-left" size={20} color={palette.text} />
         </Pressable>
         <Text style={[styles.title, { color: palette.text }]}>Gift Membership</Text>

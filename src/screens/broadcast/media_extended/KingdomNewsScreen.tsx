@@ -14,6 +14,7 @@ import LinearGradient from 'react-native-linear-gradient';
 import { useKISTheme } from '@/theme/useTheme';
 import { useResponsiveLayout } from '@/theme/responsive';
 import { KISIcon } from '@/constants/kisIcons';
+import KISButton from '@/constants/KISButton';
 import { getRequest } from '@/network/get';
 import ROUTES from '@/network';
 import type { RootStackParamList } from '@/navigation/types';
@@ -42,26 +43,33 @@ export default function KingdomNewsScreen({ navigation }: Props) {
 
   const [articles, setArticles] = useState<Article[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [category, setCategory] = useState('All');
   const [selectedArticle, setSelectedArticle] = useState<Article | null>(null);
 
-  useFocusEffect(
-    useCallback(() => {
-      let active = true;
-      setLoading(true);
-      getRequest(ROUTES.mediaExtended.news)
-        .then((res: any) => {
-          // getRequest resolves (never throws) on failure too, with `data`
-          // undefined — the old `?? res` fallback set `articles` to the
-          // wrapper object itself (truthy, so `?? []` never fired), and
-          // `articles.filter(...)` below crashed the screen.
-          if (active) setArticles(Array.isArray(res?.data) ? res.data : []);
-        })
-        .catch(() => {})
-        .finally(() => { if (active) setLoading(false); });
-      return () => { active = false; };
-    }, []),
-  );
+  const fetchArticles = useCallback(() => {
+    let active = true;
+    setLoading(true);
+    setLoadError(false);
+    getRequest(ROUTES.mediaExtended.news)
+      .then((res: any) => {
+        if (!active) return;
+        // getRequest resolves (never throws) on failure too, with `data`
+        // undefined — the old `?? res` fallback set `articles` to the
+        // wrapper object itself (truthy, so `?? []` never fired), and
+        // `articles.filter(...)` below crashed the screen.
+        if (res?.success === false) {
+          setLoadError(true);
+          return;
+        }
+        setArticles(Array.isArray(res?.data) ? res.data : []);
+      })
+      .catch(() => { if (active) setLoadError(true); })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, []);
+
+  useFocusEffect(useCallback(() => fetchArticles(), [fetchArticles]));
 
   const filtered = useMemo(() => {
     return category === 'All'
@@ -73,7 +81,12 @@ export default function KingdomNewsScreen({ navigation }: Props) {
   const rest = filtered.filter((a) => !a.is_featured);
 
   const credibilityColor = (score?: number) => {
-    if (!score) return palette.subtext;
+    // `score == null` (not `!score`) so a genuine 0% credibility score —
+    // the worst, most important case to flag — renders as danger/red
+    // instead of being treated the same as "no score provided" (neutral
+    // grey), which previously hid the lowest-credibility articles behind
+    // a neutral-looking badge.
+    if (score == null) return palette.subtext;
     if (score >= 80) return palette.primary;
     if (score >= 50) return palette.gold;
     return palette.danger;
@@ -185,6 +198,8 @@ export default function KingdomNewsScreen({ navigation }: Props) {
             style={styles.articleFullBackBtn}
             onPress={() => setSelectedArticle(null)}
             hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel="Back to articles"
           >
             <KISIcon name="chevron-back-outline" size={22} color={palette.primary} />
           </Pressable>
@@ -213,7 +228,13 @@ export default function KingdomNewsScreen({ navigation }: Props) {
   return (
     <SafeAreaView style={styles.safe}>
       <LinearGradient colors={[palette.gradientStart, palette.gradientEnd]} style={styles.header}>
-        <Pressable style={styles.backBtn} onPress={() => navigation.goBack()} hitSlop={8}>
+        <Pressable
+          style={styles.backBtn}
+          onPress={() => navigation.goBack()}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
+        >
           <KISIcon name="chevron-back-outline" size={22} color={palette.ivory} />
           <Text style={styles.backLabel}>Back</Text>
         </Pressable>
@@ -247,7 +268,15 @@ export default function KingdomNewsScreen({ navigation }: Props) {
       </ScrollView>
 
       <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
-        {filtered.length === 0 && (
+        {loadError && (
+          <View style={{ paddingHorizontal: sp, paddingTop: 10, gap: 8 }}>
+            <Text style={{ color: palette.danger, fontWeight: '700', textAlign: 'center' }}>
+              Unable to load articles. Check your connection and try again.
+            </Text>
+            <KISButton title="Retry" size="sm" variant="outline" onPress={fetchArticles} />
+          </View>
+        )}
+        {filtered.length === 0 && !loadError && (
           <Text style={styles.empty}>No articles found.</Text>
         )}
 

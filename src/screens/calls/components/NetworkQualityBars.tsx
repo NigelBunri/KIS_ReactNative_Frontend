@@ -21,8 +21,18 @@ export default function NetworkQualityBars({ quality, size = 16 }: Props) {
   };
   const color = QUALITY_COLORS[quality];
   const unit = size / 16;
+  const QUALITY_LABEL: Record<NetworkQuality, string> = {
+    1: 'Network quality: very poor',
+    2: 'Network quality: weak',
+    3: 'Network quality: good',
+    4: 'Network quality: excellent',
+  };
   return (
-    <View style={[styles.row, { gap: Math.round(unit * 2) }]}>
+    <View
+      style={[styles.row, { gap: Math.round(unit * 2) }]}
+      accessible
+      accessibilityLabel={QUALITY_LABEL[quality]}
+    >
       {BAR_HEIGHTS.map((h, i) => {
         const active = i < quality;
         return (

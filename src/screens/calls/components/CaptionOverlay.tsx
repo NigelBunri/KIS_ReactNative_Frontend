@@ -101,7 +101,14 @@ export default function CaptionOverlay({ captions, isSending, onCaption, onToggl
   if (visible.length === 0 && !partial) return null;
 
   return (
-    <Animated.View style={[styles.container, { opacity }]} pointerEvents="box-none">
+    // accessibilityLiveRegion (Android-only; harmless no-op elsewhere) tells
+    // the screen reader to announce new captions as they arrive, without
+    // collapsing the subtree's own per-line text (no `accessible` here).
+    <Animated.View
+      style={[styles.container, { opacity }]}
+      pointerEvents="box-none"
+      accessibilityLiveRegion="polite"
+    >
       {visible.map(c => (
         <View key={c.id} style={[styles.row, { backgroundColor: `${palette.royalInk}CC` }]}>
           <Text style={[styles.name, { color: palette.gold }]} numberOfLines={1}>

@@ -72,6 +72,7 @@ export default function PartnerGovernancePanel({
   const [newInviteMaxUses, setNewInviteMaxUses] = useState('');
   const [newInviteExpiry, setNewInviteExpiry] = useState('');
   const [inviteCreating, setInviteCreating] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const backdropOpacity = panelTranslateX.interpolate({
     inputRange: [0, panelWidth],
@@ -92,9 +93,16 @@ export default function PartnerGovernancePanel({
         errorMessage: 'Unable to load invite codes.',
       }),
     ]);
-    const reqList = (reqRes?.data ?? reqRes ?? []) as AccessRequest[];
-    const reviewList = (reviewRes?.data ?? reviewRes ?? []) as AccessReview[];
-    const inviteList = (inviteRes?.data ?? inviteRes ?? []) as PartnerInvite[];
+    if (!reqRes?.success || !reviewRes?.success || !inviteRes?.success) {
+      setError(
+        reqRes?.message || reviewRes?.message || inviteRes?.message || "Couldn't load governance data. Tap to retry.",
+      );
+      return;
+    }
+    setError(null);
+    const reqList = (reqRes?.data ?? []) as AccessRequest[];
+    const reviewList = (reviewRes?.data ?? []) as AccessReview[];
+    const inviteList = (inviteRes?.data ?? []) as PartnerInvite[];
     setAccessRequests(Array.isArray(reqList) ? reqList : []);
     setAccessReviews(Array.isArray(reviewList) ? reviewList : []);
     setInvites(Array.isArray(inviteList) ? inviteList : []);
@@ -255,6 +263,27 @@ export default function PartnerGovernancePanel({
         >
           {loading ? (
             <ActivityIndicator size="small" color={palette.primary} />
+          ) : error ? (
+            <View
+              style={{
+                borderRadius: 10,
+                borderWidth: 1,
+                borderColor: palette.danger,
+                backgroundColor: palette.danger + '15',
+                padding: 12,
+              }}
+            >
+              <Text style={{ color: palette.danger, fontSize: 13, fontWeight: '600' }}>{error}</Text>
+              <Pressable
+                onPress={() => {
+                  setLoading(true);
+                  loadAll().finally(() => setLoading(false));
+                }}
+                style={{ marginTop: 8 }}
+              >
+                <Text style={{ color: palette.primary, fontWeight: '700', fontSize: 13 }}>Tap to retry</Text>
+              </Pressable>
+            </View>
           ) : (
             <>
               <Text style={[styles.settingsSectionTitle, { color: palette.text }]}>

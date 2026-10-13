@@ -2,6 +2,7 @@ import React, { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Clipboard,
   ScrollView,
   StyleSheet,
   Text,
@@ -141,7 +142,16 @@ export default function FamilyHubScreen({ navigation }: Props) {
             </Text>
             <TouchableOpacity
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              onPress={() => Alert.alert('Invite Code', family.invite_code)}
+              onPress={() => {
+                // Was previously just an Alert showing the code — the
+                // "copy" icon promised clipboard behavior it didn't
+                // deliver. Match the same copy-then-confirm pattern
+                // already used in MembersScreen's invite flow.
+                Clipboard.setString(family.invite_code);
+                Alert.alert('Copied', `Invite code ${family.invite_code} copied to clipboard.`);
+              }}
+              accessibilityRole="button"
+              accessibilityLabel="Copy invite code"
             >
               <KISIcon name="copy-outline" size={14} color={palette.gold} />
             </TouchableOpacity>
@@ -164,6 +174,8 @@ export default function FamilyHubScreen({ navigation }: Props) {
             <TouchableOpacity
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               onPress={() => navigation.navigate('FamilyMembers')}
+              accessibilityRole="button"
+              accessibilityLabel="View all family members"
             >
               <View style={[styles.avatar, { backgroundColor: palette.card, borderWidth: 1, borderColor: palette.gold }]}>
                 <KISIcon name="people-outline" size={16} color={palette.gold} />

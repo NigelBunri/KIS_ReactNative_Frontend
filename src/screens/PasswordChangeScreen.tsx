@@ -75,7 +75,13 @@ function PasswordField({
           placeholderTextColor={palette.subtext}
           placeholder="••••••••"
         />
-        <Pressable onPress={onToggle} style={styles.eyeButton}>
+        <Pressable
+          onPress={onToggle}
+          style={styles.eyeButton}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel={show ? 'Hide password' : 'Show password'}
+        >
           <KISIcon
             name={show ? 'eye-off' : 'eye'}
             size={20}

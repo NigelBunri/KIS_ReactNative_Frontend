@@ -2160,6 +2160,8 @@ const handleOpenChatFromAddContacts = useCallback((chat: Chat) => {
               <Pressable
                 onPress={handleClearSelection}
                 hitSlop={10}
+                accessibilityRole="button"
+                accessibilityLabel="Exit selection mode"
                 style={({ pressed }) => [
                   {
                     width: messageHeaderIconSize,
@@ -2206,15 +2208,17 @@ const handleOpenChatFromAddContacts = useCallback((chat: Chat) => {
 
             <View style={[styles.appBarRight, isTinyDevice && { gap: 4 }]}>
               {[
-                { key: 'archive', icon: 'download', onPress: handleArchiveSelected },
-                { key: 'pin', icon: 'pin', onPress: handlePinSelected },
-                { key: 'mute', icon: 'mute', onPress: handleMuteSelected },
-                { key: 'delete', icon: 'trash', onPress: handleDeleteSelected },
+                { key: 'archive', icon: 'download', onPress: handleArchiveSelected, label: 'Archive selected chats' },
+                { key: 'pin', icon: 'pin', onPress: handlePinSelected, label: 'Pin selected chats' },
+                { key: 'mute', icon: 'mute', onPress: handleMuteSelected, label: 'Mute selected chats' },
+                { key: 'delete', icon: 'trash', onPress: handleDeleteSelected, label: 'Delete selected chats' },
               ].map(action => (
                 <Pressable
                   key={action.key}
                   onPress={action.onPress}
                   hitSlop={8}
+                  accessibilityRole="button"
+                  accessibilityLabel={action.label}
                   style={({ pressed }) => [
                     {
                       width: responsive.isWatch ? 30 : 36,
@@ -2236,6 +2240,8 @@ const handleOpenChatFromAddContacts = useCallback((chat: Chat) => {
               <Pressable
                 onPress={toggleMenu}
                 hitSlop={8}
+                accessibilityRole="button"
+                accessibilityLabel="More options"
                 style={({ pressed }) => [
                   {
                     width: 36,
@@ -2319,13 +2325,16 @@ const handleOpenChatFromAddContacts = useCallback((chat: Chat) => {
                   key: 'camera-search',
                   icon: activeTopTab === 'Chats' ? 'camera' : activeTopTab === 'Communities' ? 'globe' : 'search',
                   onPress: handleHeaderCameraPress,
+                  label: activeTopTab === 'Chats' ? 'Open camera' : activeTopTab === 'Communities' ? 'Browse communities' : 'Search',
                 },
-                { key: 'menu', icon: 'menu', onPress: toggleMenu },
+                { key: 'menu', icon: 'menu', onPress: toggleMenu, label: 'More options' },
               ].map(action => (
                 <Pressable
                   key={action.key}
                   onPress={action.onPress}
                   hitSlop={8}
+                  accessibilityRole="button"
+                  accessibilityLabel={action.label}
                   style={({ pressed }) => [
                     {
                       width: messageHeaderIconSize,
@@ -2452,11 +2461,22 @@ const handleOpenChatFromAddContacts = useCallback((chat: Chat) => {
               placeholderTextColor={palette.subtext}
               style={[styles.searchInput, { color: palette.text }]}
             />
-            <Pressable onPress={() => setQuery('')} style={styles.searchIconBtn}>
+            <Pressable
+              onPress={() => setQuery('')}
+              style={styles.searchIconBtn}
+              accessibilityRole="button"
+              accessibilityLabel={query.trim() ? 'Clear search' : 'Voice search'}
+            >
               <KISIcon name={query.trim() ? 'close' : 'mic'} size={18} color={palette.text} />
             </Pressable>
             <View style={[styles.searchDivider, { backgroundColor: palette.inputBorder }]} />
-            <Pressable onPress={() => setFilterMgrOpen(true)} style={styles.searchIconBtn} hitSlop={8}>
+            <Pressable
+              onPress={() => setFilterMgrOpen(true)}
+              style={styles.searchIconBtn}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel="Message filters"
+            >
               <KISIcon name="settings" size={18} color={palette.text} />
             </Pressable>
           </View>
@@ -2614,7 +2634,12 @@ const handleOpenChatFromAddContacts = useCallback((chat: Chat) => {
                 style={[styles.searchInput, { color: palette.text }]}
                 autoFocus
               />
-              <Pressable onPress={() => setTabSearchQuery('')} style={styles.searchIconBtn}>
+              <Pressable
+                onPress={() => setTabSearchQuery('')}
+                style={styles.searchIconBtn}
+                accessibilityRole="button"
+                accessibilityLabel="Clear search"
+              >
                 <KISIcon name="close" size={18} color={palette.text} />
               </Pressable>
             </View>
@@ -2775,6 +2800,8 @@ const handleOpenChatFromAddContacts = useCallback((chat: Chat) => {
                 <Pressable
                   onPress={() => setAvatarPreview(null)}
                   hitSlop={10}
+                  accessibilityRole="button"
+                  accessibilityLabel="Close photo preview"
                   style={{
                     position: 'absolute',
                     top: 10,
@@ -2811,6 +2838,8 @@ const handleOpenChatFromAddContacts = useCallback((chat: Chat) => {
                     }
                   }}
                   style={{ flex: 1, paddingVertical: 12, alignItems: 'center' }}
+                  accessibilityRole="button"
+                  accessibilityLabel="Open chat"
                 >
                   <KISIcon name="chat" size={20} color={palette.primary} />
                 </Pressable>
@@ -2819,6 +2848,8 @@ const handleOpenChatFromAddContacts = useCallback((chat: Chat) => {
                     void handleStartQuickCall(avatarPreview.chat, 'voice');
                   }}
                   style={{ flex: 1, paddingVertical: 12, alignItems: 'center' }}
+                  accessibilityRole="button"
+                  accessibilityLabel="Start voice call"
                 >
                   <KISIcon name="phone" size={20} color={palette.text} />
                 </Pressable>
@@ -2827,6 +2858,8 @@ const handleOpenChatFromAddContacts = useCallback((chat: Chat) => {
                     void handleStartQuickCall(avatarPreview.chat, 'video');
                   }}
                   style={{ flex: 1, paddingVertical: 12, alignItems: 'center' }}
+                  accessibilityRole="button"
+                  accessibilityLabel="Start video call"
                 >
                   <KISIcon name="video" size={20} color={palette.text} />
                 </Pressable>
@@ -2845,6 +2878,8 @@ const handleOpenChatFromAddContacts = useCallback((chat: Chat) => {
                     }
                   }}
                   style={{ flex: 1, paddingVertical: 12, alignItems: 'center' }}
+                  accessibilityRole="button"
+                  accessibilityLabel="View contact info"
                 >
                   <KISIcon name="info" size={20} color={palette.text} />
                 </Pressable>

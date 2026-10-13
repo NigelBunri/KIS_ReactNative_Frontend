@@ -183,7 +183,13 @@ function VideoPlayer({ message, onClose }: { message: Message; onClose: () => vo
   return (
     <View style={[styles.playerWrap, { backgroundColor: palette.bg, }]}>
       <View style={[styles.playerHeader, { backgroundColor: palette.surface, borderBottomColor: palette.divider }]}>
-        <TouchableOpacity onPress={onClose} style={{ padding: 4 }}>
+        <TouchableOpacity
+          onPress={onClose}
+          style={{ padding: 4 }}
+          hitSlop={10}
+          accessibilityRole="button"
+          accessibilityLabel="Close video"
+        >
           <KISIcon name="arrow-back" size={22} color={palette.text} />
         </TouchableOpacity>
         <Text
@@ -256,19 +262,31 @@ export default function BibleMessagesPanel() {
   const [selectedMinister, setSelectedMinister] = useState<Minister | null>(null);
   const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
   const [query, setQuery] = useState('');
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const loadTopics = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await getRequest(ROUTES.bible.kcanMessageTopics, {});
+      const res = await getRequest(ROUTES.bible.kcanMessageTopics, {
+        errorMessage: 'Unable to load message topics right now.',
+      });
       // getRequest resolves to the ApiResult wrapper ({success, data,
       // message}) — `.payload` is a field the wrapper never has (that's a
       // raw fetch() Response shape, not this contract), so `data` was
       // always [] regardless of what the backend returned.
+      if (!res.success) {
+        // A failed request is not the same thing as "no topics published" —
+        // showing the empty state for both told the user there was nothing
+        // to watch when the real problem was connectivity, with no retry.
+        setTopics([]);
+        setLoadError(res.message || 'Unable to load message topics right now.');
+        return;
+      }
       const data = res.data?.results ?? res.data ?? [];
       setTopics(Array.isArray(data) ? data : []);
+      setLoadError('');
     } finally {
       setLoading(false);
     }
@@ -277,10 +295,18 @@ export default function BibleMessagesPanel() {
   const loadMinisters = useCallback(async (topicId: number) => {
     setLoading(true);
     try {
-      const res = await getRequest(`${ROUTES.bible.kcanMinisters}?topic=${topicId}`, {});
+      const res = await getRequest(`${ROUTES.bible.kcanMinisters}?topic=${topicId}`, {
+        errorMessage: 'Unable to load ministers right now.',
+      });
       // Same fix as loadTopics above.
+      if (!res.success) {
+        setMinisters([]);
+        setLoadError(res.message || 'Unable to load ministers right now.');
+        return;
+      }
       const data = res.data?.results ?? res.data ?? [];
       setMinisters(Array.isArray(data) ? data : []);
+      setLoadError('');
     } finally {
       setLoading(false);
     }
@@ -294,10 +320,18 @@ export default function BibleMessagesPanel() {
       if (ministerId) params.push(`minister=${ministerId}`);
       if (q?.trim()) params.push(`q=${encodeURIComponent(q.trim())}`);
       const url = `${ROUTES.bible.kcanMessages}${params.length ? '?' + params.join('&') : ''}`;
-      const res = await getRequest(url, {});
+      const res = await getRequest(url, {
+        errorMessage: 'Unable to load messages right now.',
+      });
       // Same fix as loadTopics above.
+      if (!res.success) {
+        setMessages([]);
+        setLoadError(res.message || 'Unable to load messages right now.');
+        return;
+      }
       const data = res.data?.results ?? res.data ?? [];
       setMessages(Array.isArray(data) ? data : []);
+      setLoadError('');
     } finally {
       setLoading(false);
     }
@@ -389,7 +423,13 @@ export default function BibleMessagesPanel() {
       {/* Title row */}
       <View style={[styles.sectionHeader, { borderBottomColor: palette.divider }]}>
         {viewMode !== 'topics' && (
-          <TouchableOpacity onPress={handleBack} style={{ marginRight: 8 }}>
+          <TouchableOpacity
+            onPress={handleBack}
+            style={{ marginRight: 8 }}
+            hitSlop={10}
+            accessibilityRole="button"
+            accessibilityLabel="Back"
+          >
             <KISIcon name="arrow-back" size={20} color={palette.text} />
           </TouchableOpacity>
         )}
@@ -426,7 +466,12 @@ export default function BibleMessagesPanel() {
             style={[styles.searchInput, { color: palette.text }]}
           />
           {query.length > 0 && (
-            <Pressable onPress={() => { setQuery(''); loadMessages(selectedTopic?.id, selectedMinister?.id); }}>
+            <Pressable
+              onPress={() => { setQuery(''); loadMessages(selectedTopic?.id, selectedMinister?.id); }}
+              hitSlop={10}
+              accessibilityRole="button"
+              accessibilityLabel="Clear search"
+            >
               <KISIcon name="close-circle" size={16} color={palette.subtext} />
             </Pressable>
           )}
@@ -437,6 +482,29 @@ export default function BibleMessagesPanel() {
         <View style={styles.centered}>
           <ActivityIndicator color={palette.primary} />
           <Text style={{ color: palette.subtext, marginTop: 8 }}>Loading…</Text>
+        </View>
+      ) : loadError ? (
+        <View style={styles.centered}>
+          <KISIcon name="warning" size={40} color={palette.subtext} />
+          <Text style={{ color: palette.text, fontWeight: '900', marginTop: 10 }}>Couldn't load this</Text>
+          <Text style={{ color: palette.subtext, fontSize: 13, textAlign: 'center', marginTop: 4 }}>
+            {loadError}
+          </Text>
+          <TouchableOpacity
+            onPress={() =>
+              viewMode === 'topics'
+                ? loadTopics()
+                : viewMode === 'ministers'
+                ? selectedTopic && loadMinisters(selectedTopic.id)
+                : loadMessages(selectedTopic?.id, selectedMinister?.id, query)
+            }
+            style={[styles.retryBtn, { borderColor: palette.primary }]}
+            accessibilityRole="button"
+            accessibilityLabel="Retry"
+          >
+            <KISIcon name="refresh" size={14} color={palette.primary} />
+            <Text style={{ color: palette.primary, fontWeight: '800', fontSize: 13 }}>Try again</Text>
+          </TouchableOpacity>
         </View>
       ) : (
         <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
@@ -649,6 +717,16 @@ const styles = StyleSheet.create({
     paddingVertical: 40,
     gap: 6,
     paddingHorizontal: 24,
+  },
+  retryBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    borderWidth: 1.5,
+    borderRadius: 999,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    marginTop: 8,
   },
   playerWrap: {
     flex: 1,

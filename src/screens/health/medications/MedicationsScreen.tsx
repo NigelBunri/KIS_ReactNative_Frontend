@@ -43,12 +43,20 @@ type Reminder = {
   medication_name: string;
 };
 
-function isRefillSoon(dateStr?: string): boolean {
-  if (!dateStr) return false;
+type RefillUrgency = 'none' | 'soon' | 'overdue';
+
+// A refill due within the next 7 days is a routine admin reminder, not an
+// emergency - it should read as a nudge (warning/amber), not an alarm
+// (danger/red). An already-overdue refill is the one case that genuinely
+// warrants the stronger red treatment.
+function getRefillUrgency(dateStr?: string): RefillUrgency {
+  if (!dateStr) return 'none';
   const refill = new Date(dateStr);
   const now = new Date();
   const diffDays = (refill.getTime() - now.getTime()) / (1000 * 60 * 60 * 24);
-  return diffDays <= 7;
+  if (diffDays < 0) return 'overdue';
+  if (diffDays <= 7) return 'soon';
+  return 'none';
 }
 
 export default function MedicationsScreen({ navigation }: Props) {
@@ -59,6 +67,7 @@ export default function MedicationsScreen({ navigation }: Props) {
   const [medications, setMedications] = useState<Medication[]>([]);
   const [reminders, setReminders] = useState<Reminder[]>([]);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [medName, setMedName] = useState('');
   const [dosage, setDosage] = useState('');
@@ -69,17 +78,29 @@ export default function MedicationsScreen({ navigation }: Props) {
 
   const fetchData = useCallback(async () => {
     setLoading(true);
-    const [medsRes, remindersRes] = await Promise.all([
-      getRequest(ROUTES.healthExtended.medications),
-      getRequest(ROUTES.healthExtended.medicationReminders),
-    ]);
-    if (medsRes.success) {
-      setMedications(Array.isArray(medsRes.data?.results ?? medsRes.data) ? (medsRes.data?.results ?? medsRes.data) : []);
+    setFetchError(null);
+    try {
+      const [medsRes, remindersRes] = await Promise.all([
+        getRequest(ROUTES.healthExtended.medications),
+        getRequest(ROUTES.healthExtended.medicationReminders),
+      ]);
+      if (medsRes.success) {
+        setMedications(Array.isArray(medsRes.data?.results ?? medsRes.data) ? (medsRes.data?.results ?? medsRes.data) : []);
+      } else {
+        // The medications list is the primary content of this screen - if
+        // it fails, show a real error instead of a misleading "no
+        // medications tracked" empty state. Reminders are secondary, so a
+        // reminders-only failure just means the banner stays hidden.
+        setFetchError('Could not load your medications. Please try again.');
+      }
+      if (remindersRes.success) {
+        setReminders(Array.isArray(remindersRes.data?.results ?? remindersRes.data) ? (remindersRes.data?.results ?? remindersRes.data) : []);
+      }
+    } catch {
+      setFetchError('Unable to load your medications. Check your connection and try again.');
+    } finally {
+      setLoading(false);
     }
-    if (remindersRes.success) {
-      setReminders(Array.isArray(remindersRes.data?.results ?? remindersRes.data) ? (remindersRes.data?.results ?? remindersRes.data) : []);
-    }
-    setLoading(false);
   }, []);
 
   useFocusEffect(useCallback(() => { fetchData(); }, [fetchData]));
@@ -157,16 +178,25 @@ export default function MedicationsScreen({ navigation }: Props) {
             </>
           }
           ListEmptyComponent={
-            <View style={styles.emptyContainer}>
-              <KISIcon name="file" size={48} color={palette.subtext} />
-              <Text style={styles.emptyText}>No medications tracked.</Text>
-              <Text style={styles.emptySubtext}>Tap the button below to add one.</Text>
-            </View>
+            fetchError ? (
+              <View style={styles.emptyContainer}>
+                <KISIcon name="file" size={48} color={palette.danger} />
+                <Text style={[styles.emptyText, { color: palette.danger }]}>{fetchError}</Text>
+                <KISButton title="Retry" size="sm" variant="outline" onPress={fetchData} />
+              </View>
+            ) : (
+              <View style={styles.emptyContainer}>
+                <KISIcon name="file" size={48} color={palette.subtext} />
+                <Text style={styles.emptyText}>No medications tracked.</Text>
+                <Text style={styles.emptySubtext}>Tap the button below to add one.</Text>
+              </View>
+            )
           }
           renderItem={({ item: med }) => {
-            const soon = isRefillSoon(med.refill_due);
+            const urgency = getRefillUrgency(med.refill_due);
+            const urgencyColor = urgency === 'overdue' ? palette.danger : urgency === 'soon' ? palette.warning : palette.subtext;
             return (
-              <View style={[styles.medCard, soon && styles.medCardAlert]}>
+              <View style={[styles.medCard, urgency !== 'none' && { borderColor: urgencyColor + '66' }]}>
                 <View style={styles.medRow}>
                   <View style={styles.medIcon}>
                     <KISIcon name="heart" size={18} color={palette.primary} />
@@ -181,12 +211,12 @@ export default function MedicationsScreen({ navigation }: Props) {
                   {med.refill_due && (
                     <View style={[
                       styles.refillBadge,
-                      { backgroundColor: soon ? palette.danger + '22' : palette.surface },
+                      { backgroundColor: urgency !== 'none' ? urgencyColor + '22' : palette.surface },
                     ]}>
-                      <KISIcon name="refresh" size={12} color={soon ? palette.danger : palette.subtext} />
+                      <KISIcon name="refresh" size={12} color={urgencyColor} />
                       <Text style={[
                         styles.refillText,
-                        { color: soon ? palette.danger : palette.subtext },
+                        { color: urgencyColor },
                       ]}>
                         {new Date(med.refill_due).toLocaleDateString()}
                       </Text>
@@ -199,7 +229,12 @@ export default function MedicationsScreen({ navigation }: Props) {
         />
       )}
 
-      <KISFab icon="add" onPress={() => setShowForm(true)} style={styles.fab} />
+      <KISFab
+        icon="add"
+        onPress={() => setShowForm(true)}
+        style={styles.fab}
+        accessibilityLabel="Add medication"
+      />
 
       {/* Add Medication Modal */}
       <Modal visible={showForm} animationType="slide" presentationStyle="pageSheet">
@@ -210,6 +245,8 @@ export default function MedicationsScreen({ navigation }: Props) {
               onPress={() => setShowForm(false)}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               style={styles.closeBtn}
+              accessibilityRole="button"
+              accessibilityLabel="Close"
             >
               <KISIcon name="close" size={22} color={palette.text} />
             </TouchableOpacity>

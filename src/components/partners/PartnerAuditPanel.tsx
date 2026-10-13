@@ -31,6 +31,7 @@ export default function PartnerAuditPanel({
   const { palette } = useKISTheme();
   const [events, setEvents] = useState<PartnerAuditEvent[]>([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const backdropOpacity = panelTranslateX.interpolate({
     inputRange: [0, panelWidth],
@@ -43,7 +44,13 @@ export default function PartnerAuditPanel({
     const res = await getRequest(ROUTES.partners.auditEvents(partnerId), {
       errorMessage: 'Unable to load audit events.',
     });
-    const list = (res?.data ?? res ?? []) as PartnerAuditEvent[];
+    if (!res?.success) {
+      setError(res?.message || "Couldn't load audit events. Tap to retry.");
+      setEvents([]);
+      return;
+    }
+    setError(null);
+    const list = (res?.data ?? []) as PartnerAuditEvent[];
     setEvents(Array.isArray(list) ? list : []);
   }, [partnerId]);
 
@@ -111,6 +118,27 @@ export default function PartnerAuditPanel({
         >
           {loading ? (
             <ActivityIndicator size="small" color={palette.primary} />
+          ) : error ? (
+            <View
+              style={{
+                borderRadius: 10,
+                borderWidth: 1,
+                borderColor: palette.danger,
+                backgroundColor: palette.danger + '15',
+                padding: 12,
+              }}
+            >
+              <Text style={{ color: palette.danger, fontSize: 13, fontWeight: '600' }}>{error}</Text>
+              <Pressable
+                onPress={() => {
+                  setLoading(true);
+                  loadEvents().finally(() => setLoading(false));
+                }}
+                style={{ marginTop: 8 }}
+              >
+                <Text style={{ color: palette.primary, fontWeight: '700', fontSize: 13 }}>Tap to retry</Text>
+              </Pressable>
+            </View>
           ) : events.length === 0 ? (
             <Text style={{ color: palette.subtext }}>No audit events yet.</Text>
           ) : (

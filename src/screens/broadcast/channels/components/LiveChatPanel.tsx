@@ -6,6 +6,7 @@
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
+  Alert,
   Animated,
   FlatList,
   KeyboardAvoidingView,
@@ -47,7 +48,7 @@ export default function LiveChatPanel({
       duration:       200,
       useNativeDriver: true,
     }).start();
-  }, [collapsed]);
+  }, [collapsed, fadeAnim]);
 
   // Auto-scroll when new messages arrive
   useEffect(() => {
@@ -63,6 +64,13 @@ export default function LiveChatPanel({
     setSending(true);
     try {
       await onSend(text);
+    } catch {
+      // Restore the draft so a failed send doesn't just silently vanish —
+      // onSend (useLiveStream's sendChatMessage) removes its optimistic
+      // bubble on failure, so without this the user would have no sign
+      // their message never went out and no easy way to retry it.
+      setDraft(text);
+      Alert.alert('Message not sent', 'Could not send your message. Please try again.');
     } finally {
       setSending(false);
     }
@@ -84,7 +92,7 @@ export default function LiveChatPanel({
         <Text style={[styles.msgText, { color: palette.ivory }]}>{item.text}</Text>
       </View>
     </View>
-  ), [palette.primary, palette.primaryStrong]);
+  ), [palette.primary, palette.primaryStrong, palette.royalInk, palette.ivory]);
 
   return (
     <View style={styles.container} pointerEvents="box-none">
@@ -92,6 +100,8 @@ export default function LiveChatPanel({
       <Pressable
         onPress={onToggleCollapse}
         style={[styles.toggleBtn, { backgroundColor: collapsed ? palette.royalInk : palette.card }]}
+        accessibilityRole="button"
+        accessibilityLabel={collapsed ? 'Show live chat' : 'Hide live chat'}
       >
         <KISIcon
           name="comment"
@@ -159,6 +169,8 @@ export default function LiveChatPanel({
                 styles.sendBtn,
                 { backgroundColor: draft.trim() ? palette.primary : palette.primaryWeak },
               ]}
+              accessibilityRole="button"
+              accessibilityLabel="Send message"
             >
               <KISIcon name="send" size={16} color={palette.ivory} />
             </Pressable>

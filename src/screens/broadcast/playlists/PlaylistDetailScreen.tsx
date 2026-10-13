@@ -363,7 +363,12 @@ export default function PlaylistDetailScreen() {
     <SafeAreaView style={[styles.root, { backgroundColor: palette.bg, }]} edges={['top', 'bottom']}>
       {/* ── Header ── */}
       <View style={[styles.header, { borderBottomColor: palette.divider }]}>
-        <KISButton variant="ghost" onPress={() => navigation.goBack()} style={styles.headerBack}>
+        <KISButton
+          variant="ghost"
+          onPress={() => navigation.goBack()}
+          style={styles.headerBack}
+          accessibilityLabel="Go back"
+        >
           <KISIcon name="chevron-left" size={22} color={palette.text} />
         </KISButton>
 
@@ -387,7 +392,12 @@ export default function PlaylistDetailScreen() {
           </KISButton>
         )}
 
-        <KISButton variant="ghost" onPress={handleDelete} style={styles.headerDelete}>
+        <KISButton
+          variant="ghost"
+          onPress={handleDelete}
+          style={styles.headerDelete}
+          accessibilityLabel={`Delete playlist "${playlist.name}"`}
+        >
           <KISIcon name="trash" size={18} color={palette.subtext} />
         </KISButton>
       </View>
@@ -442,7 +452,12 @@ export default function PlaylistDetailScreen() {
           {/* Playback controls */}
           {items.length > 0 && (
             <View style={styles.controls}>
-              <KISButton variant="outline" disabled={currentIndex < 0} onPress={handlePrev}>
+              <KISButton
+                variant="outline"
+                disabled={currentIndex < 0}
+                onPress={handlePrev}
+                accessibilityLabel="Previous item"
+              >
                 <KISIcon
                   name="arrow-left"
                   size={18}
@@ -456,11 +471,20 @@ export default function PlaylistDetailScreen() {
                 left={<KISIcon name="play" size={18} color={palette.onPrimary} />}
               />
 
-              <KISButton variant={isShuffled ? 'primary' : 'outline'} onPress={handleShuffle}>
+              <KISButton
+                variant={isShuffled ? 'primary' : 'outline'}
+                onPress={handleShuffle}
+                accessibilityLabel={isShuffled ? 'Shuffle on' : 'Shuffle off'}
+              >
                 <KISIcon name="refresh" size={18} color={isShuffled ? palette.onPrimary : palette.text} />
               </KISButton>
 
-              <KISButton variant="outline" disabled={currentIndex < 0} onPress={handleNext}>
+              <KISButton
+                variant="outline"
+                disabled={currentIndex < 0}
+                onPress={handleNext}
+                accessibilityLabel="Next item"
+              >
                 <KISIcon
                   name="chevron-right"
                   size={18}
@@ -571,6 +595,9 @@ export default function PlaylistDetailScreen() {
                   <Pressable
                     onPress={() => handleToggleSelected(it.id)}
                     hitSlop={10}
+                    accessibilityRole="checkbox"
+                    accessibilityState={{ checked: it.selectedForLoop }}
+                    accessibilityLabel={`Loop ${it.broadcastItem.title || 'this item'}`}
                     style={[
                       styles.checkbox,
                       {
@@ -647,6 +674,7 @@ export default function PlaylistDetailScreen() {
                     disabled={idx === 0}
                     onPress={() => handleMoveItem(idx, 'up')}
                     style={styles.reorderBtn}
+                    accessibilityLabel="Move up"
                   >
                     <Text style={[styles.reorderArrow, { color: palette.subtext }]}>↑</Text>
                   </KISButton>
@@ -655,13 +683,19 @@ export default function PlaylistDetailScreen() {
                     disabled={idx === items.length - 1}
                     onPress={() => handleMoveItem(idx, 'down')}
                     style={styles.reorderBtn}
+                    accessibilityLabel="Move down"
                   >
                     <Text style={[styles.reorderArrow, { color: palette.subtext }]}>↓</Text>
                   </KISButton>
                 </View>
 
                 {/* Remove button */}
-                <KISButton variant="ghost" onPress={() => handleRemoveItem(it.id, idx)} style={styles.removeBtn}>
+                <KISButton
+                  variant="ghost"
+                  onPress={() => handleRemoveItem(it.id, idx)}
+                  style={styles.removeBtn}
+                  accessibilityLabel={`Remove ${it.broadcastItem.title || 'this item'} from playlist`}
+                >
                   <KISIcon name="close" size={16} color={palette.subtext} />
                 </KISButton>
               </Pressable>

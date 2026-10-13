@@ -430,7 +430,7 @@ export default function BibleCourseDetailSheet({
     Alert.alert('Payment complete', 'Course unlocked.');
   };
 
-  const handleRequestRefund = async () => {
+  const requestRefund = async () => {
     if (!courseState?.enrollment_id || refundLoading) return;
     setRefundLoading(true);
     try {
@@ -439,11 +439,29 @@ export default function BibleCourseDetailSheet({
         { enrollment: courseState.enrollment_id },
         { errorMessage: 'Unable to request refund.' },
       );
-      if (!res?.success) return;
+      if (!res?.success) {
+        Alert.alert('Refund', res?.message || 'Unable to request refund.');
+        return;
+      }
       Alert.alert('Refund', 'Your refund request has been submitted.');
     } finally {
       setRefundLoading(false);
     }
+  };
+
+  const handleRequestRefund = () => {
+    if (!courseState?.enrollment_id || refundLoading) return;
+    // Refunding revokes paid access to the course, so confirm first rather
+    // than firing the request on a single tap (this button sits right next
+    // to "Share certificate" in the same row).
+    Alert.alert(
+      'Request refund?',
+      'This will submit a refund request for this course. Your access may be revoked once it is processed.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Request refund', style: 'destructive', onPress: requestRefund },
+      ],
+    );
   };
 
   const handleShareCredential = async () => {
@@ -663,14 +681,19 @@ export default function BibleCourseDetailSheet({
 
   const handleShare = async () => {
     if (!courseState) return;
-    await postRequest(ROUTES.bible.courseShare(courseState.id), {}, { errorMessage: 'Unable to share.' });
+    const res = await postRequest(ROUTES.bible.courseShare(courseState.id), {}, { errorMessage: 'Unable to share.' });
     await Share.share({
       message: `${courseState.title} - ${courseState.subtitle || courseState.description || 'Course on KIS'}`,
     });
-    updateCourseState({
-      ...courseState,
-      share_count: (courseState.share_count ?? 0) + 1,
-    });
+    // Only bump the displayed share count when the backend actually recorded
+    // the share — otherwise a failed courseShare call still showed an
+    // incremented count, fabricating success the server never confirmed.
+    if (res?.success) {
+      updateCourseState({
+        ...courseState,
+        share_count: (courseState.share_count ?? 0) + 1,
+      });
+    }
   };
 
   const submitComment = async () => {
@@ -1047,6 +1070,7 @@ export default function BibleCourseDetailSheet({
                         }
                       }}
                       onEnd={() => handleAutoAdvance(String(activeLesson?.id))}
+                      onError={() => Alert.alert('Video', 'Unable to play this lesson video. Check your connection and try again.')}
                       playInBackground={backgroundPlayback}
                       ignoreSilentSwitch="ignore"
                     />
@@ -1091,6 +1115,7 @@ export default function BibleCourseDetailSheet({
                         }
                       }}
                       onEnd={() => handleAutoAdvance(String(activeLesson?.id))}
+                      onError={() => Alert.alert('Audio', 'Unable to play this lesson audio. Check your connection and try again.')}
                       playInBackground={backgroundPlayback}
                       ignoreSilentSwitch="ignore"
                     />
@@ -1100,7 +1125,11 @@ export default function BibleCourseDetailSheet({
               if (kind.includes('pdf')) {
                 return (
                   <View style={{ marginTop: 16, height: 420 }}>
-                    <Pdf source={{ uri }} style={styles.pdfViewer} />
+                    <Pdf
+                      source={{ uri }}
+                      style={styles.pdfViewer}
+                      onError={() => Alert.alert('Document', 'Unable to load this lesson document.')}
+                    />
                   </View>
                 );
               }

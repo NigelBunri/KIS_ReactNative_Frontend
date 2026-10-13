@@ -40,6 +40,7 @@ export default function PartnerPostTemplatesPanel({ isOpen, panelWidth, panelTra
   const [loading, setLoading] = useState(false);
   const [templates, setTemplates] = useState<Template[]>([]);
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const [showCreate, setShowCreate] = useState(false);
   const [newTitle, setNewTitle] = useState('');
@@ -54,6 +55,12 @@ export default function PartnerPostTemplatesPanel({ isOpen, panelWidth, panelTra
   const load = useCallback(async () => {
     if (!partnerId) return;
     const res = await getRequest(ROUTES.partners.postTemplates(partnerId), { errorMessage: 'Unable to load templates.' });
+    if (!res?.success) {
+      setError(res?.message || "Couldn't load templates. Tap to retry.");
+      setTemplates([]);
+      return;
+    }
+    setError(null);
     const payload = res?.data ?? [];
     setTemplates(Array.isArray(payload) ? payload : []);
   }, [partnerId]);
@@ -155,7 +162,7 @@ export default function PartnerPostTemplatesPanel({ isOpen, panelWidth, panelTra
         ]}
       >
         <View style={[styles.settingsPanelHeader, { borderBottomColor: palette.divider }]}>
-          <Pressable onPress={onClose} style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}>
+          <Pressable onPress={onClose} accessibilityRole="button" accessibilityLabel="Close" style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}>
             <Text style={{ color: palette.text, fontSize: 18 }}>‹</Text>
           </Pressable>
           <View style={{ flex: 1 }}>
@@ -167,6 +174,27 @@ export default function PartnerPostTemplatesPanel({ isOpen, panelWidth, panelTra
         <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.settingsPanelBody} showsVerticalScrollIndicator={false}>
           {loading ? (
             <ActivityIndicator size="small" color={palette.primary} />
+          ) : error ? (
+            <View
+              style={{
+                borderRadius: 10,
+                borderWidth: 1,
+                borderColor: palette.danger,
+                backgroundColor: palette.danger + '15',
+                padding: 12,
+              }}
+            >
+              <Text style={{ color: palette.danger, fontSize: 13, fontWeight: '600' }}>{error}</Text>
+              <Pressable
+                onPress={() => {
+                  setLoading(true);
+                  load().finally(() => setLoading(false));
+                }}
+                style={{ marginTop: 8 }}
+              >
+                <Text style={{ color: palette.primary, fontWeight: '700', fontSize: 13 }}>Tap to retry</Text>
+              </Pressable>
+            </View>
           ) : (
             <>
               <Pressable onPress={() => setShowCreate((v) => !v)}>

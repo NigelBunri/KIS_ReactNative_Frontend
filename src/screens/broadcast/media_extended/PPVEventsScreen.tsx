@@ -42,17 +42,21 @@ export default function PPVEventsScreen({ navigation }: Props) {
 
   const [events, setEvents] = useState<PPVEvent[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [ticketLoading, setTicketLoading] = useState<string | null>(null);
   const [watchLoading, setWatchLoading] = useState<string | null>(null);
 
   const fetchEvents = useCallback(async () => {
     setLoading(true);
+    setLoadError(false);
     try {
       const res: any = await getRequest(ROUTES.mediaExtended.ppvEvents);
       // Same fix as KingdomNewsScreen — `events.map(...)` below would
       // crash on the leaked wrapper object.
       setEvents(Array.isArray(res?.data) ? res.data : []);
-    } catch {}
+    } catch {
+      setLoadError(true);
+    }
     setLoading(false);
   }, []);
 
@@ -163,7 +167,13 @@ export default function PPVEventsScreen({ navigation }: Props) {
   return (
     <SafeAreaView style={styles.safe}>
       <LinearGradient colors={[palette.gradientStart, palette.gradientEnd]} style={styles.header}>
-        <Pressable style={styles.backBtn} onPress={() => navigation.goBack()} hitSlop={8}>
+        <Pressable
+          style={styles.backBtn}
+          onPress={() => navigation.goBack()}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
+        >
           <KISIcon name="chevron-back-outline" size={22} color={palette.ivory} />
           <Text style={styles.backLabel}>Back</Text>
         </Pressable>
@@ -171,7 +181,15 @@ export default function PPVEventsScreen({ navigation }: Props) {
       </LinearGradient>
 
       <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
-        {events.length === 0 && (
+        {loadError && (
+          <View style={{ paddingBottom: 10, gap: 8 }}>
+            <Text style={[styles.empty, { color: palette.danger, padding: 0 }]}>
+              Unable to load events. Check your connection and try again.
+            </Text>
+            <KISButton title="Retry" size="sm" variant="outline" onPress={fetchEvents} />
+          </View>
+        )}
+        {events.length === 0 && !loadError && (
           <Text style={styles.empty}>No events scheduled.</Text>
         )}
         {events.map((event) => (

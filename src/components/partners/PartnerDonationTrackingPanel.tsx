@@ -61,6 +61,7 @@ export default function PartnerDonationTrackingPanel({ isOpen, panelWidth, panel
   const [donations, setDonations] = useState<Donation[]>([]);
   const [summary, setSummary] = useState<Summary | null>(null);
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const [showCreate, setShowCreate] = useState(false);
   const [donorName, setDonorName] = useState('');
@@ -77,9 +78,15 @@ export default function PartnerDonationTrackingPanel({ isOpen, panelWidth, panel
       getRequest(ROUTES.partners.donations(partnerId), { errorMessage: 'Unable to load donations.' }),
       getRequest(ROUTES.partners.donationsSummary(partnerId), { errorMessage: 'Unable to load summary.' }),
     ]);
+    if (!donationRes?.success) {
+      setError(donationRes?.message || "Couldn't load donations. Tap to retry.");
+      setDonations([]);
+      return;
+    }
+    setError(null);
     const payload = donationRes?.data ?? [];
     setDonations(Array.isArray(payload) ? payload : []);
-    setSummary(summaryRes?.data ?? null);
+    setSummary(summaryRes?.success ? summaryRes?.data ?? null : null);
   }, [partnerId]);
 
   useEffect(() => {
@@ -162,6 +169,27 @@ export default function PartnerDonationTrackingPanel({ isOpen, panelWidth, panel
         <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.settingsPanelBody} showsVerticalScrollIndicator={false}>
           {loading ? (
             <ActivityIndicator size="small" color={palette.primary} />
+          ) : error ? (
+            <View
+              style={{
+                borderRadius: 10,
+                borderWidth: 1,
+                borderColor: palette.danger,
+                backgroundColor: palette.danger + '15',
+                padding: 12,
+              }}
+            >
+              <Text style={{ color: palette.danger, fontSize: 13, fontWeight: '600' }}>{error}</Text>
+              <Pressable
+                onPress={() => {
+                  setLoading(true);
+                  load().finally(() => setLoading(false));
+                }}
+                style={{ marginTop: 8 }}
+              >
+                <Text style={{ color: palette.primary, fontWeight: '700', fontSize: 13 }}>Tap to retry</Text>
+              </Pressable>
+            </View>
           ) : (
             <>
               {summary ? (

@@ -236,6 +236,7 @@ export default function VerseMatchGame({ gameKey, stageIndex, isReplay, onExit, 
             }}
             onBackToJourney={onExit}
             onViewStats={onOpenStats}
+            persisted={stageResult.persisted}
           />
         </View>
       </GameShell>

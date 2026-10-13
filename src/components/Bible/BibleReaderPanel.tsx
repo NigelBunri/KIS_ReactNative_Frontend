@@ -98,6 +98,19 @@ const HIGHLIGHT_COLORS = [
   '#FED7AA',
 ];
 
+// Screen-reader-friendly names for the swatches above, in the same order —
+// without these the highlight-color picker was a row of unlabeled colored
+// squares, giving VoiceOver/TalkBack users no way to tell which color they
+// were about to apply.
+const HIGHLIGHT_COLOR_NAMES: Record<string, string> = {
+  '#FDE68A': 'Yellow',
+  '#BBF7D0': 'Green',
+  '#BFDBFE': 'Blue',
+  '#FBCFE8': 'Pink',
+  '#DDD6FE': 'Purple',
+  '#FED7AA': 'Orange',
+};
+
 // Exposed to BibleScreen so the gold header's drag-to-collapse gesture
 // (BibleScreen's topAreaPanResponder) can move this panel's own ScrollView
 // in lockstep — the header lives outside this component (mounted by
@@ -1291,7 +1304,12 @@ const BibleReaderPanel = forwardRef<BibleReaderPanelHandle, Props>(function Bibl
           }
         });
         setIsPlaying(true);
-      } catch {}
+      } catch {
+        // Playback never actually started (bad URL, codec issue, etc.) —
+        // isPlaying correctly stays false, but silently doing nothing left
+        // the user tapping Play with no feedback at all.
+        Alert.alert('Unable to play audio', 'This audio could not be played right now. Please try again.');
+      }
     }
   }, [audioUrl, isPlaying]);
 
@@ -2362,6 +2380,9 @@ const BibleReaderPanel = forwardRef<BibleReaderPanelHandle, Props>(function Bibl
                     onPress={() =>
                       actionVerse && addHighlightForVerse(actionVerse, color)
                     }
+                    hitSlop={6}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Highlight ${HIGHLIGHT_COLOR_NAMES[color] || color}`}
                     style={[
                       styles.colorSwatch,
                       { backgroundColor: color, borderColor: palette.divider },
@@ -2486,7 +2507,13 @@ const BibleReaderPanel = forwardRef<BibleReaderPanelHandle, Props>(function Bibl
             Showing local text — server is starting up
             {retryCountdown > 0 ? ` (retrying in ${retryCountdown}s)` : ''}
           </Text>
-          <TouchableOpacity onPress={reloadCurrentPassage} disabled={!canReloadCurrentPassage}>
+          <TouchableOpacity
+            onPress={reloadCurrentPassage}
+            disabled={!canReloadCurrentPassage}
+            hitSlop={10}
+            accessibilityRole="button"
+            accessibilityLabel="Retry loading passage"
+          >
             <KISIcon name="refresh" size={14} color={palette.warningText ?? '#92400E'} />
           </TouchableOpacity>
         </View>
@@ -2570,6 +2597,7 @@ const BibleReaderPanel = forwardRef<BibleReaderPanelHandle, Props>(function Bibl
                   activeOpacity={0.8}
                   onPress={() => setReadAloudSheetOpen(true)}
                   disabled={!verses.length}
+                  hitSlop={8}
                   accessibilityRole="button"
                   accessibilityLabel={readAloud.status === 'playing' ? 'Reading aloud' : readAloud.status === 'paused' ? 'Paused' : 'Listen'}
                   style={[
@@ -2586,6 +2614,7 @@ const BibleReaderPanel = forwardRef<BibleReaderPanelHandle, Props>(function Bibl
                   activeOpacity={0.8}
                   onPress={() => verses.length && openShareSheetForVerses(verses)}
                   disabled={!verses.length}
+                  hitSlop={8}
                   accessibilityRole="button"
                   accessibilityLabel="Share chapter"
                   style={[
@@ -2607,7 +2636,7 @@ const BibleReaderPanel = forwardRef<BibleReaderPanelHandle, Props>(function Bibl
                 activeOpacity={0.8}
                 onPress={() => loadNavigation(reader?.navigation?.previous)}
                 disabled={!reader?.navigation?.previous}
-                hitSlop={6}
+                hitSlop={11}
                 accessibilityRole="button"
                 accessibilityLabel="Previous chapter"
                 style={[
@@ -2627,7 +2656,7 @@ const BibleReaderPanel = forwardRef<BibleReaderPanelHandle, Props>(function Bibl
                 activeOpacity={0.8}
                 onPress={() => loadNavigation(reader?.navigation?.next)}
                 disabled={!reader?.navigation?.next}
-                hitSlop={6}
+                hitSlop={11}
                 accessibilityRole="button"
                 accessibilityLabel="Next chapter"
                 style={[

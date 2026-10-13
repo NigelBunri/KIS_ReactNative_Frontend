@@ -559,15 +559,7 @@ export default function HealthInstitutionManagementScreen({ route, navigation }:
     }
   }, [form, hasHealthProfile, institutions, loadInstitutions, navigation, ownerProfile, parseCount]);
 
-  const handleDelete = useCallback(async () => {
-    if (!form.id) {
-      Alert.alert('Delete institution', 'Missing institution ID.');
-      return;
-    }
-    if (!canDeleteInstitution) {
-      Alert.alert('Delete institution', 'Only owner, admin, or manager can delete an institution.');
-      return;
-    }
+  const performDelete = useCallback(async () => {
     const nextInstitutions = institutions.filter((inst) => inst.id !== form.id);
     setSubmitting(true);
     try {
@@ -580,7 +572,30 @@ export default function HealthInstitutionManagementScreen({ route, navigation }:
     } finally {
       setSubmitting(false);
     }
-  }, [canDeleteInstitution, form.id, institutions, navigation]);
+  }, [form.id, institutions, navigation]);
+
+  const handleDelete = useCallback(() => {
+    if (!form.id) {
+      Alert.alert('Delete institution', 'Missing institution ID.');
+      return;
+    }
+    if (!canDeleteInstitution) {
+      Alert.alert('Delete institution', 'Only owner, admin, or manager can delete an institution.');
+      return;
+    }
+    // This permanently removes the institution record — its members, service
+    // catalog, and schedules all go with it. There was previously no
+    // confirmation step at all: a single tap on "Delete" deleted it
+    // immediately, with no way to recover.
+    Alert.alert(
+      'Delete institution',
+      `Delete "${form.name || 'this institution'}"? This removes its members, services, and schedules. This cannot be undone.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Delete', style: 'destructive', onPress: () => { performDelete(); } },
+      ],
+    );
+  }, [canDeleteInstitution, form.id, form.name, performDelete]);
 
   const handleManageServices = useCallback(() => {
     if (!resolvedInstitutionId) {

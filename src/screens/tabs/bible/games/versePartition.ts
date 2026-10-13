@@ -122,7 +122,17 @@ function getAllChapterBlocksInCanonicalOrder(): ChapterBlock[] {
   const blocks: ChapterBlock[] = [];
   LOCAL_BIBLE_BOOKS.forEach((book, bookIndex) => {
     const chapters = BUNDLED_KJV[book.name];
-    if (!chapters) return;
+    if (!chapters) {
+      // Silently dropping a whole book here (e.g. a future rename of
+      // book.name in LOCAL_BIBLE_BOOKS that isn't mirrored in kjv.json's
+      // keys) would quietly shrink every game's verse pool with nothing to
+      // show for it — no crash, no visibly wrong UI, just a permanently
+      // missing book. A console warning at least leaves a trail.
+      console.warn(
+        `[versePartition] No KJV text found for book "${book.name}" (code ${book.code}) — this book will be excluded from all Bible games.`,
+      );
+      return;
+    }
     const chapterNums = Object.keys(chapters).map(Number).sort((a, b) => a - b);
     for (const chapter of chapterNums) {
       const verseMap = chapters[String(chapter)];

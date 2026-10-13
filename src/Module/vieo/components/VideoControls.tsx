@@ -53,7 +53,12 @@ export default function VideoControls({ state, actions, onFullScreenPress, onSee
         </Text>
         <View style={styles.topActions}>
           {state.availableQualities.length > 0 && (
-            <Pressable onPress={() => setQualityOpen(true)} style={styles.iconHitArea}>
+            <Pressable
+              onPress={() => setQualityOpen(true)}
+              accessibilityRole="button"
+              accessibilityLabel="Video quality"
+              style={styles.iconHitArea}
+            >
               <KISIcon name="settings" size={16} color={palette.ivory} />
             </Pressable>
           )}
@@ -66,18 +71,31 @@ export default function VideoControls({ state, actions, onFullScreenPress, onSee
                   actions.setCaptionsEnabled(!state.captionsEnabled);
                 }
               }}
+              accessibilityRole="button"
+              accessibilityLabel="Subtitles and captions"
+              accessibilityState={{ selected: state.captionsEnabled }}
               style={[styles.iconHitArea, state.captionsEnabled && styles.activeButton]}
             >
               <KISIcon name="list" size={16} color={state.captionsEnabled ? palette.primaryStrong : palette.ivory} />
             </Pressable>
           )}
           {enablePip && onPipPress ? (
-            <Pressable onPress={onPipPress} style={styles.iconHitArea}>
+            <Pressable
+              onPress={onPipPress}
+              accessibilityRole="button"
+              accessibilityLabel="Picture in picture"
+              style={styles.iconHitArea}
+            >
               <KISIcon name="pip" size={16} color={palette.ivory} />
             </Pressable>
           ) : null}
           {onFullScreenPress ? (
-            <Pressable onPress={onFullScreenPress} style={styles.iconHitArea}>
+            <Pressable
+              onPress={onFullScreenPress}
+              accessibilityRole="button"
+              accessibilityLabel="Full screen"
+              style={styles.iconHitArea}
+            >
               <KISIcon name="fullscreen" size={18} color={palette.ivory} />
             </Pressable>
           ) : null}
@@ -114,17 +132,32 @@ export default function VideoControls({ state, actions, onFullScreenPress, onSee
 
       <View style={styles.actionsRow}>
         <View style={styles.leftActions}>
-          <Pressable onPress={actions.togglePlay} style={styles.iconHitArea}>
+          <Pressable
+            onPress={actions.togglePlay}
+            accessibilityRole="button"
+            accessibilityLabel={state.playing ? 'Pause' : 'Play'}
+            style={styles.iconHitArea}
+          >
             <KISIcon name={state.playing ? 'pause' : 'play'} size={24} color={palette.ivory} />
           </Pressable>
-          <Pressable onPress={() => actions.setMuted(!state.muted)} style={styles.iconHitArea}>
+          <Pressable
+            onPress={() => actions.setMuted(!state.muted)}
+            accessibilityRole="button"
+            accessibilityLabel={state.muted ? 'Unmute' : 'Mute'}
+            style={styles.iconHitArea}
+          >
             <KISIcon name={state.muted ? 'mute' : 'volume'} size={20} color={palette.ivory} />
           </Pressable>
           {state.isBuffering ? (
             <Text style={{ color: 'rgba(255,255,255,0.6)', fontSize: 11 }}>Buffering…</Text>
           ) : null}
         </View>
-        <Pressable onPress={() => setSpeedOpen(true)} style={[styles.speedButton, { borderColor: 'rgba(255,255,255,0.5)' }]}>
+        <Pressable
+          onPress={() => setSpeedOpen(true)}
+          accessibilityRole="button"
+          accessibilityLabel={`Playback speed, ${speedLabel}`}
+          style={[styles.speedButton, { borderColor: 'rgba(255,255,255,0.5)' }]}
+        >
           <Text style={[styles.speedLabel, { color: palette.ivory }]}>{speedLabel}</Text>
         </Pressable>
       </View>

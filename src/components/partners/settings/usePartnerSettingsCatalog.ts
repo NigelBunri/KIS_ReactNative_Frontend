@@ -67,6 +67,11 @@ export const usePartnerSettingsCatalog = (
   );
   const [role, setRole] = useState<PartnerRole>(forceRole ?? fallbackRole);
   const [loading, setLoading] = useState(false);
+  // Falling back to the bundled default catalog on a failed fetch is the
+  // right behavior offline, but it must not look identical to "this is the
+  // real, role-accurate catalog from the server" — callers can use this to
+  // show a quiet "showing defaults" notice instead of staying silent.
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (forceRole) {
@@ -87,8 +92,14 @@ export const usePartnerSettingsCatalog = (
         const apiSections = Array.isArray(payload?.sections) ? payload.sections : null;
         if (apiSections?.length) {
           setSections(apiSections.map(mapSection));
+          setError(null);
         } else {
           setSections(PARTNER_SETTINGS_SECTIONS);
+          // res.success === false means the request actually failed (vs. a
+          // partner that legitimately has an empty catalog) — only that case
+          // is worth telling the user the list they're seeing is the bundled
+          // default, not what the server currently has configured.
+          setError(res?.success === false ? (res?.message || 'Unable to load live settings.') : null);
         }
         // forceRole always wins — superadmin trumps whatever the API returns
         const nextRole = forceRole ?? normalizePartnerRole(payload?.role ?? null, fallbackRole);
@@ -115,5 +126,6 @@ export const usePartnerSettingsCatalog = (
     sectionMap,
     role,
     loading,
+    error,
   };
 };

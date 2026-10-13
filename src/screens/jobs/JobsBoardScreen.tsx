@@ -104,16 +104,27 @@ export default function JobsBoardScreen() {
           text: 'Apply Now',
           onPress: async () => {
             try {
-              if (job.partner_id) {
-                await postRequest(
-                  `${ROUTES.partners.apply(job.partner_id)}`,
-                  { job_post: job.id },
-                );
-                Alert.alert('Application submitted', 'Your application has been sent successfully.');
-              } else {
-                await postRequest(ROUTES.business.jobApplications, { job: job.id });
-                Alert.alert('Application submitted', 'Your application has been sent successfully.');
+              // postRequest resolves { success: false, message } on a
+              // backend rejection (already applied, job closed, validation
+              // error) rather than throwing — this previously showed
+              // "Application submitted" unconditionally, so a job seeker
+              // could walk away believing they'd applied when the
+              // application was never actually recorded.
+              const res = job.partner_id
+                ? await postRequest(
+                    `${ROUTES.partners.apply(job.partner_id)}`,
+                    { job_post: job.id },
+                    { errorMessage: 'Unable to submit your application.' },
+                  )
+                : await postRequest(
+                    ROUTES.business.jobApplications,
+                    { job: job.id },
+                    { errorMessage: 'Unable to submit your application.' },
+                  );
+              if (res?.success === false) {
+                throw new Error((res as any)?.message || 'Unable to submit your application.');
               }
+              Alert.alert('Application submitted', 'Your application has been sent successfully.');
             } catch (e: any) {
               Alert.alert('Application failed', e?.message ?? 'Please try again.');
             }
@@ -202,7 +213,7 @@ export default function JobsBoardScreen() {
     <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg, }} edges={['top']}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
       <View style={[styles.header, { borderBottomColor: palette.divider }]}>
-        <Pressable onPress={() => navigation.goBack()} style={styles.backBtn}>
+        <Pressable onPress={() => navigation.goBack()} style={styles.backBtn} accessibilityRole="button" accessibilityLabel="Go back">
           <KISIcon name="arrow-left" size={22} color={palette.text} />
         </Pressable>
         <Text style={[styles.headerTitle, { color: palette.text }]}>Jobs Board</Text>

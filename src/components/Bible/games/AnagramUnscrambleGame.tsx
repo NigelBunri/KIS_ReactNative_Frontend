@@ -225,6 +225,7 @@ export default function AnagramUnscrambleGame({ gameKey, stageIndex, isReplay, o
             onPlayAgain={resetGame}
             onBackToJourney={onExit}
             onViewStats={onOpenStats}
+            persisted={stageResult.persisted}
           />
         </View>
       </GameShell>

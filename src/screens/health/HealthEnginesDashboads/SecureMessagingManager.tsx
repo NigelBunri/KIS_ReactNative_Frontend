@@ -206,21 +206,18 @@ export default function SecureMessagingManager({ institutionId, engineKey }: Pro
       encrypted: defaultEncryption,
     });
 
-    if (res.success && res.data) {
-      const newConv = normalizeConversation(res.data);
-      setConversations((prev) => [...prev, newConv]);
-    } else {
-      // Optimistic fallback
-      const newConv: Conversation = {
-        id: Date.now().toString(),
-        patientName: newPatientName,
-        participants: ["Doctor", "Nurse"],
-        encrypted: defaultEncryption,
-        messages: [],
-      };
-      setConversations((prev) => [...prev, newConv]);
+    // Previously: a failed POST silently fell through to a local-only fake
+    // conversation. Since this screen has no backend list endpoint to
+    // reconcile against on reload, that fake conversation (and anything
+    // sent into it) would have been the only copy that ever existed and
+    // would vanish — with no warning — the moment this screen closed.
+    // Surface the failure instead of fabricating a secure conversation.
+    if (!res.success || !res.data) {
+      Alert.alert("Secure messaging", res?.message || "Unable to start the conversation. Please try again.");
+      return;
     }
 
+    setConversations((prev) => [...prev, normalizeConversation(res.data)]);
     setNewPatientName("");
   }, [newPatientName, defaultEncryption]);
 
@@ -245,17 +242,17 @@ export default function SecureMessagingManager({ institutionId, engineKey }: Pro
       }
     );
 
-    const newMessage: Message =
-      res.success && res.data
-        ? normalizeMessage(res.data)
-        : {
-            id: Date.now().toString(),
-            sender: "Doctor",
-            content: messageText,
-            timestamp: Date.now(),
-            read: false,
-            urgent: urgentFlag,
-          };
+    // Previously: a failed send silently fell through to a local-only fake
+    // message that rendered identically to a delivered one — the sender had
+    // no way to tell their note to the care team never actually reached the
+    // backend. For clinical messaging that is a real communication-safety
+    // risk, so surface the failure instead of fabricating a sent message.
+    if (!res.success || !res.data) {
+      Alert.alert("Secure messaging", res?.message || "Message was not sent. Please try again.");
+      return;
+    }
+
+    const newMessage: Message = normalizeMessage(res.data);
 
     setConversations((prev) =>
       prev.map((c) =>

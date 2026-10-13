@@ -4545,7 +4545,20 @@ export default function HealthServiceSessionScreen({
                     loading={busy}
                     variant="outline"
                     onPress={() => {
-                      cancelBooking().catch(() => undefined);
+                      // This previously cancelled a real, booked patient
+                      // appointment on a single tap with zero confirmation.
+                      Alert.alert(
+                        'Cancel appointment',
+                        'Cancel this appointment? You will need to book a new slot if you change your mind.',
+                        [
+                          { text: "Don't cancel", style: 'cancel' },
+                          {
+                            text: 'Cancel appointment',
+                            style: 'destructive',
+                            onPress: () => { cancelBooking().catch(() => undefined); },
+                          },
+                        ],
+                      );
                     }}
                     disabled={busy || !cleanBookingId}
                   />
@@ -5026,7 +5039,21 @@ export default function HealthServiceSessionScreen({
                     loading={videoBusy}
                     variant="outline"
                     onPress={() => {
-                      endVideoSession('cancelled').catch(() => undefined);
+                      // This and the 8 other "Cancel <workflow>" buttons in
+                      // this file (admission, emergency, pharmacy, billing,
+                      // home logistics, wellness, reminder, plus the
+                      // appointment cancel above) previously fired
+                      // immediately on a single tap with no confirmation —
+                      // a mis-tap could cancel a real, in-progress clinical
+                      // session with no way to undo it.
+                      Alert.alert(
+                        'Cancel video session',
+                        'Cancel this video consultation?',
+                        [
+                          { text: "Don't cancel", style: 'cancel' },
+                          { text: 'Cancel session', style: 'destructive', onPress: () => { endVideoSession('cancelled').catch(() => undefined); } },
+                        ],
+                      );
                     }}
                     disabled={
                       videoBusy ||
@@ -5957,8 +5984,13 @@ export default function HealthServiceSessionScreen({
                     loading={admissionBusy}
                     variant="outline"
                     onPress={() => {
-                      finishAdmissionSession('cancelled').catch(
-                        () => undefined,
+                      Alert.alert(
+                        'Cancel admission',
+                        'Cancel this hospital admission? This cannot be undone.',
+                        [
+                          { text: "Don't cancel", style: 'cancel' },
+                          { text: 'Cancel admission', style: 'destructive', onPress: () => { finishAdmissionSession('cancelled').catch(() => undefined); } },
+                        ],
                       );
                     }}
                     disabled={
@@ -6286,8 +6318,13 @@ export default function HealthServiceSessionScreen({
                     loading={emergencyBusy}
                     variant="outline"
                     onPress={() => {
-                      finishEmergencySession('cancelled').catch(
-                        () => undefined,
+                      Alert.alert(
+                        'Cancel emergency session',
+                        'Cancel this emergency session? Only do this if the emergency has been resolved or was started in error.',
+                        [
+                          { text: "Don't cancel", style: 'cancel' },
+                          { text: 'Cancel session', style: 'destructive', onPress: () => { finishEmergencySession('cancelled').catch(() => undefined); } },
+                        ],
                       );
                     }}
                     disabled={
@@ -6618,7 +6655,14 @@ export default function HealthServiceSessionScreen({
                     loading={pharmacyBusy}
                     variant="outline"
                     onPress={() => {
-                      finishPharmacySession('cancelled').catch(() => undefined);
+                      Alert.alert(
+                        'Cancel fulfillment',
+                        'Cancel this prescription fulfillment?',
+                        [
+                          { text: "Don't cancel", style: 'cancel' },
+                          { text: 'Cancel fulfillment', style: 'destructive', onPress: () => { finishPharmacySession('cancelled').catch(() => undefined); } },
+                        ],
+                      );
                     }}
                     disabled={
                       pharmacyBusy ||
@@ -6900,7 +6944,14 @@ export default function HealthServiceSessionScreen({
                     loading={billingBusy}
                     variant="outline"
                     onPress={() => {
-                      finishBillingSession('cancelled').catch(() => undefined);
+                      Alert.alert(
+                        'Cancel billing',
+                        'Cancel this billing session?',
+                        [
+                          { text: "Don't cancel", style: 'cancel' },
+                          { text: 'Cancel billing', style: 'destructive', onPress: () => { finishBillingSession('cancelled').catch(() => undefined); } },
+                        ],
+                      );
                     }}
                     disabled={
                       billingBusy ||
@@ -7250,8 +7301,17 @@ export default function HealthServiceSessionScreen({
                     loading={homeLogisticsBusy}
                     variant="outline"
                     onPress={() => {
-                      finishHomeLogisticsSession('cancelled').catch(
-                        () => undefined,
+                      Alert.alert(
+                        'Cancel logistics',
+                        'Cancel this home visit / delivery?',
+                        [
+                          { text: "Don't cancel", style: 'cancel' },
+                          { text: 'Cancel logistics', style: 'destructive', onPress: () => {
+                            finishHomeLogisticsSession('cancelled').catch(
+                              () => undefined,
+                            );
+                          } },
+                        ],
                       );
                     }}
                     disabled={
@@ -7603,7 +7663,14 @@ export default function HealthServiceSessionScreen({
                     loading={wellnessBusy}
                     variant="outline"
                     onPress={() => {
-                      finishWellnessSession('cancelled').catch(() => undefined);
+                      Alert.alert(
+                        'Cancel wellness session',
+                        'Cancel this wellness session?',
+                        [
+                          { text: "Don't cancel", style: 'cancel' },
+                          { text: 'Cancel session', style: 'destructive', onPress: () => { finishWellnessSession('cancelled').catch(() => undefined); } },
+                        ],
+                      );
                     }}
                     disabled={
                       wellnessBusy ||
@@ -7930,7 +7997,14 @@ export default function HealthServiceSessionScreen({
                     loading={reminderBusy}
                     variant="outline"
                     onPress={() => {
-                      finishReminderSession('cancelled').catch(() => undefined);
+                      Alert.alert(
+                        'Cancel reminder',
+                        'Cancel this reminder session?',
+                        [
+                          { text: "Don't cancel", style: 'cancel' },
+                          { text: 'Cancel reminder', style: 'destructive', onPress: () => { finishReminderSession('cancelled').catch(() => undefined); } },
+                        ],
+                      );
                     }}
                     disabled={
                       reminderBusy ||

@@ -248,6 +248,7 @@ function LobbyToggle({
     <Pressable
       onPress={onPress}
       accessibilityRole="button"
+      accessibilityLabel={label}
       style={({ pressed }) => [
         styles.toggleBtn,
         {

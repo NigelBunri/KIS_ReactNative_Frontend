@@ -2,6 +2,7 @@
 
 import React, { useRef, useState } from 'react';
 import {
+  Alert,
   Modal,
   View,
   Text,
@@ -147,11 +148,42 @@ export const VideoEditor: React.FC<VideoEditorProps> = ({
     return asset;
   };
 
+  // Whether the user actually touched any control whose effect is NOT
+  // applied by buildEditedAsset() yet (trim/rotate/flip/aspect/filter are
+  // all preview-only today — see the TODO above). Used so we only warn
+  // when it would actually matter, instead of nagging on every save.
+  const hasUnappliedEdits = () =>
+    trimIn !== 0 ||
+    trimOut !== null ||
+    rotation !== 0 ||
+    flipH ||
+    aspectMode !== 'fit' ||
+    filterMode !== 'none';
+
   // New behavior: save edits and finish, let parent propagate edited list
   const handleSaveAndDone = () => {
     const edited = buildEditedAsset();
-    onSaveAsset(index, edited);       // update local list in MediaEditModal
-    onDoneAll(index, edited);         // tell MediaEditModal we're done with this asset
+    const finish = () => {
+      onSaveAsset(index, edited);       // update local list in MediaEditModal
+      onDoneAll(index, edited);         // tell MediaEditModal we're done with this asset
+    };
+
+    if (hasUnappliedEdits()) {
+      // Don't silently hand back the untouched original while implying the
+      // trim/rotate/flip/aspect/filter changes were applied — tell the user
+      // up front so they're not confused why the sent video looks unedited.
+      Alert.alert(
+        'Edits not applied yet',
+        'Trimming, rotation, flip, aspect ratio, and filters are preview-only right now — the original video will be sent as-is.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Send original', onPress: finish },
+        ],
+      );
+      return;
+    }
+
+    finish();
   };
 
   return (

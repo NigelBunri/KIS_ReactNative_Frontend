@@ -868,19 +868,25 @@ export default function ActiveCallScreen({ session, actions }: Props) {
 
       {/* Android: Add-participant input modal */}
       <Modal visible={showAddParticipant} transparent animationType="fade" onRequestClose={() => setShowAddParticipant(false)}>
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.6)', padding: 24 }}>
-          <View style={{ backgroundColor: '#1B1428', borderRadius: 16, padding: 20, width: '100%' }}>
-            <Text style={{ color: '#FFF4B8', fontSize: 16, fontWeight: '700', marginBottom: 12 }}>Add to Call</Text>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: palette.overlay, padding: 24 }}>
+          <View style={{ backgroundColor: palette.royalInk, borderRadius: 16, padding: 20, width: '100%' }}>
+            <Text style={{ color: palette.goldHighlight, fontSize: 16, fontWeight: '700', marginBottom: 12 }}>Add to Call</Text>
             <TextInput
-              style={{ borderWidth: 1, borderColor: '#D9A875', borderRadius: 10, padding: 12, color: '#F7F1E3', fontSize: 15, marginBottom: 16 }}
+              style={{ borderWidth: 1, borderColor: palette.inputBorder, borderRadius: 10, padding: 12, color: palette.ivory, fontSize: 15, marginBottom: 16 }}
               placeholder="Enter username or user ID"
-              placeholderTextColor="#8A6557"
+              placeholderTextColor={palette.subtext}
               value={addParticipantInput}
               onChangeText={setAddParticipantInput}
+              accessibilityLabel="Username or user ID to invite"
               autoFocus
             />
             <View style={{ flexDirection: 'row', gap: 10 }}>
-              <Pressable onPress={() => setShowAddParticipant(false)} style={{ flex: 1, alignItems: 'center', paddingVertical: 12, borderRadius: 10, borderWidth: 1, borderColor: palette.gold }}>
+              <Pressable
+                onPress={() => setShowAddParticipant(false)}
+                accessibilityRole="button"
+                accessibilityLabel="Cancel"
+                style={{ flex: 1, alignItems: 'center', paddingVertical: 12, borderRadius: 10, borderWidth: 1, borderColor: palette.gold }}
+              >
                 <Text style={{ color: palette.gold, fontWeight: '700' }}>Cancel</Text>
               </Pressable>
               <Pressable
@@ -889,9 +895,11 @@ export default function ActiveCallScreen({ session, actions }: Props) {
                   if (uid && addParticipantCb.current) addParticipantCb.current([uid]);
                   setShowAddParticipant(false);
                 }}
+                accessibilityRole="button"
+                accessibilityLabel="Invite"
                 style={{ flex: 1, alignItems: 'center', paddingVertical: 12, borderRadius: 10, backgroundColor: palette.goldDeep }}
               >
-                <Text style={{ color: '#FFFFFF', fontWeight: '700' }}>Invite</Text>
+                <Text style={{ color: palette.ivory, fontWeight: '700' }}>Invite</Text>
               </Pressable>
             </View>
           </View>

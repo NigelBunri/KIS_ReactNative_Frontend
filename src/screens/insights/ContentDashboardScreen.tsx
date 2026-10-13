@@ -56,6 +56,13 @@ export default function ContentDashboardScreen() {
         `${ROUTES.analytics.contentTrends}?time_range=${timeRange}`,
         { errorMessage: 'Unable to load content trends.' },
       );
+      // getRequest resolves (never throws) on a failed HTTP response too, with
+      // `data` left undefined — without this check a 4xx/5xx response fell
+      // through to "No content data available" as if the feed were genuinely
+      // empty, silently masking a real failure as a success/empty-state.
+      if (!res.success) {
+        throw new Error(res.message || 'Unable to load content trends.');
+      }
       const data = res.data ?? {};
       const trending: ContentTrendItem[] =
         data.results ?? data.trending ?? data.posts ?? data ?? [];

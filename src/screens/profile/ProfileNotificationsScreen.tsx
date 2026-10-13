@@ -349,10 +349,22 @@ export default function ProfileNotificationsScreen() {
             </Text>
           </Pressable>
           <View style={{ alignItems: 'center', gap: 6 }}>
-            <Pressable onPress={() => openNotification(item)} hitSlop={8} style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}>
+            <Pressable
+              onPress={() => openNotification(item)}
+              hitSlop={8}
+              style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}
+              accessibilityRole="button"
+              accessibilityLabel="Open notification"
+            >
               <KISIcon name="chevron-right" size={18} color={palette.subtext} />
             </Pressable>
-            <Pressable onPress={() => removeNotification(item)} hitSlop={8} style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}>
+            <Pressable
+              onPress={() => removeNotification(item)}
+              hitSlop={8}
+              style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}
+              accessibilityRole="button"
+              accessibilityLabel="Delete notification"
+            >
               <KISIcon name="trash" size={16} color={palette.subtext} />
             </Pressable>
           </View>

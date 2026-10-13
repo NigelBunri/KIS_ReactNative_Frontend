@@ -32,6 +32,9 @@ export default function BackgroundColorSelector({ value, onChange, palette, typo
                 onChange(option.key);
               }}
               disabled={disabled}
+              accessibilityRole="button"
+              accessibilityLabel={`${option.label} background`}
+              accessibilityState={{ selected: active, disabled: !!disabled }}
               style={{
                 borderWidth: 1,
                 borderColor: active ? palette.accentPrimary : palette.divider,

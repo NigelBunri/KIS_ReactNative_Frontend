@@ -82,7 +82,14 @@ export default function MyApplicationsScreen() {
             setWithdrawingId(application.id);
             try {
               const url = application.cancel_url ?? ROUTES.jobs.withdrawApplication(application.id);
-              await postRequest(url, {});
+              // postRequest resolves { success: false, message } on failure
+              // rather than throwing — this previously marked the
+              // application WITHDRAWN locally regardless of whether the
+              // server actually withdrew it.
+              const res = await postRequest(url, {}, { errorMessage: 'Could not withdraw application.' });
+              if (res?.success === false) {
+                throw new Error((res as any)?.message || 'Could not withdraw application.');
+              }
               setApplications(prev =>
                 prev.map(a => a.id === application.id ? { ...a, status: 'WITHDRAWN' as ApplicationStatus } : a),
               );
@@ -150,7 +157,7 @@ export default function MyApplicationsScreen() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg, }} edges={['top']}>
       <View style={[styles.header, { borderBottomColor: palette.divider }]}>
-        <Pressable onPress={() => navigation.goBack()} style={styles.backBtn}>
+        <Pressable onPress={() => navigation.goBack()} style={styles.backBtn} accessibilityRole="button" accessibilityLabel="Go back">
           <KISIcon name="arrow-left" size={22} color={palette.text} />
         </Pressable>
         <Text style={[styles.headerTitle, { color: palette.text }]}>My Applications</Text>

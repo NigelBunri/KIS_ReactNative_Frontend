@@ -6,9 +6,9 @@ import {
   KeyboardAvoidingView,
   Modal,
   Platform,
-  ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -182,13 +182,16 @@ export default function MinistryScreen({ navigation }: Props) {
                   ) : null}
 
                   <Text style={styles.modalLabel}>Why do you want to volunteer? (optional)</Text>
-                  <TouchableOpacity
+                  <TextInput
                     style={styles.noteInput}
-                    onPress={() => {}}
-                    activeOpacity={1}
-                  >
-                    <Text style={styles.noteInputPlaceholder}>Add a note...</Text>
-                  </TouchableOpacity>
+                    value={signupNote}
+                    onChangeText={setSignupNote}
+                    placeholder="Add a note..."
+                    placeholderTextColor={palette.subtext}
+                    multiline
+                    numberOfLines={3}
+                    textAlignVertical="top"
+                  />
 
                   <KISButton
                     title={submitting ? 'Submitting...' : 'Volunteer for this Ministry'}
@@ -282,8 +285,9 @@ function makeStyles(palette: any, layout: any) {
       padding: 14,
       minHeight: 80,
       marginBottom: 16,
+      fontSize: 14,
+      color: palette.text,
     },
-    noteInputPlaceholder: { fontSize: 14, color: palette.subtext },
     volunteerBtn: { minHeight: 52, marginBottom: 8 },
     cancelBtn: {},
   });

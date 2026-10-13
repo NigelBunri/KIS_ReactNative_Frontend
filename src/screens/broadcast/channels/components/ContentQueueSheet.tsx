@@ -219,20 +219,30 @@ export default function ContentQueueSheet({ visible, onClose, onPlayContent }: P
                     onPress={() => handleMoveUp(index)}
                     style={[styles.arrowBtn, { minWidth: minTouchTarget, minHeight: minTouchTarget }]}
                     hitSlop={8}
+                    disabled={index === 0}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Move "${item.title ?? 'item'}" up in queue`}
+                    accessibilityState={{ disabled: index === 0 }}
                   >
-                    <Text style={[styles.arrowText, { color: palette.subtext }]}>↑</Text>
+                    <Text style={[styles.arrowText, { color: index === 0 ? palette.border : palette.subtext }]}>↑</Text>
                   </Pressable>
                   <Pressable
                     onPress={() => handleMoveDown(index)}
                     style={[styles.arrowBtn, { minWidth: minTouchTarget, minHeight: minTouchTarget }]}
                     hitSlop={8}
+                    disabled={index >= items.length - 1}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Move "${item.title ?? 'item'}" down in queue`}
+                    accessibilityState={{ disabled: index >= items.length - 1 }}
                   >
-                    <Text style={[styles.arrowText, { color: palette.subtext }]}>↓</Text>
+                    <Text style={[styles.arrowText, { color: index >= items.length - 1 ? palette.border : palette.subtext }]}>↓</Text>
                   </Pressable>
                   <Pressable
                     onPress={() => handleRemove(item)}
                     style={[styles.removeBtn, { minWidth: minTouchTarget, minHeight: minTouchTarget }]}
                     hitSlop={8}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Remove "${item.title ?? 'item'}" from queue`}
                   >
                     <Text style={[styles.removeText, { color: palette.danger }]}>✕</Text>
                   </Pressable>

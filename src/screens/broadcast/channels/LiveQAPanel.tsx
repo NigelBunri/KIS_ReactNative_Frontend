@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -91,6 +92,7 @@ export default function LiveQAPanel({ streamId, isManager, palette }: Props) {
   }, [questionText, session, submitting]);
 
   const handleUpvote = useCallback(async (questionId: string) => {
+    const previous = questions;
     setQuestions(prev =>
       [...prev.map(q =>
         q.id === questionId
@@ -98,12 +100,24 @@ export default function LiveQAPanel({ streamId, isManager, palette }: Props) {
           : q,
       )].sort((a, b) => (b.upvote_count ?? 0) - (a.upvote_count ?? 0)),
     );
-    await upvoteQAQuestion(questionId);
-  }, []);
+    try {
+      await upvoteQAQuestion(questionId);
+    } catch {
+      // Roll back — previously a failed upvote silently kept the local
+      // tally change forever with no error shown.
+      setQuestions(previous);
+      Alert.alert('Error', 'Could not register your upvote. Please try again.');
+    }
+  }, [questions]);
 
   const handleMarkAnswered = useCallback(async (questionId: string, current: boolean) => {
     setQuestions(prev => prev.map(q => q.id === questionId ? { ...q, is_answered: !current } : q));
-    await markQAQuestionAnswered(questionId, !current);
+    try {
+      await markQAQuestionAnswered(questionId, !current);
+    } catch {
+      setQuestions(prev => prev.map(q => q.id === questionId ? { ...q, is_answered: current } : q));
+      Alert.alert('Error', 'Could not update this question. Please try again.');
+    }
   }, []);
 
   if (loading) {

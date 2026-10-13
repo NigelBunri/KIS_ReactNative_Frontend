@@ -134,7 +134,19 @@ export default function ReturnsManagementPage() {
           {canApprove ? (
             <KISButton
               title="Approve" size="xs" loading={busyId === item.id}
-              onPress={() => runAction(item, ROUTES.commerce.returnApprove(item.id), 'Approve return')}
+              onPress={() =>
+                Alert.alert(
+                  'Approve return',
+                  'This tells the buyer to ship the item back. Are you sure you want to approve this return?',
+                  [
+                    { text: 'Not yet', style: 'cancel' },
+                    {
+                      text: 'Approve',
+                      onPress: () => runAction(item, ROUTES.commerce.returnApprove(item.id), 'Approve return'),
+                    },
+                  ],
+                )
+              }
               disabled={Boolean(busyId)}
             />
           ) : null}
@@ -148,7 +160,20 @@ export default function ReturnsManagementPage() {
           {canComplete ? (
             <KISButton
               title="Complete & refund" size="xs" loading={busyId === item.id}
-              onPress={() => runAction(item, ROUTES.commerce.returnComplete(item.id), 'Complete return and issue refund')}
+              onPress={() =>
+                Alert.alert(
+                  'Complete return and issue refund',
+                  `This will issue a refund to the buyer for: ${(item.items || []).map((ri: any) => `${ri.quantity}x ${ri.product_name}`).join(', ') || 'this return'}. This cannot be undone. Continue?`,
+                  [
+                    { text: 'Not yet', style: 'cancel' },
+                    {
+                      text: 'Complete & refund',
+                      style: 'destructive',
+                      onPress: () => runAction(item, ROUTES.commerce.returnComplete(item.id), 'Complete return and issue refund'),
+                    },
+                  ],
+                )
+              }
               disabled={Boolean(busyId)}
             />
           ) : null}
@@ -163,7 +188,13 @@ export default function ReturnsManagementPage() {
   return (
     <View style={[styles.root, { backgroundColor: palette.bg, paddingTop: topInset }]}>
       <View style={[styles.header, { backgroundColor: palette.surface, borderColor: palette.divider }]}>
-        <Pressable onPress={() => navigation.goBack()} style={styles.backButton}>
+        <Pressable
+          onPress={() => navigation.goBack()}
+          style={styles.backButton}
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        >
           <KISIcon name="arrow-left" size={18} color={palette.text} />
         </Pressable>
         <Text style={[styles.title, { color: palette.text }]}>Returns to manage</Text>

@@ -62,6 +62,7 @@ export default function PartnerSupportInboxPanel({ isOpen, panelWidth, panelTran
   const [summary, setSummary] = useState<{ counts: Record<string, number>; unassigned: number; total: number } | null>(null);
   const [members, setMembers] = useState<MemberOption[]>([]);
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const [showCreate, setShowCreate] = useState(false);
   const [newSubject, setNewSubject] = useState('');
@@ -86,6 +87,11 @@ export default function PartnerSupportInboxPanel({ isOpen, panelWidth, panelTran
       requests.push(getRequest(`${ROUTES.partners.members(partnerId)}?page=1`, { errorMessage: 'Unable to load members.' }));
     }
     const [ticketRes, summaryRes, memberRes] = await Promise.all(requests);
+    if (!ticketRes?.success) {
+      setError(ticketRes?.message || "Couldn't load tickets. Tap to retry.");
+      return;
+    }
+    setError(null);
     const payload = ticketRes?.data ?? [];
     setTickets(Array.isArray(payload) ? payload : []);
     if (summaryRes) setSummary(summaryRes.data ?? null);
@@ -201,6 +207,8 @@ export default function PartnerSupportInboxPanel({ isOpen, panelWidth, panelTran
         <View style={[styles.settingsPanelHeader, { borderBottomColor: palette.divider }]}>
           <Pressable
             onPress={() => (selectedTicketId ? setSelectedTicketId(null) : onClose())}
+            accessibilityRole="button"
+            accessibilityLabel={selectedTicketId ? 'Back to tickets' : 'Close'}
             style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}
           >
             <Text style={{ color: palette.text, fontSize: 18 }}>‹</Text>
@@ -218,6 +226,13 @@ export default function PartnerSupportInboxPanel({ isOpen, panelWidth, panelTran
         <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.settingsPanelBody} showsVerticalScrollIndicator={false}>
           {loading ? (
             <ActivityIndicator size="small" color={palette.primary} />
+          ) : error ? (
+            <View style={[styles.settingsFeatureRow, { borderColor: palette.danger, backgroundColor: palette.danger + '15' }]}>
+              <Text style={{ color: palette.danger, fontSize: 13, fontWeight: '600' }}>{error}</Text>
+              <Pressable onPress={() => { setLoading(true); load().finally(() => setLoading(false)); }} style={{ marginTop: 8 }}>
+                <Text style={{ color: palette.primary, fontWeight: '700', fontSize: 13 }}>Tap to retry</Text>
+              </Pressable>
+            </View>
           ) : selectedTicket ? (
             <>
               {selectedTicket.description ? (

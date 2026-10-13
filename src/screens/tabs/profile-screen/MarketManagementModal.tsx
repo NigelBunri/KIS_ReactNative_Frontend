@@ -313,7 +313,13 @@ export function MarketManagementModal(props: MarketManagementModalProps) {
                     >
                       {shop.name}
                     </Text>
-                    <Text style={{ color: palette.ivory, fontSize: 12 }}>
+                    {/* was palette.ivory (near-white) — this banner's
+                       backgroundColor is palette.primarySoft, a *light*
+                       tan/gold tint in light mode when there's no banner
+                       image, so near-white text was nearly invisible;
+                       primaryStrong matches the title above and stays
+                       legible against both the tint and any photo. */}
+                    <Text style={{ color: palette.primaryStrong, fontSize: 12 }}>
                       {category}
                     </Text>
                   </View>

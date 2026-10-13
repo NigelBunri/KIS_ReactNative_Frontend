@@ -32,6 +32,7 @@ import {
   Pressable,
   StyleSheet,
   Text,
+  TextInput,
   View,
   Alert,
   DeviceEventEmitter,
@@ -747,46 +748,55 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
     [onOpenChat],
   );
 
+  // Android has no equivalent of iOS's Alert.prompt (RN's Alert.alert never
+  // renders a text field on Android), so the Android branch here used to
+  // show an Alert that SAID "Enter a new subject for this thread" but gave
+  // the user nowhere to type one - pressing "Save" just re-ran doRename
+  // with the thread's own unchanged title, silently "succeeding" at renaming
+  // the thread to the name it already had. Thread renaming was effectively
+  // dead on Android. Fixed with a real in-app text-input modal below
+  // (renameSubRoomTarget/renameSubRoomText) instead of a fake Android prompt.
+  const [renameSubRoomTarget, setRenameSubRoomTarget] = useState<SubRoom | null>(null);
+  const [renameSubRoomText, setRenameSubRoomText] = useState('');
+
+  const commitThreadRename = useCallback(
+    (subRoom: SubRoom, newTitle: string) => {
+      const trimmed = newTitle.trim();
+      if (!trimmed) return;
+      setSubRooms((prev) =>
+        prev.map((sr) =>
+          sr.conversationId === subRoom.conversationId
+            ? { ...sr, title: trimmed }
+            : sr,
+        ),
+      );
+      socket?.emit('subroom.rename', {
+        subroomId: subRoom.conversationId,
+        title: trimmed,
+      });
+    },
+    [socket],
+  );
+
   const handleEditThreadSubject = useCallback(
     (subRoom: SubRoom) => {
-      const doRename = (newTitle: string) => {
-        const trimmed = newTitle.trim();
-        if (!trimmed) return;
-        setSubRooms((prev) =>
-          prev.map((sr) =>
-            sr.conversationId === subRoom.conversationId
-              ? { ...sr, title: trimmed }
-              : sr,
-          ),
-        );
-        socket?.emit('subroom.rename', {
-          subroomId: subRoom.conversationId,
-          title: trimmed,
-        });
-      };
       if (Platform.OS === 'ios') {
         Alert.prompt(
           'Edit thread subject',
           'Enter a new subject for this thread.',
           [
             { text: 'Cancel', style: 'cancel' },
-            { text: 'Save', onPress: (val: string | undefined) => doRename(val ?? '') },
+            { text: 'Save', onPress: (val: string | undefined) => commitThreadRename(subRoom, val ?? '') },
           ],
           'plain-text',
           subRoom.title ?? '',
         );
       } else {
-        Alert.alert(
-          'Edit thread subject',
-          'Enter a new subject for this thread.',
-          [
-            { text: 'Cancel', style: 'cancel' },
-            { text: 'Save', onPress: () => doRename(subRoom.title ?? '') },
-          ],
-        );
+        setRenameSubRoomText(subRoom.title ?? '');
+        setRenameSubRoomTarget(subRoom);
       }
     },
-    [socket],
+    [commitThreadRename],
   );
 
   const handleReactMessage = useCallback(
@@ -1684,13 +1694,23 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
     const convId = conversationId ?? chat?.id;
     if (!convId) return;
     const next = !isMuted;
-    await Handlers.handleMuteConversation({
+    // Only flip the local override on a confirmed success - previously this
+    // always flipped regardless of the request's outcome, so a failed
+    // mute/unmute (network error, server rejection) still showed the toggle
+    // as changed even though nothing actually changed server-side.
+    const ok = await Handlers.handleMuteConversation({
       conversationId: String(convId),
       muted: next,
     });
-    setMuteOverride(next);
+    if (ok) setMuteOverride(next);
   };
 
+  // Unlike handleClearChat just above (which already confirms via
+  // Alert.alert before doing anything irreversible-feeling), this used to
+  // call Handlers.handleBlockRequest the instant the menu item was tapped -
+  // no confirmation at all for an action that blocks the other participant
+  // and locks the conversation. Bring it in line with the same confirm
+  // pattern the rest of this screen's destructive actions already use.
   const handleBlockChat = async () => {
     const convId = conversationId ?? chat?.id;
     if (!convId) return;
@@ -1712,8 +1732,22 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
       }
     }
 
-    await Handlers.handleBlockRequest(String(convId), blockedUser);
-    setLockOverride(true);
+    const blockedName = blockedUser?.displayName || chat?.name || 'this contact';
+    Alert.alert(
+      'Block chat',
+      `Block ${blockedName}? They won't be able to message you, and this conversation will be locked.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Block',
+          style: 'destructive',
+          onPress: async () => {
+            await Handlers.handleBlockRequest(String(convId), blockedUser);
+            setLockOverride(true);
+          },
+        },
+      ],
+    );
   };
 
   const handleAcceptRequest = async () => {
@@ -2743,8 +2777,18 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
                     try {
                       const res = await postRequest(ROUTES.chat.directConversation, { other_user_id: memberTap.userId }, {});
                       const convId = res?.data?.conversation_id ?? res?.data?.id ?? res?.data?.conversationId;
-                      if (convId) DeviceEventEmitter.emit('chat.open', { conversationId: String(convId), name: memberTap.name, kind: 'dm' });
-                    } catch { /* best-effort */ }
+                      if (convId) {
+                        DeviceEventEmitter.emit('chat.open', { conversationId: String(convId), name: memberTap.name, kind: 'dm' });
+                      } else {
+                        Alert.alert('Message', 'Could not open a chat with this member. Please try again.');
+                      }
+                    } catch {
+                      // Previously swallowed entirely - tapping "Message" on a
+                      // group member could fail (network/server error) with
+                      // zero feedback, leaving the user staring at a sheet
+                      // that had already closed itself for no visible reason.
+                      Alert.alert('Message', 'Could not open a chat with this member. Please try again.');
+                    }
                   }},
                   { icon: 'phone', label: 'Voice', onPress: () => {
                     setMemberTap(null);
@@ -2773,6 +2817,63 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
           </Pressable>
         </Modal>
       )}
+
+      {/* Android thread-subject rename (see handleEditThreadSubject above -
+          Android has no Alert.prompt, so this is the real text-input UI for
+          the "Edit thread subject" action on that platform). */}
+      <Modal
+        visible={!!renameSubRoomTarget}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setRenameSubRoomTarget(null)}
+      >
+        <Pressable
+          style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', padding: 24 }}
+          onPress={() => setRenameSubRoomTarget(null)}
+        >
+          <Pressable
+            onPress={() => {}}
+            style={{ borderRadius: 16, padding: 16, backgroundColor: palette.card ?? palette.surface }}
+          >
+            <Text style={{ fontSize: 16, fontWeight: '700', color: palette.text, marginBottom: 12 }}>
+              Edit thread subject
+            </Text>
+            <TextInput
+              value={renameSubRoomText}
+              onChangeText={setRenameSubRoomText}
+              placeholder="Thread subject"
+              placeholderTextColor={palette.subtext}
+              autoFocus
+              style={{
+                borderWidth: 2,
+                borderRadius: 10,
+                borderColor: palette.inputBorder,
+                color: palette.text,
+                paddingHorizontal: 12,
+                paddingVertical: 8,
+                marginBottom: 14,
+              }}
+            />
+            <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 10 }}>
+              <Pressable
+                onPress={() => setRenameSubRoomTarget(null)}
+                style={{ paddingHorizontal: 14, paddingVertical: 10, borderRadius: 10, borderWidth: 2, borderColor: palette.inputBorder }}
+              >
+                <Text style={{ color: palette.text }}>Cancel</Text>
+              </Pressable>
+              <Pressable
+                onPress={() => {
+                  if (renameSubRoomTarget) commitThreadRename(renameSubRoomTarget, renameSubRoomText);
+                  setRenameSubRoomTarget(null);
+                }}
+                style={{ paddingHorizontal: 14, paddingVertical: 10, borderRadius: 10, borderWidth: 2, backgroundColor: palette.primary, borderColor: palette.primary }}
+              >
+                <Text style={{ color: palette.onPrimary }}>Save</Text>
+              </Pressable>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 };

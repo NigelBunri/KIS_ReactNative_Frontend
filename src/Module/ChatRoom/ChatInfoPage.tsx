@@ -1018,7 +1018,13 @@ export const ChatInfoPage: React.FC<ChatInfoPageProps> = ({
   return (
     <View style={[styles.root, { backgroundColor: palette.bg, paddingTop: topInset }]}>
       <View style={[styles.header, { borderBottomColor: palette.divider, paddingHorizontal: responsive.pageGutter }]}>
-        <Pressable onPress={onBack} style={styles.backBtn}>
+        <Pressable
+          onPress={onBack}
+          style={styles.backBtn}
+          accessibilityRole="button"
+          accessibilityLabel="Back"
+          hitSlop={8}
+        >
           <KISIcon name="arrow-left" size={22} color={palette.text} />
         </Pressable>
         <Text style={[styles.headerTitle, { color: palette.text }]} numberOfLines={1}>

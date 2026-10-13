@@ -51,7 +51,61 @@ export default function SOSScreen({ navigation }: Props) {
     return () => pulse.stop();
   }, [sent, pulseAnim]);
 
-  async function handleSOS() {
+  async function sendSOS() {
+    setSending(true);
+    try {
+      let latitude = 0;
+      let longitude = 0;
+      try {
+        const Geolocation = require('react-native-geolocation-service').default;
+        await new Promise<void>((resolve) => {
+          Geolocation.getCurrentPosition(
+            (pos: { coords: { latitude: number; longitude: number } }) => {
+              latitude = pos.coords.latitude;
+              longitude = pos.coords.longitude;
+              resolve();
+            },
+            () => resolve(), // Fall back to 0,0 if GPS denied — better than blocking the SOS
+            { enableHighAccuracy: true, timeout: 5000 },
+          );
+        });
+      } catch { /* GPS unavailable — send without coordinates */ }
+
+      const res: any = await postRequest(ROUTES.family.sos, {
+        latitude,
+        longitude,
+        message: 'SOS triggered',
+      });
+      // Previously: success was assumed as soon as the request did not
+      // throw, so a backend-rejected SOS (res.success === false) still
+      // showed "Alert Sent — Help is on the way" to someone who may be
+      // in real danger, with no actual alert delivered to their family.
+      // For an emergency screen that is the single worst outcome this
+      // audit looks for — verify the response actually succeeded before
+      // showing the success state, and let the user retry immediately
+      // (without re-confirming — they already confirmed intent to send,
+      // and re-prompting "are you sure?" only costs time in an emergency).
+      if (res?.success) {
+        setSent(true);
+      } else {
+        Alert.alert(
+          'SOS Not Sent',
+          res?.message ?? 'Your family could not be alerted. Please try again or call emergency services directly.',
+          [{ text: 'Try Again', onPress: () => { void sendSOS(); } }],
+        );
+      }
+    } catch (e: any) {
+      Alert.alert(
+        'SOS Not Sent',
+        e?.message ?? 'Network error — your family was not alerted. Please try again or call emergency services directly.',
+        [{ text: 'Try Again', onPress: () => { void sendSOS(); } }],
+      );
+    } finally {
+      setSending(false);
+    }
+  }
+
+  function handleSOS() {
     Alert.alert(
       'Send SOS Alert',
       'This will immediately alert your family with your location. Are you sure?',
@@ -60,38 +114,7 @@ export default function SOSScreen({ navigation }: Props) {
         {
           text: 'Send SOS',
           style: 'destructive',
-          onPress: async () => {
-            setSending(true);
-            try {
-              let latitude = 0;
-              let longitude = 0;
-              try {
-                const Geolocation = require('react-native-geolocation-service').default;
-                await new Promise<void>((resolve) => {
-                  Geolocation.getCurrentPosition(
-                    (pos: { coords: { latitude: number; longitude: number } }) => {
-                      latitude = pos.coords.latitude;
-                      longitude = pos.coords.longitude;
-                      resolve();
-                    },
-                    () => resolve(), // Fall back to 0,0 if GPS denied — better than blocking the SOS
-                    { enableHighAccuracy: true, timeout: 5000 },
-                  );
-                });
-              } catch { /* GPS unavailable — send without coordinates */ }
-
-              await postRequest(ROUTES.family.sos, {
-                latitude,
-                longitude,
-                message: 'SOS triggered',
-              });
-              setSent(true);
-            } catch (e: any) {
-              Alert.alert('Error', e?.message ?? 'Failed to send SOS alert');
-            } finally {
-              setSending(false);
-            }
-          },
+          onPress: () => { void sendSOS(); },
         },
       ],
     );
@@ -129,6 +152,8 @@ export default function SOSScreen({ navigation }: Props) {
           style={styles.backBtn}
           onPress={() => navigation.goBack()}
           hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+          accessibilityRole="button"
+          accessibilityLabel="Back"
         >
           <KISIcon name="arrow-back-outline" size={24} color={palette.text} />
         </TouchableOpacity>

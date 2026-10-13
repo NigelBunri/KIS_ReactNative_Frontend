@@ -80,6 +80,8 @@ export default function PartnerMembersPanel({
   const [busyUserId, setBusyUserId] = useState<string | null>(null);
   const [logEntries, setLogEntries] = useState<ModerationLogEntry[]>([]);
   const [logLoading, setLogLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [logError, setLogError] = useState<string | null>(null);
 
   const backdropOpacity = panelTranslateX.interpolate({
     inputRange: [0, panelWidth],
@@ -93,6 +95,11 @@ export default function PartnerMembersPanel({
       const res = await getRequest(`${ROUTES.partners.members(partnerId)}?page=${targetPage}`, {
         errorMessage: 'Unable to load members.',
       });
+      if (!res?.success) {
+        setError(res?.message || "Couldn't load members. Pull to retry.");
+        return;
+      }
+      setError(null);
       const payload = res?.data ?? res ?? {};
       const results = (payload.results ?? payload.members ?? []) as MemberEntry[];
       const totalPages = payload?.meta?.total_pages;
@@ -109,6 +116,11 @@ export default function PartnerMembersPanel({
       errorMessage: 'Unable to load moderation log.',
     });
     setLogLoading(false);
+    if (!res?.success) {
+      setLogError(res?.message || "Couldn't load the moderation log. Tap to retry.");
+      return;
+    }
+    setLogError(null);
     const payload = res?.data ?? res ?? [];
     setLogEntries(Array.isArray(payload) ? payload : []);
   }, [partnerId]);
@@ -334,6 +346,13 @@ export default function PartnerMembersPanel({
         {tab === 'log' ? (
           logLoading ? (
             <ActivityIndicator size="small" color={palette.primary} style={{ marginTop: 24 }} />
+          ) : logError ? (
+            <View style={[styles.settingsFeatureRow, { margin: 16, borderColor: palette.danger, backgroundColor: palette.danger + '15' }]}>
+              <Text style={[styles.settingsFeatureDescription, { color: palette.danger }]}>{logError}</Text>
+              <Pressable onPress={() => loadLog()} style={{ marginTop: 8 }}>
+                <Text style={{ color: palette.primary, fontWeight: '700', fontSize: 13 }}>Tap to retry</Text>
+              </Pressable>
+            </View>
           ) : (
             <FlatList
               initialNumToRender={20}
@@ -362,6 +381,13 @@ export default function PartnerMembersPanel({
           )
         ) : loading ? (
           <ActivityIndicator size="small" color={palette.primary} style={{ marginTop: 24 }} />
+        ) : error ? (
+          <View style={[styles.settingsFeatureRow, { margin: 16, borderColor: palette.danger, backgroundColor: palette.danger + '15' }]}>
+            <Text style={[styles.settingsFeatureDescription, { color: palette.danger }]}>{error}</Text>
+            <Pressable onPress={() => { setLoading(true); loadPage(1, true).finally(() => setLoading(false)); }} style={{ marginTop: 8 }}>
+              <Text style={{ color: palette.primary, fontWeight: '700', fontSize: 13 }}>Tap to retry</Text>
+            </Pressable>
+          </View>
         ) : (
           <FlatList
             initialNumToRender={20}

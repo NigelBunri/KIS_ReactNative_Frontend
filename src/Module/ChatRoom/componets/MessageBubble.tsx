@@ -3658,9 +3658,22 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
             </View>
 
             {isMe && status && (
-              <View style={{ marginLeft: 4, alignSelf: 'center' }}>
+              // Previously a plain View here on this bubble variant - unlike
+              // the default text/contacts/poll/event bubble below, tapping
+              // this status tick did nothing: onShowReadReceipts was passed
+              // into this component but only ever wired up on that one
+              // variant. Match the same tap-to-view-receipts affordance here
+              // so it isn't inconsistent depending on what kind of message
+              // the user sent.
+              <Pressable
+                onPress={() => onShowReadReceipts?.(message as ChatMessage)}
+                style={{ marginLeft: 4, alignSelf: 'center' }}
+                hitSlop={6}
+                accessibilityRole="button"
+                accessibilityLabel="View message status"
+              >
                 {renderStatusIcon(status, statusColor, 13)}
-              </View>
+              </Pressable>
             )}
           </View>
         </View>
@@ -3734,9 +3747,22 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
             </View>
 
             {isMe && status && (
-              <View style={{ marginLeft: 4, alignSelf: 'center' }}>
+              // Previously a plain View here on this bubble variant - unlike
+              // the default text/contacts/poll/event bubble below, tapping
+              // this status tick did nothing: onShowReadReceipts was passed
+              // into this component but only ever wired up on that one
+              // variant. Match the same tap-to-view-receipts affordance here
+              // so it isn't inconsistent depending on what kind of message
+              // the user sent.
+              <Pressable
+                onPress={() => onShowReadReceipts?.(message as ChatMessage)}
+                style={{ marginLeft: 4, alignSelf: 'center' }}
+                hitSlop={6}
+                accessibilityRole="button"
+                accessibilityLabel="View message status"
+              >
                 {renderStatusIcon(status, statusColor, 13)}
-              </View>
+              </Pressable>
             )}
           </View>
         </View>
@@ -3808,9 +3834,22 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
             </View>
 
             {isMe && status && (
-              <View style={{ marginLeft: 4, alignSelf: 'center' }}>
+              // Previously a plain View here on this bubble variant - unlike
+              // the default text/contacts/poll/event bubble below, tapping
+              // this status tick did nothing: onShowReadReceipts was passed
+              // into this component but only ever wired up on that one
+              // variant. Match the same tap-to-view-receipts affordance here
+              // so it isn't inconsistent depending on what kind of message
+              // the user sent.
+              <Pressable
+                onPress={() => onShowReadReceipts?.(message as ChatMessage)}
+                style={{ marginLeft: 4, alignSelf: 'center' }}
+                hitSlop={6}
+                accessibilityRole="button"
+                accessibilityLabel="View message status"
+              >
                 {renderStatusIcon(status, statusColor, 13)}
-              </View>
+              </Pressable>
             )}
           </View>
         </View>
@@ -4020,6 +4059,8 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
               void handleVoicePress();
             }}
             disabled={!voicePlaybackSource && !isVoiceRecoverableViaResolver}
+            accessibilityRole="button"
+            accessibilityLabel={isPlaying ? 'Pause voice message' : 'Play voice message'}
             style={{
               flexDirection: 'row',
               alignItems: 'center',
@@ -4154,9 +4195,22 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
             </View>
 
             {isMe && status && (
-              <View style={{ marginLeft: 4, alignSelf: 'center' }}>
+              // Previously a plain View here on this bubble variant - unlike
+              // the default text/contacts/poll/event bubble below, tapping
+              // this status tick did nothing: onShowReadReceipts was passed
+              // into this component but only ever wired up on that one
+              // variant. Match the same tap-to-view-receipts affordance here
+              // so it isn't inconsistent depending on what kind of message
+              // the user sent.
+              <Pressable
+                onPress={() => onShowReadReceipts?.(message as ChatMessage)}
+                style={{ marginLeft: 4, alignSelf: 'center' }}
+                hitSlop={6}
+                accessibilityRole="button"
+                accessibilityLabel="View message status"
+              >
                 {renderStatusIcon(status, statusColor, 13)}
-              </View>
+              </Pressable>
             )}
           </View>
         </View>
@@ -4406,6 +4460,8 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
               onPress={() => onShowReadReceipts?.(message as ChatMessage)}
               style={{ marginLeft: 4, alignSelf: 'center' }}
               hitSlop={6}
+              accessibilityRole="button"
+              accessibilityLabel="View message status"
             >
               {renderStatusIcon(status, statusColor, 13)}
             </Pressable>

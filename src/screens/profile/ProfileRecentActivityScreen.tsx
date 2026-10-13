@@ -1,6 +1,7 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
 
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useKISTheme } from '@/theme/useTheme';
@@ -17,6 +18,7 @@ const CANCELLED_BOOKING_STATUSES = new Set(['cancelled', 'canceled', 'rejected',
 export default function ProfileRecentActivityScreen() {
   const { palette } = useKISTheme();
   const topInset = useSafeTopInset();
+  const insets = useSafeAreaInsets();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const responsive = useResponsiveLayout();
   const [loading, setLoading] = useState(true);
@@ -80,7 +82,7 @@ export default function ProfileRecentActivityScreen() {
   );
 
   return (
-    <ScrollView style={{ flex: 1, paddingTop: topInset, backgroundColor: palette.bg, }} contentContainerStyle={{ padding: responsive.pageGutter, gap: 14, width: '100%', maxWidth: responsive.contentMaxWidth, alignSelf: 'center' }}>
+    <ScrollView style={{ flex: 1, paddingTop: topInset, backgroundColor: palette.bg, }} contentContainerStyle={{ padding: responsive.pageGutter, paddingBottom: responsive.pageGutter + insets.bottom, gap: 14, width: '100%', maxWidth: responsive.contentMaxWidth, alignSelf: 'center' }}>
       <View style={{ gap: 6 }}>
         <Text style={{ color: palette.text, fontSize: responsive.headerTitleSize, fontWeight: '800' }}>Recent activity</Text>
         <Text style={{ color: palette.subtext }}>

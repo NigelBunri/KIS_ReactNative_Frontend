@@ -232,7 +232,28 @@ export default function ParentalControlsScreen({ route }: Props) {
             <Text style={[styles.toggleLabel, { color: palette.text }]}>SOS Alert</Text>
             <Switch
               value={controls.sos_enabled}
-              onValueChange={(v) => setControls((prev) => ({ ...prev, sos_enabled: v }))}
+              onValueChange={(v) => {
+                // Turning SOS off is a safety-reducing change — it takes
+                // away this family member's ability to alert the family in
+                // an emergency — so confirm before applying it. Turning it
+                // back on is always safe to apply immediately.
+                if (!v) {
+                  Alert.alert(
+                    'Turn Off SOS Alert?',
+                    'This member will no longer be able to send an emergency SOS alert to the family. Are you sure?',
+                    [
+                      { text: 'Cancel', style: 'cancel' },
+                      {
+                        text: 'Turn Off',
+                        style: 'destructive',
+                        onPress: () => setControls((prev) => ({ ...prev, sos_enabled: false })),
+                      },
+                    ],
+                  );
+                } else {
+                  setControls((prev) => ({ ...prev, sos_enabled: true }));
+                }
+              }}
               trackColor={{ false: palette.divider, true: palette.primaryStrong }}
               thumbColor={palette.ivory}
             />

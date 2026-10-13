@@ -259,6 +259,7 @@ export default function CrossReferenceConnectGame({ gameKey, stageIndex, isRepla
             onPlayAgain={load}
             onBackToJourney={onExit}
             onViewStats={onOpenStats}
+            persisted={stageResult.persisted}
           />
         </View>
       </GameShell>

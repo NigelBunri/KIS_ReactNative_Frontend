@@ -72,6 +72,7 @@ export default function PartnerLeadershipPanel({ isOpen, panelWidth, panelTransl
   const [noteTitle, setNoteTitle] = useState('');
   const [noteBody, setNoteBody] = useState('');
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const backdropOpacity = panelTranslateX.interpolate({ inputRange: [0, panelWidth], outputRange: [1, 0], extrapolate: 'clamp' });
 
@@ -81,9 +82,14 @@ export default function PartnerLeadershipPanel({ isOpen, panelWidth, panelTransl
       getRequest(ROUTES.partners.leadership(partnerId), { errorMessage: 'Unable to load leadership data.' }),
       getRequest(ROUTES.partners.departmentNotes(partnerId), { errorMessage: 'Unable to load notes.' }),
     ]);
-    const leadershipPayload = (leadershipRes?.data ?? leadershipRes ?? {}) as Leadership;
+    if (!leadershipRes?.success) {
+      setError(leadershipRes?.message || "Couldn't load leadership data. Tap to retry.");
+      return;
+    }
+    setError(null);
+    const leadershipPayload = (leadershipRes?.data ?? {}) as Leadership;
     setData(leadershipPayload);
-    const notesPayload = (notesRes?.data ?? notesRes ?? []) as DeptNote[];
+    const notesPayload = (notesRes?.success ? notesRes?.data ?? [] : []) as DeptNote[];
     setNotes(Array.isArray(notesPayload) ? notesPayload : []);
     if (!selectedDeptId && leadershipPayload.org_tree?.length) {
       setSelectedDeptId(leadershipPayload.org_tree[0].department_id);
@@ -162,7 +168,30 @@ export default function PartnerLeadershipPanel({ isOpen, panelWidth, panelTransl
         </View>
 
         <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.settingsPanelBody} showsVerticalScrollIndicator={false}>
-          {loading || !data ? (
+          {loading ? (
+            <ActivityIndicator size="small" color={palette.primary} />
+          ) : error ? (
+            <View
+              style={{
+                borderRadius: 10,
+                borderWidth: 1,
+                borderColor: palette.danger,
+                backgroundColor: palette.danger + '15',
+                padding: 12,
+              }}
+            >
+              <Text style={{ color: palette.danger, fontSize: 13, fontWeight: '600' }}>{error}</Text>
+              <Pressable
+                onPress={() => {
+                  setLoading(true);
+                  load().finally(() => setLoading(false));
+                }}
+                style={{ marginTop: 8 }}
+              >
+                <Text style={{ color: palette.primary, fontWeight: '700', fontSize: 13 }}>Tap to retry</Text>
+              </Pressable>
+            </View>
+          ) : !data ? (
             <ActivityIndicator size="small" color={palette.primary} />
           ) : (
             <>

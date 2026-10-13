@@ -131,6 +131,7 @@ export default function PartnerCoursesPanel({
 }: Props) {
   const { palette } = useKISTheme();
   const [courses, setCourses] = useState<any[]>([]);
+  const [coursesError, setCoursesError] = useState<string | null>(null);
   const [courseForm, setCourseForm] = useState(emptyCourse);
   const [lessonForm, setLessonForm] = useState(emptyLesson);
   const [quizForm, setQuizForm] = useState(emptyQuiz);
@@ -158,6 +159,12 @@ export default function PartnerCoursesPanel({
     const res = await getRequest(`${ROUTES.bible.courses}?partner=${partnerId}`, {
       errorMessage: 'Unable to load courses.',
     });
+    if (!res?.success) {
+      setCoursesError(res?.message || "Couldn't load courses. Tap to retry.");
+      setCourses([]);
+      return;
+    }
+    setCoursesError(null);
     const payload = res?.data?.results ?? res?.data ?? [];
     setCourses(Array.isArray(payload) ? payload : []);
   }, [partnerId]);
@@ -1067,6 +1074,23 @@ export default function PartnerCoursesPanel({
           </View>
 
           <Text style={[styles.settingsSectionTitle, { color: palette.text }]}>Existing courses</Text>
+          {coursesError ? (
+            <View
+              style={{
+                borderRadius: 10,
+                borderWidth: 1,
+                borderColor: palette.danger,
+                backgroundColor: palette.danger + '15',
+                padding: 12,
+                marginBottom: 10,
+              }}
+            >
+              <Text style={{ color: palette.danger, fontSize: 13, fontWeight: '600' }}>{coursesError}</Text>
+              <Pressable onPress={() => loadCourses()} style={{ marginTop: 8 }}>
+                <Text style={{ color: palette.primary, fontWeight: '700', fontSize: 13 }}>Tap to retry</Text>
+              </Pressable>
+            </View>
+          ) : null}
           <View style={{ gap: 10 }}>
             {courses.map((course) => (
               <View key={course.id} style={[styles.settingsFeatureRow, { borderColor: palette.borderMuted, backgroundColor: palette.surface }]}

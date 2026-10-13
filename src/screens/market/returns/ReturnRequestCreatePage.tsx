@@ -113,7 +113,13 @@ export default function ReturnRequestCreatePage() {
   return (
     <View style={[styles.root, { backgroundColor: palette.bg, paddingTop: topInset }]}>
       <View style={[styles.header, { backgroundColor: palette.surface, borderColor: palette.divider }]}>
-        <Pressable onPress={() => navigation.goBack()} style={styles.backButton}>
+        <Pressable
+          onPress={() => navigation.goBack()}
+          style={styles.backButton}
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        >
           <KISIcon name="arrow-left" size={18} color={palette.text} />
         </Pressable>
         <Text style={[styles.title, { color: palette.text }]}>Request a return</Text>

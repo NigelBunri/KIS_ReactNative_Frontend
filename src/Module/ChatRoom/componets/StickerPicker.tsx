@@ -27,6 +27,8 @@ export const StickerPicker: React.FC<StickerPickerProps> = ({
       {/* Create new sticker button */}
       <Pressable
         onPress={onCreateStickerPress}
+        accessibilityRole="button"
+        accessibilityLabel="Create new sticker"
         style={{
           marginBottom: 12,
           backgroundColor: palette.primary,
@@ -59,6 +61,8 @@ export const StickerPicker: React.FC<StickerPickerProps> = ({
           <Pressable
             key={sticker.id}
             onPress={() => onSelectSticker(sticker)}
+            accessibilityRole="button"
+            accessibilityLabel={sticker.text ? `Sticker: ${sticker.text}` : 'Sticker'}
             style={{
               width: 80,
               height: 80,

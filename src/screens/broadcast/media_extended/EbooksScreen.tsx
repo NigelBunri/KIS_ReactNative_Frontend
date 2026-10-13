@@ -44,6 +44,7 @@ export default function EbooksScreen({ navigation }: Props) {
 
   const [ebooks, setEbooks] = useState<Ebook[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [activeTab, setActiveTab] = useState<'Browse' | 'My Library'>('Browse');
   const [purchaseLoading, setPurchaseLoading] = useState<string | null>(null);
 
@@ -54,7 +55,10 @@ export default function EbooksScreen({ navigation }: Props) {
       // Same fix as KingdomNewsScreen — `ebooks.filter(...)` below would
       // crash on the leaked wrapper object.
       setEbooks(Array.isArray(res?.data) ? res.data : []);
-    } catch {}
+      setLoadError(false);
+    } catch {
+      setLoadError(true);
+    }
     setLoading(false);
   }, []);
 
@@ -168,7 +172,13 @@ export default function EbooksScreen({ navigation }: Props) {
   return (
     <SafeAreaView style={styles.safe}>
       <LinearGradient colors={[palette.gradientStart, palette.gradientEnd]} style={styles.header}>
-        <Pressable style={styles.backBtn} onPress={() => navigation.goBack()} hitSlop={8}>
+        <Pressable
+          style={styles.backBtn}
+          onPress={() => navigation.goBack()}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
+        >
           <KISIcon name="chevron-back-outline" size={22} color={palette.ivory} />
           <Text style={styles.backLabel}>Back</Text>
         </Pressable>
@@ -193,9 +203,21 @@ export default function EbooksScreen({ navigation }: Props) {
       </View>
 
       <ScrollView style={styles.scroll}>
+        {loadError && (
+          <View style={{ padding: sp, paddingBottom: 0, gap: 8 }}>
+            <Text style={{ color: palette.danger, fontWeight: '700', textAlign: 'center' }}>
+              Unable to load ebooks. Check your connection and try again.
+            </Text>
+            <KISButton title="Retry" size="sm" variant="outline" onPress={() => { fetchEbooks(); }} />
+          </View>
+        )}
         {displayed.length === 0 ? (
           <Text style={styles.empty}>
-            {activeTab === 'My Library' ? 'No purchased ebooks yet.' : 'No ebooks available.'}
+            {loadError
+              ? ''
+              : activeTab === 'My Library'
+              ? 'No purchased ebooks yet.'
+              : 'No ebooks available.'}
           </Text>
         ) : (
           <View style={styles.grid}>

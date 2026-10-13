@@ -20,32 +20,7 @@ import type { RootStackParamList } from '@/navigation/types';
 import { useProfileController } from '@/screens/tabs/profile/useProfileController';
 import { useAuth } from '../../../App';
 import { useSafeTopInset } from '@/hooks/useSafeTopInset';
-
-const CATEGORY_LABELS: Record<string, string> = {
-  health: 'Health & Medical',
-  finances: 'Financial Hardship',
-  relationships: 'Relationships & Marriage',
-  faith: 'Faith & Spirituality',
-  business: 'Business & Career',
-  grief: 'Loss & Grief',
-  addiction: 'Addiction & Recovery',
-  family: 'Family & Parenting',
-  mental_health: 'Mental Health',
-  other: 'Other',
-};
-const CATEGORIES = Object.keys(CATEGORY_LABELS);
-const CATEGORY_EMOJI: Record<string, string> = {
-  health: '🏥',
-  finances: '💰',
-  relationships: '💑',
-  faith: '🙏',
-  business: '💼',
-  grief: '🕊️',
-  addiction: '🌱',
-  family: '👨‍👩‍👧',
-  mental_health: '🧠',
-  other: '💙',
-};
+import { CATEGORIES, CATEGORY_EMOJI, CATEGORY_LABELS } from './testimonyCategories';
 
 function timeAgo(iso: string) {
   const diff = Date.now() - new Date(iso).getTime();
@@ -73,9 +48,19 @@ export default function TestimonyHubScreen() {
   const [testimonies, setTestimonies] = useState<any[]>([]);
   const [reachOuts, setReachOuts] = useState<any[]>([]);
   const [resolvingId, setResolvingId] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState(false);
 
   const styles = useMemo(() => makeStyles(palette), [palette]);
 
+  // Promise.allSettled means a rejected/unsuccessful request never threw
+  // here, and there was no error state at all — if the backend was down,
+  // every section quietly fell back to its "you have nothing yet" empty
+  // state (e.g. "Your story could change someone's life.") with no way to
+  // tell that apart from a genuine first-time-user empty state. That's a
+  // particularly bad failure mode for testimony content specifically,
+  // where "we lost your data" and "you have none" read very differently
+  // to someone sharing something vulnerable. Surface a banner + retry when
+  // every one of the three loads failed, without blocking the screen.
   const loadAll = useCallback(async () => {
     const [seasonsRes, testimoniesRes, reachRes] = await Promise.allSettled([
       getRequest(ROUTES.testimony.seasonsMine),
@@ -85,21 +70,26 @@ export default function TestimonyHubScreen() {
       getRequest(ROUTES.testimony.reach),
     ]);
 
+    let anySucceeded = false;
     if (seasonsRes.status === 'fulfilled' && seasonsRes.value?.success) {
+      anySucceeded = true;
       const data = seasonsRes.value.data;
       const list = Array.isArray(data) ? data : Array.isArray(data?.results) ? data.results : [];
       setSeasons(list);
     }
     if (testimoniesRes.status === 'fulfilled' && testimoniesRes.value?.success) {
+      anySucceeded = true;
       const data = testimoniesRes.value?.data;
       const list = Array.isArray(data) ? data : Array.isArray(data?.results) ? data.results : [];
       setTestimonies(list);
     }
     if (reachRes.status === 'fulfilled' && reachRes.value?.success) {
+      anySucceeded = true;
       const data = reachRes.value.data;
       const list = Array.isArray(data) ? data : Array.isArray(data?.results) ? data.results : [];
       setReachOuts(list);
     }
+    setLoadError(!anySucceeded);
   }, [currentUserId]);
 
   useEffect(() => {
@@ -131,8 +121,12 @@ export default function TestimonyHubScreen() {
             text: 'Resolve',
             onPress: async () => {
               setResolvingId(seasonId);
-              await patchRequest(ROUTES.testimony.seasonDetail(seasonId), { is_active: false });
+              const res = await patchRequest(ROUTES.testimony.seasonDetail(seasonId), { is_active: false }, { errorMessage: 'Unable to resolve this season.' });
               setResolvingId(null);
+              if (res?.success === false) {
+                Alert.alert('Testimony Network', (res as any)?.message || 'Unable to resolve this season.');
+                return;
+              }
               void loadAll();
             },
           },
@@ -154,7 +148,7 @@ export default function TestimonyHubScreen() {
         }
       >
         <View style={styles.header}>
-          <Pressable onPress={() => navigation.goBack()} style={styles.backBtn} hitSlop={12}>
+          <Pressable onPress={() => navigation.goBack()} style={styles.backBtn} hitSlop={12} accessibilityRole="button" accessibilityLabel="Go back">
             <KISIcon name="arrow-left" size={22} color={palette.text} />
           </Pressable>
           <View style={{ flex: 1 }}>
@@ -162,6 +156,19 @@ export default function TestimonyHubScreen() {
             <Text style={[styles.subtitle, { color: palette.subtext }]}>Real people. Real stories. Real help.</Text>
           </View>
         </View>
+
+        {loadError ? (
+          <View style={[styles.section, { marginTop: 12 }]}>
+            <View style={[styles.promptCard, { backgroundColor: palette.card, borderColor: palette.danger }]}>
+              <Text style={[styles.promptText, { color: palette.text }]}>
+                Couldn't load your seasons, testimonies, or reach-outs. Pull down to try again.
+              </Text>
+              <Pressable onPress={() => void loadAll()} style={[styles.resolveBtn, { borderColor: palette.primary, marginTop: 10, alignSelf: 'center' }]}>
+                <Text style={[styles.resolveBtnText, { color: palette.primary }]}>Retry</Text>
+              </Pressable>
+            </View>
+          </View>
+        ) : null}
 
         <View style={[styles.section]}>
           <View style={styles.sectionRow}>

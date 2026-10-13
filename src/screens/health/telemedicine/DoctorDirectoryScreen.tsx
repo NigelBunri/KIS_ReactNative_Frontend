@@ -101,6 +101,8 @@ export default function DoctorDirectoryScreen({ navigation }: Props) {
           onPress={() => navigation.goBack()}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           style={styles.backBtn}
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
         >
           <KISIcon name="arrow-left" size={22} color={palette.ivory} />
         </TouchableOpacity>
@@ -122,6 +124,9 @@ export default function DoctorDirectoryScreen({ navigation }: Props) {
             ]}
             onPress={() => handleSpecialtyChange(s)}
             hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
+            accessibilityRole="button"
+            accessibilityLabel={s}
+            accessibilityState={{ selected: selectedSpecialty === s }}
           >
             <Text
               style={[

@@ -13,6 +13,7 @@ import { SafeAreaView } from '@/components/common/SafeAreaViewWithTopPadding';
 import { HEALTH_THEME_SPACING } from "@/theme/health/spacing";
 import { HEALTH_THEME_TYPOGRAPHY } from "@/theme/health/typography";
 import { getHealthThemeColors } from "@/theme/health/colors";
+import { useKISTheme } from "@/theme/useTheme";
 import KISButton from "@/constants/KISButton";
 import ROUTES from "@/network";
 import { getRequest } from "@/network/get";
@@ -53,6 +54,7 @@ type Props = { institutionId: string; engineKey: string };
 export default function EHRManager({ institutionId }: Props) {
   const scheme = useColorScheme();
   const palette = getHealthThemeColors(scheme === "light" ? "light" : "dark");
+  const { palette: kisPalette } = useKISTheme();
   const spacing = HEALTH_THEME_SPACING;
   const typography = HEALTH_THEME_TYPOGRAPHY;
 
@@ -71,6 +73,7 @@ export default function EHRManager({ institutionId }: Props) {
 
   const [patients, setPatients] = useState<Patient[]>([]);
   const [loadingPatients, setLoadingPatients] = useState(false);
+  const [patientsError, setPatientsError] = useState<string | null>(null);
   const [savingPatient, setSavingPatient] = useState(false);
   const [activePatientId, setActivePatientId] = useState<string | null>(null);
 
@@ -84,9 +87,16 @@ export default function EHRManager({ institutionId }: Props) {
       const res = await getRequest(ROUTES.patients.master, {
         errorMessage: "Unable to load patients.",
       });
-      const list = res?.data?.results ?? res?.data ?? res?.results ?? res ?? [];
+      if (!res?.success) {
+        setPatientsError(res?.message || "Unable to load patients. Tap to retry.");
+        setPatients([]);
+        return;
+      }
+      setPatientsError(null);
+      const list = res?.data?.results ?? res?.data ?? [];
       setPatients(Array.isArray(list) ? list : []);
-    } catch {
+    } catch (e: any) {
+      setPatientsError(e?.message || "Unable to load patients. Tap to retry.");
       setPatients([]);
     } finally {
       setLoadingPatients(false);
@@ -128,6 +138,7 @@ export default function EHRManager({ institutionId }: Props) {
 
   const [encounters, setEncounters] = useState<Encounter[]>([]);
   const [loadingEncounters, setLoadingEncounters] = useState(false);
+  const [encountersError, setEncountersError] = useState<string | null>(null);
   const [addingVisit, setAddingVisit] = useState(false);
 
   const fetchEncounters = useCallback(async (patientId: string) => {
@@ -137,9 +148,16 @@ export default function EHRManager({ institutionId }: Props) {
         `${ROUTES.patients.encounters}?patient=${patientId}`,
         { errorMessage: "Unable to load encounters." }
       );
-      const list = res?.data?.results ?? res?.data ?? res?.results ?? res ?? [];
+      if (!res?.success) {
+        setEncountersError(res?.message || "Unable to load visit records. Tap to retry.");
+        setEncounters([]);
+        return;
+      }
+      setEncountersError(null);
+      const list = res?.data?.results ?? res?.data ?? [];
       setEncounters(Array.isArray(list) ? list : []);
-    } catch {
+    } catch (e: any) {
+      setEncountersError(e?.message || "Unable to load visit records. Tap to retry.");
       setEncounters([]);
     } finally {
       setLoadingEncounters(false);
@@ -290,6 +308,11 @@ export default function EHRManager({ institutionId }: Props) {
 
         {loadingPatients ? (
           <ActivityIndicator color={palette.primary} />
+        ) : patientsError ? (
+          <TouchableOpacity onPress={() => fetchPatients()}>
+            <Text style={{ color: kisPalette.danger, marginBottom: 4 }}>{patientsError}</Text>
+            <Text style={{ color: palette.primary, fontWeight: "700" }}>Tap to retry</Text>
+          </TouchableOpacity>
         ) : patients.length === 0 ? (
           <Text style={{ color: palette.subtext }}>No patients found.</Text>
         ) : (
@@ -325,6 +348,11 @@ export default function EHRManager({ institutionId }: Props) {
 
           {loadingEncounters ? (
             <ActivityIndicator color={palette.primary} />
+          ) : encountersError ? (
+            <TouchableOpacity onPress={() => activePatientId && fetchEncounters(activePatientId)}>
+              <Text style={{ color: kisPalette.danger, marginBottom: 4 }}>{encountersError}</Text>
+              <Text style={{ color: palette.primary, fontWeight: "700" }}>Tap to retry</Text>
+            </TouchableOpacity>
           ) : (
             <>
               <KISButton

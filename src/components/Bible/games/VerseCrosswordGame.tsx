@@ -226,6 +226,7 @@ export default function VerseCrosswordGame({ gameKey, stageIndex, isReplay, onEx
             }}
             onBackToJourney={onExit}
             onViewStats={onOpenStats}
+            persisted={stageResult.persisted}
           />
         </View>
       </GameShell>
