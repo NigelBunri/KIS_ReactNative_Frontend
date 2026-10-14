@@ -106,12 +106,25 @@
             <category android:name="android.intent.category.BROWSABLE" />
             <data android:scheme="kis" />
         </intent-filter>
-        <!-- Universal link: https://kis.app -->
+        <!-- Universal link: https://kis.app (content sharing — broadcasts,
+             channels, shorts, posts, market, etc. Domain ownership/hosting
+             is a separate, unresolved issue, out of scope here.) -->
         <intent-filter android:autoVerify="true">
             <action android:name="android.intent.action.VIEW" />
             <category android:name="android.intent.category.DEFAULT" />
             <category android:name="android.intent.category.BROWSABLE" />
             <data android:scheme="https" android:host="kis.app" />
+        </intent-filter>
+        <!-- Universal link: https://go.kingdomimpactventures.org — KIS Auth
+             redirect domain (fixed 2026-10, replacing kis.app for this
+             purpose only; kis.app was an unowned, parked domain). Needs
+             its own intent-filter since autoVerify is per-filter, and
+             assetlinks.json verification is per-host. -->
+        <intent-filter android:autoVerify="true">
+            <action android:name="android.intent.action.VIEW" />
+            <category android:name="android.intent.category.DEFAULT" />
+            <category android:name="android.intent.category.BROWSABLE" />
+            <data android:scheme="https" android:host="go.kingdomimpactventures.org" />
         </intent-filter>
       </activity>
 

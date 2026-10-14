@@ -23,15 +23,16 @@
 //     (openBibleVerse/BIBLE_VERSE_OPEN_EVENT) rather than a new mechanism -
 //     this is the same path a tapped in-app chat quote already uses.
 //   kis://education/events/<id>            https://kis.app/education/events/<id>
-//   https://kis.app/auth/kisauth-callback?code=&state=   KIS Auth recovery
-//     round trip (see ParentRecoveryScreen.tsx) — reuses this already-
-//     verified Universal Link domain rather than registering a new
-//     associated domain for kisauth.kingdomimpactventures.org, which
-//     would need real DNS + hosting to verify (external action, out of
-//     scope for a code change). Revisit if KIS Auth ever needs its own
-//     domain for a multi-app future.
-//   https://kis.app/auth/kisauth-link-callback?code=&state=          link
-//   https://kis.app/auth/kisauth-registration-callback?code=&state=  sign-up
+//   https://go.kingdomimpactventures.org/auth/kisauth-callback?code=&state=
+//     KIS Auth recovery round trip (see ParentRecoveryScreen.tsx).
+//     go.kingdomimpactventures.org, not kis.app or kisauth.kingdomimpact-
+//     ventures.org directly — kis.app turned out to be an unowned, parked
+//     domain (fixed 2026-10), and the kisauth.* host is reserved for the
+//     KIS Auth service itself, not app deep links. go.* is a dedicated,
+//     KIS-owned subdomain hosting a real apple-app-site-association file
+//     and a fallback page, specifically for this purpose.
+//   https://go.kingdomimpactventures.org/auth/kisauth-link-callback?code=&state=          link
+//   https://go.kingdomimpactventures.org/auth/kisauth-registration-callback?code=&state=  sign-up
 //     Same domain, distinct paths per purpose (kis-auth's client registry
 //     keys allowed_redirect_uris per exact string) so each routes
 //     unambiguously without a purpose flag threaded through app state.
@@ -105,7 +106,7 @@ export function routeDeepLink(url: string, navigation: any): boolean {
       if (!code) return false;
       navigation.navigate('KisAuthRegisterPhone', {
         registrationCode: code,
-        redirectUri: 'https://kis.app/auth/kisauth-registration-callback',
+        redirectUri: 'https://go.kingdomimpactventures.org/auth/kisauth-registration-callback',
         state,
       } as any);
       return true;

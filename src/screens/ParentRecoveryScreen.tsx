@@ -24,7 +24,14 @@ import { ensureDeviceId, initE2EE } from '@/security/e2ee';
 import { launchKisAuthFlow } from '@/security/kisAuthBrowser';
 import { useAuth } from '../../App';
 
-const KIS_AUTH_RECOVERY_REDIRECT_URI = 'https://kis.app/auth/kisauth-callback';
+// kis.app is a parked/unowned domain - never actually hosted an
+// apple-app-site-association file or anything at this path, so Universal
+// Links could never verify and Linking.openURL's fallback (InAppBrowser
+// unavailable) landed users on a dead page. go.kingdomimpactventures.org
+// is a real subdomain KIS controls, with an AASA file and a fallback page
+// actually hosted there. Must match what's registered for kis-mobile in
+// kis-auth's client table exactly (see KIS_GOOGLE_AUTH_SECURITY_REVIEW.md).
+const KIS_AUTH_RECOVERY_REDIRECT_URI = 'https://go.kingdomimpactventures.org/auth/kisauth-callback';
 
 // Email/SMS-code recovery has been removed; KIS Auth (Google) is now the
 // only account-recovery mechanism. 'idle' just shows the explainer + the

@@ -6,16 +6,23 @@ import { useKISTheme } from '@/theme/useTheme';
 import { useResponsiveLayout } from '@/theme/responsive';
 import { KISIcon } from '@/constants/kisIcons';
 import { postRequest } from '@/network/post';
+import { getRequest } from '@/network/get';
 import ROUTES from '@/network';
 import { KISAUTH_BASE_URL } from '@/network/config';
 import { launchKisAuthFlow } from '@/security/kisAuthBrowser';
+import { useAuth } from '../../App';
 
 // Distinct from the recovery redirect_uri — kis-auth's client registry
 // keys allowed_redirect_uris per exact string, so each purpose gets its
-// own path even though all three point at the same kis.app domain. This
-// keeps deepLinkRouter.ts's routing unambiguous rather than overloading
-// one path with a purpose flag baked into app state.
-const KIS_AUTH_LINK_REDIRECT_URI = 'https://kis.app/auth/kisauth-link-callback';
+// own path even though all three point at the same domain. This keeps
+// deepLinkRouter.ts's routing unambiguous rather than overloading one
+// path with a purpose flag baked into app state.
+//
+// go.kingdomimpactventures.org, not kis.app - kis.app is a parked domain
+// KIS never actually owned, so it could never serve a real
+// apple-app-site-association file; Universal Links silently failed to
+// verify, and the Linking.openURL fallback path landed on a dead page.
+const KIS_AUTH_LINK_REDIRECT_URI = 'https://go.kingdomimpactventures.org/auth/kisauth-link-callback';
 
 // Not in RootStackParamList's KisAuthLink entry (currently `undefined`) —
 // same situation ParentRecoveryScreen documents for its own deep-link
@@ -48,9 +55,16 @@ export default function KisAuthLinkScreen() {
   const route = useRoute();
   const responsive = useResponsiveLayout();
   const formMaxWidth = Math.min(480, responsive.contentMaxWidth - 32);
+  const { user, setUser } = useAuth();
 
   const [loading, setLoading] = useState(false);
-  const [linked, setLinked] = useState(false);
+  // Seeded from the already-authenticated user's own server-reported
+  // state (never client-writable — see apps.kis_auth_bridge's
+  // UserSerializer.Meta.read_only_fields), not just "did THIS screen
+  // session complete a link" — otherwise reopening this screen from
+  // Settings on an already-linked account would show the "Connect to
+  // Google" button again and invite a confusing, redundant attempt.
+  const [linked, setLinked] = useState(Boolean(user?.verification?.google?.linked));
   const fromRegistration = Boolean((route.params as KisAuthLinkDeepLinkParams | undefined)?.fromRegistration);
 
   // Registration already completed and persisted before this screen is ever
@@ -84,12 +98,27 @@ export default function KisAuthLinkScreen() {
         return;
       }
       setLinked(true);
+      // The link-complete response is deliberately minimal ({ok, linked} —
+      // see apps.kis_auth_bridge.KisAuthLinkCompleteView), so it never
+      // carries the new verification.google block itself. Refetch the
+      // profile so the in-memory user (ProfileScreen's row, and this
+      // screen if reopened later this session) reflects "already
+      // connected" immediately, not just after the next app restart.
+      try {
+        const profileRes = await getRequest(ROUTES.auth.profile, { errorMessage: '' });
+        if (profileRes?.success && profileRes.data) {
+          setUser?.(profileRes.data);
+        }
+      } catch {
+        // Non-fatal — the link itself already succeeded; worst case the
+        // "already connected" state just catches up on next app boot.
+      }
     } catch (e: any) {
       Alert.alert('Error', e?.message ?? 'Unable to link your Google account.');
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [setUser]);
 
   useEffect(() => {
     const params = (route.params ?? {}) as KisAuthLinkDeepLinkParams;
@@ -200,10 +229,13 @@ export default function KisAuthLinkScreen() {
 
         {linked ? (
           <>
-            <Text style={[styles.title, { color: palette.text }]}>Google account linked</Text>
+            <Text style={[styles.title, { color: palette.text }]}>Google account connected</Text>
             <Text style={[styles.subtitle, { color: palette.subtext }]}>
+              {user?.verification?.google?.email
+                ? `Your KIS account is connected to ${user.verification.google.email}. `
+                : ''}
               You can now use "Recover with KIS Auth" to sign back in with Google if you ever lose access to this
-              device.
+              device. There's nothing more to connect.
             </Text>
             {fromRegistration ? (
               <Pressable

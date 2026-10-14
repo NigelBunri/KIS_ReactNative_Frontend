@@ -2,10 +2,17 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-    <!-- Universal links -->
+    <!-- Universal links. go.kingdomimpactventures.org is the KIS Auth
+         redirect domain (fixed 2026-10 — kis.app was an unowned, parked
+         domain that could never serve an apple-app-site-association
+         file). kis.app stays listed too since content-sharing links
+         (broadcasts/channels/shorts/posts/market/etc.) still use it;
+         that domain's own ownership/hosting is a separate, unresolved
+         issue out of scope for this fix. -->
     <key>com.apple.developer.associated-domains</key>
     <array>
         <string>applinks:kis.app</string>
+        <string>applinks:go.kingdomimpactventures.org</string>
     </array>
 
     <!-- Push Notifications capability (for FCM / APNs) — production for
