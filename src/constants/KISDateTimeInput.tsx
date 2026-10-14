@@ -124,7 +124,7 @@ export default function KISDateTimeInput({
   containerStyle,
   layout,
 }: Props) {
-  const { palette, tokens } = useKISTheme();
+  const { palette, tokens, isDark } = useKISTheme();
   const [open, setOpen] = useState(false);
   const [tempDate, setTempDate] = useState<Date>(toSafeDate(value));
   const [androidStep, setAndroidStep] = useState<'date' | 'time'>(
@@ -282,6 +282,15 @@ export default function KISDateTimeInput({
                 maximumDate={maximumDate}
                 onChange={onNativeChange}
                 style={{ alignSelf: 'stretch' }}
+                // iOS-only: the spinner's wheel text color otherwise follows
+                // the system light/dark setting, not this app's theme. When
+                // that doesn't match palette.surface (the card background
+                // right behind it), the text renders in a color that's
+                // invisible against it even though the wheel still scrolls
+                // and reports values fine - exactly this bug. Pin both so
+                // the picker always matches the actual card it's drawn on.
+                themeVariant={isDark ? 'dark' : 'light'}
+                textColor={palette.text}
               />
             </Pressable>
           </Pressable>
