@@ -24,22 +24,24 @@ type KisAuthLinkDeepLinkParams = {
   kisAuthCode?: string;
   kisAuthState?: string;
   kisAuthError?: string;
-  // Set when this screen is pushed right after a fresh phone/password
-  // registration (see App.tsx's pendingGoogleLinkPrompt effect) rather than
-  // opened from Settings. Swaps in the registration-flow copy and adds the
-  // "Skip for now" affordance — linking stays optional, so this screen must
-  // never be a dead end. Not present on deep-link returns from a killed
-  // app; in that case this falls back to the Settings framing, which is
-  // still safe (the button simply says "Continue with Google" instead of
-  // "Connect Google Account").
+  // Set when this screen is presented as a modal right after a fresh
+  // phone/password registration (see App.tsx's pendingGoogleLinkPrompt
+  // effect and the KisAuthLink screen's `presentation: 'modal'` option)
+  // rather than opened from Settings. Swaps in the registration-flow copy
+  // and adds the "Ignore" affordance — linking stays optional, so this
+  // screen must never be a dead end. Not present on deep-link returns from
+  // a killed app; in that case this falls back to the Settings framing,
+  // which is still safe (the button says the same "Connect to Google" —
+  // only the surrounding copy/title and the Ignore affordance differ).
   fromRegistration?: boolean;
 };
 
 // This is the ONLY entry point that can ever create a Google-identity
-// link (Phase 2 §7/§8 decision: linking happens from Settings, while
-// already authenticated — never inferred from a recovery or registration
-// attempt). Recovery and Google sign-up both depend on a link already
-// existing; neither can create one.
+// link (Phase 2 §7/§8 decision: linking happens while already
+// authenticated — either right after registration (RegisterScreen calls
+// setAuth(true) before this screen ever mounts) or from Settings — never
+// inferred from a recovery attempt). Recovery and Google sign-up both
+// depend on a link already existing; neither can create one.
 export default function KisAuthLinkScreen() {
   const { palette } = useKISTheme();
   const navigation = useNavigation();
@@ -52,11 +54,11 @@ export default function KisAuthLinkScreen() {
   const fromRegistration = Boolean((route.params as KisAuthLinkDeepLinkParams | undefined)?.fromRegistration);
 
   // Registration already completed and persisted before this screen is ever
-  // shown (RegisterScreen calls setAuth(true) first) — so skipping, failing,
+  // shown (RegisterScreen calls setAuth(true) first) — so ignoring, failing,
   // or killing the app mid-link never loses the account or forces a retry
-  // of registration itself. Skip just leaves the identity unlinked; "Connect
-  // Google Account" / "Continue with Google" above remains available from
-  // Settings any time afterward.
+  // of registration itself. Ignoring just leaves the identity unlinked;
+  // "Connect to Google" above remains available from Settings any time
+  // afterward.
   const handleSkip = useCallback(() => {
     if (loading) return;
     navigation.goBack();
@@ -166,19 +168,25 @@ export default function KisAuthLinkScreen() {
 
   return (
     <SafeAreaView style={[styles.root, { backgroundColor: palette.bg }]} edges={['top', 'bottom']}>
-      <View style={[styles.header, { borderBottomColor: palette.divider }]}>
-        <Pressable
-          onPress={() => navigation.goBack()}
-          style={styles.backBtn}
-          hitSlop={12}
-          accessibilityRole="button"
-          accessibilityLabel="Go back"
-        >
-          <KISIcon name="arrow-left" size={22} color={palette.text} />
-        </Pressable>
-        <Text style={[styles.headerTitle, { color: palette.text }]}>Link Google Account</Text>
-        <View style={{ width: 40 }} />
-      </View>
+      {/* The registration-prompt modal has its own large title in the body
+          below and dismisses via the "Ignore" button — a thin header bar
+          with a back arrow and the Settings-flow title would be redundant
+          and wrong here, so it only renders when reached from Settings. */}
+      {fromRegistration ? null : (
+        <View style={[styles.header, { borderBottomColor: palette.divider }]}>
+          <Pressable
+            onPress={() => navigation.goBack()}
+            style={styles.backBtn}
+            hitSlop={12}
+            accessibilityRole="button"
+            accessibilityLabel="Go back"
+          >
+            <KISIcon name="arrow-left" size={22} color={palette.text} />
+          </Pressable>
+          <Text style={[styles.headerTitle, { color: palette.text }]}>Link Google Account</Text>
+          <View style={{ width: 40 }} />
+        </View>
+      )}
 
       <ScrollView
         contentContainerStyle={[
@@ -229,7 +237,7 @@ export default function KisAuthLinkScreen() {
                 <ActivityIndicator color={palette.ivory} />
               ) : (
                 <Text style={[styles.primaryBtnText, { color: palette.ivory }]}>
-                  {fromRegistration ? 'Connect Google Account' : 'Continue with Google'}
+                  Connect to Google
                 </Text>
               )}
             </Pressable>
@@ -244,7 +252,7 @@ export default function KisAuthLinkScreen() {
             {fromRegistration ? (
               <Pressable onPress={handleSkip} disabled={loading} style={styles.skipBtn}>
                 <Text style={[styles.skipBtnText, { color: palette.subtext, opacity: loading ? 0.5 : 1 }]}>
-                  Skip for now
+                  Ignore
                 </Text>
               </Pressable>
             ) : null}

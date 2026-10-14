@@ -3395,7 +3395,7 @@ export default function ProfileScreen() {
                   ? [{
                       label: authUser?.verification?.google?.linked
                         ? 'Google Account Connected'
-                        : 'Connect Google Account',
+                        : 'Connect to Google',
                       route: 'KisAuthLink' as const,
                       danger: false,
                       badge: false,

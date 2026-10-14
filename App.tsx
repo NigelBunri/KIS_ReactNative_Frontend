@@ -1839,6 +1839,20 @@ function AppContent() {
                     <RootStack.Screen
                       name="KisAuthLink"
                       getComponent={() => KisAuthLinkScreen}
+                      // Presented as a modal specifically for the
+                      // post-registration prompt (fromRegistration: true) —
+                      // it should feel like a next step overlaying the app,
+                      // not a pushed page. Reached from Settings (no
+                      // fromRegistration param) keeps the normal card/header
+                      // presentation instead.
+                      options={({ route }) => {
+                        const fromRegistration = Boolean(
+                          (route.params as { fromRegistration?: boolean } | undefined)?.fromRegistration,
+                        );
+                        return fromRegistration
+                          ? { presentation: 'modal', headerShown: false }
+                          : {};
+                      }}
                     />
                     <RootStack.Screen
                       name="AccountDeletion"

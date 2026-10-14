@@ -25,7 +25,6 @@ import { ensureDeviceId, initE2EE } from '@/security/e2ee';
 import { getSimPhoneNumber } from '@/services/simInfo';
 import { setAuthTokens } from '@/security/authStorage';
 import { useAuth } from '../../App';
-import { FEATURE_FLAGS } from '@/constants/featureFlags';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { useKISTheme } from '@/theme/useTheme';
 import { useResponsiveLayout } from '@/theme/responsive';
@@ -33,13 +32,6 @@ import KISText from '@/components/common/KISText';
 import KISDateTimeInput from '@/constants/KISDateTimeInput';
 import { KIS_TOKENS } from '@/theme/constants';
 import { readReferralCodeFromClipboard } from '@/utils/referralAttribution';
-import { KISAUTH_BASE_URL } from '@/network/config';
-import { launchKisAuthFlow, rememberPendingState } from '@/security/kisAuthBrowser';
-
-// Distinct from the recovery/link redirect_uris for the same reason —
-// kis-auth's client registry keys allowed_redirect_uris per exact
-// string, keeping deepLinkRouter.ts's routing unambiguous per purpose.
-const KIS_AUTH_REGISTRATION_REDIRECT_URI = 'https://kis.app/auth/kisauth-registration-callback';
 
 const createStyles = (tokens: typeof KIS_TOKENS, contentMaxWidth: number) =>
   StyleSheet.create({
@@ -170,7 +162,6 @@ export default function RegisterScreen({ navigation, route }: any) {
   const [regPassword2, setRegPassword2] = useState('');
   const [loading, setLoading] = useState(false);
   const [termsAgreed, setTermsAgreed] = useState(false);
-  const [googleLoading, setGoogleLoading] = useState(false);
 
   // Install attribution: InviteJoinScreen's referral branch navigates here
   // with a code straight from a deep link the app was already installed
@@ -225,116 +216,6 @@ export default function RegisterScreen({ navigation, route }: any) {
     passwordsMatch &&
     termsAgreed &&
     !loading;
-
-  // Google is the only credential in the combined flow, so readiness here
-  // is everything the form collects EXCEPT password.
-  const googleReady = countryCodeValid && phoneValid && termsAgreed && !googleLoading;
-
-  const onGoogleSignUp = async () => {
-    const normalizedPhone = regPhone.replace(/[^\d]/g, '');
-    if (!callingCode) {
-      Alert.alert('Registration failed', 'Country code is required.');
-      return;
-    }
-    if (!normalizedPhone || !termsAgreed) {
-      return;
-    }
-    setGoogleLoading(true);
-    try {
-      const state = `${Date.now()}.${Math.random().toString(36).slice(2)}`;
-      // Remembered at module scope, not a component ref — needed only for
-      // the deep-link fallback path (InAppBrowser unavailable), which lands
-      // on a DIFFERENT screen (KisAuthRegisterPhoneScreen) after a cold
-      // start; a ref here would already be gone by then. The happy path
-      // below never touches this — it compares outcome.state to the local
-      // `state` closure directly.
-      rememberPendingState('registration', state);
-      const url =
-        `${KISAUTH_BASE_URL}/authorize` +
-        `?client_id=kis-mobile` +
-        `&redirect_uri=${encodeURIComponent(KIS_AUTH_REGISTRATION_REDIRECT_URI)}` +
-        `&purpose=registration` +
-        `&state=${encodeURIComponent(state)}`;
-
-      const outcome = await launchKisAuthFlow(url, KIS_AUTH_REGISTRATION_REDIRECT_URI);
-      if (outcome.kind === 'cancelled') return;
-      if (outcome.kind === 'pending') {
-        // No InAppBrowser — deepLinkRouter.ts routes the universal-link
-        // return to KisAuthRegisterPhone, which re-collects these same
-        // fields since this screen's local state won't survive a cold
-        // start.
-        return;
-      }
-      if (outcome.state !== state) {
-        Alert.alert('Error', 'We could not complete this authentication request.');
-        return;
-      }
-      if (outcome.kind === 'error') {
-        if (outcome.error === 'already_registered') {
-          Alert.alert(
-            'Account already exists',
-            'This Google account is already associated with a KIS account. Try signing in instead.',
-          );
-        } else {
-          Alert.alert('Error', 'We could not complete this authentication request.');
-        }
-        return;
-      }
-
-      // Success — finish registration right here, in the same process,
-      // using the fields already collected on this screen. No separate
-      // phone-entry screen needed: everything kis-auth's ticket doesn't
-      // carry (name/phone/DOB/referral) was already gathered above.
-      const deviceId = await ensureDeviceId();
-      const res = await postRequest(
-        ROUTES.auth.kisAuthRegistrationComplete,
-        {
-          registration_code: outcome.code,
-          redirect_uri: KIS_AUTH_REGISTRATION_REDIRECT_URI,
-          phone: `${callingCode}${normalizedPhone}`,
-          phone_country_code: callingCode,
-          phone_number: normalizedPhone,
-          country: countryCode,
-          ...(displayName.trim() ? { display_name: displayName.trim() } : {}),
-          ...(dateOfBirth ? { date_of_birth: dateOfBirth.slice(0, 10) } : {}),
-          ...(referralCode.trim() ? { referral_code: referralCode.trim() } : {}),
-          device_id: deviceId,
-          device_name: `${Platform.OS === 'ios' ? 'iPhone' : 'Android'} (KIS Auth sign-up)`,
-          platform: Platform.OS,
-        },
-        { errorMessage: 'Unable to complete sign-up.' },
-      );
-
-      if (!res?.success) {
-        Alert.alert(
-          'Sign-up failed',
-          res?.message || res?.data?.detail || 'Please check your details and try again.',
-        );
-        return;
-      }
-
-      const accessToken = res.data?.access;
-      if (!accessToken) {
-        Alert.alert('Sign-up failed', 'We could not complete this authentication request.');
-        return;
-      }
-
-      await AsyncStorage.multiSet([
-        ['user_dial_code', callingCode],
-        ['user_country_code', countryCode],
-      ]);
-      await setAuthTokens({ accessToken, refreshToken: res.data?.refresh ?? null });
-      const resolvedUser = res?.data?.user ?? null;
-      await setUserData(resolvedUser, res.data);
-      setUser?.(resolvedUser);
-      void initE2EE(String(resolvedUser?.id ?? '')).catch(() => {});
-      setAuth(true);
-    } catch (e: any) {
-      Alert.alert('Error', e?.message ?? 'Unable to sign up with Google.');
-    } finally {
-      setGoogleLoading(false);
-    }
-  };
 
   const onRegister = async () => {
     const normalizedPhone = regPhone.replace(/[^\d]/g, '');
@@ -548,23 +429,6 @@ export default function RegisterScreen({ navigation, route }: any) {
               Tap the country code to change it
             </KISText>
           </View>
-
-          {FEATURE_FLAGS.KIS_AUTH_REGISTRATION_ENABLED && (
-            <>
-              <KISButton
-                title={googleLoading ? undefined : 'Continue with Google'}
-                onPress={onGoogleSignUp}
-                disabled={!googleReady}
-                variant="primary"
-                size="md"
-              >
-                {googleLoading ? <ActivityIndicator /> : null}
-              </KISButton>
-              <KISText preset="helper" color={palette.subtext} style={{ fontWeight: '600', textAlign: 'center' }}>
-                — or create an account with a password —
-              </KISText>
-            </>
-          )}
 
           <View style={styles.field}>
             <KISText preset="label" color={palette.text}>Password</KISText>
