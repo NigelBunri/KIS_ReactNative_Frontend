@@ -11,7 +11,6 @@ import {
   Alert,
   ActivityIndicator,
   Platform,
-  Modal,
   KeyboardAvoidingView,
   ScrollView,
 } from 'react-native';
@@ -25,7 +24,6 @@ import KISTextInput from '../constants/KISTextInput';
 import KISText from '@/components/common/KISText';
 import { setUserData } from '@/network/cache';
 import { postRequest } from '@/network/post/index';
-import { getRequest } from '@/network/get';
 import ROUTES from '@/network';
 import { useAuth } from '../../App';
 import { ensureDeviceId, initE2EE } from '@/security/e2ee';
@@ -144,53 +142,20 @@ export default function LoginScreen({ navigation }: any) {
   const [password, setPassword] = useState('');
   const [remember, setRemember] = useState(true);
   const [loading, setLoading] = useState(false);
-  const [forgotVisible, setForgotVisible] = useState(false);
-  const [forgotStep, setForgotStep] = useState<'request' | 'reset'>('request');
-  const [forgotPhone, setForgotPhone] = useState('');
-  const [forgotDialCode, setForgotDialCode] = useState('+237');
-  const [forgotCountryCode, setForgotCountryCode] = useState<CountryCode>('CM');
-  const [forgotCountryPickerVisible, setForgotCountryPickerVisible] = useState(false);
-  const [forgotCode, setForgotCode] = useState('');
-  const [forgotPassword, setForgotPassword] = useState('');
-  const [forgotLoading, setForgotLoading] = useState(false);
   const [qrLoading, setQrLoading] = useState(false);
-  // Preferred reset-code delivery channel, resolved from what's actually
-  // configured (SMS/WhatsApp preferred over email) rather than hardcoded —
-  // email is the last-resort fallback, not the default.
-  const [forgotChannel, setForgotChannel] = useState<'sms' | 'whatsapp' | 'email'>('email');
 
   useEffect(() => {
     return navigation.addListener('focus', () => setQrLoading(false));
   }, [navigation]);
 
   useEffect(() => {
-    if (!forgotVisible) return;
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await getRequest(ROUTES.auth.otpChannels, { forceNetwork: true });
-        if (cancelled || !res?.success || !res?.data) return;
-        if (res.data.sms) setForgotChannel('sms');
-        else if (res.data.whatsapp) setForgotChannel('whatsapp');
-        else setForgotChannel('email');
-      } catch {
-        // Keep the default ('email') — the backend still validates
-        // availability before sending, so this fails safe either way.
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [forgotVisible]);
-
-  useEffect(() => {
     AsyncStorage.multiGet(['user_dial_code', 'user_country_code']).then(pairs => {
       const stored = Object.fromEntries(pairs.map(([k, v]) => [k, v]));
       if (stored.user_dial_code) {
         setDialCode(stored.user_dial_code);
-        setForgotDialCode(stored.user_dial_code);
       }
       if (stored.user_country_code) {
         setCountryCode(stored.user_country_code as CountryCode);
-        setForgotCountryCode(stored.user_country_code as CountryCode);
       }
     }).catch(() => {});
   }, []);
@@ -343,37 +308,6 @@ export default function LoginScreen({ navigation }: any) {
             ],
           );
         }
-        const isVerifyRequired =
-          errorCode === 'phone_not_verified' ||
-          String(res?.message ?? '').toLowerCase().includes('verif') ||
-          String(res?.data?.detail ?? '').toLowerCase().includes('verif');
-
-        if (isVerifyRequired) {
-          // Prefer server-returned E.164; fall back to locally composed E.164 (dialCode + digits)
-          const phone = String(
-            res?.data?.phone ||
-            res?.data?.data?.phone ||
-            (normalizedPhone ? `${dialCode}${normalizedPhone}` : '') ||
-            '',
-          );
-          try {
-            navigation.navigate('VerificationChannelSelect', { phone, purpose: 'register' });
-          } catch {
-            Alert.alert(
-              'Phone verification required',
-              'Your account needs to be verified before you can log in.',
-              [
-                { text: 'Cancel', style: 'cancel' },
-                {
-                  text: 'Verify Now',
-                  onPress: () =>
-                    navigation.navigate('VerificationChannelSelect', { phone, purpose: 'register' }),
-                },
-              ],
-            );
-          }
-          return;
-        }
         if (res?.data?.two_factor_required) {
           navigation.navigate('TwoFactor', {
             phone: normalizedPhone,
@@ -408,69 +342,6 @@ export default function LoginScreen({ navigation }: any) {
       Alert.alert('Error', e?.message ?? 'Unexpected error while logging in.');
     } finally {
       setLoading(false);
-    }
-  };
-
-  const forgotPhoneDigits = useMemo(
-    () => String(forgotPhone || '').replace(/[^\d]/g, ''),
-    [forgotPhone],
-  );
-  const forgotPhoneValid = forgotPhoneDigits.length >= 6;
-  const forgotPhoneE164 = forgotPhoneValid ? `${forgotDialCode}${forgotPhoneDigits}` : '';
-
-  const onForgotCountrySelect = useCallback((country: Country) => {
-    const code = country.callingCode?.[0];
-    if (code) setForgotDialCode(`+${code}`);
-    setForgotCountryCode(country.cca2 as CountryCode);
-    setForgotCountryPickerVisible(false);
-  }, []);
-
-  const requestResetCode = async () => {
-    try {
-      if (!forgotPhoneValid || forgotLoading) return;
-      setForgotLoading(true);
-      const payload = { phone: forgotPhoneE164, channel: forgotChannel };
-      const res = await postRequest(ROUTES.auth.forgotPassword, payload, {
-        errorMessage: 'Unable to send reset code.',
-      });
-      if (!res?.success) {
-        const msg = res?.message || res?.data?.detail || 'Failed to send code.';
-        return Alert.alert('Reset failed', msg);
-      }
-      setForgotStep('reset');
-    } catch (e: any) {
-      Alert.alert('Error', e?.message ?? 'Failed to send reset code.');
-    } finally {
-      setForgotLoading(false);
-    }
-  };
-
-  const resetPassword = async () => {
-    try {
-      if (!forgotPhoneValid || !forgotCode || !forgotPassword || forgotLoading) return;
-      setForgotLoading(true);
-      const payload = {
-        phone: forgotPhoneE164,
-        code: forgotCode.trim(),
-        new_password: forgotPassword,
-      };
-      const res = await postRequest(ROUTES.auth.resetPassword, payload, {
-        errorMessage: 'Unable to reset password.',
-      });
-      if (!res?.success) {
-        const msg = res?.message || res?.data?.detail || 'Reset failed.';
-        return Alert.alert('Reset failed', msg);
-      }
-      Alert.alert('Success', 'Password reset. Please log in.');
-      setForgotVisible(false);
-      setForgotStep('request');
-      setForgotPhone('');
-      setForgotCode('');
-      setForgotPassword('');
-    } catch (e: any) {
-      Alert.alert('Error', e?.message ?? 'Failed to reset password.');
-    } finally {
-      setForgotLoading(false);
     }
   };
 
@@ -535,7 +406,7 @@ export default function LoginScreen({ navigation }: any) {
             Remember me
           </KISText>
         </View>
-        <Pressable onPress={() => setForgotVisible(true)}>
+        <Pressable onPress={() => navigation.navigate('ParentRecovery')}>
           <KISText preset="helper" color={palette.subtext} style={styles.link}>
             Forgot password?
           </KISText>
@@ -611,81 +482,6 @@ export default function LoginScreen({ navigation }: any) {
       </KISText>
 
       </ScrollView>
-
-      <Modal visible={forgotVisible} transparent animationType="fade" onRequestClose={() => setForgotVisible(false)}>
-        <View style={styles.modalBackdrop}>
-          <View style={[styles.modalCard, { backgroundColor: palette.card }]}>
-            <KISText preset="h3" color={palette.text} style={styles.modalTitle}>
-              Reset password
-            </KISText>
-            <KISText preset="label" color={palette.subtext} style={{ marginBottom: 6 }}>Phone number</KISText>
-            <View style={styles.phoneRow}>
-              <Pressable
-                onPress={() => setForgotCountryPickerVisible(true)}
-                style={[styles.prefixBox, { borderColor: palette.inputBorder, backgroundColor: palette.surface }]}
-                accessibilityLabel="Select country code"
-                accessibilityRole="button"
-              >
-                <KISText preset="body" color={palette.text} style={{ fontWeight: '600' }}>{forgotDialCode}</KISText>
-                <KISText preset="helper" color={palette.subtext}>▾</KISText>
-              </Pressable>
-              <SafeCountryPicker
-                visible={forgotCountryPickerVisible}
-                countryCode={forgotCountryCode}
-                onSelect={onForgotCountrySelect}
-                onClose={() => setForgotCountryPickerVisible(false)}
-              />
-              <KISTextInput
-                placeholder="e.g. 676139881"
-                autoCapitalize="none"
-                keyboardType="phone-pad"
-                value={forgotPhone}
-                onChangeText={text => setForgotPhone(text.replace(/[^\d]/g, '').slice(0, 14))}
-                errorText={forgotPhone.length > 0 && !forgotPhoneValid ? 'Enter a valid phone number.' : undefined}
-                containerStyle={styles.phoneInput}
-              />
-            </View>
-            {forgotStep === 'reset' ? (
-              <>
-                <KISTextInput
-                  label="Code"
-                  placeholder="6-digit code"
-                  keyboardType="number-pad"
-                  value={forgotCode}
-                  onChangeText={setForgotCode}
-                />
-                <KISTextInput
-                  label="New password"
-                  placeholder="New password"
-                  secureTextEntry
-                  value={forgotPassword}
-                  onChangeText={setForgotPassword}
-                />
-              </>
-            ) : null}
-            <View style={styles.modalRow}>
-              <KISButton
-                title={forgotLoading ? undefined : forgotStep === 'request' ? 'Send code' : 'Reset'}
-                onPress={forgotStep === 'request' ? requestResetCode : resetPassword}
-                disabled={forgotLoading || !forgotPhoneValid || (forgotStep === 'reset' && (!forgotCode || !forgotPassword))}
-              >
-                {forgotLoading ? <ActivityIndicator /> : null}
-              </KISButton>
-              <Pressable onPress={() => {
-                setForgotVisible(false);
-                setForgotStep('request');
-                setForgotPhone('');
-                setForgotCode('');
-                setForgotPassword('');
-              }}>
-                <KISText preset="helper" color={palette.subtext}>
-                  Cancel
-                </KISText>
-              </Pressable>
-            </View>
-          </View>
-        </View>
-      </Modal>
     </KeyboardAvoidingView>
   );
 }

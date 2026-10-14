@@ -6,12 +6,6 @@ const authRoutes = {
     register: `${API_BASE_URL}/api/v1/auth/register/`,
     logout: `${API_BASE_URL}/api/v1/auth/logout/`,
     checkLogin: `${API_BASE_URL}/api/v1/users/me/`,
-    otp: `${API_BASE_URL}/api/v1/auth/otp/initiate/`,
-    sendDeviceCode: `${API_BASE_URL}/api/v1/auth/otp/verify/`,
-    otpChannels: `${API_BASE_URL}/api/v1/auth/otp/channels/`,
-    status: `${API_BASE_URL}/api/v1/auth/otp/status/`,
-    forgotPassword: `${API_BASE_URL}/api/v1/auth/password/forgot/`,
-    resetPassword: `${API_BASE_URL}/api/v1/auth/password/reset/`,
     e2eeRegisterKeys: `${API_BASE_URL}/api/v1/auth/e2ee/keys/`,
     e2eeFetchBundle: (userId: string) => `${API_BASE_URL}/api/v1/auth/e2ee/keys/${userId}/`,
     e2eeFetchDeviceBundles: (userId: string) => `${API_BASE_URL}/api/v1/auth/e2ee/keys/${userId}/devices/`,
@@ -23,11 +17,9 @@ const authRoutes = {
     transferParentDevice: `${API_BASE_URL}/api/v1/auth/devices/transfer-parent/`,
     revokeAllSecondary: `${API_BASE_URL}/api/v1/auth/devices/revoke-all-secondary/`,
     renameDevice: (deviceId: string) => `${API_BASE_URL}/api/v1/auth/devices/${deviceId}/rename/`,
-    parentRecoveryInit: `${API_BASE_URL}/api/v1/auth/recovery/initiate/`,
-    parentRecoveryConfirm: `${API_BASE_URL}/api/v1/auth/recovery/confirm/`,
-    // KIS Auth (Google-backed) recovery — ships alongside the email/phone
-    // OTP path above, not replacing it. See apps/kis_auth_bridge on the
-    // Django backend.
+    // KIS Auth (Google-backed) recovery/linking — the sole account-recovery
+    // and email-verification mechanism now that email/SMS OTP has been
+    // removed. See apps/kis_auth_bridge on the Django backend.
     kisAuthRecoveryComplete: `${API_BASE_URL}/api/v1/kis-auth/recovery/complete/`,
     kisAuthLinkInitiate: `${API_BASE_URL}/api/v1/kis-auth/link/initiate/`,
     kisAuthLinkComplete: `${API_BASE_URL}/api/v1/kis-auth/link/complete/`,

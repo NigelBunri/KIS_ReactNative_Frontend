@@ -50,7 +50,6 @@ import { runChatMediaMigrationIfNeeded } from '@/Module/ChatRoom/Storage/chatMed
 import { startMediaTransferQueue, stopMediaTransferQueue } from '@/services/mediaTransferQueue';
 import { flushPendingMutations } from '@/services/pendingMutationsQueue';
 import { loadConsentPreferences } from '@/services/consentService';
-import { FEATURE_FLAGS } from '@/constants/featureFlags';
 
 import SplashScreen from './src/screens/SplashScreen';
 import WelcomeScreen from './src/screens/WelcomeScreen';
@@ -58,8 +57,6 @@ import LoginScreen from './src/screens/LoginScreen';
 import RegisterScreen from './src/screens/RegisterScreen';
 import TermsAndConditionsScreen from './src/screens/TermsAndConditionsScreen';
 import PrivacyPolicyScreen from './src/screens/PrivacyPolicyScreen';
-import DeviceVerificationScreen from './src/screens/DeviceVerificationScreen';
-import VerificationChannelSelectScreen from './src/screens/VerificationChannelSelectScreen';
 import TwoFactorScreen from './src/screens/TwoFactorScreen';
 import { MainTabs, AnimatedKISTabBar } from '@/navigation/AppNavigator';
 import {
@@ -221,7 +218,6 @@ import KISPrinciplesScreen from '@/screens/profile/KISPrinciplesScreen';
 import AccountDeletionScreen from '@/screens/AccountDeletionScreen';
 import BlockedContactsScreen from '@/screens/tabs/BlockedContactsScreen';
 import PasswordChangeScreen from '@/screens/PasswordChangeScreen';
-import EmailVerificationScreen from '@/screens/EmailVerificationScreen';
 import ComplianceSettingsScreen from '@/screens/ComplianceSettingsScreen';
 import CacheManagementScreen from '@/screens/CacheManagementScreen';
 import AdminUserManagementScreen from '@/screens/AdminUserManagementScreen';
@@ -373,6 +369,11 @@ type AuthCtx = {
   // fact. null = not yet hydrated this session. See QuickLockService.
   hasPin?: boolean | null;
   setHasPin?: (v: boolean | null) => void;
+  // Set by RegisterScreen's phone/password path right before setAuth(true)
+  // so the authenticated stack (which this screen isn't mounted inside yet)
+  // can push the skippable Google-linking prompt once it comes up. Never
+  // set after the Google sign-up path, since that path already links.
+  setPendingGoogleLinkPrompt?: (v: boolean) => void;
 };
 const AuthContext = createContext<AuthCtx>({
   isAuth: false,
@@ -385,6 +386,7 @@ const AuthContext = createContext<AuthCtx>({
   setUser: () => {},
   hasPin: null,
   setHasPin: () => {},
+  setPendingGoogleLinkPrompt: () => {},
 });
 export const useAuth = () => useContext(AuthContext);
 
@@ -629,7 +631,7 @@ function AppContent() {
   }, [isAuth, booting, syncActiveRoute]);
 
   const [load, setLoad] = useState(false);
-  const [pendingVerificationPhone, setPendingVerificationPhone] = useState<string | null>(null);
+  const [pendingGoogleLinkPrompt, setPendingGoogleLinkPrompt] = useState(false);
   const [_phone, setPhone] = useState<string | null>(null);
   const [user, setUser] = useState<KISUser | null>(null);
   const [showQuickLock, setShowQuickLock] = useState(false);
@@ -899,22 +901,6 @@ function AppContent() {
         console.log('active from backend:', active);
 
         if (active) {
-          // Anti-bypass: tokens exist but phone was never verified (edge case from old data)
-          // Suspended via FEATURE_FLAGS.PHONE_VERIFICATION_ENABLED — flip it (and the
-          // matching API flag) back to true to re-enforce this.
-          const phoneVerified = Boolean(
-            (u as any)?.verification?.phone?.verified,
-          );
-          if (FEATURE_FLAGS.PHONE_VERIFICATION_ENABLED && !phoneVerified) {
-            const pendingPhone =
-              (u as any)?.phone ||
-              (u as any)?.phone_number ||
-              '';
-            setPendingVerificationPhone(pendingPhone);
-            setUser(null);
-            setAuth(false);
-            return;
-          }
           applyUser(u);
           setAuth(true);
         } else if (Number(res?.status) === 429) {
@@ -1055,23 +1041,24 @@ function AppContent() {
     console.log('isAuth ->', isAuth);
   }, [isAuth]);
 
-  // After boot, route unverified accounts (has tokens but phone_verified=false) to verification.
-  // Retries until the navigator is ready (onReady fires async after first render).
+  // Post-registration (phone/password path), the skippable Google-linking
+  // prompt is pushed once the authenticated stack comes up — RegisterScreen
+  // sets this flag right before setAuth(true), since it isn't mounted
+  // inside the authenticated navigator where 'KisAuthLink' lives. Retries
+  // until the navigator is ready (onReady fires async after first render).
   useEffect(() => {
-    if (!booting && pendingVerificationPhone) {
+    if (!booting && isAuth && pendingGoogleLinkPrompt) {
       const tryNavigate = () => {
         if (navigationRef.current?.isReady?.()) {
-          navigationRef.current.navigate('VerificationChannelSelect' as any, {
-            phone: pendingVerificationPhone,
-            purpose: 'register',
-          });
+          navigationRef.current.navigate('KisAuthLink' as any, { fromRegistration: true });
+          setPendingGoogleLinkPrompt(false);
         } else {
           setTimeout(tryNavigate, 50);
         }
       };
       tryNavigate();
     }
-  }, [booting, pendingVerificationPhone]);
+  }, [booting, isAuth, pendingGoogleLinkPrompt]);
 
   useEffect(() => {
     if (user?.id) {
@@ -1236,6 +1223,7 @@ function AppContent() {
       setUser,
       hasPin,
       setHasPin,
+      setPendingGoogleLinkPrompt,
     }),
     [
       isAuth,
@@ -1816,10 +1804,6 @@ function AppContent() {
                       getComponent={() => PasswordChangeScreen}
                     />
                     <RootStack.Screen
-                      name="EmailVerification"
-                      getComponent={() => EmailVerificationScreen}
-                    />
-                    <RootStack.Screen
                       name="ComplianceSettings"
                       getComponent={() => ComplianceSettingsScreen}
                       options={{ headerShown: false }}
@@ -2199,19 +2183,6 @@ function AppContent() {
                     <RootStack.Screen
                       name="KisAuthRegisterPhone"
                       component={KisAuthRegisterPhoneScreen}
-                    />
-                    <RootStack.Screen name="DeviceVerification">
-                      {props => (
-                        <DeviceVerificationScreen
-                          {...props}
-                          setLoad={setLoad}
-                        />
-                      )}
-                    </RootStack.Screen>
-                    <RootStack.Screen
-                      name="VerificationChannelSelect"
-                      component={VerificationChannelSelectScreen}
-                      options={{ headerShown: false }}
                     />
                     <RootStack.Screen
                       name="TwoFactor"

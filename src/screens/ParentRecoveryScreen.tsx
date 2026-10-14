@@ -8,7 +8,6 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from 'react-native';
 import { SafeAreaView } from '@/components/common/SafeAreaViewWithTopPadding';
@@ -22,13 +21,19 @@ import { KISAUTH_BASE_URL } from '@/network/config';
 import { setAuthTokens } from '@/security/authStorage';
 import { setUserData } from '@/network/cache';
 import { ensureDeviceId, initE2EE } from '@/security/e2ee';
-import { FEATURE_FLAGS } from '@/constants/featureFlags';
 import { launchKisAuthFlow } from '@/security/kisAuthBrowser';
 import { useAuth } from '../../App';
 
 const KIS_AUTH_RECOVERY_REDIRECT_URI = 'https://kis.app/auth/kisauth-callback';
 
-type Step = 'identify' | 'verify' | 'done';
+// Email/SMS-code recovery has been removed; KIS Auth (Google) is now the
+// only account-recovery mechanism. 'idle' just shows the explainer + the
+// one action; 'done' is the success state.
+type Step = 'idle' | 'done';
+
+const SUPPORT_CONTACT_COPY =
+  "We couldn't complete recovery with that Google account. If you haven't connected a Google account to KIS, " +
+  'email support@kingdomimpact.social for help regaining access.';
 
 // Not in RootStackParamList (src/navigation/types.ts) — that file had
 // unrelated uncommitted changes in flight from a concurrent session when
@@ -44,10 +49,7 @@ export default function ParentRecoveryScreen() {
   const responsive = useResponsiveLayout();
   const formMaxWidth = Math.min(480, responsive.contentMaxWidth - 32);
 
-  const [step, setStep] = useState<Step>('identify');
-  const [phone, setPhone] = useState('');
-  const [email, setEmail] = useState('');
-  const [recoveryToken, setRecoveryToken] = useState('');
+  const [step, setStep] = useState<Step>('idle');
   const [loading, setLoading] = useState(false);
   const [kisAuthLoading, setKisAuthLoading] = useState(false);
 
@@ -77,16 +79,13 @@ export default function ParentRecoveryScreen() {
         );
 
         if (!res?.success) {
-          Alert.alert(
-            'Recovery failed',
-            res?.message || res?.data?.detail || 'We could not complete this authentication request.',
-          );
+          Alert.alert('Recovery failed', res?.message || res?.data?.detail || SUPPORT_CONTACT_COPY);
           return;
         }
 
         const accessToken = res.data?.access;
         if (!accessToken) {
-          Alert.alert('Recovery failed', 'We could not complete this authentication request.');
+          Alert.alert('Recovery failed', SUPPORT_CONTACT_COPY);
           return;
         }
 
@@ -133,12 +132,11 @@ export default function ParentRecoveryScreen() {
         return;
       }
       if (outcome.kind === 'error') {
-        Alert.alert(
-          'Recovery failed',
-          outcome.error === 'not_linked'
-            ? "This Google account isn't linked to a KIS account yet. Log in the usual way and link it from Settings first."
-            : 'We could not complete this authentication request.',
-        );
+        // Deliberately the same generic message regardless of the real
+        // failure reason (not_linked vs. anything else) — distinguishing
+        // them would let an attacker enumerate which Google accounts are
+        // linked to a KIS account.
+        Alert.alert('Recovery failed', SUPPORT_CONTACT_COPY);
         return;
       }
       kisAuthHandledCode.current = outcome.code;
@@ -165,82 +163,6 @@ export default function ParentRecoveryScreen() {
     void completeKisAuthRecovery(params.kisAuthCode);
   }, [route.params, completeKisAuthRecovery]);
 
-  const handleInitiate = useCallback(async () => {
-    if (!phone.trim() && !email.trim()) {
-      Alert.alert('Required', 'Enter your phone number or email address.');
-      return;
-    }
-    setLoading(true);
-    try {
-      const body: Record<string, string> = {};
-      if (phone.trim()) body.phone = phone.trim();
-      if (email.trim()) body.email = email.trim();
-
-      await postRequest(ROUTES.auth.parentRecoveryInit, body, {
-        errorMessage: 'Recovery initiation failed.',
-      });
-      // Always show this message regardless of result — prevents account enumeration
-      Alert.alert(
-        'Check your email',
-        'If an account matches, a recovery code has been sent. It expires in 15 minutes.\n\nOnce verified, this device becomes your primary device immediately and your previous primary device is signed out.',
-      );
-      setStep('verify');
-    } catch (e: any) {
-      Alert.alert('Error', e?.message ?? 'Unable to initiate recovery.');
-    } finally {
-      setLoading(false);
-    }
-  }, [phone, email]);
-
-  const handleConfirm = useCallback(async () => {
-    if (!recoveryToken.trim()) {
-      Alert.alert('Required', 'Enter the recovery code from your email.');
-      return;
-    }
-    setLoading(true);
-    try {
-      const deviceId = await ensureDeviceId();
-      const res = await postRequest(
-        ROUTES.auth.parentRecoveryConfirm,
-        {
-          recovery_token: recoveryToken.trim(),
-          device_id: deviceId,
-          device_name: `${Platform.OS === 'ios' ? 'iPhone' : 'Android'} (recovered)`,
-          platform: Platform.OS,
-        },
-        { errorMessage: 'Recovery confirmation failed.' },
-      );
-
-      if (!res?.success) {
-        Alert.alert(
-          'Invalid code',
-          res?.message || res?.data?.detail || 'Recovery code is invalid or expired.',
-        );
-        return;
-      }
-
-      const t = res.data?.tokens ?? res.data ?? {};
-      const accessToken = t.access ?? t.access_token;
-      if (!accessToken) {
-        // Recovery initiated (24-hour delay) — no immediate login token
-        setStep('done');
-        return;
-      }
-
-      setStep('done');
-      await setAuthTokens({ accessToken, refreshToken: t.refresh ?? t.refresh_token ?? null });
-      const resolvedUser = res?.data?.user ?? null;
-      await setUserData(resolvedUser, res.data);
-      setUser?.(resolvedUser);
-      void initE2EE(String(resolvedUser?.id ?? '')).catch(() => {});
-      setAuth(true);
-    } catch (e: any) {
-      Alert.alert('Error', e?.message ?? 'Unable to complete recovery.');
-    } finally {
-      setLoading(false);
-    }
-  }, [recoveryToken, setAuth, setUser]);
-
   return (
     <SafeAreaView style={[styles.root, { backgroundColor: palette.bg, }]} edges={['top', 'bottom']}>
       <View style={[styles.header, { borderBottomColor: palette.divider }]}>
@@ -263,107 +185,34 @@ export default function ParentRecoveryScreen() {
           <KISIcon name="warning" size={36} color={palette.primary} />
         </View>
 
-        {step === 'identify' && (
+        {step === 'idle' && (
           <>
-            <Text style={[styles.title, { color: palette.text }]}>Recover Primary Device</Text>
+            <Text style={[styles.title, { color: palette.text }]}>Recover Your Account</Text>
             <Text style={[styles.subtitle, { color: palette.subtext }]}>
-              If you lost your primary device, enter your phone number or email. We'll send a recovery code.
-              Verifying it makes this device your primary immediately and signs your previous primary device out.
+              If you lost your primary device or forgot your password, recover access using the Google account
+              previously linked to your KIS account. Verifying it makes this device your primary immediately and
+              signs your previous primary device out.
             </Text>
 
-            {FEATURE_FLAGS.KIS_AUTH_RECOVERY_ENABLED && (
-              <>
-                <Pressable
-                  style={[
-                    styles.primaryBtn,
-                    { backgroundColor: palette.primary, opacity: kisAuthLoading ? 0.6 : 1, maxWidth: formMaxWidth },
-                  ]}
-                  onPress={handleKisAuthRecovery}
-                  disabled={kisAuthLoading || loading}
-                >
-                  {kisAuthLoading ? (
-                    <ActivityIndicator color={palette.ivory} />
-                  ) : (
-                    <Text style={[styles.primaryBtnText, { color: palette.ivory }]}>Recover with KIS Auth</Text>
-                  )}
-                </Pressable>
-                <Text style={[{ color: palette.subtext, fontWeight: '600', fontSize: 12 }]}>
-                  — or use a recovery code —
-                </Text>
-              </>
-            )}
-
-            <View style={[styles.inputGroup, { maxWidth: formMaxWidth }]}>
-              <Text style={[styles.label, { color: palette.subtext }]}>Phone number</Text>
-              <TextInput
-                style={[styles.input, { backgroundColor: palette.surface, borderColor: palette.border, color: palette.text }]}
-                placeholder="+237 6XX XXX XXX"
-                placeholderTextColor={palette.subtext}
-                value={phone}
-                onChangeText={setPhone}
-                keyboardType="phone-pad"
-                autoCapitalize="none"
-              />
-            </View>
-
-            <Text style={[{ color: palette.subtext, fontWeight: '600', fontSize: 12 }]}>— or —</Text>
-
-            <View style={[styles.inputGroup, { maxWidth: formMaxWidth }]}>
-              <Text style={[styles.label, { color: palette.subtext }]}>Email address</Text>
-              <TextInput
-                style={[styles.input, { backgroundColor: palette.surface, borderColor: palette.border, color: palette.text }]}
-                placeholder="you@example.com"
-                placeholderTextColor={palette.subtext}
-                value={email}
-                onChangeText={setEmail}
-                keyboardType="email-address"
-                autoCapitalize="none"
-                autoCorrect={false}
-              />
-            </View>
-
             <Pressable
-              style={[styles.primaryBtn, { backgroundColor: palette.primary, opacity: (phone.trim() || email.trim()) && !loading ? 1 : 0.5, maxWidth: formMaxWidth }]}
-              onPress={handleInitiate}
-              disabled={loading || (!phone.trim() && !email.trim())}
+              style={[
+                styles.primaryBtn,
+                { backgroundColor: palette.primary, opacity: kisAuthLoading ? 0.6 : 1, maxWidth: formMaxWidth },
+              ]}
+              onPress={handleKisAuthRecovery}
+              disabled={kisAuthLoading || loading}
             >
-              {loading ? <ActivityIndicator color={palette.ivory} /> : <Text style={[styles.primaryBtnText, { color: palette.ivory }]}>Send Recovery Code</Text>}
+              {kisAuthLoading ? (
+                <ActivityIndicator color={palette.ivory} />
+              ) : (
+                <Text style={[styles.primaryBtnText, { color: palette.ivory }]}>Recover with Google</Text>
+              )}
             </Pressable>
-          </>
-        )}
 
-        {step === 'verify' && (
-          <>
-            <Text style={[styles.title, { color: palette.text }]}>Enter Recovery Code</Text>
-            <Text style={[styles.subtitle, { color: palette.subtext }]}>
-              Check your email for a 6-character recovery code. It expires in 15 minutes and can only be used once.
+            <Text style={[styles.subtitle, { color: palette.subtext, fontSize: 12, lineHeight: 17 }]}>
+              Haven't connected a Google account, or recovery didn't work? Email support@kingdomimpact.social for
+              help regaining access.
             </Text>
-
-            <View style={[styles.inputGroup, { maxWidth: formMaxWidth }]}>
-              <Text style={[styles.label, { color: palette.subtext }]}>Recovery code</Text>
-              <TextInput
-                style={[styles.input, { backgroundColor: palette.surface, borderColor: palette.border, color: palette.text, letterSpacing: 4, textAlign: 'center', fontSize: 22, fontWeight: '700' }]}
-                placeholder="A1B2C3"
-                placeholderTextColor={palette.subtext}
-                value={recoveryToken}
-                onChangeText={(t) => setRecoveryToken(t.toUpperCase())}
-                autoCapitalize="characters"
-                autoCorrect={false}
-                maxLength={64}
-              />
-            </View>
-
-            <Pressable
-              style={[styles.primaryBtn, { backgroundColor: palette.primary, opacity: recoveryToken.trim() && !loading ? 1 : 0.5, maxWidth: formMaxWidth }]}
-              onPress={handleConfirm}
-              disabled={loading || !recoveryToken.trim()}
-            >
-              {loading ? <ActivityIndicator color={palette.ivory} /> : <Text style={[styles.primaryBtnText, { color: palette.ivory }]}>Verify & Recover</Text>}
-            </Pressable>
-
-            <Pressable onPress={() => setStep('identify')} style={styles.backLink}>
-              <Text style={[styles.backLinkText, { color: palette.subtext }]}>← Back</Text>
-            </Pressable>
           </>
         )}
 
@@ -383,8 +232,8 @@ export default function ParentRecoveryScreen() {
         <View style={[styles.securityNote, { backgroundColor: palette.surface, borderColor: palette.divider, maxWidth: formMaxWidth }]}>
           <KISIcon name="lock" size={14} color={palette.subtext} />
           <Text style={[styles.securityNoteText, { color: palette.subtext }]}>
-            The recovery code only reaches a verified email you already control, and transfer happens immediately —
-            your previous primary device is signed out as soon as this completes. All recovery attempts are logged and audited.
+            Recovery transfers primary-device status immediately once Google confirms your identity — your previous
+            primary device is signed out as soon as this completes. All recovery attempts are logged and audited.
           </Text>
         </View>
       </ScrollView>

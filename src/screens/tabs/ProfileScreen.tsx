@@ -3374,17 +3374,6 @@ export default function ProfileScreen() {
                   danger: false,
                   badge: false,
                 },
-                // Verified email is required for primary-device recovery
-                // (lost/stolen phone) — surface it here, before the user
-                // ever needs it, and drop the row once it's done.
-                ...(authUser?.email_verified
-                  ? []
-                  : [{
-                      label: 'Verify Email',
-                      route: 'EmailVerification' as const,
-                      danger: false,
-                      badge: true,
-                    }]),
                 {
                   label: 'Manage Devices',
                   route: 'DeviceManagement' as const,
@@ -3392,11 +3381,21 @@ export default function ProfileScreen() {
                   badge: false,
                 },
                 // Prerequisite for Google-backed recovery (ParentRecoveryScreen's
-                // "Recover with KIS Auth") — that flow can only ever find an
+                // "Recover with Google") — that flow can only ever find an
                 // account here already linked one, never the other way around.
+                // Also the only path to a verified email now that OTP email
+                // verification has been removed (email_verified is set
+                // server-side only from a verified Google identity).
+                // `verification.google` is server-authoritative (never
+                // client-writable) and distinct from the generic
+                // `email_verified` proxy: it carries the connected Google
+                // email specifically, separate from the account's contact
+                // email, since linking never changes contact email.
                 ...(FEATURE_FLAGS.KIS_AUTH_LINK_ENABLED
                   ? [{
-                      label: 'Link Google Account',
+                      label: authUser?.verification?.google?.linked
+                        ? 'Google Account Connected'
+                        : 'Connect Google Account',
                       route: 'KisAuthLink' as const,
                       danger: false,
                       badge: false,

@@ -10,6 +10,21 @@ export interface KISUser {
   phone_number?: string | null;
   email?: string | null;
   email_verified?: boolean;
+  // Server-authoritative Google-link status, set only by
+  // apps.kis_auth_bridge after a verified KIS Auth identity assertion is
+  // redeemed - never client-writable (UserSerializer.Meta.read_only_fields
+  // excludes `verification` entirely). `google.email` is the connected
+  // Google account's email, distinct from the top-level `email` (contact
+  // email), since linking an existing account never changes contact email.
+  verification?: {
+    google?: {
+      linked: boolean;
+      email: string | null;
+      email_verified: boolean;
+      linked_at: string;
+    };
+    [key: string]: unknown;
+  } | null;
   is_active?: boolean;
   status?: string;
   is_staff?: boolean;

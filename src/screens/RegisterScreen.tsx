@@ -142,7 +142,7 @@ const createStyles = (tokens: typeof KIS_TOKENS, contentMaxWidth: number) =>
   });
 
 export default function RegisterScreen({ navigation, route }: any) {
-  const { setAuth, setUser } = useAuth();
+  const { setAuth, setUser, setPendingGoogleLinkPrompt } = useAuth();
   const { palette, tokens, tone } = useKISTheme();
   const responsive = useResponsiveLayout();
   const styles = useMemo(() => createStyles(tokens, responsive.contentMaxWidth), [tokens, responsive.contentMaxWidth]);
@@ -413,10 +413,16 @@ export default function RegisterScreen({ navigation, route }: any) {
         ['user_country_code', countryCode],
       ]);
 
-      // Phone verification suspended (FEATURE_FLAGS.PHONE_VERIFICATION_ENABLED false):
-      // the backend auto-verifies and returns tokens directly, so log the user in now.
+      // Phone/email OTP verification has been removed entirely — the backend
+      // auto-verifies and returns tokens directly, so log the user in now.
+      // Email verification itself is no longer OTP-driven either; it's only
+      // ever set once this account links a Google identity (see
+      // KisAuthLinkScreen / apps.kis_auth_bridge), so every phone/password
+      // registration is routed into that linking step next — skippable, per
+      // the optional-but-encouraged linking policy, but offered immediately
+      // while the benefit is top of mind.
       const accessToken = res?.data?.access || res?.data?.access_token;
-      if (!FEATURE_FLAGS.PHONE_VERIFICATION_ENABLED && accessToken) {
+      if (accessToken) {
         await setAuthTokens({
           accessToken,
           refreshToken: res?.data?.refresh || res?.data?.refresh_token || null,
@@ -425,12 +431,12 @@ export default function RegisterScreen({ navigation, route }: any) {
         await setUserData(resolvedUser, res.data);
         setUser?.(resolvedUser);
         void initE2EE(String(resolvedUser?.id ?? '')).catch(() => {});
+        setPendingGoogleLinkPrompt?.(true);
         setAuth(true);
         return;
       }
 
-      // Account created — now verify. No tokens yet.
-      navigation.navigate('VerificationChannelSelect', { phone: phoneE164 });
+      Alert.alert('Registration failed', 'We could not complete this registration. Please try again.');
     } catch (e: any) {
       Alert.alert('Error', e?.message ?? 'Unexpected issue occurred.');
     } finally {

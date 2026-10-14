@@ -24,6 +24,15 @@ type KisAuthLinkDeepLinkParams = {
   kisAuthCode?: string;
   kisAuthState?: string;
   kisAuthError?: string;
+  // Set when this screen is pushed right after a fresh phone/password
+  // registration (see App.tsx's pendingGoogleLinkPrompt effect) rather than
+  // opened from Settings. Swaps in the registration-flow copy and adds the
+  // "Skip for now" affordance — linking stays optional, so this screen must
+  // never be a dead end. Not present on deep-link returns from a killed
+  // app; in that case this falls back to the Settings framing, which is
+  // still safe (the button simply says "Continue with Google" instead of
+  // "Connect Google Account").
+  fromRegistration?: boolean;
 };
 
 // This is the ONLY entry point that can ever create a Google-identity
@@ -40,6 +49,18 @@ export default function KisAuthLinkScreen() {
 
   const [loading, setLoading] = useState(false);
   const [linked, setLinked] = useState(false);
+  const fromRegistration = Boolean((route.params as KisAuthLinkDeepLinkParams | undefined)?.fromRegistration);
+
+  // Registration already completed and persisted before this screen is ever
+  // shown (RegisterScreen calls setAuth(true) first) — so skipping, failing,
+  // or killing the app mid-link never loses the account or forces a retry
+  // of registration itself. Skip just leaves the identity unlinked; "Connect
+  // Google Account" / "Continue with Google" above remains available from
+  // Settings any time afterward.
+  const handleSkip = useCallback(() => {
+    if (loading) return;
+    navigation.goBack();
+  }, [navigation, loading]);
 
   // Same replay/CSRF guard as ParentRecoveryScreen's expected-state ref —
   // this flow returns to the SAME screen (deepLinkRouter.ts navigates back
@@ -176,13 +197,24 @@ export default function KisAuthLinkScreen() {
               You can now use "Recover with KIS Auth" to sign back in with Google if you ever lose access to this
               device.
             </Text>
+            {fromRegistration ? (
+              <Pressable
+                style={[styles.primaryBtn, { backgroundColor: palette.primary, maxWidth: formMaxWidth }]}
+                onPress={handleSkip}
+              >
+                <Text style={[styles.primaryBtnText, { color: palette.ivory }]}>Continue</Text>
+              </Pressable>
+            ) : null}
           </>
         ) : (
           <>
-            <Text style={[styles.title, { color: palette.text }]}>Link your Google account</Text>
+            <Text style={[styles.title, { color: palette.text }]}>
+              {fromRegistration ? 'Secure your KIS account' : 'Link your Google account'}
+            </Text>
             <Text style={[styles.subtitle, { color: palette.subtext }]}>
-              Linking lets you sign back into KIS with Google if you lose this device — no SMS or email code needed.
-              Your KIS account stays exactly as it is; this only adds a second way in.
+              {fromRegistration
+                ? 'Connect your Google account to help protect your account and make recovery easier if you forget your password or lose access to your usual sign-in method.'
+                : 'Linking lets you sign back into KIS with Google if you lose this device — no SMS or email code needed. Your KIS account stays exactly as it is; this only adds a second way in.'}
             </Text>
 
             <Pressable
@@ -196,9 +228,26 @@ export default function KisAuthLinkScreen() {
               {loading ? (
                 <ActivityIndicator color={palette.ivory} />
               ) : (
-                <Text style={[styles.primaryBtnText, { color: palette.ivory }]}>Continue with Google</Text>
+                <Text style={[styles.primaryBtnText, { color: palette.ivory }]}>
+                  {fromRegistration ? 'Connect Google Account' : 'Continue with Google'}
+                </Text>
               )}
             </Pressable>
+
+            {fromRegistration ? (
+              <Text style={[styles.subtitle, { color: palette.subtext, fontSize: 12, lineHeight: 17 }]}>
+                KIS uses Google to verify your identity securely. Your KIS account remains yours, and connecting
+                Google does not give Google control over your KIS account.
+              </Text>
+            ) : null}
+
+            {fromRegistration ? (
+              <Pressable onPress={handleSkip} disabled={loading} style={styles.skipBtn}>
+                <Text style={[styles.skipBtnText, { color: palette.subtext, opacity: loading ? 0.5 : 1 }]}>
+                  Skip for now
+                </Text>
+              </Pressable>
+            ) : null}
           </>
         )}
 
@@ -243,6 +292,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   primaryBtnText: { fontSize: 16, fontWeight: '800' },
+  skipBtn: { paddingVertical: 8 },
+  skipBtnText: { fontSize: 14, fontWeight: '600', textDecorationLine: 'underline' },
   securityNote: {
     flexDirection: 'row',
     alignItems: 'flex-start',
