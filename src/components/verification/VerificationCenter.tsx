@@ -23,6 +23,7 @@ import {
   type VerificationSubjectRef,
   type VerificationSummary,
 } from '@/services/verificationService';
+import { resolveLocationCountry, COUNTRY_NAMES } from '@/services/locationCountryService';
 
 type BadgeTone = 'verified' | 'pending' | 'review' | 'neutral' | 'rejected';
 
@@ -190,6 +191,33 @@ export function VerificationCenterSheet({
   const subjectType = subject.type;
   const subjectId = subject.id ? String(subject.id) : '';
 
+  // User-identity verification only - this is the ONLY place in the app
+  // that ever requests the OS location permission dialog now (App.tsx's
+  // old boot-time gate was removed; general app use never touches
+  // location at all). Optional evidence: a denial or lookup failure
+  // never blocks submission, it just means location isn't included.
+  const [userLocation, setUserLocation] = useState<{ countryISO: string; label: string } | null>(null);
+  const [requestingLocation, setRequestingLocation] = useState(false);
+  const [locationDeclined, setLocationDeclined] = useState(false);
+
+  const requestLocationForVerification = async () => {
+    setRequestingLocation(true);
+    try {
+      const resolved = await resolveLocationCountry(true);
+      setUserLocation({
+        countryISO: resolved.countryISO,
+        label: COUNTRY_NAMES[resolved.countryISO] ?? resolved.countryISO,
+      });
+      setLocationDeclined(false);
+    } catch {
+      // Denied, unavailable, or undetectable - proceed without it. This
+      // step is optional evidence, never a hard requirement to verify.
+      setLocationDeclined(true);
+    } finally {
+      setRequestingLocation(false);
+    }
+  };
+
   useEffect(() => {
     if (!visible) return;
     setSummary(initialSummary ?? null);
@@ -293,6 +321,9 @@ export function VerificationCenterSheet({
         certificate_issuer: issuer.trim() || undefined,
         expires_at: expiresAt.trim() || undefined,
         applicant_notes: notes.trim() || undefined,
+        ...(subjectType === 'user' && userLocation
+          ? { location: { country: userLocation.countryISO } }
+          : {}),
       };
       let response: any;
       if (pendingCaseId) {
@@ -447,6 +478,45 @@ export function VerificationCenterSheet({
                 style={[styles.input, styles.textArea, { color: palette.text, borderColor: palette.divider, backgroundColor: palette.card }]}
               />
             </View>
+
+            {subjectType === 'user' ? (
+              <View style={[styles.providerBox, { backgroundColor: palette.surface, borderColor: palette.divider }]}>
+                <Text style={[styles.blockTitle, { color: palette.text }]}>Location (optional)</Text>
+                <Text style={[styles.statusBody, { color: palette.subtext, marginBottom: 10 }]}>
+                  Sharing your location helps confirm your identity. This is the only time KIS ever asks for it —
+                  it's never required just to use the app, and skipping it won't block your verification.
+                </Text>
+                {userLocation ? (
+                  <Text style={[styles.uploadedRef, { color: palette.text, borderColor: palette.divider, backgroundColor: palette.card }]}>
+                    {userLocation.label}
+                  </Text>
+                ) : (
+                  <TextInput
+                    editable={false}
+                    value={requestingLocation ? 'Checking…' : locationDeclined ? 'Not shared — you can still submit' : ''}
+                    placeholder="Not shared yet"
+                    placeholderTextColor={palette.subtext}
+                    style={[styles.input, { color: palette.subtext, borderColor: palette.divider, backgroundColor: palette.card }]}
+                  />
+                )}
+                {!userLocation ? (
+                  <Pressable
+                    onPress={requestLocationForVerification}
+                    disabled={requestingLocation}
+                    style={[styles.statusCard, { backgroundColor: palette.card, borderColor: palette.divider, marginTop: 8, opacity: requestingLocation ? 0.6 : 1 }]}
+                  >
+                    {requestingLocation ? (
+                      <ActivityIndicator size="small" color={palette.primaryStrong} />
+                    ) : (
+                      <KISIcon name="check" size={16} color={palette.primaryStrong} />
+                    )}
+                    <Text style={[styles.statusTitle, { color: palette.text, marginLeft: 8 }]}>
+                      {locationDeclined ? 'Try sharing location again' : 'Share my location'}
+                    </Text>
+                  </Pressable>
+                ) : null}
+              </View>
+            ) : null}
 
             <View style={[styles.providerBox, { backgroundColor: palette.surface, borderColor: palette.divider }]}>
               <Text style={[styles.blockTitle, { color: palette.text }]}>Review timeline</Text>

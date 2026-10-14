@@ -39,7 +39,6 @@ import {
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
-  RESULTS,
   openSettings,
   type PermissionStatus,
 } from 'react-native-permissions';
@@ -185,13 +184,10 @@ import { initE2EE } from '@/security/e2ee';
 import ShopProductsPage from '@/screens/broadcast/market/pages/ShopProductsPage';
 import ShopServicesPage from '@/screens/broadcast/market/pages/ShopServicesPage';
 import {
-  CALLING_CODE_BY_ISO,
-  COUNTRY_NAMES,
   DEFAULT_CALLING_CODE,
   DEFAULT_COUNTRY_ISO,
   LocationCountryError,
   resolveLocationCountry,
-  wasLocationPermissionEverGranted,
   getLastCachedLocationCountry,
   cacheLocationCountry,
 } from '@/services/locationCountryService';
@@ -664,8 +660,6 @@ function AppContent() {
   const [_locationError, setLocationError] = useState(
     'Location access is required to use KIS.',
   );
-  const [showCountryPicker, setShowCountryPicker] = useState(false);
-  const [countrySearch, setCountrySearch] = useState('');
 
   useEffect(() => {
     startOfflineActionQueue();
@@ -933,12 +927,9 @@ function AppContent() {
 
   useEffect(() => {
     (async () => {
-      // Pre-fill from cache immediately — prevents "Location Required" screen
-      // on repeat launches when permission was already granted.
-      const [cached, hadPermission] = await Promise.all([
-        getLastCachedLocationCountry(),
-        wasLocationPermissionEverGranted(),
-      ]);
+      // Pre-fill from cache immediately — best-effort default, nothing
+      // ever blocks on this.
+      const cached = await getLastCachedLocationCountry();
       if (cached?.iso) {
         setLocationCountryISO(cached.iso);
         setLocationCallingCode(cached.callingCode);
@@ -954,8 +945,12 @@ function AppContent() {
 
       await Promise.race([
         Promise.allSettled([
-          // Only request the OS permission dialog on the very first launch.
-          syncLocationCountry(!hadPermission),
+          // Never requests the OS permission dialog at boot — only the
+          // identity-verification flow does that now. `false` here still
+          // gets a real country via IP-based detection
+          // (resolveLocationCountry → detectCountryFromIP), no permission
+          // needed for that path at all.
+          syncLocationCountry(false),
           checkAuth(),
         ]),
         new Promise<void>(resolve => setTimeout(resolve, BOOT_MAX_MS)),
@@ -1240,127 +1235,14 @@ function AppContent() {
     return <SplashScreen />;
   }
 
-  if (!locationReady) {
-    const isBlocked = locationStatus === RESULTS.BLOCKED;
-    const countryList = Object.keys(CALLING_CODE_BY_ISO)
-      .map((iso) => ({ iso, name: COUNTRY_NAMES[iso] ?? iso, code: CALLING_CODE_BY_ISO[iso] }))
-      .sort((a, b) => a.name.localeCompare(b.name));
-    const filtered = countrySearch.trim()
-      ? countryList.filter(
-          (c) =>
-            c.name.toLowerCase().includes(countrySearch.toLowerCase()) ||
-            c.iso.toLowerCase().includes(countrySearch.toLowerCase()) ||
-            c.code.includes(countrySearch),
-        )
-      : countryList;
-
-    return (
-      <View key={`location-${languageVersion}-age-${ageVersion}`} style={{ flex: 1 }}>
-        <View style={locationStyles.root}>
-          <Text style={locationStyles.title}>Location Required</Text>
-          <Text style={locationStyles.message}>
-            KIS uses your location to set your country and calling code automatically.
-          </Text>
-
-          {locationChecking ? (
-            <ActivityIndicator size="small" color="#111" />
-          ) : null}
-
-          {/* Primary action */}
-          {!locationChecking && (
-            <Pressable
-              style={locationStyles.primaryButton}
-              onPress={async () => {
-                if (isBlocked) {
-                  await openSettings().catch(() => undefined);
-                } else {
-                  await syncLocationCountry(true);
-                }
-              }}
-            >
-              <Text style={locationStyles.primaryText}>
-                {isBlocked ? 'Open Settings' : 'Allow Location Access'}
-              </Text>
-            </Pressable>
-          )}
-
-          {/* Retry (when not blocked) */}
-          {!locationChecking && !isBlocked && (
-            <Pressable
-              style={locationStyles.secondaryButton}
-              onPress={() => syncLocationCountry(false)}
-            >
-              <Text style={locationStyles.secondaryText}>Retry</Text>
-            </Pressable>
-          )}
-
-          {/* Manual country picker — always available */}
-          {!locationChecking && (
-            <Pressable
-              style={locationStyles.skipButton}
-              onPress={() => setShowCountryPicker(true)}
-            >
-              <Text style={locationStyles.skipText}>
-                Choose country manually
-              </Text>
-            </Pressable>
-          )}
-        </View>
-
-        {/* Country picker modal */}
-        <Modal
-          visible={showCountryPicker}
-          animationType="slide"
-          onRequestClose={() => setShowCountryPicker(false)}
-        >
-          <View style={locationStyles.pickerContainer}>
-            <View style={locationStyles.pickerHeader}>
-              <Text style={locationStyles.pickerTitle}>Choose your country</Text>
-              <Pressable onPress={() => setShowCountryPicker(false)}>
-                <Text style={locationStyles.pickerClose}>Cancel</Text>
-              </Pressable>
-            </View>
-            <TextInput
-              style={locationStyles.searchInput}
-              placeholder="Search country…"
-              value={countrySearch}
-              onChangeText={setCountrySearch}
-              autoFocus
-              clearButtonMode="while-editing"
-            />
-            <FlatList
-              data={filtered}
-              keyExtractor={(item) => item.iso}
-              keyboardShouldPersistTaps="handled"
-              renderItem={({ item }) => (
-                <Pressable
-                  style={locationStyles.countryRow}
-                  onPress={() => {
-                    setLocationCountryISO(item.iso);
-                    setLocationCallingCode(item.code);
-                    void cacheLocationCountry(item.iso, item.code);
-                    locationReadyRef.current = true;
-                    setLocationReady(true);
-                    setShowCountryPicker(false);
-                    setCountrySearch('');
-                  }}
-                >
-                  <Text style={locationStyles.countryName}>{item.name}</Text>
-                  <Text style={locationStyles.countryCode}>
-                    {item.iso}  {item.code}
-                  </Text>
-                </Pressable>
-              )}
-              ItemSeparatorComponent={() => <View style={locationStyles.separator} />}
-            />
-          </View>
-        </Modal>
-
-        <LanguageSwitcher />
-      </View>
-    );
-  }
-
+  // No app-wide location gate here anymore — country/calling-code is a
+  // best-effort default (IP-based via syncLocationCountry(false), never
+  // requesting the OS permission dialog — see the boot effect above) for
+  // RegisterScreen's phone input, with locationCountryISO/locationCallingCode
+  // already seeded to DEFAULT_COUNTRY_ISO/DEFAULT_CALLING_CODE so there is
+  // nothing to block on even before that resolves. Location is now only
+  // ever requested, with the real OS permission prompt, inside the
+  // identity-verification flow (src/components/verification/VerificationCenter.tsx).
   return (
     <AuthContext.Provider value={ctx}>
       <SocketProvider>

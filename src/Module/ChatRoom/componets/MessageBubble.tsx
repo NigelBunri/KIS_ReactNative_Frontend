@@ -14,6 +14,7 @@ import { chatRoomStyles as styles } from '../chatRoomStyles';
 import Pdf from 'react-native-pdf';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { KISIcon } from '@/constants/kisIcons';
+import UserBadgeRow from '@/components/common/UserBadgeRow';
 import KISButton from '@/constants/KISButton';
 import { ChatMessage } from '../chatTypes';
 import { EmojiPicker } from './EmojiPicker';
@@ -2707,15 +2708,18 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
               marginBottom: idx === contacts.length - 1 ? 0 : 6,
             }}
           >
-            <Text
-              style={{
-                fontSize: 13,
-                fontWeight: '600',
-                color: textColor,
-              }}
-            >
-              {c.name}
-            </Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+              <Text
+                style={{
+                  fontSize: 13,
+                  fontWeight: '600',
+                  color: textColor,
+                }}
+              >
+                {c.name}
+              </Text>
+              <UserBadgeRow badges={(c as any)?.badges} tier={(c as any)?.tier} context="inline-xs" />
+            </View>
             <Text
               style={{
                 fontSize: 12,

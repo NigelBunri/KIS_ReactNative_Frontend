@@ -6,6 +6,7 @@ import { withAlpha } from '@/theme/constants';
 import CommentThreadPanel from '@/components/feeds/CommentThreadPanel';
 import { useResponsiveLayout } from '@/theme/responsive';
 import { KISIcon } from '@/constants/kisIcons';
+import UserBadgeRow from '@/components/common/UserBadgeRow';
 import KISText from '@/components/common/KISText';
 import { resolveBackendAssetUrl } from '@/network';
 import RichTextRenderer from '@/components/feeds/RichTextRenderer';
@@ -409,6 +410,13 @@ export default function BroadcastFeedCard({
               >
                 <KISIcon name="check" size={12} color={palette.onPrimary} />
               </View>
+            ) : null}
+            {isUserSource ? (
+              <UserBadgeRow
+                badges={(item.author as any)?.badges}
+                tier={(item.author as any)?.tier}
+                context="inline-sm"
+              />
             ) : null}
           </View>
 

@@ -88,6 +88,11 @@ type StatusUser = {
   userId?: string;
   hasUnseen?: boolean;
   isMuted?: boolean;
+  // Not yet on ROUTES.statuses.list's response (apps.verification's
+  // serializer work for this endpoint hasn't shipped) - degrades to no
+  // badge shown, never a crash, until it does.
+  badges?: { code?: string | null; label?: string | null; issued_at?: string | null; expires_at?: string | null }[];
+  tier?: string | null;
 };
 
 const SAMPLE_STATUSES: StatusUser[] = [];
@@ -228,6 +233,8 @@ function StatusCard({
   hasUnseen,
   palette,
   label,
+  labelBadges,
+  labelTier,
   children,
 }: {
   width: number;
@@ -235,6 +242,12 @@ function StatusCard({
   hasUnseen: boolean;
   palette: ReturnType<typeof useKISTheme>['palette'];
   label?: string;
+  // Not UserBadgeRow here deliberately - that component is palette-driven
+  // (themed colors), but this label always sits on a fixed dark gradient
+  // over a photo/video thumbnail regardless of app theme, so its icons
+  // need fixed bright colors to stay legible, not theme colors.
+  labelBadges?: { code?: string | null }[];
+  labelTier?: string | null;
   children: React.ReactNode;
 }) {
   const frameWidth = 3;
@@ -278,12 +291,20 @@ function StatusCard({
               paddingBottom: 8,
             }}
           >
-            <Text
-              numberOfLines={2}
-              style={{ color: '#fff', fontSize: 12, fontWeight: '800' }}
-            >
-              {label}
-            </Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+              <Text
+                numberOfLines={2}
+                style={{ color: '#fff', fontSize: 12, fontWeight: '800', flexShrink: 1 }}
+              >
+                {label}
+              </Text>
+              {Array.isArray(labelBadges) && labelBadges.length > 0 ? (
+                <KISIcon name="checkmark-circle" size={11} color="#fff" />
+              ) : null}
+              {labelTier && String(labelTier).toLowerCase() !== 'free' ? (
+                <KISIcon name="crown" size={11} color={palette.gold} />
+              ) : null}
+            </View>
           </LinearGradient>
         ) : null}
       </View>
@@ -841,6 +862,8 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
             userId: String(entry?.user?.id ?? ''),
             name: entry?.user?.display_name ?? 'User',
             avatar: entry?.user?.avatar_url ?? undefined,
+            badges: entry?.user?.badges ?? undefined,
+            tier: entry?.user?.tier ?? undefined,
             hasUnseen: Boolean(entry?.has_unseen),
             items: Array.isArray(entry?.items)
               ? entry.items.map((item: any) => ({
@@ -1755,6 +1778,8 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
         hasUnseen={Boolean(user.hasUnseen)}
         palette={palette}
         label={user.name}
+        labelBadges={user.badges}
+        labelTier={user.tier}
       >
         {content}
       </StatusCard>
@@ -3189,9 +3214,17 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
                 )}
               </View>
               <View style={{ marginLeft: 10, flexShrink: 1 }}>
-                <Text style={styles.viewerHeaderName} numberOfLines={1}>
-                  {activeUser.id === 'me' ? 'My status' : activeUser.name}
-                </Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                  <Text style={styles.viewerHeaderName} numberOfLines={1}>
+                    {activeUser.id === 'me' ? 'My status' : activeUser.name}
+                  </Text>
+                  {activeUser.id !== 'me' && Array.isArray(activeUser.badges) && activeUser.badges.length > 0 ? (
+                    <KISIcon name="checkmark-circle" size={13} color="#fff" />
+                  ) : null}
+                  {activeUser.id !== 'me' && activeUser.tier && String(activeUser.tier).toLowerCase() !== 'free' ? (
+                    <KISIcon name="crown" size={13} color={palette.gold} />
+                  ) : null}
+                </View>
                 {currentItem?.createdAt ? (
                   <Text style={styles.viewerHeaderTime}>{timeAgo(currentItem.createdAt)}</Text>
                 ) : null}

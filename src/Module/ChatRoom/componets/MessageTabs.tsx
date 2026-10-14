@@ -21,6 +21,7 @@ import { useKISTheme } from '@/theme/useTheme';
 import { KIS_TOKENS } from '@/theme/constants';
 import { KISIcon } from '@/constants/kisIcons';
 import ImagePlaceholder from '@/components/common/ImagePlaceholder';
+import UserBadgeRow from '@/components/common/UserBadgeRow';
 
 import {
   styles,
@@ -262,6 +263,23 @@ const ChatRow = memo(function ChatRow({
   const otherId = item.isDirect
     ? ids.find((u) => u && u !== currentUserId) ?? null
     : null;
+  // Only present when this list's participants came through as the richer
+  // ParticipantWire[] payload (not a plain string[] of ids) - badges/tier
+  // aren't on the wire yet at all (apps.verification serializer work is
+  // landing separately), so this degrades to no badges shown, never a
+  // crash, until that ships.
+  const otherParticipantWire = item.isDirect
+    ? (item.participants ?? []).find((p: any) => {
+        const pid = typeof p === 'string' ? p : p?.user?.id ?? p?.id;
+        return pid && String(pid) === String(otherId);
+      })
+    : null;
+  const otherUserWire: any =
+    otherParticipantWire && typeof otherParticipantWire !== 'string'
+      ? (otherParticipantWire as any)?.user && typeof (otherParticipantWire as any).user === 'object'
+        ? (otherParticipantWire as any).user
+        : otherParticipantWire
+      : null;
   const ringColor = hasStatus
     ? hasUnseen
       ? palette.primaryStrong ?? palette.primary
@@ -388,6 +406,9 @@ const ChatRow = memo(function ChatRow({
           <Text style={[styles.name, { color: palette.text }]} numberOfLines={1}>
             {displayName}
           </Text>
+          {item.isDirect ? (
+            <UserBadgeRow badges={otherUserWire?.badges} tier={otherUserWire?.tier} context="inline-xs" />
+          ) : null}
           {item.isBlocked && (
             <View
               style={{

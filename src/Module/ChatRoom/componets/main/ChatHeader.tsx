@@ -8,6 +8,7 @@ import { directConversationAvatar } from '../../messagesUtils';
 import { chatRoomStyles as styles } from '../../chatRoomStyles';
 import { KISIcon } from '@/constants/kisIcons';
 import ImagePlaceholder from '@/components/common/ImagePlaceholder';
+import UserBadgeRow from '@/components/common/UserBadgeRow';
 
 type ChatHeaderProps = {
   chat: Chat | null;
@@ -119,6 +120,22 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
       : null);
 
   const headerStatusText = statusText ?? 'online';
+
+  // Same degrade-gracefully lookup as MessageTabs' chat list row — badges
+  // only render once the other participant's wire payload actually
+  // carries them, otherwise this is just an empty array, never a crash.
+  const otherParticipantWire = chat?.isDirect
+    ? (chat?.participants ?? []).find((p: any) => {
+        const pid = typeof p === 'string' ? p : p?.user?.id ?? p?.id;
+        return pid && String(pid) !== String(currentUserId);
+      })
+    : null;
+  const otherUserWire: any =
+    otherParticipantWire && typeof otherParticipantWire !== 'string'
+      ? (otherParticipantWire as any)?.user && typeof (otherParticipantWire as any).user === 'object'
+        ? (otherParticipantWire as any).user
+        : otherParticipantWire
+      : null;
 
   /* ─────────────────────────────────────────
    * 1) Selection mode header
@@ -358,6 +375,9 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
               >
                 {title}
               </Text>
+              {chat?.isDirect ? (
+                <UserBadgeRow badges={otherUserWire?.badges} tier={otherUserWire?.tier} context="header" />
+              ) : null}
               {isE2EE && !isConnecting && (
                 <KISIcon name="lock" size={11} color={palette.headerSubtext ?? palette.subtext} />
               )}
