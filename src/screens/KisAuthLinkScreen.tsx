@@ -7,6 +7,7 @@ import { useResponsiveLayout } from '@/theme/responsive';
 import { KISIcon } from '@/constants/kisIcons';
 import { postRequest } from '@/network/post';
 import { getRequest } from '@/network/get';
+import { setUserData } from '@/network/cache';
 import ROUTES from '@/network';
 import { KISAUTH_BASE_URL } from '@/network/config';
 import { launchKisAuthFlow } from '@/security/kisAuthBrowser';
@@ -98,27 +99,40 @@ export default function KisAuthLinkScreen() {
         return;
       }
       setLinked(true);
-      // The link-complete response is deliberately minimal ({ok, linked} —
-      // see apps.kis_auth_bridge.KisAuthLinkCompleteView), so it never
-      // carries the new verification.google block itself. Refetch the
-      // profile so the in-memory user (ProfileScreen's row, and this
-      // screen if reopened later this session) reflects "already
-      // connected" immediately, not just after the next app restart.
-      try {
-        const profileRes = await getRequest(ROUTES.auth.profile, { errorMessage: '' });
-        if (profileRes?.success && profileRes.data) {
-          setUser?.(profileRes.data);
-        }
-      } catch {
-        // Non-fatal — the link itself already succeeded; worst case the
-        // "already connected" state just catches up on next app boot.
+      // completeRes.data.google is authoritative and comes from the SAME
+      // request that just wrote it (apps.kis_auth_bridge.KisAuthLinkCompleteView
+      // returns it directly) — apply it synchronously, with no dependency
+      // on a second network round-trip. An earlier version of this screen
+      // relied solely on a follow-up GET /users/me/ to learn this, which
+      // could silently never land (deduped against a concurrent, pre-link
+      // checkAuth() call to the exact same endpoint; a transient network
+      // hiccup; anything) and left "Connect to Google" showing again the
+      // next time this screen mounted, despite the account actually being
+      // linked - confirmed in production: link/complete succeeded but no
+      // second /users/me/ request was ever made.
+      const google = completeRes.data?.google;
+      if (google && user) {
+        const updatedUser = { ...user, verification: { ...(user.verification ?? {}), google } };
+        setUser?.(updatedUser);
+        void setUserData(updatedUser, completeRes.data).catch(() => {});
       }
+      // Best-effort only from here — never the sole source of truth for
+      // "already connected" (see above). Keeps other possibly-stale
+      // profile fields (not just verification.google) in sync when it
+      // does land.
+      void getRequest(ROUTES.auth.profile, { errorMessage: '' })
+        .then(profileRes => {
+          if (profileRes?.success && profileRes.data) {
+            setUser?.(profileRes.data);
+          }
+        })
+        .catch(() => {});
     } catch (e: any) {
       Alert.alert('Error', e?.message ?? 'Unable to link your Google account.');
     } finally {
       setLoading(false);
     }
-  }, [setUser]);
+  }, [setUser, user]);
 
   useEffect(() => {
     const params = (route.params ?? {}) as KisAuthLinkDeepLinkParams;
