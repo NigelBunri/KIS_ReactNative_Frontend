@@ -7,6 +7,7 @@ import {
   ActivityIndicator,
   Animated,
   Easing,
+  Modal,
   Pressable,
   StyleSheet,
   Text,
@@ -118,6 +119,23 @@ export default function CallJoinScreen({ route, navigation }: Props) {
   const callTitle = callInfo?.title || typeLabel;
 
   return (
+    // AND-100: pushed as an ordinary stack screen, this rendered inside the
+    // normal React Navigation view hierarchy — but RN's <Modal> component
+    // (used throughout ChatRoomPage for attachment/options sheets) always
+    // renders in its own native window/dialog layer *outside* that
+    // hierarchy, on top of every regular screen regardless of navigation
+    // order. If a chat-room Modal was already open when this screen was
+    // pushed (e.g. tapping an invite link while an attachment sheet was up),
+    // this screen had no way to ever render above it. Wrapping this screen's
+    // own content in a <Modal> too puts it in that same native layer, so
+    // whichever was presented most recently — this join screen — wins, the
+    // same way any other screen-over-screen native modal stacking works.
+    <Modal
+      visible
+      transparent
+      animationType="none"
+      onRequestClose={() => navigation.replace('MainTabs')}
+    >
     <View style={[styles.root, { paddingTop: topInset, backgroundColor: palette.bg, }]}>
       <Animated.View
         style={[
@@ -212,6 +230,7 @@ export default function CallJoinScreen({ route, navigation }: Props) {
         )}
       </Animated.View>
     </View>
+    </Modal>
   );
 }
 

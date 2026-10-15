@@ -270,6 +270,23 @@ export function resolveIncomingCallTitle(args: {
   return safeDisplayName(args.payloadDisplayName ?? args.payloadCallerName, fallback);
 }
 
+// raisedHands (the userId array CallControls reads for the LOCAL raise-hand
+// button) was tracked correctly on every raise/lower, local or remote — but
+// nothing ever projected it onto participant.handRaised, the field every
+// other surface (ParticipantTile, ParticipantsSheet, VoiceCallGrid,
+// BroadcastLayout) actually reads to show a raised hand. Participants were
+// constructed with a permanent `handRaised: false` and never touched again,
+// so a raised hand was only ever visible to the person who raised it.
+export function applyRaisedHands<P extends { userId: string; handRaised: boolean }>(
+  participants: P[],
+  raisedHands: string[],
+): P[] {
+  return participants.map(p => {
+    const raised = raisedHands.includes(p.userId);
+    return raised === p.handRaised ? p : { ...p, handRaised: raised };
+  });
+}
+
 /* ============================================================================
  * HELPERS
  * ============================================================================ */
@@ -700,6 +717,21 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     setCallMinimised(false);
     setActiveCall(session);
+    // AND-100: joining via an invite link never registered the call with
+    // native CallKit/ConnectionService at all — reportCallAnswered() alone
+    // calls RNCallKeep.setCurrentCallActive() on a callUUID the native side
+    // has never heard of (that registration only happens via startCall()/
+    // displayIncomingCall(), neither of which this join path ever went
+    // through), so it silently no-ops. Without a real native call session
+    // backing it, iOS has nothing holding the app's audio/VoIP background
+    // execution open and shows no "tap to return to call" status bar, and
+    // Android has no foreground-service/ongoing notification — so the call
+    // looks to the user like it simply ended the moment the app backgrounds.
+    // Registering it the same way an outgoing call does (we're still the
+    // one establishing our own local leg of this call, just into an
+    // existing conference rather than dialing out) gives this join the same
+    // native call session startCall() already provides 1:1/group callers.
+    startOutgoingCall({ callUUID: info.callId, callerName: safeDisplayName(info.title, 'Call'), callType: info.callType });
     reportCallAnswered(info.callId);
 
     s.emit('call.answer', {
@@ -902,9 +934,14 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     });
 
     // No invitees to ring, so there is nobody who will ever emit call.answer
-    // for us — unlike startCall, we don't wait in 'dialing'/CallKit-outgoing
-    // state. We're already "in the room"; other members join independently
-    // via joinExistingCall and CALL_PARTICIPANT_JOINED drives the roster.
+    // for us — unlike startCall, we don't wait in a 'dialing' JS state. We're
+    // already "in the room"; other members join independently via
+    // joinExistingCall and CALL_PARTICIPANT_JOINED drives the roster. That
+    // meant this path never registered with CallKit/ConnectionService at
+    // all (see the matching AND-100 comment in joinExistingCall) — no native
+    // call session ever backed a voice channel, so it had no background
+    // keep-alive and no OS "in call" indicator. Register + immediately mark
+    // active, since there's no separate ring-then-answer step here.
     const session: CallSession = {
       callId,
       conversationId: args.conversationId,
@@ -938,6 +975,8 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     setCallMinimised(false);
     setActiveCall(session);
+    startOutgoingCall({ callUUID: callId, callerName: session.title, callType });
+    reportCallAnswered(callId);
 
     s.emit('call.offer', {
       callId,
@@ -954,6 +993,10 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         setActiveCall(null);
         webRTCService.closeAll();
         audioRouteManager.stop();
+        // Tear down the CallKit session registered above — otherwise a
+        // failed join leaves a native "in call" session with nothing in
+        // the app to ever end it.
+        reportCallEnded(callId, 'ended');
         Alert.alert('Unable to join', ack?.error ?? 'Unable to open this voice channel.');
       }
     });
@@ -1305,7 +1348,11 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       const hands = isRaised
         ? prev.raisedHands.filter(id => id !== prev.localUserId)
         : [...prev.raisedHands, prev.localUserId];
-      return { ...prev, raisedHands: hands };
+      return {
+        ...prev,
+        raisedHands: hands,
+        participants: applyRaisedHands(prev.participants, hands),
+      };
     });
   }, []);
 
@@ -2641,7 +2688,11 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         setActiveCall(prev => {
           if (!prev || prev.callId !== callId) return prev;
           const hands = prev.raisedHands.includes(userId) ? prev.raisedHands : [...prev.raisedHands, userId];
-          return { ...prev, raisedHands: hands };
+          return {
+            ...prev,
+            raisedHands: hands,
+            participants: applyRaisedHands(prev.participants, hands),
+          };
         });
       });
 
@@ -2651,7 +2702,12 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         if (!callId || !userId) return;
         setActiveCall(prev => {
           if (!prev || prev.callId !== callId) return prev;
-          return { ...prev, raisedHands: prev.raisedHands.filter(id => id !== userId) };
+          const hands = prev.raisedHands.filter(id => id !== userId);
+          return {
+            ...prev,
+            raisedHands: hands,
+            participants: applyRaisedHands(prev.participants, hands),
+          };
         });
       });
 

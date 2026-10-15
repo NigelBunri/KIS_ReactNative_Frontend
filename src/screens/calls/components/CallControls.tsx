@@ -154,9 +154,17 @@ export default function CallControls({
       hidden: !isGroup,
     },
     {
+      // AND-097: this button DID correctly flip session.layout and
+      // VideoGrid DID render a visibly different arrangement — but the
+      // button itself never showed an active state or said which mode you
+      // were in, so a tap among 17 icons in a scrolling row gave no
+      // feedback a tester could attribute to their own action. Label and
+      // highlight now reflect the CURRENT layout, same pattern as every
+      // other stateful button here (mute, video, speaker, etc.).
       id: 'layout',
       icon: 'grid',
-      label: 'Layout',
+      label: session.layout === 'gallery' ? 'Gallery' : 'Speaker',
+      active: session.layout === 'gallery',
       hidden: !isGroup,
     },
     {
