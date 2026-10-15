@@ -811,6 +811,13 @@ export function useChatMessaging({
             event: parsed?.event ?? mapped.event,
             voice: parsed?.voice ?? mapped.voice,
             sticker: parsed?.sticker ?? mapped.sticker,
+            // AND-032: location was never restored on decrypt (see the
+            // matching comment on mapServerMessage's own return above) -
+            // it IS present in basePayload/the plaintext JSON (sent via
+            // sendOverNetworkImpl), it just never made it back out of
+            // either decrypt path, so a decrypted location message never
+            // had anything for MessageBubble's location card to render.
+            location: (parsed as any)?.location ?? (mapped as any).location,
             replyToId: parsed?.replyToId ?? mapped.replyToId,
             kind: parsed?.kind ?? mapped.kind,
             viewOnce: parsed?.viewOnce ?? mapped.viewOnce,
@@ -855,6 +862,13 @@ export function useChatMessaging({
             event: parsed?.event ?? mapped.event,
             voice: parsed?.voice ?? mapped.voice,
             sticker: parsed?.sticker ?? mapped.sticker,
+            // AND-032: location was never restored on decrypt (see the
+            // matching comment on mapServerMessage's own return above) -
+            // it IS present in basePayload/the plaintext JSON (sent via
+            // sendOverNetworkImpl), it just never made it back out of
+            // either decrypt path, so a decrypted location message never
+            // had anything for MessageBubble's location card to render.
+            location: (parsed as any)?.location ?? (mapped as any).location,
             replyToId: parsed?.replyToId ?? mapped.replyToId,
             kind: parsed?.kind ?? mapped.kind,
             viewOnce: parsed?.viewOnce ?? mapped.viewOnce,
@@ -1287,6 +1301,17 @@ export function useChatMessaging({
         contacts,
         poll,
         event,
+        // AND-032: this field was never mapped at all, in either the plain
+        // (non-E2EE) path here or either decryptChatMessage restore patch
+        // below. A location message always arrived with location left
+        // undefined, so MessageBubble's location card never had anything
+        // to render — the bubble fell back to showing "Encrypted message"/
+        // the raw placeholder forever, which is exactly "location messages
+        // appear encrypted/unreadable". basePayload in sendOverNetworkImpl
+        // already includes `location` when building the plaintext that
+        // gets encrypted (see below) — the data was always being sent
+        // correctly, it just never came back out on read.
+        location: (serverMsg as any).location ?? undefined,
         isDeleted: !!(serverMsg.isDeleted ?? serverMsg.is_deleted),
         isEdited: !!(serverMsg.isEdited ?? serverMsg.is_edited ?? serverMsg.edited_at),
         isPinned: !!(serverMsg.isPinned ?? serverMsg.is_pinned),

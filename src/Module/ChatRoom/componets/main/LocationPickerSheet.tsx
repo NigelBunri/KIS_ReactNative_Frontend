@@ -7,6 +7,7 @@ import {
   Pressable,
   StyleSheet,
   Text,
+  TextInput,
   View,
   ActivityIndicator,
   Alert,
@@ -38,6 +39,30 @@ async function reverseGeocode(lat: number, lon: number): Promise<string> {
   }
 }
 
+// AND-032: this sheet previously only ever offered the device's current
+// GPS position — there was no way to pick anywhere else, which is what
+// "no location search" was reporting. Forward-geocodes a free-text query
+// into coordinates + a display address using the same free, keyless
+// Nominatim endpoint reverseGeocode() above already relies on (no new
+// third-party credential needed).
+export async function searchLocation(query: string): Promise<{ latitude: number; longitude: number; address: string } | null> {
+  try {
+    const res = await fetch(
+      `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(query)}`,
+      { headers: { 'User-Agent': 'KIS-App' } },
+    );
+    const json = await res.json();
+    const first = Array.isArray(json) ? json[0] : null;
+    if (!first) return null;
+    const latitude = Number(first.lat);
+    const longitude = Number(first.lon);
+    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return null;
+    return { latitude, longitude, address: first.display_name ?? query };
+  } catch {
+    return null;
+  }
+}
+
 type Props = {
   visible: boolean;
   onClose: () => void;
@@ -54,6 +79,8 @@ export const LocationPickerSheet: React.FC<Props> = ({
   const slideAnim = useRef(new Animated.Value(0)).current;
   const [loading, setLoading] = useState(false);
   const [location, setLocation] = useState<LocationMessage | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searching, setSearching] = useState(false);
 
   useEffect(() => {
     Animated.spring(slideAnim, {
@@ -84,6 +111,27 @@ export const LocationPickerSheet: React.FC<Props> = ({
     }
   }, []);
 
+  const handleSearch = useCallback(async () => {
+    const q = searchQuery.trim();
+    if (!q) return;
+    setSearching(true);
+    try {
+      const result = await searchLocation(q);
+      if (!result) {
+        Alert.alert('Location', `Couldn't find "${q}". Try a different search.`);
+        return;
+      }
+      setLocation({
+        latitude: result.latitude,
+        longitude: result.longitude,
+        address: result.address,
+        title: q,
+      });
+    } finally {
+      setSearching(false);
+    }
+  }, [searchQuery]);
+
   const translateY = slideAnim.interpolate({ inputRange: [0, 1], outputRange: [400, 0] });
 
   if (!visible) return null;
@@ -109,6 +157,49 @@ export const LocationPickerSheet: React.FC<Props> = ({
         </View>
 
         <View style={styles.body}>
+          {/* AND-032: location search — previously this sheet only ever
+              offered the device's current GPS fix, with no way to pick
+              anywhere else. */}
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            <TextInput
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              onSubmitEditing={handleSearch}
+              returnKeyType="search"
+              placeholder="Search for a place or address"
+              placeholderTextColor={palette.subtext}
+              style={{
+                flex: 1,
+                borderRadius: 12,
+                borderWidth: 1,
+                borderColor: palette.divider,
+                backgroundColor: palette.surfaceSoft ?? palette.card,
+                paddingHorizontal: 14,
+                paddingVertical: 10,
+                color: palette.text,
+              }}
+            />
+            <Pressable
+              onPress={handleSearch}
+              disabled={searching || !searchQuery.trim()}
+              accessibilityRole="button"
+              accessibilityLabel="Search location"
+              style={{
+                paddingHorizontal: 16,
+                borderRadius: 12,
+                alignItems: 'center',
+                justifyContent: 'center',
+                backgroundColor: searchQuery.trim() ? palette.primary : palette.divider,
+              }}
+            >
+              {searching ? (
+                <ActivityIndicator size="small" color={palette.onPrimary ?? '#fff'} />
+              ) : (
+                <KISIcon name="search" size={18} color={searchQuery.trim() ? (palette.onPrimary ?? '#fff') : palette.subtext} />
+              )}
+            </Pressable>
+          </View>
+
           {/* Map placeholder */}
           <View
             style={[

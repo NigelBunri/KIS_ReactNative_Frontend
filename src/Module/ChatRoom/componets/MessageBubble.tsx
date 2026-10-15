@@ -3133,6 +3133,36 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
           </Text>
         </View>
 
+        {/* AND-032: this card previously only ever showed raw lat/lng text
+            and an "Open in Maps" link with no visual preview at all — the
+            share-location PICKER (LocationPickerSheet.tsx) already renders
+            a static map image via the same free, keyless Yandex Static
+            Maps endpoint; the chat bubble just never did the same once the
+            location was actually sent. */}
+        {!!(lat || lng) && (
+          <Pressable
+            onPress={() => {
+              Linking.openURL(mapsUrl).catch(() => {});
+            }}
+            style={{
+              width: 220,
+              height: 120,
+              borderRadius: 10,
+              overflow: 'hidden',
+              marginBottom: 6,
+              backgroundColor: palette.surfaceSoft ?? '#00000011',
+            }}
+          >
+            <Image
+              source={{
+                uri: `https://static-maps.yandex.ru/1.x/?lang=en_US&ll=${lng},${lat}&z=15&l=map&size=440,240&pt=${lng},${lat},pm2rdm`,
+              }}
+              style={{ width: '100%', height: '100%' }}
+              resizeMode="cover"
+            />
+          </Pressable>
+        )}
+
         <Text
           style={{
             fontSize: 14,
