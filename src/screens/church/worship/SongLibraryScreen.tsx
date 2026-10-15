@@ -161,6 +161,25 @@ export default function SongLibraryScreen({ navigation }: Props) {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
+      {/* AND-312: "Create a worship set list" — SetListScreen already
+          exists, fully built and registered as a navigable screen
+          (route "SetLists"), but nothing anywhere in the app ever
+          navigated to it. ChurchScreen.tsx's "Worship & Songs" tile
+          description explicitly promises "Songs & set lists," but this
+          screen (what that tile actually opens) never linked onward to
+          set lists at all. */}
+      <View style={styles.headerRow}>
+        <Text style={[styles.headerTitle, { color: palette.text }]}>Songs</Text>
+        <TouchableOpacity
+          onPress={() => navigation.navigate('SetLists')}
+          style={styles.setListsLink}
+          accessibilityRole="button"
+          accessibilityLabel="Open worship set lists"
+        >
+          <KISIcon name="list" size={16} color={palette.primary} />
+          <Text style={[styles.setListsLinkText, { color: palette.primary }]}>Set Lists</Text>
+        </TouchableOpacity>
+      </View>
       <View style={styles.searchBar}>
         <KISIcon name="search" size={18} tone="muted" />
         <TextInput
@@ -256,6 +275,22 @@ function makeStyles(palette: any, layout: any) {
   const sp = layout.pageGutter;
   return StyleSheet.create({
     safe: { flex: 1, backgroundColor: palette.bg, },
+    headerRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: sp,
+      marginTop: 8,
+    },
+    headerTitle: { fontSize: 20, fontWeight: '700' },
+    setListsLink: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      paddingVertical: 6,
+      paddingHorizontal: 10,
+    },
+    setListsLinkText: { fontSize: 14, fontWeight: '600' },
     searchBar: {
       flexDirection: 'row',
       alignItems: 'center',
