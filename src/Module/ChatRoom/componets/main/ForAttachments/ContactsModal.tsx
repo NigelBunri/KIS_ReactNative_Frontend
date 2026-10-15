@@ -11,7 +11,7 @@ import {
 
 import { KISPalette, KIS_TOKENS, kisRadius } from '@/theme/constants';
 import usePullDownToClose from '@/hooks/usePullDownToClose';
-import { refreshFromDeviceAndBackend } from '@/Module/AddContacts/contactsService';
+import { refreshFromDeviceAndBackendWithOptions } from '@/Module/AddContacts/contactsService';
 
 export type SimpleContact = {
   id: string;
@@ -40,35 +40,37 @@ export const ContactsModal: React.FC<ContactsModalProps> = ({
     onClose,
   });
 
-  useEffect(() => {
-    const loadContacts = async () => {
-      if (!visible) return;
-      setLoading(true);
-      try {
-        // Pulls straight from the device (requesting permission on first use
-        // if needed) + the backend registered-contacts check, the same
-        // source AddContactsPage uses — not a passive read of a cache key
-        // nothing else in this modal's own flow ever populates. Its own
-        // 10-minute cache keeps repeat opens fast without a redundant fetch.
-        const kisContacts = await refreshFromDeviceAndBackend();
-        const mapped: SimpleContact[] = kisContacts.map(c => ({
-          id: c.id,
-          name: c.name,
-          phone: c.phone,
-        }));
-        setContacts(mapped);
-        setSelectedIds([]);
-      } catch (e) {
-        console.warn('[ContactsModal] Failed to load contacts:', e);
-        setContacts([]);
-        setSelectedIds([]);
-      } finally {
-        setLoading(false);
-      }
-    };
+  const loadContacts = React.useCallback(async (force: boolean) => {
+    setLoading(true);
+    try {
+      // Pulls straight from the device (requesting permission on first use
+      // if needed) + the backend registered-contacts check, the same
+      // source AddContactsPage uses — not a passive read of a cache key
+      // nothing else in this modal's own flow ever populates. Its own
+      // 10-minute cache keeps repeat opens fast without a redundant fetch
+      // (an empty result is never cached — see contactsService.ts — so a
+      // transient permission denial can't poison this for 10 minutes).
+      const kisContacts = await refreshFromDeviceAndBackendWithOptions({ force });
+      const mapped: SimpleContact[] = kisContacts.map(c => ({
+        id: c.id,
+        name: c.name,
+        phone: c.phone,
+      }));
+      setContacts(mapped);
+      setSelectedIds([]);
+    } catch (e) {
+      console.warn('[ContactsModal] Failed to load contacts:', e);
+      setContacts([]);
+      setSelectedIds([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
-    loadContacts();
-  }, [visible]);
+  useEffect(() => {
+    if (!visible) return;
+    loadContacts(false);
+  }, [visible, loadContacts]);
 
   const toggleContact = (id: string) => {
     setSelectedIds(prev =>
@@ -154,6 +156,21 @@ export const ContactsModal: React.FC<ContactsModalProps> = ({
                 No contacts found on this device, or contacts permission was
                 denied.
               </Text>
+              <Pressable
+                onPress={() => loadContacts(true)}
+                accessibilityRole="button"
+                accessibilityLabel="Try again"
+                style={{
+                  marginTop: KIS_TOKENS.spacing.sm,
+                  alignSelf: 'flex-start',
+                  minHeight: 44,
+                  justifyContent: 'center',
+                }}
+              >
+                <Text style={{ color: palette.primary, fontWeight: '700' }}>
+                  Try again
+                </Text>
+              </Pressable>
             </View>
           ) : (
             <FlatList
