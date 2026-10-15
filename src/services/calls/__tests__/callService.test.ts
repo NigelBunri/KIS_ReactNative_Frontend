@@ -11,6 +11,13 @@ jest.mock('../webRTCService', () => ({
     getLocalStream: jest.fn(),
     peers: new Map(),
   },
+  // This suite is platform-agnostic OS-level-stop coverage (iOS status-bar
+  // "Stop", Android's "Stop sharing" notification) — it isn't testing the
+  // AND-098 iOS broadcast-picker gate itself (see
+  // callService.ios-picker.test.ts for that), so stub this to always
+  // succeed, matching a real app where ActiveCallScreen has mounted
+  // IOSScreenSharePicker for the whole lifetime of every active call.
+  presentIOSScreenCapturePicker: jest.fn(() => true),
 }));
 
 const mockGetDisplayMedia = jest.fn();
@@ -23,7 +30,7 @@ jest.mock(
 );
 
 import { webRTCService } from '../webRTCService';
-import { toggleScreenShare, setScreenShareCallbacks } from '../callService';
+import { toggleScreenShare, setScreenShareCallbacks, registerIOSScreenCapturePickerRef } from '../callService';
 
 function makeFakeTrack(kind: 'video' | 'audio' = 'video') {
   const listeners: Record<string, Array<() => void>> = {};
@@ -62,6 +69,7 @@ describe('toggleScreenShare — screen track ended handling', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    registerIOSScreenCapturePickerRef({ current: {} });
     sessionId = `session-${++sessionCounter}`;
     cameraTrack = makeFakeTrack('video');
     screenTrack = makeFakeTrack('video');

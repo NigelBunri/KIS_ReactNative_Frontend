@@ -23,6 +23,37 @@ export const RTCPIPView = RNW?.RTCPIPView ?? null;
 export const startIOSPIP: ((ref: { current: any }) => void) | null = RNW?.startIOSPIP ?? null;
 export const stopIOSPIP: ((ref: { current: any }) => void) | null = RNW?.stopIOSPIP ?? null;
 
+// AND-098: iOS screen sharing requires a user-driven trip through ReplayKit's
+// system broadcast picker — getDisplayMedia() on iOS does NOT present any UI
+// itself, it only *waits* for the already-built RTCScreenSharingExtension
+// (ios/RTCScreenSharingExtension/SampleHandler.swift) to connect over the
+// rtc_SSFD app-group socket once ReplayKit's broadcastStarted fires, which
+// only happens after the user picks this app's extension from that system
+// sheet. react-native-webrtc exposes the trigger for that sheet as an
+// invisible native view (ScreenCapturePickerView, wrapping iOS's
+// RPSystemBroadcastPickerView) plus a "show" view-manager command that
+// synthetically taps its hidden button — the same
+// dispatchViewManagerCommand pattern startIOSPIP/stopIOSPIP above use for
+// RTCVideoView's commands. Previously nothing in this app ever mounted this
+// view or invoked "show", so getDisplayMedia() on iOS had no way to ever
+// resolve: the extension could never start, so the socket connection it's
+// listening for never happened and the call just hung/failed.
+export const ScreenCapturePickerView = RNW?.ScreenCapturePickerView ?? null;
+export function presentIOSScreenCapturePicker(ref: { current: any }): boolean {
+  if (!ScreenCapturePickerView) return false;
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { UIManager, findNodeHandle } = require('react-native');
+    const tag = findNodeHandle(ref.current);
+    const config = UIManager.getViewManagerConfig?.('ScreenCapturePickerView');
+    if (tag == null || !config?.Commands?.show) return false;
+    UIManager.dispatchViewManagerCommand(tag, config.Commands.show, []);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 // Public STUN servers only as fallback. TURN servers should be injected at
 // runtime via setIceServers() once fetched from the backend.
 const DEFAULT_ICE_SERVERS = [

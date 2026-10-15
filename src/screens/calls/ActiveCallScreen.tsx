@@ -53,6 +53,7 @@ import VirtualBackgroundSheet, { type VirtualBgOption, VirtualBgPreview } from '
 import { useVirtualBg } from '@/services/calls/virtualBgService';
 import RtmpSheet from './components/RtmpSheet';
 import InCallWhiteboardSheet from './components/InCallWhiteboardSheet';
+import IOSScreenSharePicker from './components/IOSScreenSharePicker';
 import { KISIcon } from '@/constants/kisIcons';
 import { useKISTheme } from '@/theme/useTheme';
 import { useSafeTopInset } from '@/hooks/useSafeTopInset';
@@ -637,6 +638,9 @@ export default function ActiveCallScreen({ session, actions }: Props) {
     <Modal visible animationType="slide" transparent={false} statusBarTranslucent>
       <StatusBar barStyle="light-content" backgroundColor={palette.royalInk} />
       <View style={styles.root}>
+        {/* Invisible — exists only so an iOS screen-share toggle has
+            ReplayKit's system broadcast picker to trigger. See AND-098. */}
+        <IOSScreenSharePicker />
 
         {/* ── CONTENT AREA ── */}
         <TouchableWithoutFeedback onPress={revealControls}>

@@ -100,6 +100,8 @@
 	<string>KIS uses notifications to alert you of incoming calls and messages.</string>
 	<key>RCTNewArchEnabled</key>
 	<true/>
+	<key>RTCScreenSharingExtension</key>
+	<string>com.kingdomimpactventures.kis.RTCScreenSharingExtension</string>
 	<key>UIAppFonts</key>
 	<array>
 		<string>Ionicons.ttf</string>

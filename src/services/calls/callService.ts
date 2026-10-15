@@ -2,7 +2,17 @@
 // Stateful call service - wraps webRTCService with higher-level operations
 // (screen share toggle, DTLS fingerprint extraction, etc.)
 
-import { webRTCService } from './webRTCService';
+import { Platform } from 'react-native';
+import { webRTCService, presentIOSScreenCapturePicker } from './webRTCService';
+
+/** Ref to the mounted, invisible ScreenCapturePickerView (see
+ * ActiveCallScreen's IOSScreenSharePicker) — registered by whichever screen
+ * is currently showing call controls, since this module has no component
+ * tree of its own to mount that native view in. */
+let _iosPickerRef: { current: any } | null = null;
+export function registerIOSScreenCapturePickerRef(ref: { current: any } | null) {
+  _iosPickerRef = ref;
+}
 
 /** Tracks the original camera video track so we can restore it after screen share. */
 let _originalVideoTrack: any = null;
@@ -135,6 +145,23 @@ export async function toggleScreenShare(
       const videoTracks: any[] = localStream.getVideoTracks?.() ?? [];
       if (videoTracks.length > 0) {
         _originalVideoTrack = videoTracks[0];
+      }
+    }
+
+    // AND-098: on iOS, getDisplayMedia() never shows any UI itself — it only
+    // waits for the RTCScreenSharingExtension broadcast extension to connect,
+    // which only happens once the user picks it from ReplayKit's system
+    // broadcast sheet. That sheet must be explicitly triggered first via the
+    // invisible ScreenCapturePickerView mounted by the active call screen; if
+    // it isn't mounted (e.g. this is reached outside an active call, or the
+    // native view failed to register), there is no way to ever start an iOS
+    // screen share, so fail fast with the same error callers already handle
+    // rather than hanging on a getDisplayMedia() call that can never resolve.
+    if (Platform.OS === 'ios') {
+      const presented = _iosPickerRef && presentIOSScreenCapturePicker(_iosPickerRef);
+      if (!presented) {
+        _originalVideoTrack = null;
+        throw new Error('SCREEN_SHARE_UNAVAILABLE');
       }
     }
 
