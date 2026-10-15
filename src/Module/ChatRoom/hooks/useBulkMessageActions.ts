@@ -41,13 +41,28 @@ export function useBulkMessageActions({
   const handlePinSelected = useCallback(async () => {
     if (!selectedIds.length) return;
 
+    // Previously this also called editMessage(msg.id, { isPinned }) to flip
+    // the pin flag LOCALLY before onPinMessage ever reached the server. That
+    // local write is why pinning via this header button only ever showed up
+    // for the pinning device: editMessage (useChatPersistence.ts) is a purely
+    // local persist — it doesn't call the backend — so it gave the pinner an
+    // instant "pinned" badge regardless of whether the real network request
+    // (onPinMessage -> Handlers.handleSetPinned -> POST pins.set) actually
+    // succeeded. Other participants only ever learn about a pin through the
+    // server's chat.pin/chat.message_pinned socket echo, so if that POST
+    // silently failed (handleSetPinned didn't check its response), the
+    // pinner would see a pinned message that no one else ever did. It also
+    // incorrectly stamped isEdited:true/status:QUEUED on the message as a
+    // side effect of reusing the text-edit path for a pin toggle.
+    // handlePinSingleMessage (ChatRoomPage.tsx) never had this local write —
+    // it relies solely on the server round-trip — so align this bulk path
+    // with that single-message path instead of carrying its own local state.
     for (const msg of selectedMessages) {
       const nextPinned = !msg.isPinned;
-      await editMessage(msg.id, { isPinned: nextPinned } as any);
       onPinMessage?.(msg, nextPinned);
     }
     exitSelectionMode();
-  }, [editMessage, exitSelectionMode, onPinMessage, selectedIds, selectedMessages]);
+  }, [exitSelectionMode, onPinMessage, selectedIds, selectedMessages]);
 
   const handleDeleteSelected = useCallback(async () => {
     if (!selectedIds.length) return;

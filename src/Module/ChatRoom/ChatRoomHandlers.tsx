@@ -702,14 +702,31 @@ export const handleBlockRequest = async (
 ) => {
   if (!chatId) return;
 
-  await postRequest(ROUTES.moderation.block, {
-    conversationId: chatId,
-    blocked: true,
-  });
-
-  const url = `${ROUTES.chat.listConversations}${chatId}/block_chat/`;
-  await postRequest(url, {});
-
+  // AND-060: this used to additionally POST to:
+  //   1. ROUTES.moderation.block (`${NEST_API_BASE_URL}/api/v1/moderation/
+  //      block`) with just a conversationId - a conversation-scoped record,
+  //      not a user-scoped one; and
+  //   2. `${chat.listConversations}${chatId}/block_chat/`, which sets the
+  //      Django Conversation's own `is_locked` flag.
+  // Both of those are properties of the shared Conversation object that
+  // EVERY participant reads back - normalizeConversation.ts maps
+  // `raw.is_locked` straight into `isLocked`, which ChatHeader/ChatRoomMenu/
+  // ChatRoomOverlays then use to show "Chat locked" and disable the
+  // composer for both people. So blocking someone didn't just stop you from
+  // seeing them - it locked the conversation for them too, visibly, and
+  // the "block_chat" conversation lock had nothing to do with either
+  // participant's own user-scoped block list.
+  //
+  // Required behavior is the opposite: blocking must be private to the
+  // blocker. The only correct primitive for that is a user-scoped block
+  // record - exactly what blockContact() below already writes via
+  // ROUTES.moderation.userBlocks (the same endpoint BlockedContactsScreen
+  // uses, proven to work). Nothing here should touch the conversation's
+  // shared isLocked/is_blocked state - do not call block_chat or
+  // moderation.block (conversation-scoped) again. Filtering of incoming
+  // messages from a blocked sender happens client-side in
+  // useChatMessaging.ts's onIncomingMessage, keyed off the same
+  // isContactBlocked() check BlockedContactsScreen exposes.
   if (blockedUser?.userId) {
     await blockContact({
       userId: blockedUser.userId,
@@ -719,8 +736,6 @@ export const handleBlockRequest = async (
     });
     DeviceEventEmitter.emit('blocked.contacts.refresh');
   }
-
-  notifyConversationRefresh();
 };
 
 // postRequest (see src/network/post) never throws on a normal HTTP/network
@@ -830,11 +845,24 @@ export const handleSetPinned = async ({
   pinned: boolean;
 }) => {
   if (!conversationId || !messageId) return;
-  await postRequest(ROUTES.pins.set, {
+  // Previously this result was never checked - a failed request (network
+  // error, 404, server rejection) looked identical to a success: the menu
+  // closed and nothing told the user the pin never actually happened. Since
+  // other participants only learn about a pin through the server's
+  // chat.pin/chat.message_pinned socket echo (there is no local-only
+  // fallback for this action — see useBulkMessageActions.ts), a silently
+  // failed request here is exactly how a message could end up "pinned" only
+  // on the pinning device. Surface the failure like every other mutating
+  // action in this file (handleArchiveRequest, handleLockConversation, etc.)
+  // instead of fabricating success.
+  const res = await postRequest(ROUTES.pins.set, {
     conversationId,
     messageId,
     pinned,
   });
+  if (res?.success === false) {
+    Alert.alert('Error', res?.message || `Could not ${pinned ? 'pin' : 'unpin'} this message. Please try again.`);
+  }
 };
 
 export const handleMuteConversation = async ({
@@ -847,10 +875,19 @@ export const handleMuteConversation = async ({
   untilMs?: number;
 }): Promise<boolean> => {
   if (!conversationId) return false;
-  const res = await postRequest(ROUTES.moderation.mute, {
-    conversationId,
+  // AND-056: this used to POST to ROUTES.moderation.mute, which is
+  // `${NEST_API_BASE_URL}/api/v1/moderation/mute` (src/network/routes/
+  // socialRoutes.ts). That NestJS path doesn't exist - it 404'd with
+  // "Cannot POST /api/v1/moderation/mute" every time. Conversation-level
+  // mute already has a real, working implementation on the Django side:
+  // MessagesScreen.tsx's conversationActionUrl mutes a conversation the
+  // same way it pins/archives/marks-read one, via
+  // `${chat.listConversations}{id}/mute/` (a per-action route on the
+  // Django ConversationViewSet). Use that same proven endpoint here instead
+  // of the dead NestJS one.
+  const res = await postRequest(`${ROUTES.chat.listConversations}${conversationId}/mute/`, {
     muted,
-    untilMs,
+    until_ms: untilMs,
   });
   if (res?.success === false) {
     Alert.alert('Error', res?.message || `Could not ${muted ? 'mute' : 'unmute'} notifications for this chat.`);

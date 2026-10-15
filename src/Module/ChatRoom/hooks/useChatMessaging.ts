@@ -26,6 +26,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { isOnline, onNetworkRecovery } from '@/services/networkMonitor';
 import { getRequest } from '@/network/get';
 import ROUTES from '@/network';
+import { isContactBlocked } from '@/screens/tabs/BlockedContactsScreen';
 
 import {
   SendOverNetworkResult,
@@ -2203,6 +2204,24 @@ export function useChatMessaging({
         currentUserId,
       );
       if (!msg) return;
+
+      // AND-060: blocking a contact must be private to the blocker - the
+      // blocked user keeps sending normally and is never told anything is
+      // different. The correct place to enforce that on this client is
+      // right here: drop their messages before they're stored or rendered,
+      // without acking/delivering/reading them, so the blocker's device
+      // behaves as if nothing arrived. (The user-scoped block record itself
+      // is written by handleBlockRequest in ChatRoomHandlers.tsx via
+      // blockContact()/ROUTES.moderation.userBlocks - this is purely the
+      // receive-side filter that makes blocking actually invisible.)
+      if (!msg.fromMe) {
+        const senderId = String(
+          (msg as any).senderId ?? serverMsg.senderId ?? serverMsg.sender_id ?? '',
+        );
+        if (senderId && (await isContactBlocked(senderId))) {
+          return;
+        }
+      }
 
       if (!msg.fromMe && msg.serverId) {
         emitReceiptRef.current(String(msg.conversationId), msg.serverId, 'delivered');

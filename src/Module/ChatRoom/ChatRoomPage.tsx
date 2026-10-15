@@ -1736,7 +1736,17 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
     const blockedName = blockedUser?.displayName || chat?.name || 'this contact';
     Alert.alert(
       'Block chat',
-      `Block ${blockedName}? They won't be able to message you, and this conversation will be locked.`,
+      // AND-060: blocking must be private to the blocker - the other
+      // participant is not notified and sees no change on their end, and
+      // this conversation does NOT get locked for either side (that was the
+      // bug: it previously locked the shared conversation, visibly, for
+      // both people). setLockOverride(true) below was removed for the same
+      // reason - isLocked drives the "Chat locked" banner and composer
+      // disable that both participants read from the same conversation
+      // object, so flipping it here would re-introduce a visible,
+      // bidirectional lock from the client side even once the backend call
+      // stopped doing it server-side.
+      `Block ${blockedName}? You won't see their messages anymore. They won't be notified and can still message you - you just won't see it.`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -1744,7 +1754,6 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
           style: 'destructive',
           onPress: async () => {
             await Handlers.handleBlockRequest(String(convId), blockedUser);
-            setLockOverride(true);
           },
         },
       ],

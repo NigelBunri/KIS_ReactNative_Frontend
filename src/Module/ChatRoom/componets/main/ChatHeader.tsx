@@ -148,6 +148,15 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
           {
             borderBottomColor: palette.divider,
             backgroundColor: palette.chatHeaderBg ?? palette.card,
+            // The normal (non-selection) header below applies topInset as
+            // paddingTop so its content clears the status bar / notch. This
+            // selection-mode header (shown while picking messages to pin,
+            // delete, forward, etc.) never did, so on any device with a
+            // non-zero safe-area inset the whole action row — including the
+            // Pin button — rendered partly under the status bar/notch,
+            // making it visually clipped and often untappable ("positioned
+            // unreachably/too high on screen").
+            paddingTop: topInset,
           },
         ]}
       >
