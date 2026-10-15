@@ -3133,6 +3133,36 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
           </Text>
         </View>
 
+        {/* AND-032: this card previously only ever showed raw lat/lng text
+            and an "Open in Maps" link with no visual preview at all — the
+            share-location PICKER (LocationPickerSheet.tsx) already renders
+            a static map image via the same free, keyless Yandex Static
+            Maps endpoint; the chat bubble just never did the same once the
+            location was actually sent. */}
+        {!!(lat || lng) && (
+          <Pressable
+            onPress={() => {
+              Linking.openURL(mapsUrl).catch(() => {});
+            }}
+            style={{
+              width: 220,
+              height: 120,
+              borderRadius: 10,
+              overflow: 'hidden',
+              marginBottom: 6,
+              backgroundColor: palette.surfaceSoft ?? '#00000011',
+            }}
+          >
+            <Image
+              source={{
+                uri: `https://static-maps.yandex.ru/1.x/?lang=en_US&ll=${lng},${lat}&z=15&l=map&size=440,240&pt=${lng},${lat},pm2rdm`,
+              }}
+              style={{ width: '100%', height: '100%' }}
+              resizeMode="cover"
+            />
+          </Pressable>
+        )}
+
         <Text
           style={{
             fontSize: 14,
@@ -3801,8 +3831,19 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
           {renderStatusContextPreview()}
           {renderReplyPreview()}
 
+          {/* AND-035: every other remote-media <Image>/<Video> in this file
+              (regular image attachments at ~1557/1615, the PDF preview at
+              ~4642) passes `headers: mediaHeaders` (Authorization +
+              X-Device-Id, populated above) because sticker.uri — like
+              those — points at an authenticated chat-media endpoint, not a
+              public CDN URL. This was the one bubble that fetched that URL
+              with no headers at all, so the request came back
+              401/403'd and RN's <Image> just rendered nothing — no
+              broken-image icon, no error surfaced, the sticker was simply
+              invisible to both the sender (whose own optimistic render
+              hits the exact same authenticated URL) and the receiver. */}
           <Image
-            source={{ uri: sticker.uri }}
+            source={{ uri: sticker.uri, headers: mediaHeaders }}
             style={{ width: stickerWidth, height: stickerHeight }}
             resizeMode="contain"
             resizeMethod="resize"

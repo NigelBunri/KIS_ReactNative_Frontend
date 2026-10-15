@@ -26,6 +26,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { isOnline, onNetworkRecovery } from '@/services/networkMonitor';
 import { getRequest } from '@/network/get';
 import ROUTES from '@/network';
+import { isContactBlocked } from '@/screens/tabs/BlockedContactsScreen';
 
 import {
   SendOverNetworkResult,
@@ -810,6 +811,13 @@ export function useChatMessaging({
             event: parsed?.event ?? mapped.event,
             voice: parsed?.voice ?? mapped.voice,
             sticker: parsed?.sticker ?? mapped.sticker,
+            // AND-032: location was never restored on decrypt (see the
+            // matching comment on mapServerMessage's own return above) -
+            // it IS present in basePayload/the plaintext JSON (sent via
+            // sendOverNetworkImpl), it just never made it back out of
+            // either decrypt path, so a decrypted location message never
+            // had anything for MessageBubble's location card to render.
+            location: (parsed as any)?.location ?? (mapped as any).location,
             replyToId: parsed?.replyToId ?? mapped.replyToId,
             kind: parsed?.kind ?? mapped.kind,
             viewOnce: parsed?.viewOnce ?? mapped.viewOnce,
@@ -854,6 +862,13 @@ export function useChatMessaging({
             event: parsed?.event ?? mapped.event,
             voice: parsed?.voice ?? mapped.voice,
             sticker: parsed?.sticker ?? mapped.sticker,
+            // AND-032: location was never restored on decrypt (see the
+            // matching comment on mapServerMessage's own return above) -
+            // it IS present in basePayload/the plaintext JSON (sent via
+            // sendOverNetworkImpl), it just never made it back out of
+            // either decrypt path, so a decrypted location message never
+            // had anything for MessageBubble's location card to render.
+            location: (parsed as any)?.location ?? (mapped as any).location,
             replyToId: parsed?.replyToId ?? mapped.replyToId,
             kind: parsed?.kind ?? mapped.kind,
             viewOnce: parsed?.viewOnce ?? mapped.viewOnce,
@@ -1286,6 +1301,17 @@ export function useChatMessaging({
         contacts,
         poll,
         event,
+        // AND-032: this field was never mapped at all, in either the plain
+        // (non-E2EE) path here or either decryptChatMessage restore patch
+        // below. A location message always arrived with location left
+        // undefined, so MessageBubble's location card never had anything
+        // to render — the bubble fell back to showing "Encrypted message"/
+        // the raw placeholder forever, which is exactly "location messages
+        // appear encrypted/unreadable". basePayload in sendOverNetworkImpl
+        // already includes `location` when building the plaintext that
+        // gets encrypted (see below) — the data was always being sent
+        // correctly, it just never came back out on read.
+        location: (serverMsg as any).location ?? undefined,
         isDeleted: !!(serverMsg.isDeleted ?? serverMsg.is_deleted),
         isEdited: !!(serverMsg.isEdited ?? serverMsg.is_edited ?? serverMsg.edited_at),
         isPinned: !!(serverMsg.isPinned ?? serverMsg.is_pinned),
@@ -2204,6 +2230,24 @@ export function useChatMessaging({
       );
       if (!msg) return;
 
+      // AND-060: blocking a contact must be private to the blocker - the
+      // blocked user keeps sending normally and is never told anything is
+      // different. The correct place to enforce that on this client is
+      // right here: drop their messages before they're stored or rendered,
+      // without acking/delivering/reading them, so the blocker's device
+      // behaves as if nothing arrived. (The user-scoped block record itself
+      // is written by handleBlockRequest in ChatRoomHandlers.tsx via
+      // blockContact()/ROUTES.moderation.userBlocks - this is purely the
+      // receive-side filter that makes blocking actually invisible.)
+      if (!msg.fromMe) {
+        const senderId = String(
+          (msg as any).senderId ?? serverMsg.senderId ?? serverMsg.sender_id ?? '',
+        );
+        if (senderId && (await isContactBlocked(senderId))) {
+          return;
+        }
+      }
+
       if (!msg.fromMe && msg.serverId) {
         emitReceiptRef.current(String(msg.conversationId), msg.serverId, 'delivered');
 
@@ -2498,6 +2542,65 @@ export function useChatMessaging({
     socket.on('chat.pin', onPin);
     socket.on('chat.message_pinned', onPin);
 
+    // ── Poll votes (AND-030) ──────────────────────────────────────────────
+    // votePoll() above only ever applies an OPTIMISTIC update to the
+    // voting device itself - it emits 'chat.vote_poll' and patches its own
+    // local poll.options, but until now nothing here ever listened for a
+    // server broadcast of the result. That's fine for the voter's own tap,
+    // but every OTHER participant viewing the same poll had no way to ever
+    // learn a vote happened: no listener meant no update, which is exactly
+    // "no real-time vote updates". The exact broadcast event name can't be
+    // confirmed from this client-only checkout (backend/Nestjs isn't
+    // present here) - every plausible name this backend's own naming
+    // convention could use is listened for (chat.react -> chat.
+    // message_reaction and chat.pin -> chat.message_pinned both rename the
+    // broadcast from the emit verb, so the vote broadcast most likely does
+    // too), so whichever one the server actually emits still take effect.
+    // The handler accepts either a full replacement `poll` object, a bare
+    // `options` array, or a single-vote delta ({ optionId, userId }) and
+    // applies it idempotently via voterIds, matching the optimistic path's
+    // own de-dup logic so the voter's own echo can't double-count.
+    const onPollVoteUpdate = (serverMsg: any) => {
+      const activeConv = conversationIdRef.current;
+      if (!activeConv || String(serverMsg?.conversationId) !== String(activeConv)) return;
+      const id = serverMsg?.messageId ?? serverMsg?.id ?? serverMsg?._id;
+      if (!id) return;
+
+      const next = messagesRef.current.map((m) => {
+        if (m.serverId !== id && m.id !== id) return m;
+        if (!m.poll) return m;
+
+        if (serverMsg.poll && typeof serverMsg.poll === 'object') {
+          return { ...m, poll: serverMsg.poll };
+        }
+        if (Array.isArray(serverMsg.options)) {
+          return { ...m, poll: { ...m.poll, options: serverMsg.options } };
+        }
+        const optionId = serverMsg.optionId;
+        const voterId = serverMsg.userId ?? serverMsg.voterId;
+        if (!optionId || !voterId) return m;
+        return {
+          ...m,
+          poll: {
+            ...m.poll,
+            options: m.poll.options.map((opt) => {
+              if (opt.id !== optionId) return opt;
+              const existing = opt.voterIds ?? [];
+              return existing.includes(String(voterId))
+                ? opt
+                : { ...opt, votes: (opt.votes ?? 0) + 1, voterIds: [...existing, String(voterId)] };
+            }),
+          },
+        };
+      });
+      replaceMessagesRef.current(next);
+    };
+
+    socket.on('chat.poll_vote', onPollVoteUpdate);
+    socket.on('chat.vote_poll', onPollVoteUpdate);
+    socket.on('chat.message_poll_vote', onPollVoteUpdate);
+    socket.on('chat.poll_update', onPollVoteUpdate);
+
     // ── Disappearing-message setting update ───────────────────────────────
     const onDisappear = (payload: any) => {
       const activeConv = conversationIdRef.current;
@@ -2545,6 +2648,10 @@ export function useChatMessaging({
       socket.off('chat.message_reaction', onReaction);
       socket.off('chat.pin', onPin);
       socket.off('chat.message_pinned', onPin);
+      socket.off('chat.poll_vote', onPollVoteUpdate);
+      socket.off('chat.vote_poll', onPollVoteUpdate);
+      socket.off('chat.message_poll_vote', onPollVoteUpdate);
+      socket.off('chat.poll_update', onPollVoteUpdate);
       socket.off('chat.disappear.set', onDisappear);
       socket.off('chat.disappear.update', onDisappear);
       socket.off('chat.location_update', onLocationUpdate);

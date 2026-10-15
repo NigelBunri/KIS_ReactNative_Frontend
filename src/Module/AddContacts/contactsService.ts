@@ -354,13 +354,33 @@ export async function refreshFromDeviceAndBackendWithOptions(options: {
 
   if (!options.force) {
     const cached = await getCachedContacts(maxAgeMs);
-    if (cached) return cached;
+    // AND-029: a cached EMPTY array used to be trusted just like any other
+    // cache hit. If the very first read ever happened to come back empty —
+    // permission not yet granted, a transient native-module hiccup, the
+    // system permission dialog getting dismissed because a React Native
+    // <Modal> (e.g. ContactsModal, the "Share a contact" sheet) was already
+    // on screen when it popped — that empty result got written to the
+    // 10-minute cache and then served back verbatim to every caller for the
+    // next 10 minutes, even after the user went and granted permission in
+    // between. AddContactsPage has its own manual refresh button (force:
+    // true) to push through this; ContactsModal has no such affordance, so
+    // "share a contact" was stuck showing "No contacts available" for the
+    // full cache window with no way for the user to retry. Treat an empty
+    // cached result as a miss so it always re-fetches instead of serving a
+    // stale false negative.
+    if (cached && cached.length > 0) return cached;
   }
 
   const deviceContacts = await getDeviceContactsFromDevice();
   const marked = await markRegisteredBulk(deviceContacts);
-  await setCachedContacts(marked);
-  lastBackendRefreshAt = Date.now();
+  // Don't poison the cache with an empty result — only a non-empty fetch is
+  // worth remembering for 10 minutes. An empty fetch (permission still not
+  // granted, no contacts on device) should be retried on the very next call
+  // instead of being treated as a confirmed "no contacts" verdict.
+  if (marked.length > 0) {
+    await setCachedContacts(marked);
+    lastBackendRefreshAt = Date.now();
+  }
   return marked;
 }
 

@@ -3,7 +3,9 @@
 import React, { useState } from 'react';
 import {
   Animated,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   View,
   Text,
   TextInput,
@@ -83,6 +85,18 @@ export const PollModal: React.FC<PollModalProps> = ({
 
   return (
     <Modal transparent visible={visible} animationType="slide">
+      {/* AND-030: this bottom sheet had no keyboard handling at all, unlike
+          every other full-screen chat composer in this module
+          (TextCardComposer.tsx's KeyboardAvoidingView is the established
+          pattern). The sheet is pinned to the bottom with justifyContent:
+          'flex-end', so on focusing the Question field (or any Option
+          field further down the ScrollView) the keyboard simply overlaid
+          the lower half of the sheet - including the Options list and the
+          Create button - with nothing shifting it up out of the way. */}
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
       <View
         style={{
           flex: 1,
@@ -258,6 +272,7 @@ export const PollModal: React.FC<PollModalProps> = ({
           </View>
         </Animated.View>
       </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 };

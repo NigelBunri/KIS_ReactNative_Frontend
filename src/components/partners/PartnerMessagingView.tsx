@@ -121,9 +121,28 @@ export default function PartnerMessagingView({ partnerId, partnerName }: Props) 
   }, []);
 
   if (activeChat) {
+    // AND-039: ChatRoomPage's "Forward to..." picker (ForwardChatSheet)
+    // only ever lists whatever is passed in via `allChats` - it has no
+    // other data source (see ChatRoomPage.tsx's forwardTargets memo,
+    // which defaults to [] when the prop is omitted). This call site never
+    // passed it at all, so forwarding from any partner group/channel/
+    // community chat opened a picker with a search box and nothing to
+    // search, even though `items` (loaded just above) already holds every
+    // other conversation this partner has. Map it into the same minimal
+    // Chat shape handleOpenItem already builds for the active chat.
+    const allChats: Chat[] = items
+      .filter((it) => it.conversationId)
+      .map((it) => ({
+        id: it.conversationId as string,
+        name: it.name,
+        avatarUrl: it.avatarUrl ?? undefined,
+        conversationId: it.conversationId as string,
+        kind: it.kind === 'community' ? 'community' : it.kind === 'channel' ? 'channel' : 'group',
+        isGroup: it.kind !== 'channel',
+      }));
     return (
       <View style={{ flex: 1 }}>
-        <ChatRoomPage chat={activeChat} onBack={() => setActiveChat(null)} />
+        <ChatRoomPage chat={activeChat} onBack={() => setActiveChat(null)} allChats={allChats} />
       </View>
     );
   }
