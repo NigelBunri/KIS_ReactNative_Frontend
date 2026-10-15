@@ -14,10 +14,21 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { KISIcon } from '@/constants/kisIcons';
 import { useResponsiveLayout } from '@/theme/responsive';
+import { APP_ENV } from '@/env';
 
-// Tenor GIF API — set TENOR_API_KEY in your .env file.
-// In development, if no key is configured, GIF search will return an empty result.
-const TENOR_API_KEY: string = (process.env as any).TENOR_API_KEY ?? (__DEV__ ? 'LIVDSRZULELA' : '');
+// Tenor GIF API — set KIS_TENOR_API_KEY in .env (see .env.example) and run
+// `npm run env:sync` (or `prestart`/`preandroid`/`preios`, which do it
+// automatically) to regenerate src/env.ts.
+//
+// NOTE: this used to read `process.env.TENOR_API_KEY`, which is never
+// populated in this app — Metro/React Native does not inject arbitrary
+// process.env values (there's no react-native-config or babel dotenv
+// plugin here; see scripts/sync-env.cjs, the one real env mechanism this
+// project has). That meant the hardcoded __DEV__ fallback key was the ONLY
+// key that ever actually got used, and production builds always sent a
+// blank key to Tenor, which this function below treats as "no results" —
+// hence AND-034 ("no gif found") reproducing 100% of the time in prod.
+const TENOR_API_KEY: string = APP_ENV.KIS_TENOR_API_KEY || (__DEV__ ? 'LIVDSRZULELA' : '');
 const TENOR_BASE = 'https://tenor.googleapis.com/v2';
 
 export type TenorGif = {

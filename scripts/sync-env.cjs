@@ -38,6 +38,11 @@ const defaults = {
   KIS_AUTH_RECOVERY_ENABLED: 'false',
   KIS_AUTH_LINK_ENABLED: 'false',
   KIS_AUTH_REGISTRATION_ENABLED: 'false',
+  // Tenor GIF search (see src/Module/ChatRoom/componets/main/GifPickerSheet.tsx).
+  // Leave empty until a real production key is provisioned — GIF search will
+  // correctly show "No GIFs found" rather than silently using a rate-limited
+  // demo key in production builds.
+  KIS_TENOR_API_KEY: '',
 };
 
 const env = fs.existsSync(envPath)
@@ -62,6 +67,7 @@ export const APP_ENV = {
   KIS_AUTH_RECOVERY_ENABLED: ${pick('KIS_AUTH_RECOVERY_ENABLED')},
   KIS_AUTH_LINK_ENABLED: ${pick('KIS_AUTH_LINK_ENABLED')},
   KIS_AUTH_REGISTRATION_ENABLED: ${pick('KIS_AUTH_REGISTRATION_ENABLED')},
+  KIS_TENOR_API_KEY: ${pick('KIS_TENOR_API_KEY')},
 } as const;
 `;
 

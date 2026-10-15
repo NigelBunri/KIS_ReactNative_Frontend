@@ -14,4 +14,5 @@ export const APP_ENV = {
   KIS_AUTH_RECOVERY_ENABLED: "true",
   KIS_AUTH_LINK_ENABLED: "true",
   KIS_AUTH_REGISTRATION_ENABLED: "true",
+  KIS_TENOR_API_KEY: "",
 } as const;

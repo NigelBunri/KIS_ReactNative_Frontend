@@ -213,6 +213,11 @@ export const AttachmentSheet: React.FC<AttachmentSheetProps> = ({
     }
 
     pickInProgressRef.current = true;
+    // Dismiss the "Share more" sheet as soon as an option is picked, same as
+    // every other tile (contacts/poll/event/location/scan/payment). Without
+    // this the sheet stayed visible behind the native document picker until
+    // the async pick() resolved, which read as "doesn't dismiss" (AND-027).
+    onClose();
 
     try {
       const options: any = {
@@ -289,6 +294,9 @@ export const AttachmentSheet: React.FC<AttachmentSheetProps> = ({
     }
 
     pickInProgressRef.current = true;
+    // See handleSendFilesPress: close immediately so the sheet never lingers
+    // behind the native audio picker (AND-027).
+    onClose();
 
     try {
       // This restricts to audio MIME types only (from device & providers)
