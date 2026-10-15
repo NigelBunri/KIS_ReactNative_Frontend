@@ -36,6 +36,7 @@ import { addCallPiPModeChangeListener } from '@/services/calls/callPiPService';
 import CallControls from './components/CallControls';
 import VideoGrid from './components/VideoGrid';
 import BroadcastLayout from './components/BroadcastLayout';
+import VoiceCallGrid from './components/VoiceCallGrid';
 import ReactionsLayer from './components/ReactionsLayer';
 import InCallChatSheet from './components/InCallChatSheet';
 import ParticipantsSheet from './components/ParticipantsSheet';
@@ -644,8 +645,19 @@ export default function ActiveCallScreen({ session, actions }: Props) {
               />
             )}
 
-            {/* ── GROUP / VIDEO GROUP ── */}
-            {isGroup && !isBroadcast && (
+            {/* ── VOICE GROUP ── a true voice call, never video-capable, gets
+                its own always-multi-participant avatar-tile grid rather than
+                VideoGrid's single-big-avatar network-degraded fallback. */}
+            {isGroup && !isBroadcast && session.callType === 'voice-group' && (
+              <VoiceCallGrid
+                participants={session.participants}
+                activeSpeakerId={session.activeSpeakerId}
+              />
+            )}
+
+            {/* ── VIDEO GROUP ── isAudioOnly here means "this video call's
+                adaptive layer disabled video", not "this is a voice call". */}
+            {isGroup && !isBroadcast && session.callType !== 'voice-group' && (
               <VideoGrid
                 participants={session.participants}
                 layout={session.layout}

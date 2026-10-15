@@ -8,8 +8,9 @@ import {
   Pressable,
   Animated,
   Alert,
+  Image,
 } from 'react-native';
-import { useRef, useEffect } from 'react';
+import { useRef, useEffect, useState } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { CallParticipant } from '@/services/calls/callTypes';
 import { KISIcon } from '@/constants/kisIcons';
@@ -42,6 +43,42 @@ const buildRoleColor = (p: any): Record<string, string> => ({
   speaker: p.success,
   audience: 'rgba(255,255,255,0.4)',
 });
+
+// Same real-photo-with-initials-fallback pattern as ParticipantTile.tsx —
+// this list never rendered avatarUrl at all before, always showing the
+// gold initials circle even for a participant with a real profile photo.
+// Needs its own component (rather than inline JSX in renderItem) so the
+// load-failure flag can be per-row state.
+function ParticipantAvatar({
+  displayName,
+  avatarUrl,
+  backgroundColor,
+  textColor,
+}: {
+  displayName: string;
+  avatarUrl?: string | null;
+  backgroundColor: string;
+  textColor: string;
+}) {
+  const [failed, setFailed] = useState(false);
+  useEffect(() => setFailed(false), [avatarUrl]);
+  if (avatarUrl && !failed) {
+    return (
+      <Image
+        source={{ uri: avatarUrl }}
+        style={styles.avatar}
+        onError={() => setFailed(true)}
+      />
+    );
+  }
+  return (
+    <View style={[styles.avatar, { backgroundColor }]}>
+      <Text style={[styles.avatarText, { color: textColor }]}>
+        {displayName.charAt(0).toUpperCase()}
+      </Text>
+    </View>
+  );
+}
 
 export default function ParticipantsSheet({ participants, visible, onClose, localUserId, isHost, onMute, onRemove, onAddParticipant, onPromote }: Props) {
   const { palette } = useKISTheme();
@@ -125,11 +162,12 @@ export default function ParticipantsSheet({ participants, visible, onClose, loca
           return (
             <View style={styles.row}>
               {/* Avatar */}
-              <View style={[styles.avatar, { backgroundColor: palette.gold }]}>
-                <Text style={[styles.avatarText, { color: palette.royalInk }]}>
-                  {item.displayName.charAt(0).toUpperCase()}
-                </Text>
-              </View>
+              <ParticipantAvatar
+                displayName={item.displayName}
+                avatarUrl={item.avatarUrl}
+                backgroundColor={palette.gold}
+                textColor={palette.royalInk}
+              />
 
               {/* Info */}
               <View style={styles.info}>

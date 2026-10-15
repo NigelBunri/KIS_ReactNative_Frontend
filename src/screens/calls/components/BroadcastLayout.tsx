@@ -11,6 +11,7 @@ import type { CallParticipant } from '@/services/calls/callTypes';
 import ParticipantTile from './ParticipantTile';
 import CallTimer from './CallTimer';
 import { useKISTheme } from '@/theme/useTheme';
+import { computeGridColumns, computeTileCell } from '../callGridMath';
 
 type Props = {
   participants: CallParticipant[];
@@ -27,6 +28,11 @@ const TOP_BAR_H   = 44;   // LIVE indicator bar
 const CO_HOST_H   = 96;   // on-stage horizontal strip
 const HANDS_H     = 56;   // raised-hands strip
 const AUDIENCE_H  = 36;   // audience count bar
+const MAIN_STAGE_GAP = 4;
+// Cap on simultaneous large tiles in the main stage — beyond this a
+// broadcast with many cameras-on co-hosts/speakers would crowd the main
+// area past legibility; the overflow stays in the "On stage" strip below.
+const MAIN_STAGE_CAP = 4;
 
 export default function BroadcastLayout({
   participants,
@@ -57,15 +63,38 @@ export default function BroadcastLayout({
   const coHosts     = hosts.filter(h => h !== primaryHost);
   const onStage     = [...coHosts, ...speakers];
 
-  // Main host tile height = total container minus every section below it.
+  // Main stage: the primary host always gets prominent space, plus any
+  // on-stage co-host/speaker who currently has their camera on — they're
+  // an actual "broadcasting location" with a video feed worth showing
+  // large, not just a voice in the mix. Gated on camera state (a
+  // deliberate action) rather than activeSpeakerId so the main stage
+  // doesn't jitter on every speaking blip. Capped so a large panel still
+  // reads cleanly; anyone past the cap, or on-stage without video, stays
+  // in the horizontal strip below.
+  const camOnStage = onStage.filter(p => !p.isVideoOff);
+  const mainStage: CallParticipant[] = [
+    ...(primaryHost ? [primaryHost] : []),
+    ...camOnStage,
+  ].slice(0, MAIN_STAGE_CAP);
+  const stageStrip = onStage.filter(p => !mainStage.includes(p));
+
+  // Main stage height = total container minus every section below it.
   const mainH = Math.max(
     80,
     containerH
       - TOP_BAR_H
-      - (onStage.length > 0 ? CO_HOST_H : 0)
+      - (stageStrip.length > 0 ? CO_HOST_H : 0)
       - (raisedHands.length > 0 ? HANDS_H : 0)
       - AUDIENCE_H,
   );
+
+  const mainCols = computeGridColumns(mainStage.length, containerW, mainH);
+  const mainRows = Math.ceil(mainStage.length / Math.max(mainCols, 1));
+  const mainCell = computeTileCell(containerW, mainH, mainCols, mainRows, MAIN_STAGE_GAP);
+  const mainRowChunks: CallParticipant[][] = [];
+  for (let i = 0; i < mainStage.length; i += mainCols) {
+    mainRowChunks.push(mainStage.slice(i, i + mainCols));
+  }
 
   return (
     <View
@@ -96,20 +125,40 @@ export default function BroadcastLayout({
         )}
       </View>
 
-      {/* Primary host — fills remaining height */}
-      {primaryHost && containerW > 0 && (
-        <ParticipantTile
-          participant={primaryHost}
-          width={containerW}
-          height={mainH}
-          isSpeaker={primaryHost.userId === activeSpeakerId}
-          cornerRadius={0}
-          showName
-        />
+      {/* Main stage — primary host plus any on-stage participant with their
+          camera on, arranged in a small responsive grid (1 = full size). */}
+      {mainStage.length > 0 && containerW > 0 && (
+        <View style={{ width: containerW, height: mainH, justifyContent: 'center' }}>
+          {mainRowChunks.map((row, ri) => (
+            <View
+              key={ri}
+              style={{
+                flexDirection: 'row',
+                justifyContent: 'center',
+                gap: MAIN_STAGE_GAP,
+                marginBottom: ri < mainRowChunks.length - 1 ? MAIN_STAGE_GAP : 0,
+              }}
+            >
+              {row.map(p => (
+                <ParticipantTile
+                  key={p.userId}
+                  participant={p}
+                  width={mainStage.length === 1 ? containerW : mainCell.width}
+                  height={mainStage.length === 1 ? mainH : mainCell.height}
+                  isSpeaker={p.userId === activeSpeakerId}
+                  cornerRadius={mainStage.length === 1 ? 0 : 12}
+                  showName
+                  onPress={p === primaryHost ? undefined : () => onPressParticipant?.(p.userId)}
+                />
+              ))}
+            </View>
+          ))}
+        </View>
       )}
 
-      {/* On-stage co-hosts + speakers */}
-      {onStage.length > 0 && (
+      {/* On-stage co-hosts + speakers not currently in the main stage
+          (camera off, or past the main-stage cap) */}
+      {stageStrip.length > 0 && (
         <View style={[styles.stageSection, { backgroundColor: palette.royalInk, height: CO_HOST_H }]}>
           <Text style={styles.sectionLabel}>On stage</Text>
           <ScrollView
@@ -117,7 +166,7 @@ export default function BroadcastLayout({
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.stageRow}
           >
-            {onStage.map(p => (
+            {stageStrip.map(p => (
               <ParticipantTile
                 key={p.userId}
                 participant={p}

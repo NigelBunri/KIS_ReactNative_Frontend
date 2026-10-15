@@ -3,13 +3,13 @@ import React, { useState, useCallback } from 'react';
 import {
   View,
   ScrollView,
-  FlatList,
   StyleSheet,
   Text,
   LayoutChangeEvent,
 } from 'react-native';
 import type { CallParticipant, CallLayout } from '@/services/calls/callTypes';
 import ParticipantTile from './ParticipantTile';
+import PaginatedTileGrid from './PaginatedTileGrid';
 import { useKISTheme } from '@/theme/useTheme';
 
 type Props = {
@@ -143,108 +143,44 @@ export default function VideoGrid({
   }
 
   // ── Gallery layout ──────────────────────────────────────────────────────────
-  const count = participants.length;
-  const cols = count <= 1 ? 1 : count <= 4 ? 2 : count <= 9 ? 3 : 4;
-  const rows = Math.ceil(count / cols);
-
-  // Use measured container dimensions so tiles fill the space exactly.
-  // Math.floor prevents sub-pixel overflow that causes scrollability.
-  const tileW = ready ? Math.floor((containerW - GAP * (cols - 1)) / cols) : 0;
-  const tileH = ready ? Math.floor((containerH - GAP * (rows - 1)) / rows) : 0;
-
-  // For ≤ 16 participants we can render all tiles in a plain View — no scroll,
-  // no accidental swipe-off. Beyond that, FlatList pages efficiently.
-  const useList = count > 16;
-
-  if (!useList) {
-    return (
-      <View
-        style={[styles.fill, { backgroundColor: palette.royalInk }]}
-        onLayout={onLayout}
-      >
-        {allCamerasOff && (
-          <View style={[styles.noCamBanner, { backgroundColor: `${palette.royalInk}CC` }]}>
-            <Text style={[styles.noCamText, { color: palette.subtext }]}>
-              📷 Everyone's camera is off
-            </Text>
-          </View>
-        )}
-        {ready && chunkBy(participants, cols).map((row, ri) => (
-          <View key={ri} style={[styles.row, { gap: GAP, marginTop: ri === 0 ? 0 : GAP }]}>
-            {row.map(p => (
-              <ParticipantTile
-                key={p.userId}
-                participant={p}
-                width={tileW}
-                height={tileH}
-                isPinned={pinnedUserId === p.userId}
-                isSpeaker={p.userId === activeSpeakerId}
-                isAudioOnly={isAudioOnly}
-                cornerRadius={12}
-                onPress={() => onPinParticipant(p.userId === pinnedUserId ? null : p.userId)}
-                showName
-              />
-            ))}
-            {/* Fill empty slots in the last row so remaining tiles keep their width */}
-            {row.length < cols &&
-              Array.from({ length: cols - row.length }).map((_, fi) => (
-                <View key={`fill-${fi}`} style={{ width: tileW, height: tileH }} />
-              ))}
-          </View>
-        ))}
-      </View>
-    );
-  }
-
-  // Large group (> 16): paginated FlatList — tiles are fixed size so the list
-  // knows heights upfront and doesn't miscalculate scroll position.
-  const rowH = tileH + GAP;
-  const rowData = chunkBy(participants, cols);
-
+  // Real horizontal pagination (via PaginatedTileGrid) rather than an
+  // infinite vertical scroll, so large groups stay legible and navigable —
+  // page size is screen-size-aware (see getMaxTilesPerPage).
   return (
     <View
       style={[styles.fill, { backgroundColor: palette.royalInk }]}
       onLayout={onLayout}
     >
+      {allCamerasOff && (
+        <View style={[styles.noCamBanner, { backgroundColor: `${palette.royalInk}CC` }]}>
+          <Text style={[styles.noCamText, { color: palette.subtext }]}>
+            📷 Everyone's camera is off
+          </Text>
+        </View>
+      )}
       {ready && (
-        <FlatList
-          data={rowData}
-          keyExtractor={(_, i) => String(i)}
-          getItemLayout={(_, i) => ({ length: rowH, offset: rowH * i, index: i })}
-          showsVerticalScrollIndicator={false}
-          initialNumToRender={Math.ceil(containerH / rowH) + 1}
-          renderItem={({ item: row, index: ri }) => (
-            <View style={[styles.row, { gap: GAP, marginTop: ri === 0 ? 0 : GAP }]}>
-              {row.map(p => (
-                <ParticipantTile
-                  key={p.userId}
-                  participant={p}
-                  width={tileW}
-                  height={tileH}
-                  isPinned={pinnedUserId === p.userId}
-                  isSpeaker={p.userId === activeSpeakerId}
-                  isAudioOnly={isAudioOnly}
-                  cornerRadius={12}
-                  onPress={() => onPinParticipant(p.userId === pinnedUserId ? null : p.userId)}
-                  showName
-                />
-              ))}
-              {row.length < cols &&
-                Array.from({ length: cols - row.length }).map((_, fi) => (
-                  <View key={`fill-${fi}`} style={{ width: tileW, height: tileH }} />
-                ))}
-            </View>
+        <PaginatedTileGrid
+          items={participants}
+          containerW={containerW}
+          containerH={containerH}
+          keyExtractor={p => p.userId}
+          renderTile={(p, cellW, cellH) => (
+            <ParticipantTile
+              participant={p}
+              width={cellW}
+              height={cellH}
+              isPinned={pinnedUserId === p.userId}
+              isSpeaker={p.userId === activeSpeakerId}
+              isAudioOnly={isAudioOnly}
+              cornerRadius={12}
+              onPress={() => onPinParticipant(p.userId === pinnedUserId ? null : p.userId)}
+              showName
+            />
           )}
         />
       )}
     </View>
   );
-}
-
-function chunkBy<T>(arr: T[], n: number): T[][] {
-  const result: T[][] = [];
-  for (let i = 0; i < arr.length; i += n) result.push(arr.slice(i, i + n));
-  return result;
 }
 
 const styles = StyleSheet.create({
