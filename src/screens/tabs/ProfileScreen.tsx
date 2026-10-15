@@ -2480,6 +2480,32 @@ export default function ProfileScreen() {
             <KISIcon name="settings" size={16} color={palette.goldReadable} />
             <Text style={{ fontSize: 13, fontWeight: '700', color: palette.text }}>Privacy settings</Text>
           </Pressable>
+          {/* AND-273 / AND-479: Change Password and Connect to Google already
+              existed, but only inside the "Account Security" card much further
+              down this screen's scroll — the only path to either was scrolling
+              past every other profile section first. Surfacing both here, in
+              the always-near-the-top Quick Actions card (same card as Edit
+              profile/Notifications/Privacy), fixes discoverability without
+              touching the Account Security card itself or this screen's
+              scroll/header animation. */}
+          <Pressable
+            onPress={() => rootNavigation?.navigate('PasswordChange')}
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}
+          >
+            <KISIcon name="lock" size={16} color={palette.goldReadable} />
+            <Text style={{ fontSize: 13, fontWeight: '700', color: palette.text }}>Change password</Text>
+          </Pressable>
+          {FEATURE_FLAGS.KIS_AUTH_LINK_ENABLED && (
+            <Pressable
+              onPress={() => rootNavigation?.navigate('KisAuthLink')}
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}
+            >
+              <KISIcon name="link" size={16} color={palette.goldReadable} />
+              <Text style={{ fontSize: 13, fontWeight: '700', color: palette.text }}>
+                {authUser?.verification?.google?.linked ? 'Google account connected' : 'Connect to Google'}
+              </Text>
+            </Pressable>
+          )}
         </View>
       </TabletCard>
     </>,
