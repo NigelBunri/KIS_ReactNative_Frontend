@@ -2548,6 +2548,22 @@ export default function ProfileScreen() {
             <KISIcon name="calendar" size={16} color={palette.goldReadable} />
             <Text style={{ fontSize: 13, fontWeight: '700', color: palette.text }}>Browse events</Text>
           </Pressable>
+          {/* AND-195: "Create Organization"/"Create Partner" already exist
+              as working, correctly plan-gated CTAs (PartnerOrganizationSummary
+              and the Business tab's Quick Actions grid) - but both only live
+              inside the "Business" profile tab, a tab switcher further down
+              this same screen, not a place a tester necessarily thinks to
+              check for "create a new partner organization." Same
+              discoverability gap as the entries above. */}
+          {canCreatePartner && (
+            <Pressable
+              onPress={() => { setActiveProfileTab('business'); c.openCreatePartner(); }}
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}
+            >
+              <KISIcon name="people" size={16} color={palette.goldReadable} />
+              <Text style={{ fontSize: 13, fontWeight: '700', color: palette.text }}>Create partner organization</Text>
+            </Pressable>
+          )}
         </View>
       </TabletCard>
     </>,
