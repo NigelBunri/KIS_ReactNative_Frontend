@@ -11,7 +11,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from '@/components/common/SafeAreaViewWithTopPadding';
-import { useNavigation, useRoute } from '@react-navigation/native';
+import { CommonActions, useNavigation, useRoute } from '@react-navigation/native';
 import { useKISTheme } from '@/theme/useTheme';
 import { useResponsiveLayout } from '@/theme/responsive';
 import { KISIcon } from '@/constants/kisIcons';
@@ -103,6 +103,27 @@ export default function ParentRecoveryScreen() {
         setUser?.(resolvedUser);
         void initE2EE(String(resolvedUser?.id ?? '')).catch(() => {});
         setAuth(true);
+        // ParentRecovery is registered in BOTH the authenticated and
+        // unauthenticated screen sets (so this exact "done" success view
+        // keeps rendering through the isAuth flip above, instead of being
+        // unmounted mid-message like LoginScreen's success path is) - but
+        // that also means this screen's own history still has the
+        // UNAUTHENTICATED stack underneath it (e.g. Login), which no
+        // longer exists as a valid screen once isAuth is true. The
+        // header's back button calling navigation.goBack() against that
+        // stale history is exactly what throws "The action 'GO_BACK' was
+        // not handled by any navigator" - confirmed in production: user
+        // saw "Logged in successfully" then hit the only available
+        // button (back) and got stuck. Resetting straight to MainTabs
+        // (same fix QRScanLoginScreen already uses for the identical
+        // unauthenticated-screen-completes-login scenario) sidesteps the
+        // stale history entirely rather than depending on it resolving.
+        navigation.dispatch(
+          CommonActions.reset({
+            index: 0,
+            routes: [{ name: 'MainTabs' as never }],
+          }),
+        );
       } catch (e: any) {
         Alert.alert('Error', e?.message ?? 'Unable to complete recovery.');
       } finally {
@@ -173,15 +194,24 @@ export default function ParentRecoveryScreen() {
   return (
     <SafeAreaView style={[styles.root, { backgroundColor: palette.bg, }]} edges={['top', 'bottom']}>
       <View style={[styles.header, { borderBottomColor: palette.divider }]}>
-        <Pressable
-          onPress={() => navigation.goBack()}
-          style={styles.backBtn}
-          hitSlop={12}
-          accessibilityRole="button"
-          accessibilityLabel="Go back"
-        >
-          <KISIcon name="arrow-left" size={22} color={palette.text} />
-        </Pressable>
+        {step === 'done' ? (
+          // Already logged in by this point (setAuth(true) + the
+          // navigation.reset above already fired) - going "back" from
+          // here has no sensible destination and depends on stale
+          // pre-login history that may no longer resolve. No button here
+          // at all rather than one that can dead-end.
+          <View style={{ width: 40 }} />
+        ) : (
+          <Pressable
+            onPress={() => navigation.goBack()}
+            style={styles.backBtn}
+            hitSlop={12}
+            accessibilityRole="button"
+            accessibilityLabel="Go back"
+          >
+            <KISIcon name="arrow-left" size={22} color={palette.text} />
+          </Pressable>
+        )}
         <Text style={[styles.headerTitle, { color: palette.text }]}>Account Recovery</Text>
         <View style={{ width: 40 }} />
       </View>
