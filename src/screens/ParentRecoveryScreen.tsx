@@ -11,7 +11,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from '@/components/common/SafeAreaViewWithTopPadding';
-import { CommonActions, useNavigation, useRoute } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import { useKISTheme } from '@/theme/useTheme';
 import { useResponsiveLayout } from '@/theme/responsive';
 import { KISIcon } from '@/constants/kisIcons';
@@ -102,28 +102,23 @@ export default function ParentRecoveryScreen() {
         await setUserData(resolvedUser, res.data);
         setUser?.(resolvedUser);
         void initE2EE(String(resolvedUser?.id ?? '')).catch(() => {});
-        setAuth(true);
+        // Tokens/user are already persisted above (setAuthTokens,
+        // setUserData), so a manual restart alone is enough to land
+        // authenticated via App.tsx's normal boot-time checkAuth() - no
+        // in-app navigation needed. setAuth(true) is still set for
+        // consistency in case the user doesn't restart immediately, but
+        // the 'done' view below explicitly asks them to restart rather
+        // than attempting to navigate them into the app from here:
         // ParentRecovery is registered in BOTH the authenticated and
-        // unauthenticated screen sets (so this exact "done" success view
-        // keeps rendering through the isAuth flip above, instead of being
-        // unmounted mid-message like LoginScreen's success path is) - but
-        // that also means this screen's own history still has the
-        // UNAUTHENTICATED stack underneath it (e.g. Login), which no
-        // longer exists as a valid screen once isAuth is true. The
-        // header's back button calling navigation.goBack() against that
-        // stale history is exactly what throws "The action 'GO_BACK' was
-        // not handled by any navigator" - confirmed in production: user
-        // saw "Logged in successfully" then hit the only available
-        // button (back) and got stuck. Resetting straight to MainTabs
-        // (same fix QRScanLoginScreen already uses for the identical
-        // unauthenticated-screen-completes-login scenario) sidesteps the
-        // stale history entirely rather than depending on it resolving.
-        navigation.dispatch(
-          CommonActions.reset({
-            index: 0,
-            routes: [{ name: 'MainTabs' as never }],
-          }),
-        );
+        // unauthenticated screen sets (so this exact "done" view keeps
+        // rendering through the isAuth flip, unlike LoginScreen's
+        // equivalent success path, which unmounts immediately) - but
+        // that also means this screen's own navigation history still has
+        // the UNAUTHENTICATED stack underneath it (e.g. Login), which no
+        // longer exists as a valid screen once isAuth is true. An
+        // in-screen CommonActions.reset to MainTabs worked, but a plain
+        // restart is simpler and has no stale-history edge case at all.
+        setAuth(true);
       } catch (e: any) {
         Alert.alert('Error', e?.message ?? 'Unable to complete recovery.');
       } finally {
@@ -263,6 +258,9 @@ export default function ParentRecoveryScreen() {
               <KISIcon name="check" size={20} color={palette.success} />
               <Text style={{ color: palette.success, fontWeight: '700', fontSize: 14 }}>Logged in successfully</Text>
             </View>
+            <Text style={[styles.subtitle, { color: palette.subtext, fontWeight: '600' }]}>
+              Please close and reopen KIS to continue.
+            </Text>
           </>
         )}
 
