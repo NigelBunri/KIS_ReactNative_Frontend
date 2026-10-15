@@ -154,6 +154,48 @@ const isNoSignalSessionError = (error: any): boolean => {
   return message.includes('no record for');
 };
 
+// Whether a message object already carries the result of a successful
+// decrypt - used to short-circuit re-decrypting (both in decryptChatMessage's
+// own early-exit, and in its MessageCounterError handler's "this failure is
+// harmless, we already have the real content" check). Checking ONLY
+// `text` non-empty (the original check) misses every attachment-only
+// message with no caption - an image/video/voice/sticker/contact/poll/
+// event sent with no text has an empty `text` field even once correctly
+// decrypted, so that check never recognized them as "already decrypted".
+// Signal Protocol sessions are one-shot per message counter: decrypting
+// the SAME ciphertext a second time (e.g. because a reconnect's history
+// resync calls decryptChatMessage again for a message the real-time
+// socket path already decrypted moments earlier) reliably throws
+// MessageCounterError - and for a caption-less media message, THIS
+// broadened check is what stops that harmless second failure from being
+// mistaken for "never decrypted", which otherwise left the message stuck
+// behind the "Encrypted message" placeholder forever despite the
+// attachment data already being correctly populated by the first,
+// successful attempt.
+const hasDecryptedContent = (message: Pick<ChatMessage, 'text'> & {
+  attachments?: unknown[];
+  media?: unknown;
+  voice?: unknown;
+  sticker?: unknown;
+  contacts?: unknown[];
+  poll?: unknown;
+  event?: unknown;
+}): boolean => {
+  const text = typeof message.text === 'string' ? message.text.trim() : '';
+  if (text.length > 0 && text.toLowerCase() !== 'encrypted message') return true;
+  if (Array.isArray(message.attachments) && message.attachments.length > 0) return true;
+  if (message.media && typeof message.media === 'object') {
+    const attachments = (message.media as any)?.attachments;
+    if (Array.isArray(attachments) && attachments.length > 0) return true;
+  }
+  if (message.voice) return true;
+  if (message.sticker) return true;
+  if (Array.isArray(message.contacts) && message.contacts.length > 0) return true;
+  if (message.poll) return true;
+  if (message.event) return true;
+  return false;
+};
+
 const EMIT_ACK_TIMEOUT_MS = 8_000;
 
 // socket.emit(event, payload) alone is fire-and-forget - the server's
@@ -587,23 +629,20 @@ export function useChatMessaging({
       const existingReadable = messageId
         ? messagesRef.current.find((m) => {
             const sameMessage = m.serverId === messageId || m.id === messageId || m.clientId === messageId;
-            const text = typeof m.text === 'string' ? m.text.trim() : '';
-            return sameMessage && text.length > 0 && text.toLowerCase() !== 'encrypted message';
+            return sameMessage && hasDecryptedContent(m);
           })
         : null;
       if (existingReadable) {
-        // This is meant to short-circuit re-decrypting a message we've
-        // already successfully decrypted in this session — but it infers
-        // "already decrypted" purely from mapped.text not being blank/not
-        // being the exact literal "Encrypted message". If the raw payload
-        // ever arrives with anything else in that field (a placeholder
-        // string that doesn't match exactly, a stray copy of the ciphertext
-        // itself, etc.), this treats that as trustworthy content and skips
-        // decryption entirely — permanently, since every future call (e.g.
-        // on reopening the chat) re-derives the same text and hits the same
-        // skip. Logging this explicitly for the "initial messages arrive
-        // garbled" investigation: if this fires for a message that's
-        // actually still ciphertext, this check is the bug.
+        // Short-circuits re-decrypting a message we've already
+        // successfully decrypted in this session. hasDecryptedContent
+        // (not just non-empty text) is what makes this actually correct
+        // for attachment-only messages with no caption — see its own doc
+        // comment for the MessageCounterError bug this was previously
+        // causing. If the raw payload ever arrives with stray text that
+        // merely LOOKS non-empty (a placeholder string, a stray copy of
+        // the ciphertext itself), this would still wrongly treat that as
+        // trustworthy and skip decryption permanently — logging explicitly
+        // for that case.
         if (__DEV__) {
           console.warn('[useChatMessaging] skipping decrypt — existing text treated as already-readable', {
             messageId,
@@ -850,11 +889,19 @@ export function useChatMessaging({
           if (__DEV__) {
             console.warn('[useChatMessaging] Signal message-counter error (ratchet state mismatch)', {
               messageId, senderId: mapped.senderId, senderDeviceId, currentDeviceId,
-              alreadyHasReadableText: !!(existing?.text && existing.text !== 'Encrypted message'),
+              // hasDecryptedContent, not just non-empty text - a caption-less
+              // image/video/voice message already correctly decrypted by an
+              // earlier attempt (e.g. the real-time socket path) has empty
+              // text but a populated attachments/media/voice field; the old
+              // text-only check didn't recognize that, treated this harmless
+              // "decrypted twice" MessageCounterError as a real failure, and
+              // left the attachment stuck behind the "Encrypted message"
+              // placeholder forever despite already having the real content.
+              alreadyHasContent: existing ? hasDecryptedContent(existing) : false,
               error: serializeErrorForDiagnostics(error),
             });
           }
-          if (existing?.text && existing.text !== 'Encrypted message') {
+          if (existing && hasDecryptedContent(existing)) {
             return;
           }
           // Falls through to the failedAt cooldown above (5s) instead of a

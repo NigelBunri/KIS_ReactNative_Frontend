@@ -103,9 +103,23 @@ export const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [caption, setCaption] = useState("");
   const [isOpeningCamera, setIsOpeningCamera] = useState(false);
-  // Use a ref for the guard so it doesn't cause openSystemCamera to be recreated,
-  // which would retrigger the visibility effect in an infinite loop.
-  const isOpeningCameraRef = useRef(false);
+  const [isOpeningGallery, setIsOpeningGallery] = useState(false);
+  // Shared by BOTH openSystemCamera and openGallery — previously
+  // isOpeningCameraRef only guarded re-entrant CAMERA calls, so nothing
+  // stopped the auto-open-camera-on-mount timer below from firing WHILE a
+  // user-initiated openGallery() call was already in flight (nothing
+  // cancelled the timer when the user tapped Gallery first, and
+  // openGallery never checked or set this ref). That let the system
+  // camera launch concurrently with/after the gallery picker the user
+  // actually asked for — confirmed root cause of "I picked an image but
+  // the camera opened instead" and "the picked image/send button never
+  // appear": whichever native picker's result landed last overwrote
+  // `assets` (setNewAssetsAndSelectFirst replaces the array wholesale),
+  // leaving the OTHER picker's selection silently discarded, sometimes
+  // mid-transition so neither preview nor the send button's `hasContent`
+  // check ever resolved to a consistent, visible state. Use a ref (not
+  // state) so it doesn't cause either callback to be recreated.
+  const pickerInProgressRef = useRef(false);
   // launchCamera()'s promise can be lost entirely on Android if the hosting
   // Activity is recreated while the system camera is in the foreground (a
   // known react-native-image-picker/OS interaction, not something this
@@ -125,8 +139,8 @@ export const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({
 
   const openSystemCamera = useCallback(
     async (mediaType: 'photo' | 'video') => {
-      if (isOpeningCameraRef.current) return;
-      isOpeningCameraRef.current = true;
+      if (pickerInProgressRef.current) return;
+      pickerInProgressRef.current = true;
       setIsOpeningCamera(true);
       const requestId = ++requestIdRef.current;
       let timedOut = false;
@@ -216,7 +230,7 @@ export const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({
       } finally {
         clearTimeout(timeoutHandle);
         if (requestId === requestIdRef.current) {
-          isOpeningCameraRef.current = false;
+          pickerInProgressRef.current = false;
           setIsOpeningCamera(false);
         }
       }
@@ -225,6 +239,12 @@ export const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({
   );
 
   const openGallery = useCallback(async () => {
+    // Same shared guard openSystemCamera uses — see its declaration for
+    // why this must be checked/set here too, not just in the camera path.
+    if (pickerInProgressRef.current) return;
+    pickerInProgressRef.current = true;
+    setIsOpeningGallery(true);
+    const requestId = ++requestIdRef.current;
     try {
       const options: ImageLibraryOptions = {
         mediaType: 'mixed',
@@ -236,6 +256,7 @@ export const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({
       };
 
       const result = await launchImageLibrary(options);
+      if (requestId !== requestIdRef.current) return; // superseded by a newer attempt
       if (result.didCancel) return;
 
       if (result.errorCode) {
@@ -261,7 +282,13 @@ export const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({
       setGalleryAssets(libAssets);
       setNewAssetsAndSelectFirst(libAssets);
     } catch {
+      if (requestId !== requestIdRef.current) return; // superseded by a newer attempt
       Alert.alert('Gallery Error', 'Could not open gallery.');
+    } finally {
+      if (requestId === requestIdRef.current) {
+        pickerInProgressRef.current = false;
+        setIsOpeningGallery(false);
+      }
     }
   }, []);
 
@@ -375,11 +402,13 @@ export const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({
 
           <Pressable
             onPress={openGallery}
+            disabled={isOpeningCamera || isOpeningGallery}
             accessibilityRole="button"
             accessibilityLabel="Choose from gallery"
             style={({ pressed }) => [
               styles.headerIconButton,
               { backgroundColor: palette.surface },
+              (isOpeningCamera || isOpeningGallery) && { opacity: KIS_TOKENS.opacity.disabled },
               pressed && { opacity: KIS_TOKENS.opacity.pressed },
             ]}
           >
@@ -451,11 +480,11 @@ export const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({
               <View style={styles.emptyActions}>
                 <Pressable
                   onPress={() => openSystemCamera('photo')}
-                  disabled={isOpeningCamera}
+                  disabled={isOpeningCamera || isOpeningGallery}
                   style={({ pressed }) => [
                     styles.emptyActionButtonWrap,
                     pressed && { transform: [{ scale: 0.97 }] },
-                    isOpeningCamera && { opacity: KIS_TOKENS.opacity.disabled },
+                    (isOpeningCamera || isOpeningGallery) && { opacity: KIS_TOKENS.opacity.disabled },
                   ]}
                 >
                   <LinearGradient
@@ -474,13 +503,19 @@ export const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({
                 </Pressable>
                 <Pressable
                   onPress={openGallery}
+                  disabled={isOpeningCamera || isOpeningGallery}
                   style={({ pressed }) => [
                     styles.emptyActionButton,
                     { backgroundColor: palette.card, borderColor: palette.border, borderWidth: 1 },
+                    (isOpeningCamera || isOpeningGallery) && { opacity: KIS_TOKENS.opacity.disabled },
                     pressed && { opacity: KIS_TOKENS.opacity.pressed },
                   ]}
                 >
-                  <KISIcon name="image" size={18} color={palette.text} />
+                  {isOpeningGallery ? (
+                    <ActivityIndicator size="small" color={palette.text} />
+                  ) : (
+                    <KISIcon name="image" size={18} color={palette.text} />
+                  )}
                   <Text style={[styles.emptyActionText, { color: palette.text }]}>Gallery</Text>
                 </Pressable>
               </View>
@@ -570,13 +605,19 @@ export const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({
               {/* ADD MORE FROM GALLERY */}
               <Pressable
                 onPress={openGallery}
+                disabled={isOpeningCamera || isOpeningGallery}
                 style={({ pressed }) => [
                   styles.addMoreItem,
                   { borderColor: palette.primary },
+                  (isOpeningCamera || isOpeningGallery) && { opacity: KIS_TOKENS.opacity.disabled },
                   pressed && { opacity: KIS_TOKENS.opacity.pressed },
                 ]}
               >
-                <KISIcon name="add" size={22} color={palette.primary} />
+                {isOpeningGallery ? (
+                  <ActivityIndicator size="small" color={palette.primary} />
+                ) : (
+                  <KISIcon name="add" size={22} color={palette.primary} />
+                )}
                 <Text style={[styles.galleryLabel, { color: palette.primary }]}>Add</Text>
               </Pressable>
             </ScrollView>
@@ -608,9 +649,11 @@ export const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({
               style={({ pressed }) => [
                 styles.sideButton,
                 { backgroundColor: palette.surface },
+                (isOpeningCamera || isOpeningGallery) && { opacity: KIS_TOKENS.opacity.disabled },
                 pressed && { opacity: KIS_TOKENS.opacity.pressed },
               ]}
               onPress={() => openSystemCamera('video')}
+              disabled={isOpeningCamera || isOpeningGallery}
             >
               <KISIcon name="video" size={20} color={palette.text} />
               <Text style={[styles.sideButtonLabel, { color: palette.text }]}>Video</Text>
@@ -618,13 +661,13 @@ export const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({
 
             <Pressable
               onPress={() => openSystemCamera('photo')}
-              disabled={isOpeningCamera}
+              disabled={isOpeningCamera || isOpeningGallery}
               accessibilityRole="button"
               accessibilityLabel="Take photo"
               style={({ pressed }) => [
                 styles.shutterWrap,
                 pressed && { transform: [{ scale: 0.95 }] },
-                isOpeningCamera && { opacity: KIS_TOKENS.opacity.disabled },
+                (isOpeningCamera || isOpeningGallery) && { opacity: KIS_TOKENS.opacity.disabled },
               ]}
             >
               <LinearGradient
