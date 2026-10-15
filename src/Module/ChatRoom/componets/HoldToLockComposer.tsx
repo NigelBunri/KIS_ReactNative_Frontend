@@ -131,7 +131,20 @@ export const HoldToLockComposer: React.FC<Props> = ({
   const cancelledRef   = useRef(false);
   const recordUriRef   = useRef<string | null>(null);
   const recordMsRef    = useRef(0);
+  // Wall-clock timestamp (Date.now()) for when the native recorder
+  // actually confirmed it started — used by stopRecordingCore() as the
+  // authoritative recording duration, since recordMsRef is otherwise only
+  // ever updated by the live-metering listener on its ~90ms subscription
+  // interval (see setSubscriptionDuration below) and can still read 0 if
+  // the recording was stopped before that listener's first tick landed.
+  const recordStartedAtRef = useRef(0);
   const playActiveRef  = useRef(false);
+  // True once startPlayer() has run for the CURRENT preview clip and the
+  // player hasn't been fully stopped since (only paused, or never
+  // touched) — lets togglePlayback distinguish "resume from where this
+  // was paused" (resumePlayer) from "begin playback for the first time"
+  // (startPlayer), and lets pausePlayer leave position/listener intact.
+  const playerStartedRef = useRef(false);
   const permissionCheckInFlightRef = useRef(false);
 
   /* ── animated values ───────────────────────────────────────────────────── */
@@ -308,6 +321,7 @@ export const HoldToLockComposer: React.FC<Props> = ({
     lockedRef.current    = false;
     recordUriRef.current = null;
     recordMsRef.current  = 0;
+    recordStartedAtRef.current = 0;
 
     setRecordSeconds(0);
     setPreviewProgress(0);
@@ -338,6 +352,7 @@ export const HoldToLockComposer: React.FC<Props> = ({
         return;
       }
       startedRef.current = true;
+      recordStartedAtRef.current = Date.now();
       if (uri) recordUriRef.current = uri;
 
       audioRecorderPlayer.addRecordBackListener((e: RecordBackType) => {
@@ -377,6 +392,22 @@ export const HoldToLockComposer: React.FC<Props> = ({
     let uri: string | null = null;
     try { uri = (await audioRecorderPlayer.stopRecorder()) ?? null; } catch {}
     try { audioRecorderPlayer.removeRecordBackListener(); } catch {}
+    // recordMsRef is otherwise only ever written by the live-metering
+    // listener (addRecordBackListener below), which only ticks every
+    // ~90ms (setSubscriptionDuration). A release quicker than that left
+    // recordMsRef at its initial 0 even for a perfectly real recording —
+    // stopToPreview's "was anything actually recorded" check then read
+    // that as "nothing to preview" and silently discarded it via
+    // resetAll(), with zero feedback. This is exactly what made a plain
+    // hold-and-release feel broken while the slower swipe-to-lock drag
+    // "worked" — it simply took long enough for one metering tick to
+    // land first. Wall-clock elapsed time since the native recorder
+    // actually confirmed it started is the real recording duration
+    // regardless of listener timing, so take whichever value is larger.
+    if (recordStartedAtRef.current) {
+      const elapsedMs = Date.now() - recordStartedAtRef.current;
+      recordMsRef.current = Math.max(recordMsRef.current, elapsedMs);
+    }
     // Deliberately does NOT call setIsRecording(false) here. This is the
     // shared "stop the native recorder" step for both stopToPreview (which
     // immediately transitions to voiceMode 'preview', not 'idle') and
@@ -406,6 +437,7 @@ export const HoldToLockComposer: React.FC<Props> = ({
     lockedRef.current    = false;
     recordUriRef.current = null;
     recordMsRef.current  = 0;
+    recordStartedAtRef.current = 0;
     setVoiceMode('idle');
     setRecordSeconds(0);
     setIsPlayingPreview(false);
@@ -434,16 +466,37 @@ export const HoldToLockComposer: React.FC<Props> = ({
 
   /* ── preview playback ───────────────────────────────────────────────────── */
 
-  const stopPlayback = async () => {
+  // Full teardown — only for when playback is truly done (reached the end
+  // of the clip) or the preview itself is going away (delete/send). Resets
+  // position to 0 and clears playerStartedRef so the NEXT play starts a
+  // fresh clip from the beginning, which is correct in both of those cases.
+  const stopPlaybackFully = async () => {
     try {
       await audioRecorderPlayer.stopPlayer();
-      if (playActiveRef.current) {
-        audioRecorderPlayer.removePlayBackListener();
-        playActiveRef.current = false;
-      }
     } catch {}
+    if (playActiveRef.current) {
+      try { audioRecorderPlayer.removePlayBackListener(); } catch {}
+      playActiveRef.current = false;
+    }
+    playerStartedRef.current = false;
     setIsPlayingPreview(false);
     setPreviewProgress(0);
+  };
+
+  // User-facing "pause" — deliberately NOT a full stop. The previous
+  // implementation called stopPlayer() here (identical to
+  // stopPlaybackFully), which is the actual "after pausing it doesn't
+  // restart" bug: stopPlayer() is a hard stop, so the next startPlayer()
+  // call always began the clip again from 0:00 — visually indistinguishable
+  // from the pause having silently failed, since the progress bar snapped
+  // back to the start the instant pause was tapped. pausePlayer() keeps the
+  // native player's position and the listener intact so resuming can
+  // actually continue from where this left off.
+  const pausePlayback = async () => {
+    try {
+      await audioRecorderPlayer.pausePlayer();
+    } catch {}
+    setIsPlayingPreview(false);
   };
 
   const startPlayback = async () => {
@@ -451,14 +504,21 @@ export const HoldToLockComposer: React.FC<Props> = ({
     if (!uri) return;
     try {
       setIsPlayingPreview(true);
+      if (playerStartedRef.current) {
+        // Already playing this exact clip once and only paused since -
+        // resume from the paused position instead of restarting.
+        await audioRecorderPlayer.resumePlayer();
+        return;
+      }
       await audioRecorderPlayer.startPlayer(uri);
+      playerStartedRef.current = true;
       playActiveRef.current = true;
       const estDur = Math.max(recordMsRef.current, 1);
       audioRecorderPlayer.addPlayBackListener((e: PlayBackType) => {
         const pos = e.currentPosition ?? 0;
         const dur = e.duration && e.duration > 0 ? e.duration : estDur;
         setPreviewProgress(Math.min(1, pos / dur));
-        if (pos >= dur - 50) stopPlayback();
+        if (pos >= dur - 50) void stopPlaybackFully();
       });
     } catch {
       setIsPlayingPreview(false);
@@ -466,7 +526,7 @@ export const HoldToLockComposer: React.FC<Props> = ({
   };
 
   const togglePlayback = () => {
-    if (isPlayingPreview) stopPlayback();
+    if (isPlayingPreview) pausePlayback();
     else startPlayback();
   };
 
@@ -477,6 +537,7 @@ export const HoldToLockComposer: React.FC<Props> = ({
     cancelledRef.current = false;
     recordUriRef.current = null;
     recordMsRef.current  = 0;
+    recordStartedAtRef.current = 0;
     setVoiceMode('idle');
     setRecordSeconds(0);
     setIsPlayingPreview(false);
@@ -490,7 +551,10 @@ export const HoldToLockComposer: React.FC<Props> = ({
   }, [setIsRecording]);
 
   const handleSendPreview = async () => {
-    if (isPlayingPreview) await stopPlayback();
+    // Guards on playerStartedRef, not isPlayingPreview — a paused (not
+    // playing) player session still needs a real stopPlayer() call before
+    // this preview goes away, same reasoning as handleDeletePreview below.
+    if (playerStartedRef.current) await stopPlaybackFully();
     const uri = recordUriRef.current;
     const durationMs = recordMsRef.current;
     if (uri && durationMs > 0) onSendVoice?.({ uri, durationMs });
@@ -498,7 +562,7 @@ export const HoldToLockComposer: React.FC<Props> = ({
   };
 
   const handleDeletePreview = async () => {
-    if (isPlayingPreview) await stopPlayback();
+    if (playerStartedRef.current) await stopPlaybackFully();
     resetAll();
   };
 
