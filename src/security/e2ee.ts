@@ -30,12 +30,21 @@ const sessionBuildRequests = new Map<
   Promise<{ address: any; device_id: string } | null>
 >();
 
+// Keyed by session id (userId.deviceId) — see decryptFromUser's doc comment
+// for why decrypt needs this at all (concurrent decrypts for the SAME
+// sender/device racing on that session's ratchet state) and why it's
+// per-session rather than one global queue like encryptSerializationTail
+// (decrypts for different senders touch independent session state and
+// gain nothing from waiting on each other).
+const decryptSerializationTails = new Map<string, Promise<unknown>>();
+
 const clearRuntimeE2EECaches = () => {
   deviceBundleCache.clear();
   deviceBundleRequests.clear();
   sessionBuildRequests.clear();
   decryptPlaintextCache.clear();
   decryptInFlight.clear();
+  decryptSerializationTails.clear();
 };
 
 const rememberDecryptedPlaintext = (key: string, value: string) => {
@@ -852,6 +861,48 @@ export const isSignalMessageCounterError = (error: unknown): boolean => {
   );
 };
 
+// Mirrors encryptSerializationTail above, for the same reason: decryptFromUser
+// is called via "void decryptChatMessage(msg)" fire-and-forget loops over
+// a whole batch of messages at once (see useChatMessaging.ts's history-load
+// and gap-fill handlers, e.g. `mapped.forEach(m => void decryptChatMessage(m))`
+// and `for (const m of mapped) void decryptChatMessageRef.current(m)`) -
+// every normal multi-message conversation history load fires N concurrent
+// decrypts, and any two of them from the SAME sender/device race on that
+// session's loadSession -> advance-the-receiving-ratchet -> storeSession
+// sequence exactly like the documented encrypt-side race above, just on
+// the receiving end. Unlike encrypt, decrypt had no serialization at all
+// before this fix - confirmed root cause of "some received messages,
+// images, and files appear encrypted/unreadable": whichever decrypt's
+// storeSession call lost the race left that session permanently desynced,
+// and every later message in it (or just that one message's own ratchet
+// step) became unrecoverable, matching the intermittent, sender-dependent
+// pattern reported (never total breakage, never the same message twice).
+// Scoped to one promise per SESSION (decryptSerializationTails, declared
+// near the top of this file alongside the other runtime caches it's
+// cleared with) rather than one global queue like encrypt's, since
+// decrypts for different senders/devices touch entirely independent
+// session state and gain nothing from waiting on each other - only
+// concurrent decrypts for the SAME session need to be serialized.
+// Exported for regression testing only (see __tests__/e2ee.decryptSerialization.test.ts)
+// — every real caller in this module stays internal.
+export const runSerializedForSession = <T>(sessionId: string, job: () => Promise<T>): Promise<T> => {
+  const tail = decryptSerializationTails.get(sessionId) ?? Promise.resolve();
+  const run = tail.then(job, job);
+  // Keep the per-session chain alive regardless of outcome - one failed
+  // decrypt (bad mac, counter error, whatever) must not permanently wedge
+  // every later decrypt attempt for that same session behind a dead
+  // promise. Clear the map entry once this is the last link in the chain,
+  // so the Map doesn't grow forever across a long-lived app session.
+  const settled = run.catch(() => undefined);
+  decryptSerializationTails.set(sessionId, settled);
+  settled.finally(() => {
+    if (decryptSerializationTails.get(sessionId) === settled) {
+      decryptSerializationTails.delete(sessionId);
+    }
+  });
+  return run;
+};
+
 export const decryptFromUser = async (
   senderUserId: string,
   senderDeviceId: string,
@@ -859,14 +910,15 @@ export const decryptFromUser = async (
   metaType: number,
 ) => {
   const address = getAddress(senderUserId, senderDeviceId);
-  const cacheKey = `${getSessionId(address)}:${metaType}:${ciphertext}`;
+  const sessionId = getSessionId(address);
+  const cacheKey = `${sessionId}:${metaType}:${ciphertext}`;
   const cached = decryptPlaintextCache.get(cacheKey);
   if (cached !== undefined) return cached;
 
   const pending = decryptInFlight.get(cacheKey);
   if (pending) return pending;
 
-  const decryptPromise = (async () => {
+  const decryptPromise = runSerializedForSession(sessionId, async () => {
     const bytes = fromB64(ciphertext);
 
     let plaintext;
@@ -884,7 +936,7 @@ export const decryptFromUser = async (
       // A sender from an older build may have rebuilt its prekey session before
       // every send. Drop only that stale peer session and establish the new one
       // from this prekey message.
-      await signalStore.removeSession(getSessionId(address));
+      await signalStore.removeSession(sessionId);
       const retryCipher = new libsignal.SessionCipher(signalStore, address);
       plaintext = await retryCipher.decryptPreKeyWhisperMessage(bytes, 'binary');
     }
@@ -892,7 +944,7 @@ export const decryptFromUser = async (
     const decoded = Buffer.from(new Uint8Array(plaintext)).toString('utf8');
     rememberDecryptedPlaintext(cacheKey, decoded);
     return decoded;
-  })();
+  });
 
   decryptInFlight.set(cacheKey, decryptPromise);
   try {
