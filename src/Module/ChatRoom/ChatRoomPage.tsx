@@ -82,6 +82,7 @@ import type { CallType } from '@/services/calls/callTypes';
 import ROUTES, { NEST_API_BASE_URL } from '@/network';
 import { patchRequest } from '@/network/patch';
 import { loadMessages } from './Storage/chatStorage';
+import { deleteDecryptedMessage } from './Storage/decryptedMessageStorage';
 import RNFS from 'react-native-fs';
 import { stripFileScheme } from './chatMediaStorage';
 
@@ -2198,6 +2199,19 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
       // "Message deleted" (a real delete-for-everyone), whereas this should
       // keep rendering "Opened" (see MessageBubble's isTopLevelViewOnce +
       // topLevelViewOnceViewed branch), so viewOnce/viewedAt are kept.
+      //
+      // ciphertext/encryptionMeta are stripped here too, not just the
+      // plaintext content fields - the server's markViewOnceOpened already
+      // clears both, but this client-side copy didn't, which left
+      // hydrateDecryptedMessages' own `encrypted` check still true for an
+      // already-opened message with now-empty content, triggering it to
+      // "helpfully" restore the full original plaintext from whatever
+      // saveDecryptedMessage cached under this message's id the very
+      // first time it was ever decrypted - a second, independent cause of
+      // "view-once content reappears," this one specifically surviving an
+      // app restart since that cache is a persistent, Keychain-backed
+      // store untouched by anything else here. deleteDecryptedMessage
+      // below removes that stale cache entry outright.
       replaceMessages(messages.map((m) =>
         m.id === messageId || (m as any).serverId === messageId
           ? {
@@ -2213,9 +2227,15 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
               poll: undefined,
               event: undefined,
               linkPreview: undefined,
+              ciphertext: undefined,
+              encryptionMeta: undefined,
             }
           : m,
       ));
+
+      if (target && currentUserId) {
+        void deleteDecryptedMessage(String(currentUserId), target as any);
+      }
 
       // Best-effort, fire-and-forget — same posture as the server-side purge
       // below: the user has already seen the content by this point, so a

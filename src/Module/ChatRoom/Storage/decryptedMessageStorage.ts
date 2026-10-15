@@ -73,6 +73,35 @@ export async function saveDecryptedMessage(
   }
 }
 
+/**
+ * Must be called the instant a view-once message is consumed (see
+ * ChatRoomPage.tsx's handleViewOnce). Without this, the FULL plaintext
+ * saveDecryptedMessage cached here the first time this message was ever
+ * decrypted — before it was ever opened — survives indefinitely in this
+ * persistent, Keychain-backed store. hydrateDecryptedMessages's own
+ * isOpenedViewOnce guard stops it from being READ BACK once opened, but
+ * deleting it here too is defense in depth: leaving a plaintext copy of
+ * "permanently inaccessible" content sitting in storage forever, just
+ * unused by this one code path, is still a real exposure this feature's
+ * entire premise is to prevent.
+ */
+export async function deleteDecryptedMessage(
+  userId: string,
+  message: Partial<ChatMessage>,
+): Promise<void> {
+  const ids = messageIds(message);
+  if (!userId || !ids.length) return;
+  try {
+    await Promise.all(
+      ids.map((id) => EncryptedStorage.removeItem(storageKey(userId, id))),
+    );
+  } catch (error) {
+    if (__DEV__) {
+      console.warn('[decryptedMessageStorage] deleteDecryptedMessage failed', error);
+    }
+  }
+}
+
 export async function loadDecryptedMessage(
   userId: string,
   message: Partial<ChatMessage>,
@@ -97,6 +126,28 @@ export async function hydrateDecryptedMessages(
 
   return Promise.all(
     messages.map(async message => {
+      // CONFIRMED ROOT CAUSE (one of three) of "view-once content
+      // disappears, then reappears as the original message," specifically
+      // the variant that survives an app restart: a view-once message's
+      // ciphertext/encryptionMeta fields are stripped server-side
+      // (markViewOnceOpened) but were never stripped by this client's own
+      // handleViewOnce, so `encrypted` below still evaluates true for an
+      // already-opened message whose content fields are now correctly
+      // empty - which is exactly the "nothing readable, try to rehydrate"
+      // condition this function exists to handle. Without this guard, it
+      // then faithfully restores the FULL original plaintext from
+      // whatever saveDecryptedMessage cached here the very first time
+      // this message was ever decrypted, before it was ever opened -
+      // undoing the one-time reveal on every single room reopen or app
+      // restart. handleViewOnce calls deleteDecryptedMessage the instant a
+      // message is opened (removing the stale cache entry outright); this
+      // check is the second, load-time line of defense in case that
+      // delete didn't land yet (e.g. a cold-start race) or some other
+      // code path reaches this message before it does.
+      if (Boolean((message as any).viewOnce) && (message as any).viewedAt) {
+        return message;
+      }
+
       const encrypted = Boolean(
         message.encryptionMeta ??
           message.ciphertext ??

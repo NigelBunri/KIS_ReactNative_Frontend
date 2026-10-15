@@ -40,6 +40,7 @@ import {
   removeMessage,
 } from '../Storage/chatStorage';
 import {
+  deleteDecryptedMessage,
   loadDecryptedMessage,
   saveDecryptedMessage,
 } from '../Storage/decryptedMessageStorage';
@@ -2416,6 +2417,20 @@ export function useChatMessaging({
 
       const id = serverMsg.id ?? serverMsg._id ?? serverMsg.messageId;
 
+      // Also clears ciphertext/encryptionMeta (same reasoning as
+      // ChatRoomPage.tsx's handleViewOnce) and deletes this message's
+      // cached decrypted plaintext (see deleteDecryptedMessage's doc
+      // comment) — this handler is what runs on every OTHER
+      // participant's device, including the opener's own additional
+      // devices, so without doing the exact same cleanup here, any
+      // device other than the one that physically tapped to open it
+      // would still resurrect the full content from its own local
+      // decrypted-message cache on its own next reload/restart.
+      const openedMessage = messagesRef.current.find((m) => m.serverId === id || m.id === id);
+      if (openedMessage && currentUserId) {
+        void deleteDecryptedMessage(String(currentUserId), openedMessage as any);
+      }
+
       const next = messagesRef.current.map((m) =>
         m.serverId === id || m.id === id
           ? {
@@ -2432,6 +2447,8 @@ export function useChatMessaging({
               poll: undefined,
               event: undefined,
               linkPreview: undefined,
+              ciphertext: undefined,
+              encryptionMeta: undefined,
             }
           : m,
       );

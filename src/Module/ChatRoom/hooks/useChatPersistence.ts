@@ -368,10 +368,45 @@ function normalizeSender(
 // Merge two message versions without letting a partial server update
 // (e.g. a status receipt that lacks rich fields) clobber the locally-stored
 // replyTo / sticker / voice / attachments that the full message already has.
-function mergePreservingRich(prev: ChatMessage, next: ChatMessage): ChatMessage {
-  const merged = { ...prev, ...next } as any;
+// True once a view-once message has actually been opened (ChatRoomPage's
+// handleViewOnce / the server's markViewOnceOpened both set viewedAt the
+// instant it's consumed, alongside stripping every content field). Mirrors
+// Storage/chatStorage.ts's identical helper - kept separate rather than
+// imported since the two files' ChatMessage-ish shapes aren't the same
+// type and this is a one-line structural check, not shared logic worth a
+// cross-module dependency for.
+const isOpenedViewOnce = (message: any): boolean => Boolean(message?.viewOnce && message?.viewedAt);
+
+// Exported for regression testing only (see
+// __tests__/useChatPersistence.viewOnce.test.ts) — every other caller in
+// this module stays internal.
+export function mergePreservingRich(prev: ChatMessage, next: ChatMessage): ChatMessage {
   const p = prev as any;
   const n = next as any;
+
+  // CONFIRMED ROOT CAUSE of "view-once content disappears, then reappears
+  // as the original message": this is called on EVERY replaceMessages()
+  // call - including the very same call ChatRoomPage's handleViewOnce
+  // makes to apply its own strip (text/attachments/voice/etc -> empty).
+  // Every restoration branch below exists to recover content this
+  // function infers was merely lost across a merge (e.g. a server
+  // echo stripping localUri/localPath that the client-side copy still
+  // has) - it has no concept of a view-once message's emptied fields
+  // being an intentional, permanent, terminal state. Without this guard,
+  // mergeMessages() -> mergePreservingRich(existing=full-original,
+  // next=stripped) restores attachments/voice/etc. from `existing`
+  // because `next` now has "fewer" of them - undoing the strip
+  // SYNCHRONOUSLY, on the exact call meant to apply it. The only thing
+  // that then hid the content from the viewer was MessageBubble's own
+  // local topLevelViewOnceViewed React state; the underlying message
+  // object kept the full original the entire time, ready to resurface
+  // through list virtualization recycling the row, a chat-list preview,
+  // search, or any other code path that reads the message directly
+  // instead of through that one component's local gate.
+  if (isOpenedViewOnce(n)) return n;
+  if (isOpenedViewOnce(p)) return p;
+
+  const merged = { ...prev, ...next } as any;
 
   // Never let a lower-ranked status (e.g. a stale 'sent' copy from a
   // secondary storage source) clobber a higher-ranked one (e.g. 'read')

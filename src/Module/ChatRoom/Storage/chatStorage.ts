@@ -459,9 +459,45 @@ const messageCacheScore = (message: ChatMessage): number => {
 // MESSAGE_STATUS_RANK in hooks/useChatPersistence.ts.
 const CACHE_STATUS_ORDER: Record<string, number> = { pending: 0, sending: 0, local_only: 0, failed: 0.5, sent: 1, delivered: 2, read: 3 };
 
-const mergeCachedMessage = (prev: ChatMessage, next: ChatMessage): ChatMessage => {
+// True once a view-once message has actually been opened (ChatRoomPage's
+// handleViewOnce / the server's markViewOnceOpened both set viewedAt the
+// instant it's consumed, alongside stripping every content field). An
+// UNOPENED view-once message (viewOnce true, viewedAt still unset) must
+// still go through the normal merge logic below unchanged - e.g. to
+// recover a locally-downloaded voice-note path before it's ever been
+// tapped open.
+const isOpenedViewOnce = (message: any): boolean => Boolean(message?.viewOnce && message?.viewedAt);
+
+// Exported for regression testing only (see __tests__/chatStorage.viewOnce.test.ts)
+// — not part of this module's public API, every other caller stays internal.
+export const mergeCachedMessage = (prev: ChatMessage, next: ChatMessage): ChatMessage => {
   const p = prev as any;
   const n = next as any;
+
+  // CONFIRMED ROOT CAUSE of "view-once content disappears, then reappears
+  // as the original message" (including surviving app restarts): every
+  // field-restoration branch below exists to recover content this
+  // function infers was merely LOST across a stale cache merge (e.g. a
+  // downloaded file's localUri present on one cached copy but not
+  // another) - it has no concept of a view-once message's emptied fields
+  // being an intentional, permanent, terminal state rather than loss.
+  // loadMessages() concatenates up to five separate storage layers
+  // (durable history, AsyncStorage V3/V2/V1 keys, alias-recovered keys)
+  // on every single room open, and dedupeCachedMessages runs every
+  // duplicate pair it finds through this function - so the instant ANY
+  // one of those layers still holds the pre-strip snapshot (the durable
+  // history file isn't rewritten by handleViewOnce's in-memory-only
+  // replaceMessages call; an old V1/V2 migration key; an alias-recovered
+  // key), this function dutifully "restores" the text/attachments/voice/
+  // etc. that handleViewOnce and markViewOnceOpened both deliberately
+  // emptied, undoing the one-time reveal on literally the next room open
+  // or app restart. A message that has actually been opened must always
+  // win outright, with none of its stripped fields ever backfilled from
+  // the other side, regardless of which side is more "complete" or which
+  // argument position it's passed in (dedupeCachedMessages calls this
+  // with either order depending on cache score).
+  if (isOpenedViewOnce(n)) return n;
+  if (isOpenedViewOnce(p)) return p;
   const merged: any = { ...p, ...n };
   const nextText = typeof n.text === 'string' ? n.text.trim() : '';
   const prevText = typeof p.text === 'string' ? p.text.trim() : '';
@@ -533,7 +569,8 @@ const mergeCachedMessage = (prev: ChatMessage, next: ChatMessage): ChatMessage =
   return merged as ChatMessage;
 };
 
-const dedupeCachedMessages = (messages: ChatMessage[]): ChatMessage[] => {
+// Exported for regression testing only (see __tests__/chatStorage.viewOnce.test.ts).
+export const dedupeCachedMessages = (messages: ChatMessage[]): ChatMessage[] => {
   const byIdentity = new Map<string, ChatMessage>();
   messages.forEach((message, index) => {
     const key = messageIdentityKey(message, index);
