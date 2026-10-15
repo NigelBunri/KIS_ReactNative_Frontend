@@ -117,6 +117,40 @@ export default function PartnersMessagesPane({
     selectedFeed || selectedCommunity || selectedGroupId || selectedChannelId,
   );
 
+  // AND-039: ChatRoomPage's "Forward to..." sheet (ForwardChatSheet) only
+  // ever lists chats passed in via its `allChats` prop (see
+  // ChatRoomPage.tsx's forwardTargets memo) — it has no other data source.
+  // Both call sites below used to hard-code `allChats={[]}`, so forwarding
+  // a message from a partner group/channel chat always opened a picker
+  // with a search box and nothing to search: an empty array in means an
+  // empty list out, every time, regardless of how many other groups/
+  // channels this partner actually has. Build the same minimal chat shape
+  // chatForGroup/chatForChannel above already use, for every OTHER group
+  // and channel this partner has, so there's something to forward to.
+  const allPartnerChats = useMemo(() => {
+    const fromGroups = groupsForPartner
+      .filter(g => g.conversation_id)
+      .map(g => ({
+        id: g.conversation_id,
+        conversationId: g.conversation_id,
+        title: g.name,
+        name: g.name,
+        partnerId: selectedPartner?.id,
+        partnerName: selectedPartner?.name,
+      }));
+    const fromChannels = channelsForPartner
+      .filter(c => c.conversation_id)
+      .map(c => ({
+        id: c.conversation_id,
+        conversationId: c.conversation_id,
+        title: c.name,
+        name: c.name,
+        partnerId: selectedPartner?.id,
+        partnerName: selectedPartner?.name,
+      }));
+    return [...fromGroups, ...fromChannels] as any[];
+  }, [groupsForPartner, channelsForPartner, selectedPartner]);
+
   return (
     <Animated.View
       style={[
@@ -221,7 +255,7 @@ export default function PartnersMessagesPane({
         <ChatRoomPage
           chat={chatForChannel}
           onBack={closeMessagesPane}
-          allChats={[]}
+          allChats={allPartnerChats}
           onOpenInfo={onOpenInfo}
           onOpenTasks={onOpenTasks}
         />
@@ -229,7 +263,7 @@ export default function PartnersMessagesPane({
         <ChatRoomPage
           chat={chatForGroup}
           onBack={closeMessagesPane}
-          allChats={[]}
+          allChats={allPartnerChats}
           onOpenInfo={onOpenInfo}
         />
       ) : null}
