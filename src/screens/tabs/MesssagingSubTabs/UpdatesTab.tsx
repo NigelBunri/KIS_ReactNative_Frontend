@@ -20,6 +20,7 @@ import {
   TextInput,
   View,
   DeviceEventEmitter,
+  useWindowDimensions,
 } from 'react-native';
 import { useKISTheme } from '@/theme/useTheme';
 import { KIS_TOKENS } from '@/theme/constants';
@@ -376,6 +377,14 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
   // reason. Defaults to a sane minimum before the first real measurement.
   const [viewerFooterHeight, setViewerFooterHeight] = useState(72);
   const scrollRef = useRef<ScrollView>(null);
+  // AND-074: the status composer card had no bounded height and wasn't
+  // scrollable — with the keyboard open, KeyboardAvoidingView's 'padding'
+  // behavior only adds bottom padding, it doesn't shrink/scroll the card
+  // itself, so once (title + action row + text input + color pickers +
+  // footer) plus the keyboard exceeded screen height, the top of the card —
+  // including the text input the user was actively typing into — scrolled
+  // off-screen with no way to get back to it ("writes blind").
+  const { height: windowHeight } = useWindowDimensions();
   useImperativeHandle(ref, () => ({
     scrollTo: (opts) => scrollRef.current?.scrollTo(opts),
   }), []);
@@ -2335,7 +2344,15 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
         <View style={[styles.composerBackdrop, { backgroundColor: palette.royalInk }]}>
           <View
-            style={[styles.composerCard, { backgroundColor: palette.card }]}
+            style={[
+              styles.composerCard,
+              { backgroundColor: palette.card, maxHeight: windowHeight * 0.85 },
+            ]}
+          >
+          <ScrollView
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={{ gap: 12 }}
           >
             <KISText
               preset="h3"
@@ -3061,6 +3078,7 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
                 </View>
               </View>
             ) : null}
+          </ScrollView>
           </View>
         </View>
         </KeyboardAvoidingView>
@@ -3242,6 +3260,15 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
             <KISIcon name="close" size={18} color={palette.text} />
           </Pressable>
           {activeUser?.userId && activeUser.userId !== currentUserId ? (
+            // AND-081: the only way to reach "mute this contact's statuses"
+            // was this button — but it was a plain text pill reading "More",
+            // which doesn't signal "options/mute" the way a standard kebab
+            // (⋮) menu icon does in every other status/story viewer (WhatsApp,
+            // Instagram). Testers looking for a mute option had no reason to
+            // tap something labeled "More". Icon + accessibility label now
+            // make its purpose explicit without changing its position or
+            // what it opens (still handleStatusActionMenu's same action
+            // sheet, which already has mute/unmute + report).
             <Pressable
               style={[
                 styles.viewerMenuButton,
@@ -3252,12 +3279,10 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
                 },
               ]}
               onPress={handleStatusActionMenu}
+              accessibilityRole="button"
+              accessibilityLabel="Status options: mute or report"
             >
-              <Text
-                style={{ color: palette.text, fontSize: 12, fontWeight: '700' }}
-              >
-                More
-              </Text>
+              <KISIcon name="more-vert" size={16} color={palette.text} />
             </Pressable>
           ) : null}
           <Pressable

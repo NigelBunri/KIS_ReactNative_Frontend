@@ -155,8 +155,23 @@ export function routeNotification(
       return;
     }
 
-    // Connection / friend request notifications — go to the Connections screen.
-    if (type === 'connection_request' || data.connection_id || data.sender_id) {
+    // Connection / friend request notifications — go to the Connections
+    // screen. AND-477: the backend never sent either a request or an
+    // accepted push at all (apps/accounts/views.py's UserConnectionViewSet
+    // .create/.partial_update never called create_notification) — now
+    // fixed server-side to send type='connection_request' on send and
+    // type='connection_accepted' on accept (target_type='connection' on
+    // both, via create_notification's target_type kwarg, which
+    // apps/notifications/firebase.py's _notification_data always carries
+    // into the push payload's own `data.target_type`). Matching both types
+    // plus the target_type fallback covers whichever one actually arrives.
+    if (
+      type === 'connection_request' ||
+      type === 'connection_accepted' ||
+      data.target_type === 'connection' ||
+      data.connection_id ||
+      data.sender_id
+    ) {
       navigation.navigate('Connections');
       return;
     }
