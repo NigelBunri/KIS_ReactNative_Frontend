@@ -36,8 +36,8 @@ export default function TestimonyHubScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const insets = useSafeAreaInsets();
   const topInset = useSafeTopInset();
-  const { setAuth, setPhone, callingCode } = useAuth();
-  const c = useProfileController({ setAuth, setPhone, locationCallingCode: callingCode });
+  const { setAuth, setPhone } = useAuth();
+  const c = useProfileController({ setAuth, setPhone });
   const currentUserId = useMemo(() => {
     const uid = c.profile?.user?.id;
     return uid ? String(uid) : null;

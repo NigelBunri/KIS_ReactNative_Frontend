@@ -35,8 +35,8 @@ export default function SeasonsBrowserScreen() {
   const { palette } = useKISTheme();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const route = useRoute<RouteProp<RootStackParamList, 'SeasonsBrowser'>>();
-  const { setAuth, setPhone, callingCode } = useAuth();
-  const c = useProfileController({ setAuth, setPhone, locationCallingCode: callingCode });
+  const { setAuth, setPhone } = useAuth();
+  const c = useProfileController({ setAuth, setPhone });
   const currentUserId = useMemo(() => {
     const uid = c.profile?.user?.id;
     return uid ? String(uid) : null;

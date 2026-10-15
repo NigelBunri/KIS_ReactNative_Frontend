@@ -301,11 +301,10 @@ export default function ProfileScreen() {
   type ProfileTabKey = 'overview' | 'account' | 'business' | 'wallet' | 'admin';
   const [activeProfileTab, setActiveProfileTab] = useState<ProfileTabKey>('overview');
   const { setAgeMode: setGlobalAgeMode } = useAgeMode();
-  const { setAuth, setPhone, callingCode, hasPin, setHasPin, user: authUser } = useAuth();
+  const { setAuth, setPhone, hasPin, setHasPin, user: authUser } = useAuth();
   const c = useProfileController({
     setAuth,
     setPhone,
-    locationCallingCode: callingCode,
   });
   const tabsNavigation =
     useNavigation<BottomTabNavigationProp<MainTabsParamList, 'Profile'>>();

@@ -38,8 +38,8 @@ type TabId = 'for_you' | 'sent';
 export default function TestimonyReachInboxScreen() {
   const { palette } = useKISTheme();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const { setAuth, setPhone, callingCode } = useAuth();
-  const c = useProfileController({ setAuth, setPhone, locationCallingCode: callingCode });
+  const { setAuth, setPhone } = useAuth();
+  const c = useProfileController({ setAuth, setPhone });
   const currentUserId = useMemo(() => {
     const uid = c.profile?.user?.id;
     return uid ? String(uid) : null;

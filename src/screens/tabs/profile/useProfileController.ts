@@ -347,9 +347,8 @@ const normalizePlanList = (payload: any): any[] => {
 export const useProfileController = (opts: {
   setAuth: (v: boolean) => void;
   setPhone?: (v: any) => void;
-  locationCallingCode?: string | null;
 }) => {
-  const { setAuth, setPhone, locationCallingCode } = opts;
+  const { setAuth, setPhone } = opts;
 
   const [profile, setProfile] = useState<ProfilePayload | null>(null);
   const [loading, setLoading] = useState(true);
@@ -453,8 +452,11 @@ export const useProfileController = (opts: {
 
   const applyProfilePayload = useCallback(
     (payload: ProfilePayload) => {
+      // The account's own phone_country_code (set at registration, or
+      // whatever the user last saved here) - never device location.
+      // Location is no longer required for general app use and must
+      // never silently override a value the account already has.
       const phoneDraft = splitPhoneFromUserPayload(payload?.user);
-      const locationDialCode = normalizeDialCode(locationCallingCode);
       const languages = normalizeLanguageList(
         payload?.preferences?.languages,
         true,
@@ -463,7 +465,7 @@ export const useProfileController = (opts: {
 
       setDraftProfile({
         display_name: payload?.user?.display_name || '',
-        country_code: locationDialCode || phoneDraft.country_code,
+        country_code: phoneDraft.country_code,
         phone_number: phoneDraft.phone_number,
         languages,
         headline: payload?.profile?.headline || '',
@@ -495,18 +497,8 @@ export const useProfileController = (opts: {
       rules.forEach((rule: any) => (mapped[rule.field_key] = rule));
       setDraftPrivacy(mapped);
     },
-    [locationCallingCode],
+    [],
   );
-
-  useEffect(() => {
-    const locationDialCode = normalizeDialCode(locationCallingCode);
-    if (!locationDialCode) return;
-    setDraftProfile(prev =>
-      prev.country_code === locationDialCode
-        ? prev
-        : { ...prev, country_code: locationDialCode },
-    );
-  }, [locationCallingCode]);
 
   useEffect(() => {
     const mode = String(walletForm.mode || '')
@@ -1153,8 +1145,9 @@ export const useProfileController = (opts: {
   );
 
   const openEditProfile = () => {
+    // Account's own phone_country_code, never device location - see
+    // applyProfilePayload's identical comment.
     const phoneDraft = splitPhoneFromUserPayload(profile?.user);
-    const locationDialCode = normalizeDialCode(locationCallingCode);
     const languages = normalizeLanguageList(
       profile?.preferences?.languages,
       true,
@@ -1162,7 +1155,7 @@ export const useProfileController = (opts: {
     setDraftProfile(prev => ({
       ...prev,
       display_name: profile?.user?.display_name || '',
-      country_code: locationDialCode || phoneDraft.country_code,
+      country_code: phoneDraft.country_code,
       phone_number: phoneDraft.phone_number,
       languages,
       headline: profile?.profile?.headline || '',
@@ -1322,7 +1315,6 @@ export const useProfileController = (opts: {
       };
       const normalizedCountryCode =
         normalizeDialCode(draftProfile.country_code) ||
-        normalizeDialCode(locationCallingCode) ||
         normalizeDialCode(previousPhoneParts.country_code);
       const normalizedPhoneNumber = normalizeLocalPhoneNumber(
         draftProfile.phone_number,

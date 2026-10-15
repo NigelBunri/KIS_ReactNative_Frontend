@@ -442,7 +442,7 @@ export function EditProfileModal(props: EditProfileModalProps) {
       <View style={{ flexDirection: 'row', gap: 10 }}>
         <View style={{ flex: 1 }}>
           <KISTextInput
-            label="Country code (auto from location)"
+            label="Country code"
             value={draftProfile?.country_code}
             editable={false}
           />
