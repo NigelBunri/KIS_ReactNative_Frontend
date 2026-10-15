@@ -20,6 +20,7 @@ import { KISIcon } from '@/constants/kisIcons';
 import ROUTES, { NEST_API_BASE_URL } from '@/network';
 import { getRequest } from '@/network/get';
 import { postRequest } from '@/network/post';
+import { deleteRequest } from '@/network/delete';
 import { uploadFileToBackend } from '@/Module/ChatRoom/uploadFileToBackend';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -168,7 +169,14 @@ export default function ProductTagStudio({ contentId }: Props) {
         },
         { errorMessage: 'Could not add product tag.' },
       );
-      if (res?.data || res?.id) {
+      // postRequest resolves { success: false, data: <error body> } on a
+      // failed request rather than throwing - `data` is still truthy on
+      // that error body (e.g. a 400 validation error's field-error
+      // object), so the old `res?.data || res?.id` check treated a
+      // genuinely failed submission as a success, silently clearing the
+      // form on a validation error with no indication anything went
+      // wrong.
+      if (res?.success) {
         resetForm();
         await fetchTags();
       } else {
@@ -190,14 +198,16 @@ export default function ProductTagStudio({ contentId }: Props) {
         onPress: async () => {
           setRemovingId(tag.id);
           try {
-            // postRequest resolves (never throws) on failure too — the
-            // trailing `.catch(() => {})` here used to swallow that, so a
-            // failed removal still re-fetched and looked like nothing
-            // happened (the tag just silently stayed in the list with no
-            // explanation why).
-            const res = await postRequest(
-              `${ROUTES.broadcasts.contentProducts(contentId)}${tag.id}/remove/`,
-              {},
+            // AND-169: this called postRequest (POST) against a
+            // `/remove/` sub-path that doesn't exist anywhere in the
+            // backend — ChannelContentProductDetailView (apps/broadcasts/
+            // views.py) only registers DELETE on the plain
+            // `.../products/<tag_id>/` URL, with no POST handler and no
+            // `/remove/` route at all, so this always 404'd. Never caught
+            // before because this whole screen had no navigation entry
+            // point anywhere in the app until this same fix wired it in.
+            const res = await deleteRequest(
+              `${ROUTES.broadcasts.contentProducts(contentId)}${tag.id}/`,
               { errorMessage: '' },
             );
             if (!res?.success) {

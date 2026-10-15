@@ -26,6 +26,7 @@ import ImpressionsAnalyticsPanel from '@/screens/broadcast/channels/studio/Impre
 import TrafficSourcesPanel from '@/screens/broadcast/channels/studio/TrafficSourcesPanel';
 import SubtitleEditorPanel from '@/screens/broadcast/channels/studio/SubtitleEditorPanel';
 import ChapterEditorPanel from '@/screens/broadcast/channels/studio/ChapterEditorPanel';
+import ProductTagStudio from '@/screens/broadcast/channels/studio/ProductTagStudio';
 import EndScreenEditor from '@/screens/broadcast/channels/studio/EndScreenEditor';
 import ContentCardsEditor from '@/screens/broadcast/channels/studio/ContentCardsEditor';
 import ChannelHomepageShelfEditor from '@/screens/broadcast/channels/studio/ChannelHomepageShelfEditor';
@@ -38,7 +39,7 @@ import TrustPromotionRevenuePreviewCard from '@/components/profitability/TrustPr
 import NotificationRetentionPreviewCard from '@/components/profitability/NotificationRetentionPreviewCard';
 import EnterpriseKcanRevenuePreviewCard from '@/components/profitability/EnterpriseKcanRevenuePreviewCard';
 
-type StudioTab = 'dashboard' | 'content' | 'create' | 'branding' | 'playlists' | 'live' | 'analytics' | 'moderation' | 'revenue' | 'audience' | 'copyright' | 'ads' | 'impressions' | 'traffic' | 'subtitles' | 'chapters' | 'endscreens' | 'cards' | 'shelves' | 'settings';
+type StudioTab = 'dashboard' | 'content' | 'create' | 'branding' | 'playlists' | 'live' | 'analytics' | 'moderation' | 'revenue' | 'audience' | 'copyright' | 'ads' | 'impressions' | 'traffic' | 'subtitles' | 'chapters' | 'endscreens' | 'cards' | 'shelves' | 'products' | 'settings';
 
 type Props = {
   legacyFeeds: any[];
@@ -86,6 +87,7 @@ const TABS: Array<{ id: StudioTab; label: string }> = [
   { id: 'endscreens', label: 'End Screens' },
   { id: 'cards', label: 'Cards' },
   { id: 'shelves', label: 'Shelves' },
+  { id: 'products', label: 'Products' },
   { id: 'settings', label: 'Settings' },
 ];
 
@@ -98,7 +100,7 @@ type StudioTabCategory = 'content' | 'live' | 'growth' | 'brand' | 'protect';
 const TAB_CATEGORIES: Array<{ id: StudioTabCategory; label: string; tabs: StudioTab[] }> = [
   { id: 'content', label: 'Content', tabs: ['dashboard', 'content', 'create', 'playlists'] },
   { id: 'live', label: 'Live', tabs: ['live', 'analytics', 'traffic', 'impressions'] },
-  { id: 'growth', label: 'Growth', tabs: ['audience', 'revenue', 'ads', 'shelves', 'cards'] },
+  { id: 'growth', label: 'Growth', tabs: ['audience', 'revenue', 'ads', 'shelves', 'cards', 'products'] },
   { id: 'brand', label: 'Brand', tabs: ['branding', 'subtitles', 'chapters', 'endscreens'] },
   { id: 'protect', label: 'Protect', tabs: ['moderation', 'copyright', 'settings'] },
 ];
@@ -701,6 +703,13 @@ export default function ChannelStudioScreen({ legacyFeeds, liveCount, expiresAt,
     if (activeTab === 'chapters') return <ChapterEditorPanel contentId={selectedContent?.id ?? ''} />;
     if (activeTab === 'endscreens') return <EndScreenEditor contentId={selectedContent?.id ?? ''} />;
     if (activeTab === 'cards') return <ContentCardsEditor contentId={selectedContent?.id ?? ''} />;
+    // AND-169: ProductTagStudio was a fully built panel (API calls,
+    // product search/create, timestamp picker) with no entry point
+    // anywhere in the app at all - never imported, never rendered, not
+    // even registered as a navigable screen. Wired in the same way every
+    // other per-content studio panel already is (chapters/cards/
+    // endscreens/subtitles all key off selectedContent?.id the same way).
+    if (activeTab === 'products') return <ProductTagStudio contentId={selectedContent?.id ?? ''} />;
     if (activeTab === 'shelves') return <ChannelHomepageShelfEditor channelId={selectedChannel.id} />;
     if (activeTab === 'settings') {
       return (
