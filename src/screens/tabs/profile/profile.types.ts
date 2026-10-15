@@ -69,6 +69,14 @@ export type ProfilePayload = {
   partner_profiles_limit_label?: string | null;
   partner_profiles_is_unlimited?: boolean;
   partner_profiles_can_create?: boolean;
+  // AND-247/AND-260 - shop-creation entitlement, mirrors the
+  // partner_profiles_* fields above (see _shop_profile_summary,
+  // backend/kis apps/accounts/views.py).
+  shop_profiles_count?: number;
+  shop_profiles_limit_value?: number | null;
+  shop_profiles_limit_label?: string | null;
+  shop_profiles_is_unlimited?: boolean;
+  shop_profiles_can_create?: boolean;
   privacy?: any[];
   tiers?: any[];
 };

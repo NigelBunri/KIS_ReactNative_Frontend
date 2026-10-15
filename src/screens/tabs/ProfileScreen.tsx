@@ -52,6 +52,7 @@ import { KISIcon } from '@/constants/kisIcons';
 import { useAuth } from '../../../App';
 import { launchImageLibrary, Asset } from 'react-native-image-picker';
 import { profileLayout, styles } from './profile/profile.styles';
+import { canCreateShopFromProfile } from './profile/profile.utils';
 import { tierMetaFor } from './profile/profile/tierMeta';
 import { useProfileController } from './profile/useProfileController';
 import ROUTES from '@/network';
@@ -572,6 +573,15 @@ export default function ProfileScreen() {
     c.profile?.partner_profiles_limit_value ?? 0;
   const partnerProfilesIsUnlimited = !!c.profile?.partner_profiles_is_unlimited;
   const canCreatePartner = !!c.profile?.partner_profiles_can_create;
+  // AND-247/AND-260: shops require a Business+ plan server-side
+  // (ShopViewSet.perform_create, apps/commerce/views.py enforces
+  // "shops_limit"). Mirrors canCreatePartner above so "Create Shop" gets
+  // the same up-front "you need to upgrade" signal instead of letting the
+  // user fill out the whole create-shop form only to be bounced by an
+  // Alert on submit - which read, to testers, as "shop info not saved".
+  // Defaults to true (not gated) when the field is absent, e.g. a stale
+  // cached profile fetched before this flag existed server-side.
+  const canCreateShop = canCreateShopFromProfile(c.profile);
   const [verificationCenterTarget, setVerificationCenterTarget] =
     useState<VerificationCenterTarget | null>(null);
   const [verificationStaffConsoleVisible, setVerificationStaffConsoleVisible] = useState(false);
@@ -1883,13 +1893,22 @@ export default function ProfileScreen() {
       {
         key: 'create-shop',
         title: 'Create Shop',
-        subtitle: 'Open commerce setup',
+        subtitle: canCreateShop
+          ? 'Open commerce setup'
+          : 'Requires a Business plan or higher',
         icon: 'cart' as const,
         tone: 'info' as const,
-        onPress: openShopEditorForCreate,
+        onPress: canCreateShop ? openShopEditorForCreate : undefined,
       },
     ],
-    [c.openCreatePartner, canCreatePartner, openManagementPanel, openShopEditorForCreate, rootNavigation],
+    [
+      c.openCreatePartner,
+      canCreatePartner,
+      canCreateShop,
+      openManagementPanel,
+      openShopEditorForCreate,
+      rootNavigation,
+    ],
   );
 
   const walletQuickActionItems = useMemo(
@@ -2506,6 +2525,29 @@ export default function ProfileScreen() {
               </Text>
             </Pressable>
           )}
+          {/* AND-475: already existed as a working "My Contact Link" entry,
+              but only inside a "Quick actions" grid much further down this
+              same scroll (past Language, KIS Principles) - same
+              discoverability gap as Change password/Connect to Google
+              above. The original stays where it is; this is a second,
+              earlier path to the same screen. */}
+          <Pressable
+            onPress={() => rootNavigation?.navigate('ContactShareLink')}
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}
+          >
+            <KISIcon name="link" size={16} color={palette.goldReadable} />
+            <Text style={{ fontSize: 13, fontWeight: '700', color: palette.text }}>My contact link</Text>
+          </Pressable>
+          {/* AND-480: same discoverability gap - "Community Events" already
+              existed in a separate, lower "Quick actions" grid
+              (overviewQuickActionItems, further down this same scroll). */}
+          <Pressable
+            onPress={() => rootNavigation?.navigate('Events')}
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}
+          >
+            <KISIcon name="calendar" size={16} color={palette.goldReadable} />
+            <Text style={{ fontSize: 13, fontWeight: '700', color: palette.text }}>Browse events</Text>
+          </Pressable>
         </View>
       </TabletCard>
     </>,
@@ -3001,6 +3043,20 @@ export default function ProfileScreen() {
                     title="User Management"
                     variant="secondary"
                     onPress={() => rootNavigation?.navigate('AdminUserManagement')}
+                    style={{ flexGrow: 1, flexBasis: '47%', minWidth: 168 }}
+                  />
+                  {/* AND-478: "[Admin] Bridge integration settings" had no
+                      discoverable path anywhere in the app - AdminToolsScreen
+                      (which lists the Bridge dashboard among other dev/admin
+                      dashboards) was registered as a navigable route in
+                      App.tsx but nothing ever navigated to it. Same
+                      discoverability gap as the other admin-only rows on
+                      this tab - give it one here rather than building a
+                      second, redundant entry point. */}
+                  <KISButton
+                    title="Developer tools (Bridge, etc.)"
+                    variant="secondary"
+                    onPress={() => rootNavigation?.navigate('AdminTools')}
                     style={{ flexGrow: 1, flexBasis: '47%', minWidth: 168 }}
                   />
                 </View>
