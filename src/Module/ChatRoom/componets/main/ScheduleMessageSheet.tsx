@@ -10,6 +10,7 @@ import {
   TouchableOpacity,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { KISIcon } from '@/constants/kisIcons';
 
 const QUICK_OPTIONS = [
@@ -51,6 +52,14 @@ export const ScheduleMessageSheet: React.FC<Props> = ({
   const insets = useSafeAreaInsets();
   const slideAnim = useRef(new Animated.Value(0)).current;
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  // AND-049: this sheet previously offered only 4 fixed presets (1 hour,
+  // tomorrow/Monday 9 AM, 1 week) with no way to pick an arbitrary
+  // minute-level time — exactly "there is no mins scheduling." A custom
+  // date+time picker, using the same two-step native DateTimePicker
+  // pattern EventsScreen.tsx's DateField already uses.
+  const [showCustomDate, setShowCustomDate] = useState(false);
+  const [showCustomTime, setShowCustomTime] = useState(false);
+  const customWorking = useRef<Date>(new Date(Date.now() + 60 * 60 * 1000));
 
   useEffect(() => {
     Animated.spring(slideAnim, {
@@ -75,6 +84,23 @@ export const ScheduleMessageSheet: React.FC<Props> = ({
   const handleConfirm = (date: Date) => {
     onSchedule(date.toISOString());
     onClose();
+  };
+
+  const handleCustomDateChange = (_event: DateTimePickerEvent, selected?: Date) => {
+    if (Platform.OS === 'android') setShowCustomDate(false);
+    if (selected) {
+      customWorking.current = selected;
+      if (Platform.OS === 'android') setShowCustomTime(true);
+    }
+  };
+
+  const handleCustomTimeChange = (_event: DateTimePickerEvent, selected?: Date) => {
+    if (Platform.OS === 'android') {
+      setShowCustomTime(false);
+      if (selected) handleConfirm(selected);
+      return;
+    }
+    if (selected) customWorking.current = selected;
   };
 
   const formatDate = (d: Date) =>
@@ -125,7 +151,55 @@ export const ScheduleMessageSheet: React.FC<Props> = ({
               </Pressable>
             );
           })}
+
+          <Pressable
+            style={[styles.optRow, { backgroundColor: palette.card ?? palette.surfaceElevated }]}
+            onPress={() => { customWorking.current = new Date(Date.now() + 60 * 60 * 1000); setShowCustomDate(true); }}
+          >
+            <View style={[styles.optIcon, { backgroundColor: (palette.primary) + '22' }]}>
+              <KISIcon name="edit" size={18} color={palette.primary} focused />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.optLabel, { color: palette.text }]}>Custom date & time</Text>
+              <Text style={[styles.optSub, { color: palette.subtext }]}>Pick any date and exact minute</Text>
+            </View>
+            <KISIcon name="chevron-right" size={18} color={palette.subtext} />
+          </Pressable>
         </View>
+
+        {showCustomDate && (
+          <DateTimePicker
+            value={customWorking.current}
+            mode="date"
+            display={Platform.OS === 'ios' ? 'inline' : 'default'}
+            minimumDate={new Date()}
+            onChange={handleCustomDateChange}
+            onTouchCancel={() => setShowCustomDate(false)}
+          />
+        )}
+        {showCustomTime && (
+          <DateTimePicker
+            value={customWorking.current}
+            mode="time"
+            display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+            onChange={handleCustomTimeChange}
+            onTouchCancel={() => setShowCustomTime(false)}
+          />
+        )}
+        {Platform.OS === 'ios' && showCustomDate && (
+          <View style={{ alignItems: 'flex-end', marginTop: 4 }}>
+            <TouchableOpacity onPress={() => { setShowCustomDate(false); setShowCustomTime(true); }}>
+              <Text style={{ color: palette.primary, fontWeight: '700', padding: 8 }}>Next: Time</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+        {Platform.OS === 'ios' && showCustomTime && !showCustomDate && (
+          <View style={{ alignItems: 'flex-end', marginTop: 4 }}>
+            <TouchableOpacity onPress={() => { setShowCustomTime(false); handleConfirm(customWorking.current); }}>
+              <Text style={{ color: palette.primary, fontWeight: '700', padding: 8 }}>Done</Text>
+            </TouchableOpacity>
+          </View>
+        )}
       </Animated.View>
     </Modal>
   );

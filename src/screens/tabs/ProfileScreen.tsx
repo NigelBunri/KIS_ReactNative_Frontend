@@ -2564,6 +2564,31 @@ export default function ProfileScreen() {
               <Text style={{ fontSize: 13, fontWeight: '700', color: palette.text }}>Create partner organization</Text>
             </Pressable>
           )}
+          {/* AND-146: "Redeem a gifted membership" already exists as a
+              working screen, but only among the Wallet & Orders tab's
+              billing links (the row right under "Subscription") - a
+              tester looking for this had no reason to check there over
+              anywhere else. */}
+          <Pressable
+            onPress={() => rootNavigation?.navigate('GiftMembershipRedeem', {})}
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}
+          >
+            <KISIcon name="gift" size={16} color={palette.goldReadable} />
+            <Text style={{ fontSize: 13, fontWeight: '700', color: palette.text }}>Redeem gifted membership</Text>
+          </Pressable>
+          {/* AND-338: "Submit a whistleblower report" already exists as a
+              working, labeled tile inside the Government & Civic Services
+              hub - but that hub itself is three navigation hops from
+              Profile's top (scroll to Account Security -> Government &
+              Civic Services -> Whistleblower tile), which is why the
+              tester reported "I didn't see it." */}
+          <Pressable
+            onPress={() => rootNavigation?.navigate('WhistleblowerReport')}
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}
+          >
+            <KISIcon name="shield" size={16} color={palette.goldReadable} />
+            <Text style={{ fontSize: 13, fontWeight: '700', color: palette.text }}>Submit whistleblower report</Text>
+          </Pressable>
         </View>
       </TabletCard>
     </>,
