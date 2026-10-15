@@ -483,6 +483,26 @@ export default function ActiveCallScreen({ session, actions }: Props) {
       paddingHorizontal: 6,
       paddingVertical: 2,
     },
+    screenShareBadge: {
+      position: 'absolute',
+      top: 10,
+      alignSelf: 'center',
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      maxWidth: '82%',
+      backgroundColor: palette.overlay,
+      borderRadius: 16,
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      zIndex: 3,
+    },
+    screenShareBadgeText: {
+      color: palette.ivory,
+      fontSize: 12,
+      fontWeight: '700',
+      letterSpacing: 0.2,
+    },
     selfVbgBadgeText: {
       color: palette.ivory,
       fontSize: 9,
@@ -551,10 +571,16 @@ export default function ActiveCallScreen({ session, actions }: Props) {
   // video call to show.
   if (isInPictureInPicture) {
     const pipStream = remoteParticipants[0]?.stream ?? localParticipant?.stream ?? null;
+    const pipIsScreenShare = !!remoteParticipants[0]?.isScreenSharing && remoteParticipants[0]?.stream === pipStream;
     return (
       <View style={styles.pipRoot}>
         {pipStream && RTCView ? (
-          <RTCView streamURL={pipStream.toURL()} style={styles.pipVideo} objectFit="cover" zOrder={1} />
+          <RTCView
+            streamURL={pipStream.toURL()}
+            style={styles.pipVideo}
+            objectFit={pipIsScreenShare ? 'contain' : 'cover'}
+            zOrder={1}
+          />
         ) : null}
       </View>
     );
@@ -1026,14 +1052,18 @@ function VideoOneOnOneLayout({ session, remoteParticipants, isConnecting, localS
   const remoteVideoExtraProps = RTCPIPView ? { iosPIP: { enabled: true } } : {};
 
   return (
-    <View style={StyleSheet.absoluteFill}>
-      {/* Remote video — full screen */}
+    <View style={[StyleSheet.absoluteFill, { backgroundColor: palette.royalInk }]}>
+      {/* Remote video — full screen. "contain" for a screen share so shared
+          text/UI content isn't cropped by "cover"'s zoom-to-fill — the
+          explicit background above is what shows through the resulting
+          letterbox/pillarbox bars, same dark tone ParticipantTile's tiles
+          already use elsewhere in this call UI. */}
       {remote?.stream && RemoteVideoView ? (
         <RemoteVideoView
           ref={pipRef}
           streamURL={remote.stream.toURL()}
           style={StyleSheet.absoluteFill}
-          objectFit="cover"
+          objectFit={remote?.isScreenSharing ? 'contain' : 'cover'}
           zOrder={1}
           {...remoteVideoExtraProps}
         />
@@ -1045,23 +1075,16 @@ function VideoOneOnOneLayout({ session, remoteParticipants, isConnecting, localS
         </View>
       )}
 
-      {/* GAP 1: "Sharing screen" label overlay on remote participant tile */}
+      {/* "Sharing screen" indicator — a small top-centered pill matching this
+          screen's existing badge conventions (palette.overlay translucent
+          background, same as selfMutedBadge/selfVbgBadge) rather than a
+          full-width banner, so it reads as a status chip instead of
+          covering a stripe of the shared content underneath it. */}
       {remote?.isScreenSharing && (
-        <View
-          pointerEvents="none"
-          style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            backgroundColor: `${palette.success}D9`,
-            paddingVertical: 6,
-            alignItems: 'center',
-            zIndex: 3,
-          }}
-        >
-          <Text style={{ color: palette.ivory, fontSize: 13, fontWeight: '700', letterSpacing: 0.3 }}>
-            Sharing screen
+        <View pointerEvents="none" style={styles.screenShareBadge}>
+          <KISIcon name="screen-share" size={13} color={palette.ivory} />
+          <Text style={styles.screenShareBadgeText}>
+            {remote.displayName} is sharing their screen
           </Text>
         </View>
       )}

@@ -11,7 +11,7 @@ import type { CallParticipant } from '@/services/calls/callTypes';
 import ParticipantTile from './ParticipantTile';
 import CallTimer from './CallTimer';
 import { useKISTheme } from '@/theme/useTheme';
-import { computeGridColumns, computeTileCell } from '../callGridMath';
+import { computeGridColumns, computeTileCell, resolveBroadcastMainStage } from '../callGridMath';
 
 type Props = {
   participants: CallParticipant[];
@@ -70,13 +70,12 @@ export default function BroadcastLayout({
   // deliberate action) rather than activeSpeakerId so the main stage
   // doesn't jitter on every speaking blip. Capped so a large panel still
   // reads cleanly; anyone past the cap, or on-stage without video, stays
-  // in the horizontal strip below.
-  const camOnStage = onStage.filter(p => !p.isVideoOff);
-  const mainStage: CallParticipant[] = [
-    ...(primaryHost ? [primaryHost] : []),
-    ...camOnStage,
-  ].slice(0, MAIN_STAGE_CAP);
-  const stageStrip = onStage.filter(p => !mainStage.includes(p));
+  // in the horizontal strip below. A screen-sharing host/co-host/speaker
+  // is always guaranteed a slot regardless of the cap — see
+  // resolveBroadcastMainStage.
+  const mainStage = resolveBroadcastMainStage(primaryHost, onStage, MAIN_STAGE_CAP);
+  const mainStageIds = new Set(mainStage.map(p => p.userId));
+  const stageStrip = onStage.filter(p => !mainStageIds.has(p.userId));
 
   // Main stage height = total container minus every section below it.
   const mainH = Math.max(

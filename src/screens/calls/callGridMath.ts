@@ -54,6 +54,63 @@ export function clampPageIndex(page: number, pageCount: number): number {
   return Math.max(0, Math.min(page, pageCount - 1));
 }
 
+// Minimal shape this function needs — kept structural (not importing
+// CallParticipant) so this file stays free of any React/RN-adjacent type
+// dependency, same reasoning as the rest of this module.
+export type MainStageCandidate = {
+  userId: string;
+  isScreenSharing?: boolean;
+};
+
+// Resolves which participant(s) belong in the large "main stage" area for
+// VideoGrid's speaker-style layout, given an optional manually-pinned
+// participant and the current active speaker. A screen share always wins:
+// a presentation is the whole point of looking at the call right now, so a
+// participant manually pinning someone ELSE while a share is active must
+// not un-share it from main view. Returns every currently-sharing
+// participant (not just one) so a rare simultaneous-multi-share case
+// renders all of them in the main area rather than arbitrarily picking one
+// — the caller arranges that set in a small grid via computeGridColumns/
+// computeTileCell, same as a single main participant uses the full area.
+//
+// With no active screen share, falls back to the EXACT pre-existing
+// single-pinned-participant selection VideoGrid's speaker layout already
+// used (pinnedUserId ?? activeSpeakerId ?? participants[0]), unchanged —
+// this function's screen-share branch is strictly additive.
+export function resolveMainStageParticipants<T extends MainStageCandidate>(
+  participants: T[],
+  opts: { pinnedUserId?: string | null; activeSpeakerId?: string | null },
+): T[] {
+  const sharers = participants.filter(p => p.isScreenSharing);
+  if (sharers.length > 0) return sharers;
+
+  const effectivePinnedId =
+    opts.pinnedUserId ?? opts.activeSpeakerId ?? participants[0]?.userId ?? null;
+  const pinned = participants.find(p => p.userId === effectivePinnedId);
+  return pinned ? [pinned] : [];
+}
+
+// Resolves BroadcastLayout's main-stage list: the primary host plus any
+// on-stage (co-host/speaker) participant currently screen-sharing are
+// GUARANTEED a main-stage slot, regardless of `cap` — a presentation must
+// never be bumped by a cap meant only to limit how many ordinary camera
+// feeds crowd the main area. Remaining slots (cap minus however many
+// guaranteed participants there are) go to on-stage participants with
+// their camera on, in their existing order. A sharer who IS the primary
+// host, or who otherwise appears twice, is never double-counted (`onStage`
+// is assumed to already exclude the primary host, matching how
+// BroadcastLayout constructs it, but this still guards defensively).
+export function resolveBroadcastMainStage<
+  T extends MainStageCandidate & { isVideoOff?: boolean },
+>(primaryHost: T | null, onStage: T[], cap: number): T[] {
+  const sharers = onStage.filter(p => p.isScreenSharing && p !== primaryHost);
+  const guaranteed: T[] = primaryHost ? [primaryHost, ...sharers] : [...sharers];
+  const guaranteedIds = new Set(guaranteed.map(p => p.userId));
+  const camOnStage = onStage.filter(p => !p.isVideoOff && !guaranteedIds.has(p.userId));
+  const effectiveCap = Math.max(cap, guaranteed.length);
+  return [...guaranteed, ...camOnStage].slice(0, effectiveCap);
+}
+
 export type TileCell = {
   width: number;
   height: number;

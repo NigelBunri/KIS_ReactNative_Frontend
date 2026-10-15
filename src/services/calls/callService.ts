@@ -10,6 +10,69 @@ let _originalVideoTrack: any = null;
 let _screenTrack: any = null;
 /** Whether screen share is currently active (per-session guard). */
 const _screenShareState: Record<string, boolean> = {};
+/** The socket + sessionId currently bound to the active screen share, so the
+ * spontaneous-stop path (the track's own 'ended' event, fired when the OS-level
+ * stop-sharing control is used) can emit the same signaling event the explicit
+ * toggle-off path does, without the caller having to pass them in again. */
+let _activeShareSocket: any = null;
+let _activeShareSessionId: string | null = null;
+
+type ScreenShareEndedHandler = (sessionId: string, reason: 'manual' | 'track-ended') => void;
+/** Mirrors webRTCService's setCallbacks convention (a settable handler,
+ * no-op by default) - fired any time sharing stops, whether via an explicit
+ * toggle-off call or the OS-level control ending the track out from under us.
+ * A caller's own `isScreenSharing` UI state must come from THIS, not only
+ * from toggleScreenShare's return value, since a spontaneous stop has no
+ * caller to return a value to. */
+let onScreenShareEnded: ScreenShareEndedHandler = () => {};
+
+export function setScreenShareCallbacks(cb: { onScreenShareEnded?: ScreenShareEndedHandler }) {
+  if (cb.onScreenShareEnded) onScreenShareEnded = cb.onScreenShareEnded;
+}
+
+/** Shared by the explicit toggle-off path and the screen track's own 'ended'
+ * listener (OS-level stop-sharing control) - stops the screen track if it
+ * isn't already stopped, restores the camera across every peer connection,
+ * tells the server sharing stopped, and notifies onScreenShareEnded so the
+ * UI's button/badge state resyncs even when nothing called toggleScreenShare
+ * to trigger this. */
+function stopScreenShareInternal(sessionId: string, socket: any | null, reason: 'manual' | 'track-ended') {
+  const localStream = webRTCService.getLocalStream();
+
+  // Stop ONLY the screen-capture track. Previously this stopped EVERY video
+  // track on the local stream - which includes the camera track (it is never
+  // removed from the local stream during screen share). That killed the camera
+  // permanently, so restoring _originalVideoTrack below put a dead track back
+  // on the senders and the local participant went black after un-sharing.
+  if (_screenTrack) {
+    try { _screenTrack.stop(); } catch { /* ignore */ }
+    _screenTrack = null;
+  }
+
+  // Restore original camera track across all peer connections
+  if (_originalVideoTrack && localStream) {
+    try {
+      _originalVideoTrack.enabled = true;
+      const peerConns = (webRTCService as any).peers as Map<string, any>;
+      peerConns?.forEach((pc: any) => {
+        try {
+          const senders: any[] = pc.getSenders?.() ?? [];
+          const videoSender = senders.find((s: any) => s.track?.kind === 'video');
+          if (videoSender) videoSender.replaceTrack(_originalVideoTrack);
+        } catch { /* ignore */ }
+      });
+    } catch { /* ignore */ }
+    _originalVideoTrack = null;
+  }
+
+  socket?.emit('call.screen_share', { conversationId: sessionId, enabled: false });
+  _screenShareState[sessionId] = false;
+  if (_activeShareSessionId === sessionId) {
+    _activeShareSocket = null;
+    _activeShareSessionId = null;
+  }
+  onScreenShareEnded(sessionId, reason);
+}
 
 /**
  * Toggle screen sharing for the given call session.
@@ -21,7 +84,11 @@ const _screenShareState: Record<string, boolean> = {};
  *      swapping in the camera, which would misrepresent what's being shared.
  *   3. Replaces the video sender track in all active peer connections.
  *   4. Emits `call.screen_share` with `{ conversationId, enabled: true }` via the socket.
- *   5. Returns the new isScreenSharing value (true).
+ *   5. Attaches an 'ended' listener to the screen track so stopping sharing via
+ *      the OS-level control (the status-bar "Stop" button on iOS, the persistent
+ *      "Stop sharing" notification on Android) is detected and cleaned up too -
+ *      see stopScreenShareInternal/onScreenShareEnded.
+ *   6. Returns the new isScreenSharing value (true).
  *
  * On second call (sharing on → off):
  *   1. Stops the screen capture track.
@@ -43,36 +110,7 @@ export async function toggleScreenShare(
 
   if (isCurrentlySharing) {
     // ── TOGGLE OFF ──────────────────────────────────────────────────────────
-    const localStream = webRTCService.getLocalStream();
-
-    // Stop ONLY the screen-capture track. Previously this stopped EVERY video
-    // track on the local stream - which includes the camera track (it is never
-    // removed from the local stream during screen share). That killed the camera
-    // permanently, so restoring _originalVideoTrack below put a dead track back
-    // on the senders and the local participant went black after un-sharing.
-    if (_screenTrack) {
-      try { _screenTrack.stop(); } catch { /* ignore */ }
-      _screenTrack = null;
-    }
-
-    // Restore original camera track across all peer connections
-    if (_originalVideoTrack && localStream) {
-      try {
-        _originalVideoTrack.enabled = true;
-        const peerConns = (webRTCService as any).peers as Map<string, any>;
-        peerConns?.forEach((pc: any) => {
-          try {
-            const senders: any[] = pc.getSenders?.() ?? [];
-            const videoSender = senders.find((s: any) => s.track?.kind === 'video');
-            if (videoSender) videoSender.replaceTrack(_originalVideoTrack);
-          } catch { /* ignore */ }
-        });
-      } catch { /* ignore */ }
-      _originalVideoTrack = null;
-    }
-
-    socket?.emit('call.screen_share', { conversationId: sessionId, enabled: false });
-    _screenShareState[sessionId] = false;
+    stopScreenShareInternal(sessionId, socket, 'manual');
     return false;
   }
 
@@ -113,6 +151,38 @@ export async function toggleScreenShare(
       if (screenVideoTrack) {
         // Remember the screen track so toggle-off can stop exactly this one.
         _screenTrack = screenVideoTrack;
+        _activeShareSocket = socket;
+        _activeShareSessionId = sessionId;
+
+        // The PRIMARY real-world way users stop a screen share on both iOS
+        // and Android is the OS-level control (status-bar "Stop" / the
+        // persistent "Stop sharing" notification), not this app's own
+        // toggle button - that kills the track directly, out from under us,
+        // with no call back into this file. Without this listener,
+        // _screenShareState stayed stuck `true`, the camera was never
+        // restored, the server was never told sharing stopped, and every
+        // other participant's UI stayed showing this person as still
+        // sharing indefinitely. `once: true` (where supported) avoids a
+        // double-fire if this same listener setup ever runs twice for one
+        // track; the explicit-toggle-off path already stops this exact
+        // track above (`_screenTrack.stop()`), which also fires 'ended' -
+        // stopScreenShareInternal checks _screenShareState so that second,
+        // self-inflicted firing is a correctly-idempotent no-op rather than
+        // a double cleanup.
+        try {
+          const handleEnded = () => {
+            if (!_screenShareState[sessionId]) return; // already cleaned up (manual toggle-off)
+            stopScreenShareInternal(sessionId, _activeShareSocket, 'track-ended');
+          };
+          if (typeof screenVideoTrack.addEventListener === 'function') {
+            screenVideoTrack.addEventListener('ended', handleEnded);
+          } else {
+            // react-native-webrtc's MediaStreamTrack also supports the
+            // plain onended property form on some versions/platforms.
+            screenVideoTrack.onended = handleEnded;
+          }
+        } catch { /* ignore - best effort, the explicit toggle still works without it */ }
+
         const peerConns = (webRTCService as any).peers as Map<string, any>;
         peerConns?.forEach((pc: any) => {
           try {

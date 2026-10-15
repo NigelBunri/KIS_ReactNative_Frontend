@@ -204,7 +204,16 @@ export default React.memo(function ParticipantTile({
         <RTCView
           streamURL={participant.stream.toURL()}
           style={StyleSheet.absoluteFill}
-          objectFit="cover"
+          // "cover" crops/zooms a face feed, which is fine — but it does the
+          // same to a SHARED SCREEN, cutting off text/UI content, directly
+          // defeating "maintain readable shared content". "contain" fits
+          // the whole frame letterboxed/pillarboxed on the tile's own dark
+          // background (palette.royalInk, set on `styles.tile` above)
+          // instead. Automatic from the participant's own flag — no new
+          // prop needed, applies correctly everywhere this tile is used
+          // (1-on-1, group, broadcast, voice-call avatar tiles never show
+          // video at all so this branch doesn't apply there).
+          objectFit={participant.isScreenSharing ? 'contain' : 'cover'}
           mirror={participant.isLocal}
           zOrder={participant.isLocal ? 0 : 1}
         />

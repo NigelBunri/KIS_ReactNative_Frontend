@@ -10,6 +10,7 @@ import {
 import type { CallParticipant, CallLayout } from '@/services/calls/callTypes';
 import ParticipantTile from './ParticipantTile';
 import PaginatedTileGrid from './PaginatedTileGrid';
+import { resolveMainStageParticipants, computeGridColumns, computeTileCell } from '../callGridMath';
 import { useKISTheme } from '@/theme/useTheme';
 
 type Props = {
@@ -83,14 +84,27 @@ export default function VideoGrid({
   }
 
   // ── Speaker layout ──────────────────────────────────────────────────────────
-  if (layout === 'speaker' && participants.length > 1) {
-    // Pinned or active speaker in the main area; everyone else in the thumbnail strip.
-    const effectivePinned =
-      pinnedUserId ?? activeSpeakerId ?? participants[0]?.userId ?? null;
-    const pinned = participants.find(p => p.userId === effectivePinned) ?? null;
-    const rest   = participants.filter(p => p.userId !== effectivePinned);
+  // A screen share forces this layout regardless of the current `layout`
+  // mode — a presentation must always be prominent, not hidden behind a
+  // gallery-mode toggle. resolveMainStageParticipants also makes the
+  // sharer win over a manually pinned/active-speaker participant (a user
+  // pinning someone else mid-share must not un-share the presentation from
+  // main view); with no active share it falls back to the exact
+  // single-pinned-participant selection this branch always used.
+  const anySharing = participants.some(p => p.isScreenSharing);
+  if ((layout === 'speaker' || anySharing) && participants.length > 1) {
+    const mainStage = resolveMainStageParticipants(participants, { pinnedUserId, activeSpeakerId });
+    const mainStageIds = new Set(mainStage.map(p => p.userId));
+    const rest = participants.filter(p => !mainStageIds.has(p.userId));
 
     const mainH = ready ? containerH - THUMB_H - GAP : 0;
+    const mainCols = computeGridColumns(mainStage.length, containerW, mainH);
+    const mainRows = Math.ceil(mainStage.length / Math.max(mainCols, 1));
+    const mainCell = computeTileCell(containerW, mainH, mainCols, mainRows, GAP);
+    const mainRowChunks: CallParticipant[][] = [];
+    for (let i = 0; i < mainStage.length; i += mainCols) {
+      mainRowChunks.push(mainStage.slice(i, i + mainCols));
+    }
 
     return (
       <View
@@ -104,17 +118,35 @@ export default function VideoGrid({
             </Text>
           </View>
         )}
-        {ready && pinned && (
-          <ParticipantTile
-            participant={pinned}
-            width={containerW}
-            height={mainH}
-            isPinned={!!pinnedUserId && pinnedUserId === pinned.userId}
-            isSpeaker={pinned.userId === activeSpeakerId}
-            isAudioOnly={isAudioOnly}
-            cornerRadius={0}
-            onLongPress={() => onPinParticipant(null)}
-          />
+        {ready && mainStage.length > 0 && (
+          <View style={{ width: containerW, height: mainH, justifyContent: 'center' }}>
+            {mainRowChunks.map((row, ri) => (
+              <View
+                key={ri}
+                style={{
+                  flexDirection: 'row',
+                  justifyContent: 'center',
+                  gap: GAP,
+                  marginBottom: ri < mainRowChunks.length - 1 ? GAP : 0,
+                }}
+              >
+                {row.map(p => (
+                  <ParticipantTile
+                    key={p.userId}
+                    participant={p}
+                    width={mainStage.length === 1 ? containerW : mainCell.width}
+                    height={mainStage.length === 1 ? mainH : mainCell.height}
+                    isPinned={pinnedUserId === p.userId}
+                    isSpeaker={p.userId === activeSpeakerId}
+                    isAudioOnly={isAudioOnly}
+                    cornerRadius={mainStage.length === 1 ? 0 : 12}
+                    showName
+                    onLongPress={() => onPinParticipant(null)}
+                  />
+                ))}
+              </View>
+            ))}
+          </View>
         )}
 
         {/* Thumbnail strip — horizontal scroll is intentional here */}
