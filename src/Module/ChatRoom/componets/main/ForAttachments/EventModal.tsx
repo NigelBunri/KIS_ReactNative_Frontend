@@ -3,13 +3,16 @@
 import React, { useState } from 'react';
 import {
   Animated,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   View,
   Text,
   TextInput,
   Pressable,
   ScrollView,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { KISPalette, KIS_TOKENS, kisRadius } from '@/theme/constants';
 import usePullDownToClose from '@/hooks/usePullDownToClose';
@@ -51,6 +54,13 @@ export const EventModal: React.FC<EventModalProps> = ({
     enabled: visible,
     onClose,
   });
+  // AND-031: the Actions row (Cancel/Save) had no bottom safe-area padding
+  // at all, so on any device with a gesture nav bar / home indicator this
+  // bottom-pinned sheet's Save button rendered partly or fully underneath
+  // it - unreachable even though canSave correctly gated it. Added to the
+  // Actions row's own padding below rather than the sheet's outer padding,
+  // so it only affects the bottom edge, not every side.
+  const insets = useSafeAreaInsets();
 
   const reminderOptions = [
     { label: 'None', value: 0 },
@@ -161,6 +171,15 @@ export const EventModal: React.FC<EventModalProps> = ({
 
   return (
     <Modal transparent visible={visible} animationType="slide">
+      {/* AND-031: this bottom sheet had no keyboard handling at all (same
+          gap as PollModal.tsx, fixed the same way) - focusing Title,
+          Start/End date or time, Location, or Description just let the
+          keyboard cover whichever field was lower in the ScrollView,
+          including the Save button below it. */}
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
       <View
         style={{
           flex: 1,
@@ -381,6 +400,7 @@ export const EventModal: React.FC<EventModalProps> = ({
               justifyContent: 'flex-end',
               gap: KIS_TOKENS.spacing.sm,
               marginTop: KIS_TOKENS.spacing.sm,
+              paddingBottom: insets.bottom,
             }}
           >
             <Pressable
@@ -410,6 +430,7 @@ export const EventModal: React.FC<EventModalProps> = ({
           </View>
         </Animated.View>
       </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 };
