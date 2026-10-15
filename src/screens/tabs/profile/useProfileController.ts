@@ -42,6 +42,16 @@ import { tierMetaFor } from './profile/tierMeta';
 import type { FeedMediaType, FeedMediaOptions } from '../profile-screen/types';
 import type { FeedComposerPayload } from '@/components/feeds/FeedComposerSheet';
 
+// AND-476: Experience/Education/Project all require start_date server-side
+// (apps/accounts/models.py's start_date = models.DateField(), no null/blank)
+// - EditItemModal.tsx never had a field to enter one, so adding any of
+// these three item types always failed to save. Exported standalone so the
+// validation itself is unit-testable without mounting the whole controller.
+export function itemRequiresStartDate(type: ItemType, payload: Record<string, any>): boolean {
+  if (type !== 'experience' && type !== 'education' && type !== 'project') return false;
+  return !String(payload?.start_date || '').trim();
+}
+
 const MICROS_PER_CENT = 10;
 const DEFAULT_PROFILE_LANGUAGE = 'English';
 const POPULAR_PROFILE_LANGUAGE_MAP = new Map(
@@ -1564,6 +1574,10 @@ export const useProfileController = (opts: {
       };
 
       const payload = { ...data };
+
+      if (itemRequiresStartDate(type, payload)) {
+        throw new Error('Start date is required.');
+      }
 
       if (type === 'skill' && !payload.skill_id) payload.skill_id = makeUUID();
       if (type === 'project')
