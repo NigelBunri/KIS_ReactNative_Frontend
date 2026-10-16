@@ -108,3 +108,111 @@ describe('mergePreservingRich — view-once strip must survive the very merge th
     expect((merged.attachments as any[])[0].localUri).toBe('file:///tmp/photo.jpg');
   });
 });
+
+// Regression coverage for the confirmed root cause of "a sent file never
+// shows up in the sender's OWN chat" (while the recipient sees it fine):
+// for an E2EE message, the server-visible plaintext shell only ever echoes
+// a bare `{id}` per attachment — real content (url/mimeType/size/etc.)
+// stays sealed inside encryptionMeta. Every time this message round-trips
+// through the server again (chat.history on reconnect/app restart, a
+// gap-fill, etc.), `next` is that bare stub. The per-attachment merge used
+// to build the merged attachment FROM `next`, borrowing only
+// localUri/localPath from `prev` — for a stub `next` that discards
+// everything real, the sender's own already-decrypted copy of their file
+// got replaced with a content-less shell with no url at all.
+describe('mergePreservingRich — a content-less (stub) attachment never wins over a real one', () => {
+  const stubAttachment = (id: string) => ({ id });
+  const realAttachment = (id: string, extra: Record<string, unknown> = {}) => ({
+    id,
+    url: 'https://cdn.example.com/document.pdf',
+    mimeType: 'application/pdf',
+    originalName: 'document.pdf',
+    size: 123456,
+    ...extra,
+  });
+
+  it('keeps the real attachment when the server echo is a bare {id} stub, even with readable text', () => {
+    const ownSentMessage = {
+      id: 'msg-2',
+      serverId: 'server-msg-2',
+      clientId: 'client-msg-2',
+      conversationId: 'conv-1',
+      senderId: 'user-a',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      text: 'here is the file',
+      attachments: [realAttachment('att-2')],
+    } as unknown as ChatMessage;
+
+    const historyStub = {
+      id: 'msg-2',
+      serverId: 'server-msg-2',
+      clientId: 'client-msg-2',
+      conversationId: 'conv-1',
+      senderId: 'user-a',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      text: undefined,
+      encryptionMeta: { recipients: [] },
+      attachments: [stubAttachment('att-2')],
+    } as unknown as ChatMessage;
+
+    const merged = mergePreservingRich(ownSentMessage, historyStub);
+    expect((merged.attachments as any[])[0].url).toBe('https://cdn.example.com/document.pdf');
+    expect((merged.attachments as any[])[0].mimeType).toBe('application/pdf');
+  });
+
+  it('keeps the real media.attachments entry when the server echo is a bare {id} stub', () => {
+    const ownSentMessage = {
+      id: 'msg-3',
+      serverId: 'server-msg-3',
+      clientId: 'client-msg-3',
+      conversationId: 'conv-1',
+      senderId: 'user-a',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      text: '',
+      media: { attachments: [realAttachment('att-3')] },
+    } as unknown as ChatMessage;
+
+    const historyStub = {
+      id: 'msg-3',
+      serverId: 'server-msg-3',
+      clientId: 'client-msg-3',
+      conversationId: 'conv-1',
+      senderId: 'user-a',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      text: undefined,
+      encryptionMeta: { recipients: [] },
+      media: { attachments: [stubAttachment('att-3')] },
+    } as unknown as ChatMessage;
+
+    const merged = mergePreservingRich(ownSentMessage, historyStub);
+    expect(((merged as any).media.attachments as any[])[0].url).toBe('https://cdn.example.com/document.pdf');
+  });
+
+  it('still prefers the server copy when it genuinely has real content (e.g. a successful decrypt patch)', () => {
+    const staleLocalStub = {
+      id: 'msg-4',
+      serverId: 'server-msg-4',
+      clientId: 'client-msg-4',
+      conversationId: 'conv-1',
+      senderId: 'user-b',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      text: 'Encrypted message',
+      encryptionMeta: { recipients: [] },
+      attachments: [stubAttachment('att-4')],
+    } as unknown as ChatMessage;
+
+    const freshlyDecrypted = {
+      id: 'msg-4',
+      serverId: 'server-msg-4',
+      clientId: 'client-msg-4',
+      conversationId: 'conv-1',
+      senderId: 'user-b',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      text: 'a decrypted caption',
+      attachments: [realAttachment('att-4')],
+    } as unknown as ChatMessage;
+
+    const merged = mergePreservingRich(staleLocalStub, freshlyDecrypted);
+    expect((merged.attachments as any[])[0].url).toBe('https://cdn.example.com/document.pdf');
+  });
+});

@@ -423,14 +423,37 @@ export function mergePreservingRich(prev: ChatMessage, next: ChatMessage): ChatM
   if (!n.replyTo && p.replyTo) merged.replyTo = p.replyTo;
   if (!n.sticker && p.sticker) merged.sticker = p.sticker;
   if (!n.voice && p.voice) merged.voice = p.voice;
+  // CONFIRMED ROOT CAUSE of "a sent file never shows up in the sender's OWN
+  // chat" (files/images/videos sent in any E2EE conversation): for an E2EE
+  // message, the server-visible plaintext shell only ever echoes a bare
+  // `{id}` per attachment — real content (url/mimeType/size/etc.) stays
+  // sealed inside encryptionMeta (see sendOverNetworkImpl's
+  // mediaPlaintextEcho). Every time this message round-trips through the
+  // server again (chat.history on reconnect/app restart, a gap-fill, etc.),
+  // `n` (the "incoming" server copy) is that bare stub. The per-attachment
+  // merge below used to assume `n` was always the fuller copy - server
+  // data except local-only fields - and built the merged attachment FROM
+  // `n`, borrowing only localUri/localPath from `p`. For a stub `n` that
+  // discards everything real (url, mimeType, originalName, size, kind...),
+  // keeping only localUri/localPath from the sender's own already-decrypted
+  // draft. The bottom-of-function "incomingEncrypted && incomingPlaceholder"
+  // restoration is meant to catch this, but only runs when the message's
+  // OWN text looks like a placeholder too - a message that still had
+  // readable text from a different source (or none at all) could reach
+  // here with content-less attachments and nothing left to fix them.
+  // isContentStub below makes the per-attachment merge itself robust: a
+  // stub attachment (no real locator) always defers entirely to the
+  // previous, already-decrypted copy instead of being treated as the more
+  // authoritative side.
+  const isContentStub = (att: any) =>
+    !att?.url && !att?.displayUrl && !att?.downloadUrl && !att?.publicUrl;
   if (!(n.attachments?.length) && p.attachments?.length) {
     merged.attachments = p.attachments;
   } else if (n.attachments?.length && p.attachments?.length) {
-    // Server version strips localUri/localPath — restore them per-attachment
-    // so the sender can still open their own file from local storage.
     merged.attachments = (n.attachments as any[]).map((nAtt: any, idx: number) => {
       const pAtt: any = (p.attachments as any[])[idx];
       if (!pAtt) return nAtt;
+      if (isContentStub(nAtt) && !isContentStub(pAtt)) return pAtt;
       return {
         ...nAtt,
         localUri: nAtt.localUri ?? pAtt.localUri,
@@ -446,6 +469,7 @@ export function mergePreservingRich(prev: ChatMessage, next: ChatMessage): ChatM
       attachments: (n.media.attachments as any[]).map((nAtt: any, idx: number) => {
         const pAtt: any = (p.media.attachments as any[])[idx];
         if (!pAtt) return nAtt;
+        if (isContentStub(nAtt) && !isContentStub(pAtt)) return pAtt;
         return {
           ...nAtt,
           localUri: nAtt.localUri ?? pAtt.localUri,
