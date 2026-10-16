@@ -28,6 +28,23 @@ import { copyUriToChatMedia, fileUriForPath, sanitizeChatMediaFileName } from '.
 export type { AttachmentFilePayload, FilesType } from '../../ChatRoomPage';
 
 
+// AND-027's fix made handleSendFilesPress/handleAudioPress call onClose()
+// immediately before awaiting DocumentPicker.pick() - but onClose() only
+// starts this screen's RN <Modal animationType="fade"> dismissing, it
+// doesn't wait for that animation to finish. Presenting a NEW native
+// picker (a real UIDocumentPickerViewController on iOS, an Intent/Activity
+// on Android) while the previous native modal is still mid-dismissal races
+// the OS's own presentation queue - the result is the picker silently
+// never appearing at all, which is strictly worse than the "sheet lingers
+// behind the picker" bug AND-027 was fixing. Every OTHER tile in this sheet
+// (contacts/poll/event/location/scan) is unaffected because closing this
+// Modal and opening another RN-rendered one is a pure JS state transition,
+// not a second OS-level presentation. Giving the fade animation time to
+// actually finish before invoking the native picker avoids the race.
+const NATIVE_MODAL_DISMISS_DELAY_MS = 350;
+const waitForModalDismiss = () =>
+  new Promise<void>(resolve => setTimeout(resolve, NATIVE_MODAL_DISMISS_DELAY_MS));
+
 const ensureDurablePickedFile = async (
   file: DocumentPickerResponse,
   fallbackName: string,
@@ -214,7 +231,9 @@ export const AttachmentSheet: React.FC<AttachmentSheetProps> = ({
     // every other tile (contacts/poll/event/location/scan). Without
     // this the sheet stayed visible behind the native document picker until
     // the async pick() resolved, which read as "doesn't dismiss" (AND-027).
+    // See waitForModalDismiss above for why the picker call itself must wait.
     onClose();
+    await waitForModalDismiss();
 
     try {
       const options: any = {
@@ -292,8 +311,10 @@ export const AttachmentSheet: React.FC<AttachmentSheetProps> = ({
 
     pickInProgressRef.current = true;
     // See handleSendFilesPress: close immediately so the sheet never lingers
-    // behind the native audio picker (AND-027).
+    // behind the native audio picker (AND-027), then wait for the dismiss
+    // animation to actually finish before presenting the native picker.
     onClose();
+    await waitForModalDismiss();
 
     try {
       // This restricts to audio MIME types only (from device & providers)
