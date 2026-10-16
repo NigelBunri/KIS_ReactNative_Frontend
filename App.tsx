@@ -213,6 +213,7 @@ import ProfileNotificationDetailScreen from '@/screens/profile/ProfileNotificati
 import KISPrinciplesScreen from '@/screens/profile/KISPrinciplesScreen';
 import AccountDeletionScreen from '@/screens/AccountDeletionScreen';
 import BlockedContactsScreen from '@/screens/tabs/BlockedContactsScreen';
+import ScheduledMessagesScreen from '@/screens/tabs/ScheduledMessagesScreen';
 import PasswordChangeScreen from '@/screens/PasswordChangeScreen';
 import ComplianceSettingsScreen from '@/screens/ComplianceSettingsScreen';
 import CacheManagementScreen from '@/screens/CacheManagementScreen';
@@ -1748,6 +1749,11 @@ function AppContent() {
                         <BlockedContactsScreen onBack={() => navigation.goBack()} />
                       )}
                     </RootStack.Screen>
+                    <RootStack.Screen
+                      name="ScheduledMessages"
+                      getComponent={() => ScheduledMessagesScreen}
+                      options={{ headerShown: false }}
+                    />
                     <RootStack.Screen
                       name="InvoiceList"
                       getComponent={() => InvoiceListScreen}

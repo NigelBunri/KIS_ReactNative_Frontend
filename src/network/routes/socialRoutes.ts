@@ -156,6 +156,14 @@ const socialRoutes = {
   nestNotifications: {
     deviceTokenRegister: `${NEST_API_BASE_URL}/api/v1/notifications/tokens/register`,
   },
+  // ScheduledMessagesController (Nestjs) is @Controller('chat/scheduled-messages')
+  // — mounted at /chat/scheduled-messages, no /api/v1 prefix (same rule as pins/calls above).
+  scheduledMessages: {
+    list: `${NEST_API_BASE_URL}/chat/scheduled-messages`,
+    create: `${NEST_API_BASE_URL}/chat/scheduled-messages`,
+    update: (id: string) => `${NEST_API_BASE_URL}/chat/scheduled-messages/${id}`,
+    cancel: (id: string) => `${NEST_API_BASE_URL}/chat/scheduled-messages/${id}`,
+  },
   // CallsController (Nestjs) is @Controller('calls') — mounted at /calls,
   // NOT /api/v1/calls. This whole block previously pointed at the wrong
   // prefix for every route except `history`, which happened to 401/200

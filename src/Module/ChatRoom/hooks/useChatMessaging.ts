@@ -25,6 +25,7 @@ import { Alert, AppState, DeviceEventEmitter } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { isOnline, onNetworkRecovery } from '@/services/networkMonitor';
 import { getRequest } from '@/network/get';
+import { postRequest } from '@/network/post';
 import ROUTES from '@/network';
 import { isContactBlocked } from '@/screens/tabs/BlockedContactsScreen';
 
@@ -2172,6 +2173,104 @@ export function useChatMessaging({
   }, [sendOverNetworkImpl]);
 
   /* ---------------------------------------------------------------------
+   * SCHEDULE A TEXT MESSAGE FOR LATER
+   *
+   * Deliberately does NOT reuse sendRichMessage/sendOverNetworkImpl: those
+   * immediately write an optimistic local message into this room's history
+   * (so the UI shows "sent" right away), which is exactly wrong for a
+   * message that hasn't actually been sent yet — the message must not
+   * exist anywhere, locally or server-side, until its scheduled time
+   * actually arrives (see ScheduledMessage's own doc comment server-side
+   * for why: an early-persisted row would leak content and bump unread
+   * badges before anyone was supposed to see it). Reuses the same E2EE
+   * recipient-resolution/encryption primitives sendOverNetworkImpl uses
+   * (not a parallel crypto implementation) so an encrypted conversation's
+   * scheduled messages get the exact same confidentiality as an immediate
+   * send — only the transport (one REST POST instead of a live socket
+   * emit + optimistic echo) and timing differ.
+   * ------------------------------------------------------------------ */
+  const scheduleTextMessage = useCallback(
+    async (text: string, scheduledAtIso: string): Promise<{ ok: boolean; error?: string }> => {
+      const safeText = normalizeChatSendText(text);
+      if (!safeText) return { ok: false, error: 'Message is empty' };
+      if (!chat) return { ok: false, error: 'Conversation not loaded yet' };
+
+      const convId = conversationId ?? String(storageRoomId);
+      if (!convId) return { ok: false, error: 'Missing conversation' };
+
+      const clientId = `sched_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+      const basePayload: any = {
+        conversationId: String(convId),
+        kind: 'text',
+        clientId,
+        text: safeText,
+        previewText: safeText.slice(0, 200),
+      };
+
+      const isPublicRoom = (chat as any)?.kind === 'post' || (chat as any)?.kind === 'thread';
+      let payloadToSend: any = { ...basePayload, encrypted: false, encryptionMeta: undefined };
+
+      if (E2EE_ENABLED && !isPublicRoom) {
+        const chatWithFreshParticipants = { ...chat, participants: freshParticipantsRef.current };
+        const recipientIds = resolveE2EERecipientIds(chatWithFreshParticipants as any, String(currentUserId));
+        const selfNorm = normalizeUuid(String(currentUserId));
+        const hasExternalRecipients = recipientIds.some((id) => id !== selfNorm);
+
+        if (recipientIds.length > 0 && hasExternalRecipients) {
+          try {
+            const { encryptionMeta } = await encryptPayloadForRecipients(
+              String(currentUserId),
+              recipientIds,
+              basePayload,
+            );
+            let missingRecipients = recipientUsersWithoutEnvelope(encryptionMeta, recipientIds);
+            let finalEncryptionMeta = encryptionMeta;
+            if (missingRecipients.length > 0) {
+              await repairLocalE2EEBundle(String(currentUserId));
+              const retry = await encryptPayloadForRecipients(String(currentUserId), recipientIds, basePayload);
+              finalEncryptionMeta = retry.encryptionMeta;
+              missingRecipients = recipientUsersWithoutEnvelope(finalEncryptionMeta, recipientIds);
+            }
+            if (missingRecipients.length > 0) {
+              return { ok: false, error: 'Could not encrypt for all recipients — try again' };
+            }
+            payloadToSend = {
+              conversationId: String(convId),
+              clientId,
+              kind: 'text',
+              previewText: 'Encrypted message',
+              encrypted: true,
+              encryptionMeta: finalEncryptionMeta,
+            };
+          } catch {
+            return { ok: false, error: 'Could not encrypt this message — try again' };
+          }
+        }
+        // Else: no external recipients resolved yet — fall back to the
+        // already-assigned plaintext payloadToSend above, same as
+        // sendOverNetworkImpl's own fallback for this case.
+      }
+
+      const scheduledDate = new Date(scheduledAtIso);
+      if (Number.isNaN(scheduledDate.getTime()) || scheduledDate.getTime() < Date.now() + 10_000) {
+        return { ok: false, error: 'Pick a time at least a few seconds in the future' };
+      }
+
+      const res = await postRequest(
+        ROUTES.scheduledMessages.create,
+        { ...payloadToSend, scheduledAt: scheduledDate.toISOString() },
+        { errorMessage: '' },
+      ).catch(() => ({ success: false } as any));
+
+      const body = (res as any)?.data ?? {};
+      if (body?.ok === false) return { ok: false, error: body.error };
+      if (!(res as any)?.success) return { ok: false, error: (res as any)?.message || 'Could not schedule message' };
+      return { ok: true };
+    },
+    [chat, currentUserId, conversationId, storageRoomId],
+  );
+
+  /* ---------------------------------------------------------------------
    * FLUSH QUEUE WHEN SOCKET CONNECTS (🔥 FIX)
    * ------------------------------------------------------------------ */
 
@@ -2824,6 +2923,7 @@ export function useChatMessaging({
     isLoading,
     sendTextMessage,
     sendRichMessage,
+    scheduleTextMessage,
     editMessage: async (
       messageId: string,
       patch: Partial<ChatMessage>,

@@ -28,6 +28,7 @@ import { useHeaderDragToScroll, type ScrollableHandle } from '@/hooks/useHeaderD
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRawTopInset } from '@/hooks/useSafeTopInset';
 import { createMaterialTopTabNavigator } from '@react-navigation/material-top-tabs';
+import { useNavigation } from '@react-navigation/native';
 import { useKISTheme } from '../../theme/useTheme';
 import { KIS_TOKENS } from '../../theme/constants';
 import { useStatusBarStyle } from '../../theme/useStatusBarStyle';
@@ -155,6 +156,7 @@ type GlobalSearchResult = {
  * - Avoid repeated setState on layout if height hasn't changed
  */
 export default function MessagesScreen({ onOpenChat, onOpenInfo, appName, headerGradient, sheenColor: _sheenColor }: MessagesScreenProps) {
+  const navigation = useNavigation<any>();
   const { palette, tone, gradients } = useKISTheme();
   const insets = useSafeAreaInsets();
   // Opts out of the app-wide GLOBAL_TOP_PADDING dial (useSafeTopInset) — this
@@ -1902,6 +1904,7 @@ const handleSelectAllChats = useCallback(() => {
     return [
       { key: 'new-chat', label: 'New chat' },
       { key: 'new-group', label: 'New group' },
+      { key: 'scheduled-messages', label: 'Scheduled messages' },
       { key: 'settings', label: 'Settings' },
     ];
   }, [activeTopTab]);
@@ -1937,10 +1940,13 @@ const handleSelectAllChats = useCallback(() => {
       case 'settings':
         setFilterMgrOpen(true);
         return;
+      case 'scheduled-messages':
+        navigation.navigate('ScheduledMessages');
+        return;
       default:
         return;
     }
-  }, [openAddContacts]);
+  }, [openAddContacts, navigation]);
 
   const handleHeaderCameraPress = useCallback(() => {
     if (activeTopTab === 'Chats') {

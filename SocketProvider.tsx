@@ -2104,6 +2104,11 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       s.on('channel.content.published', onChannelContentPublished);
       s.on('channel.subscribed',        onChannelSubscribed);
 
+      /* ── Scheduled message status changes (sent/failed/cancelled) — lets
+       * the Scheduled Messages screen update live instead of polling. ── */
+      const onScheduledMessageUpdated = (payload: any) => DeviceEventEmitter.emit('chat.scheduled_message_updated', payload);
+      s.on('chat.scheduled_message_updated', onScheduledMessageUpdated);
+
       // Forward outbound live events from components to the socket server
       joinLiveSub = DeviceEventEmitter.addListener('channel.live.join', (p: any) => {
         if (s.connected) s.emit('channel.live.join', p);

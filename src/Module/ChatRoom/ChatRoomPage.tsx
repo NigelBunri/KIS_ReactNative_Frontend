@@ -297,6 +297,7 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
     messages,
     sendTextMessage,
     sendRichMessage,
+    scheduleTextMessage,
     editMessage,
     softDeleteMessage,
     replyToMessage,
@@ -369,9 +370,6 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
   const [disappearingSeconds, setDisappearingSeconds] = useState<DisappearDuration>(0);
   const [wallpaperSheetVisible, setWallpaperSheetVisible] = useState(false);
   const [wallpaperId, setWallpaperId] = useState<string>('default');
-  const [scheduledQueue, setScheduledQueue] = useState<
-    { text: string; scheduledAt: string; timerId: ReturnType<typeof setTimeout> }[]
-  >([]);
 
   const [uploadBubbles, setUploadBubbles] = useState<Record<string, UploadBubble>>({});
 
@@ -472,37 +470,34 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
     loadWallpaper(chatId).then(setWallpaperId);
   }, [conversationId, chat?.id]);
 
-  // Persist + restore scheduled queue so it survives app restarts
+  // One-time migration: scheduling used to be a local setTimeout + this
+  // AsyncStorage key, which never survived the app being killed/restarted
+  // (the actual bug this whole feature is being rebuilt to fix). Any
+  // install still holding a pre-fix queue here from before this update
+  // shipped gets it re-submitted through the real server-side scheduler
+  // (or sent immediately if its time already passed while it sat
+  // un-deliverable) instead of silently losing it on this upgrade.
   const SCHED_KEY = `kis.scheduled.${conversationId ?? chat?.id ?? 'unknown'}`;
   useEffect(() => {
     if (!conversationId && !chat?.id) return;
-    AsyncStorage.getItem(SCHED_KEY).then((raw) => {
+    AsyncStorage.getItem(SCHED_KEY).then(async (raw) => {
       if (!raw) return;
       try {
         const saved: { text: string; scheduledAt: string }[] = JSON.parse(raw);
-        const now = Date.now();
-        saved.forEach((item) => {
-          const delay = new Date(item.scheduledAt).getTime() - now;
+        for (const item of saved) {
+          const delay = new Date(item.scheduledAt).getTime() - Date.now();
           if (delay <= 0) {
-            sendTextMessage(item.text);
+            await sendTextMessage(item.text);
           } else {
-            const timerId = setTimeout(() => sendTextMessage(item.text), delay);
-            setScheduledQueue((prev) => [...prev, { ...item, timerId }]);
+            await scheduleTextMessage(item.text, item.scheduledAt);
           }
-        });
-        AsyncStorage.removeItem(SCHED_KEY);
-      } catch { /* silent */ }
+        }
+        await AsyncStorage.removeItem(SCHED_KEY);
+      } catch { /* silent — left in place for the next mount to retry */ }
     });
   // Only on mount for this conversation
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversationId, chat?.id]);
-
-  useEffect(() => {
-    if (!conversationId && !chat?.id) return;
-    if (scheduledQueue.length === 0) { AsyncStorage.removeItem(SCHED_KEY).catch(() => {}); return; }
-    const toSave = scheduledQueue.map(({ text, scheduledAt }) => ({ text, scheduledAt }));
-    AsyncStorage.setItem(SCHED_KEY, JSON.stringify(toSave)).catch(() => {});
-  }, [scheduledQueue, SCHED_KEY]);
 
   // Initialize the disappearing-timer toggle from the real persisted value
   // (see handleSetDisappearing) so reopening a chat reflects what's actually
@@ -2117,22 +2112,29 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
   );
 
   const handleScheduleSend = useCallback(
-    (scheduledAt: string) => {
+    async (scheduledAt: string) => {
       const text = draft.trim();
       if (!text) return;
       const delay = new Date(scheduledAt).getTime() - Date.now();
       if (delay <= 0) { handleSend(); return; }
-      const timerId = setTimeout(() => {
-        sendTextMessage(text);
-      }, delay);
-      setScheduledQueue((prev) => [...prev, { text, scheduledAt, timerId }]);
+
+      // Persisted server-side (ScheduledMessagesController) the instant this
+      // resolves — not a local timer, so the send survives the app being
+      // closed, killed, or the device being off at the scheduled time. See
+      // the Scheduled Messages screen (Messages tab overflow menu) for
+      // visibility/cancel on anything scheduled this way.
+      const result = await scheduleTextMessage(text, scheduledAt);
+      if (!result.ok) {
+        Alert.alert('Could not schedule message', result.error || 'Please try again.');
+        return;
+      }
       setDraft('');
       Alert.alert(
         'Message scheduled',
         `Your message will be sent at ${new Date(scheduledAt).toLocaleString()}`,
       );
     },
-    [draft, handleSend, sendTextMessage],
+    [draft, handleSend, scheduleTextMessage],
   );
 
   const handleStarMessage = useCallback(

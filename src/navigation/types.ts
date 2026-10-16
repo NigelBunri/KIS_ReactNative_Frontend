@@ -330,6 +330,7 @@ export type RootStackParamList = {
   };
   AccountDeletion: undefined;
   BlockedContacts: undefined;
+  ScheduledMessages: undefined;
   PasswordChange: undefined;
   EmailVerification: undefined;
   ComplianceSettings: undefined;
