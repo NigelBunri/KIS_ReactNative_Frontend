@@ -174,7 +174,30 @@ const isNoSignalSessionError = (error: any): boolean => {
 // behind the "Encrypted message" placeholder forever despite the
 // attachment data already being correctly populated by the first,
 // successful attempt.
-const hasDecryptedContent = (message: Pick<ChatMessage, 'text'> & {
+// CONFIRMED ROOT CAUSE (live-tested 2026-10-16) of "files appear encrypted/
+// unreadable to the receiver": for an E2EE file/image/video message,
+// sendOverNetworkImpl's mediaPlaintextEcho deliberately leaves a bare
+// `{id: a.id}` stub in the server-visible plaintext shell (real content —
+// url/mimeType/size/etc. — stays sealed inside the encrypted payload; see
+// that function's own comment for why only `id` is echoed). mapServerMessage
+// maps that stub straight into message.attachments/media.attachments
+// BEFORE decryption ever runs. This check used to treat "attachments array
+// is non-empty" alone as proof the message was already fully decrypted —
+// true for a locally-sent message, but also true for that stub, which has
+// an id and nothing else. decryptChatMessage's own short-circuit
+// ("messagesRef.current already has a readable copy of this message") then
+// found that exact stub already sitting in state (it's added to
+// messagesRef BEFORE decrypt is ever called) and skipped decryption
+// entirely, forever — every E2EE attachment message therefore never
+// decrypted at all, permanently stuck on the "Encrypted message" preview
+// text with a content-less attachment stub. An attachment only counts as
+// real, decrypted content when it carries an actual locator a receiver
+// could open - the same fields mapAttachments resolves for every genuine
+// upload.
+export const attachmentHasRealContent = (att: any): boolean =>
+  !!(att && (att.url || att.downloadUrl || att.publicUrl || att.displayUrl || att.localUri || att.mimeType));
+
+export const hasDecryptedContent = (message: Pick<ChatMessage, 'text'> & {
   attachments?: unknown[];
   media?: unknown;
   voice?: unknown;
@@ -185,12 +208,18 @@ const hasDecryptedContent = (message: Pick<ChatMessage, 'text'> & {
 }): boolean => {
   const text = typeof message.text === 'string' ? message.text.trim() : '';
   if (text.length > 0 && text.toLowerCase() !== 'encrypted message') return true;
-  if (Array.isArray(message.attachments) && message.attachments.length > 0) return true;
+  if (Array.isArray(message.attachments) && message.attachments.some(attachmentHasRealContent)) return true;
   if (message.media && typeof message.media === 'object') {
     const attachments = (message.media as any)?.attachments;
-    if (Array.isArray(attachments) && attachments.length > 0) return true;
+    if (Array.isArray(attachments) && attachments.some(attachmentHasRealContent)) return true;
   }
-  if (message.voice) return true;
+  // Same stub-echo risk as attachments above: sendOverNetworkImpl's
+  // voicePlaintextEcho leaves {mediaAssetId, objectKey, durationMs} in the
+  // plaintext shell for an E2EE voice note - no uri/url - so the raw
+  // pre-decrypt mapped `voice` object is already truthy before decryption
+  // ever runs. Require an actual playable locator, not just the object's
+  // existence.
+  if (message.voice && ((message.voice as any).uri || (message.voice as any).url)) return true;
   if (message.sticker) return true;
   if (Array.isArray(message.contacts) && message.contacts.length > 0) return true;
   if (message.poll) return true;

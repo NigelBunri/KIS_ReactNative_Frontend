@@ -499,6 +499,29 @@ export const mergeCachedMessage = (prev: ChatMessage, next: ChatMessage): ChatMe
   if (isOpenedViewOnce(n)) return n;
   if (isOpenedViewOnce(p)) return p;
   const merged: any = { ...p, ...n };
+  // CONFIRMED ROOT CAUSE (live-tested 2026-10-16) of "view-once shows the
+  // tap-to-view gate for ~1-2s then silently reveals the message as a
+  // normal one, with no click": a received E2EE message is first stored
+  // via mapServerMessage() on the still-encrypted server envelope, where
+  // viewOnce is always false/undefined (the real flag lives inside the
+  // encrypted JSON, deliberately never echoed in the plaintext shell -
+  // see sendOverNetworkImpl's basePayload/mediaPlaintextEcho comments).
+  // Decryption then patches the in-memory message with the correct
+  // viewOnce:true from the decrypted payload - but loadMessages()
+  // concatenates several separate storage layers on every room open
+  // (durable history, AsyncStorage V3/V2/V1 keys, alias-recovered keys),
+  // and whichever of those layers still only holds that original
+  // pre-decrypt shell (viewOnce false) gets merged back against the
+  // correct copy through this exact function. Every OTHER content field
+  // above (text/attachments/voice/sticker/poll/event/contacts/etc.) has
+  // an explicit "restore from the other side if this side lacks it" rule;
+  // viewOnce had none, so the plain `{...p, ...n}` spread took whichever
+  // side happened to be passed as `n` for this one field - silently
+  // downgrading a message that must stay permanently gated into an
+  // ordinary, fully-visible one, with no server round-trip, no click, and
+  // no way to tell the content was ever meant to be one-time. viewOnce can
+  // only ever be promoted to true by a merge, never dropped to false.
+  if (Boolean(p.viewOnce) && !Boolean(merged.viewOnce)) merged.viewOnce = true;
   const nextText = typeof n.text === 'string' ? n.text.trim() : '';
   const prevText = typeof p.text === 'string' ? p.text.trim() : '';
   if ((!nextText || nextText.toLowerCase() === 'encrypted message') && prevText && prevText.toLowerCase() !== 'encrypted message') {
