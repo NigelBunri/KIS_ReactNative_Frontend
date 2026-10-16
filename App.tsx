@@ -165,7 +165,6 @@ import ProductDetailsPage from '@/screens/broadcast/market/ProductDetailsPage';
 import NetInfo from '@react-native-community/netinfo';
 import { getRequest } from '@/network/get';
 import ROUTES from '@/network';
-import { postRequest } from '@/network/post';
 import { SocketProvider } from '@/SocketProvider';
 import { GlobalProfilePreviewProvider } from '@/components/profile/GlobalProfilePreviewProvider';
 import { MiniPlayerProvider } from '@/contexts/MiniPlayerContext';
@@ -1143,66 +1142,6 @@ function AppContent() {
       }
     });
     return () => subscription.remove();
-  }, [isAuth]);
-
-  useEffect(() => {
-    if (!isAuth) return;
-    let active = true;
-
-    const registerPushToken = async () => {
-      try {
-        // Read all four tokens concurrently instead of sequentially.
-        const [token, fallbackToken, apnsToken, deviceId] = await Promise.all([
-          AsyncStorage.getItem('push_token'),
-          AsyncStorage.getItem('fcm_token'),
-          AsyncStorage.getItem('apns_token'),
-          AsyncStorage.getItem('device_id'),
-        ]);
-        const finalToken = token || fallbackToken;
-
-        if (!active) return;
-
-        const nestToken = finalToken || apnsToken;
-        const nestPlatform: 'ios' | 'android' = Platform.OS === 'ios' ? 'ios' : 'android';
-
-        if (Platform.OS === 'ios' && apnsToken) {
-          await postRequest(ROUTES.notifications.deviceTokenRegister, {
-            device_id: deviceId || 'unknown-device',
-            platform: 'ios',
-            push_token: finalToken || apnsToken,
-            token_type: 'fcm',
-            apns_token: apnsToken,
-            metadata: { source: 'auth-bootstrap', apns_only: !finalToken },
-          });
-        } else if (finalToken) {
-          await postRequest(ROUTES.notifications.deviceTokenRegister, {
-            device_id: deviceId || 'unknown-device',
-            platform: Platform.OS === 'ios' ? 'ios' : 'android',
-            push_token: finalToken,
-            token_type: 'fcm',
-            apns_token: apnsToken || '',
-            metadata: { source: 'auth-bootstrap' },
-          });
-        }
-
-        // Also register with the NestJS backend which handles call push notifications
-        if (nestToken) {
-          postRequest(ROUTES.nestNotifications.deviceTokenRegister, {
-            token: nestToken,
-            platform: nestPlatform,
-            deviceId: deviceId || undefined,
-          }).catch(() => {/* non-fatal */});
-        }
-      } catch (e: any) {
-        console.log('[push-token] register failed:', e?.message);
-      }
-    };
-
-    registerPushToken();
-
-    return () => {
-      active = false;
-    };
   }, [isAuth]);
 
   const ctx = useMemo(

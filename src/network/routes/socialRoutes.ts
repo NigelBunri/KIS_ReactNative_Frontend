@@ -153,9 +153,6 @@ const socialRoutes = {
   conversations: {
     broadcast: `${NEST_API_BASE_URL}/api/v1/conversations/broadcast`,
   },
-  nestNotifications: {
-    deviceTokenRegister: `${NEST_API_BASE_URL}/api/v1/notifications/tokens/register`,
-  },
   // CallsController (Nestjs) is @Controller('calls') — mounted at /calls,
   // NOT /api/v1/calls. This whole block previously pointed at the wrong
   // prefix for every route except `history`, which happened to 401/200
