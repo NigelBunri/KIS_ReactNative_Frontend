@@ -121,6 +121,14 @@ export type UseChatPersistenceResult = {
     next: ChatMessage[],
   ) => Promise<void>;
 
+  // Sets the message list to EXACTLY `next`, bypassing mergeMessages -
+  // only for callers declaring the definitive new state (e.g. clearing a
+  // conversation), never for reconciling incoming server data against
+  // what's already known locally. See its own comment at the call site.
+  forceReplaceMessages: (
+    next: ChatMessage[],
+  ) => Promise<void>;
+
   retryMessage: (messageId: string) => Promise<void>;
 };
 
@@ -1011,6 +1019,25 @@ export function useChatPersistence(
     [persist],
   );
 
+  // CONFIRMED ROOT CAUSE of "Clear chat" doing nothing visible: the caller
+  // used to call replaceMessages([]) to mean "the list is now empty", but
+  // replaceMessages MERGES its argument against messagesRef.current
+  // (mergeMessages above) - merging in an empty array has nothing to
+  // merge, so it's a pure no-op that returns the UNCHANGED existing list,
+  // then persists that same unchanged list right back to disk. Since this
+  // ran immediately after clearMessages() (chatStorage.ts) had just wiped
+  // that same disk storage, the net effect was clearing storage and then
+  // silently restoring it in the next statement - the chat never visually
+  // changed. This bypasses the merge entirely for the one case where the
+  // caller is declaring the definitive new state, not reconciling against
+  // incoming server data.
+  const forceReplaceMessages = useCallback(
+    async (next: ChatMessage[]) => {
+      await persist(Array.isArray(next) ? next : []);
+    },
+    [persist],
+  );
+
   /* ------------------------------------------------------------------------
    * API
    * --------------------------------------------------------------------- */
@@ -1025,6 +1052,7 @@ export function useChatPersistence(
     replyToMessage,
     attemptFlushQueue,
     replaceMessages,
+    forceReplaceMessages,
     retryMessage: async (messageId: string) => {
       const next = messagesRef.current.map((m) =>
         getIdentityKey(m) === messageId

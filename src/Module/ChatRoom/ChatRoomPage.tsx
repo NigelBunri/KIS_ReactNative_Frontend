@@ -81,7 +81,7 @@ import {
 import type { CallType } from '@/services/calls/callTypes';
 import ROUTES, { NEST_API_BASE_URL } from '@/network';
 import { patchRequest } from '@/network/patch';
-import { loadMessages } from './Storage/chatStorage';
+import { loadMessages, filterLocallyDeletedMessages } from './Storage/chatStorage';
 import { deleteDecryptedMessage } from './Storage/decryptedMessageStorage';
 import RNFS from 'react-native-fs';
 import { stripFileScheme } from './chatMediaStorage';
@@ -2740,12 +2740,17 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
             setIsLoadingOlderMessages(true);
             // Per the pagination contract: at most 30 messages per request.
             requestHistoryBatch({ before: oldest.createdAt, limit: 30 })
-              .then((items: any[]) => {
+              .then(async (items: any[]) => {
                 // Fewer than a full page (including empty) means this was
                 // the true start of the conversation - stop requesting more.
                 if (items.length < 30) setHasMoreOlderMessages(false);
                 if (!items.length) return;
-                const mapped = items.map((m: any) => mapServerMessage(m));
+                const mapped = await filterLocallyDeletedMessages(
+                  String(storageRoomId),
+                  items.map((m: any) => mapServerMessage(m)),
+                  currentUserId,
+                );
+                if (!mapped.length) return;
                 // replaceMessages merges+dedupes against the existing list
                 // (mergeMessages in useChatPersistence.ts), so a retried or
                 // overlapping page can't introduce duplicates.

@@ -524,6 +524,7 @@ export function useChatMessaging({
     replyToMessage,
     attemptFlushQueue,
     replaceMessages,
+    forceReplaceMessages,
     retryMessage,
   } = useChatPersistence({
     roomId: String(storageRoomId),
@@ -3200,7 +3201,12 @@ export function useChatMessaging({
     },
     clearAllMessages: async () => {
       await clearMessages(String(storageRoomId), currentUserId);
-      replaceMessages([]);
+      // forceReplaceMessages, not replaceMessages - the latter MERGES its
+      // argument against the existing in-memory list (mergeMessages in
+      // useChatPersistence.ts), so replaceMessages([]) is a no-op that
+      // silently restores the list clearMessages() just wiped from disk.
+      // See forceReplaceMessages's own comment.
+      await forceReplaceMessages([]);
     },
   };
 }

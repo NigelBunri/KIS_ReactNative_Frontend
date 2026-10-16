@@ -14,6 +14,7 @@ const STORAGE_KEY_PREFIX_V3 = 'KIS_CHAT_MESSAGES_BY_USER_ROOM_V3:';
 const STORAGE_KEY_PREFIX_V2 = 'KIS_CHAT_MESSAGES_BY_ROOM_V2:';
 const LEGACY_STORAGE_KEY_PREFIX_V1 = 'KIS_CHAT_MESSAGES_BY_ROOM_V1:';
 const LOCAL_DELETED_MESSAGE_IDS_PREFIX = 'KIS_CHAT_LOCAL_DELETED_MESSAGE_IDS_V1:';
+const CLEARED_BEFORE_PREFIX = 'KIS_CHAT_CLEARED_BEFORE_V1:';
 const MAX_LOCAL_DELETED_MESSAGE_IDS = 5000;
 const ASYNC_STORAGE_MESSAGE_SNAPSHOT_LIMIT = 500;
 const DURABLE_HISTORY_VERSION = 4;
@@ -76,6 +77,11 @@ const buildLocalDeletedMessageIdsKey = (
   currentUserId?: string | null,
 ) =>
   `${LOCAL_DELETED_MESSAGE_IDS_PREFIX}${scopedRoomId(roomId, currentUserId)}`;
+const buildClearedBeforeKey = (
+  roomId: string,
+  currentUserId?: string | null,
+) =>
+  `${CLEARED_BEFORE_PREFIX}${scopedRoomId(roomId, currentUserId)}`;
 
 
 type DurableHistoryEnvelope = {
@@ -778,20 +784,67 @@ export async function rememberLocallyDeletedMessageIds(
   }
 }
 
+export async function getClearedBeforeTimestamp(
+  roomId: string,
+  currentUserId?: string | null,
+): Promise<string | null> {
+  try {
+    return await AsyncStorage.getItem(buildClearedBeforeKey(roomId, currentUserId));
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * CONFIRMED ROOT CAUSE of "Clear chat" un-clearing itself: clearMessages()
+ * below wipes the local message cache, but nothing told the client to stop
+ * re-syncing OLD history from the server. The very next time this
+ * conversation's history-reconciliation effect runs (reopening the chat,
+ * or an app restart) it finds zero local messages for this conversation
+ * and — per its own "no local cache at all, this is the real initial
+ * load" fallback — fetches the most recent page of history straight from
+ * the server and merges it right back in, resurrecting everything the
+ * user just explicitly cleared. Recording the clear's own timestamp here
+ * lets filterLocallyDeletedMessages drop anything from THAT point
+ * backwards wherever server-sourced messages get merged in (chat.history,
+ * gap-fill, and the live 'chat.message' append-as-new path all already
+ * call it) — a message sent/received after the clear has a newer
+ * createdAt and is correctly left alone.
+ */
+export async function rememberClearedBeforeTimestamp(
+  roomId: string,
+  timestamp: string,
+  currentUserId?: string | null,
+): Promise<void> {
+  try {
+    await AsyncStorage.setItem(buildClearedBeforeKey(roomId, currentUserId), timestamp);
+  } catch (error) {
+    console.warn('[chatStorage] rememberClearedBeforeTimestamp error', error);
+  }
+}
+
 export async function filterLocallyDeletedMessages(
   roomId: string,
   messages: ChatMessage[],
   currentUserId?: string | null,
 ): Promise<ChatMessage[]> {
-  const deletedIds = new Set(
-    await getLocallyDeletedMessageIds(roomId, currentUserId),
-  );
-  if (!deletedIds.size) return messages;
+  const [deletedIdsList, clearedBefore] = await Promise.all([
+    getLocallyDeletedMessageIds(roomId, currentUserId),
+    getClearedBeforeTimestamp(roomId, currentUserId),
+  ]);
+  const deletedIds = new Set(deletedIdsList);
+  const clearedBeforeMs = clearedBefore ? Date.parse(clearedBefore) : NaN;
 
-  return messages.filter(
-    message =>
-      !identityValues(message).some(identity => deletedIds.has(identity)),
-  );
+  if (!deletedIds.size && Number.isNaN(clearedBeforeMs)) return messages;
+
+  return messages.filter((message) => {
+    if (identityValues(message).some((identity) => deletedIds.has(identity))) return false;
+    if (!Number.isNaN(clearedBeforeMs)) {
+      const createdAtMs = Date.parse(String(message.createdAt ?? ''));
+      if (!Number.isNaN(createdAtMs) && createdAtMs <= clearedBeforeMs) return false;
+    }
+    return true;
+  });
 }
 
 const messagesShareIdentity = (
@@ -882,6 +935,10 @@ export async function clearMessages(roomId: string, currentUserId?: string | nul
     await Promise.all([
       AsyncStorage.removeItem(buildKeyV3(roomId, currentUserId)),
       AsyncStorage.removeItem(buildHistorySyncStateKey(roomId, currentUserId)),
+      // See rememberClearedBeforeTimestamp's own comment - without this,
+      // the very next history resync (reopening this chat, or an app
+      // restart) re-fetches and resurrects everything just cleared below.
+      rememberClearedBeforeTimestamp(roomId, new Date().toISOString(), currentUserId),
     ]);
     const path = durableHistoryPath(roomId, currentUserId);
     await Promise.all(
