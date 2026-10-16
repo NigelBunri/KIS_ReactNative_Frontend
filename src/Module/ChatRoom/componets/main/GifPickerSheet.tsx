@@ -20,16 +20,46 @@ import { APP_ENV } from '@/env';
 // `npm run env:sync` (or `prestart`/`preandroid`/`preios`, which do it
 // automatically) to regenerate src/env.ts.
 //
-// NOTE: this used to read `process.env.TENOR_API_KEY`, which is never
-// populated in this app — Metro/React Native does not inject arbitrary
-// process.env values (there's no react-native-config or babel dotenv
-// plugin here; see scripts/sync-env.cjs, the one real env mechanism this
-// project has). That meant the hardcoded __DEV__ fallback key was the ONLY
-// key that ever actually got used, and production builds always sent a
-// blank key to Tenor, which this function below treats as "no results" —
-// hence AND-034 ("no gif found") reproducing 100% of the time in prod.
-const TENOR_API_KEY: string = APP_ENV.KIS_TENOR_API_KEY || (__DEV__ ? 'LIVDSRZULELA' : '');
+// CONFIRMED 2026-10-16: the hardcoded __DEV__ fallback key ('LIVDSRZULELA')
+// that used to sit here is itself invalid — calling Tenor's /search
+// directly with it returns `400 API_KEY_INVALID`, not just "no results".
+// That's the actual, verified cause of "I can not find any gif": there
+// has never been a working key in this app, dev or prod, so searchTenor
+// below has always returned []. There is no fallback anymore - get a real
+// key from https://developers.google.com/tenor/guides/quickstart and set
+// KIS_TENOR_API_KEY in .env (see .env.example) before this feature can
+// return anything.
+const TENOR_API_KEY: string = APP_ENV.KIS_TENOR_API_KEY || '';
 const TENOR_BASE = 'https://tenor.googleapis.com/v2';
+
+// KIS is a faith-focused app - the GIF picker must only ever surface
+// Christian/faith-themed content, never Tenor's generic trending feed.
+// Tenor has no actual "christian" category filter in its API, so this is
+// a best-effort keyword bias, not a guaranteed content filter: every
+// search is forced through one of these terms (randomly rotated for the
+// empty/default feed, appended to whatever the user typed otherwise) so
+// Tenor's own relevance ranking favors faith-tagged results, combined
+// with contentfilter=high for baseline safety. There's no server-side
+// moderation layer here - if Tenor's tagging for a given clip is wrong,
+// an off-theme result can still slip through.
+export const CHRISTIAN_GIF_THEMES = [
+  'christian', 'jesus', 'worship', 'bible', 'prayer', 'church', 'faith',
+  'blessed', 'hallelujah', 'amen', 'gospel', 'praise god', 'holy spirit',
+];
+
+const randomChristianTheme = () =>
+  CHRISTIAN_GIF_THEMES[Math.floor(Math.random() * CHRISTIAN_GIF_THEMES.length)];
+
+// Exported for regression testing only (see __tests__/GifPickerSheet.christianBias.test.ts) -
+// every other caller stays internal to this module. `pickTheme` is
+// injectable so tests don't depend on Math.random().
+export function buildChristianBiasedQuery(
+  query: string,
+  pickTheme: () => string = randomChristianTheme,
+): string {
+  const trimmed = query.trim();
+  return trimmed ? `${trimmed} ${pickTheme()}` : pickTheme();
+}
 
 export type TenorGif = {
   id: string;
@@ -42,11 +72,17 @@ export type TenorGif = {
 
 export async function searchTenor(query: string, limit = 24): Promise<TenorGif[]> {
   if (!TENOR_API_KEY) return [];
-  const endpoint = query.trim()
-    ? `${TENOR_BASE}/search?q=${encodeURIComponent(query)}&key=${TENOR_API_KEY}&limit=${limit}&media_filter=gif`
-    : `${TENOR_BASE}/featured?key=${TENOR_API_KEY}&limit=${limit}&media_filter=gif`;
+  // Default/empty feed: never show Tenor's generic trending GIFs - always
+  // search a faith theme instead. A query the user typed still gets a
+  // faith term appended so results stay on-theme without forcing them to
+  // type "christian" themselves every time.
+  const effectiveQuery = buildChristianBiasedQuery(query);
+  const endpoint =
+    `${TENOR_BASE}/search?q=${encodeURIComponent(effectiveQuery)}&key=${TENOR_API_KEY}` +
+    `&limit=${limit}&media_filter=gif&contentfilter=high`;
 
   const res = await fetch(endpoint);
+  if (!res.ok) return [];
   const json = await res.json();
   const results = json?.results ?? [];
   return results.map((item: any) => {
