@@ -193,9 +193,17 @@ const isNoSignalSessionError = (error: any): boolean => {
 // text with a content-less attachment stub. An attachment only counts as
 // real, decrypted content when it carries an actual locator a receiver
 // could open - the same fields mapAttachments resolves for every genuine
-// upload.
+// upload. mimeType is deliberately excluded: Nest's messages.service.ts
+// normalizeAttachments() backfills mimeType (and storageKey) server-side
+// from the matching confirmed UploadIntent for EVERY message, including
+// E2EE ones where the client only ever echoed a bare `{id}` - so a raw,
+// still-encrypted attachment stub already has a real mimeType before
+// decryption ever runs, with no url/downloadUrl/etc. Treating mimeType as
+// sufficient made decryptChatMessage's "already readable" short-circuit
+// fire on literally the first WS event for every E2EE image/video/file,
+// permanently skipping real decryption for all of them.
 export const attachmentHasRealContent = (att: any): boolean =>
-  !!(att && (att.url || att.downloadUrl || att.publicUrl || att.displayUrl || att.localUri || att.mimeType));
+  !!(att && (att.url || att.downloadUrl || att.publicUrl || att.displayUrl || att.localUri));
 
 export const hasDecryptedContent = (message: Pick<ChatMessage, 'text'> & {
   attachments?: unknown[];

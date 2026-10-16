@@ -25,7 +25,21 @@ describe('attachmentHasRealContent', () => {
     expect(attachmentHasRealContent({ id: 'att-1', url: 'https://cdn.example.com/photo.jpg' })).toBe(true);
     expect(attachmentHasRealContent({ id: 'att-1', downloadUrl: 'https://cdn.example.com/f' })).toBe(true);
     expect(attachmentHasRealContent({ id: 'att-1', localUri: 'file:///tmp/photo.jpg' })).toBe(true);
-    expect(attachmentHasRealContent({ id: 'att-1', mimeType: 'image/jpeg' })).toBe(true);
+  });
+
+  // CONFIRMED ROOT CAUSE (live-tested 2026-10-16) of "gallery images always
+  // show the lock icon, receiver never decrypts": Nest's
+  // messages.service.ts normalizeAttachments() backfills mimeType (and
+  // storageKey) server-side from the matching confirmed UploadIntent for
+  // EVERY message, including E2EE ones where the client only ever echoed
+  // a bare `{id}`. So the receiver's raw, still-encrypted attachment
+  // already carries a real mimeType - and often storageKey - before
+  // decryption ever runs, with no url/downloadUrl/publicUrl/displayUrl/
+  // localUri. mimeType (and storageKey) must never count as real content.
+  it('is false for the server-backfilled id+mimeType+storageKey stub, with no actual url', () => {
+    expect(
+      attachmentHasRealContent({ id: 'att-1', mimeType: 'image/jpeg', storageKey: 'uploads/att-1.jpg' }),
+    ).toBe(false);
   });
 
   it('is false for null/undefined', () => {
