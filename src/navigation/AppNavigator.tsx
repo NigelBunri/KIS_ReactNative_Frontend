@@ -39,6 +39,7 @@ import BibleScreen from '../screens/tabs/BibleScreen';
 import BroadcastScreen from '../screens/tabs/BroadcastScreen';
 import ProfileScreen from '../screens/tabs/ProfileScreen';
 import { Chat } from '@/Module/ChatRoom/messagesUtils';
+import { resolveChatOpenPayload } from './resolveChatOpenPayload';
 import { useSocket } from '../../SocketProvider';
 import ROUTES from '@/network';
 import { getRequest } from '@/network/get';
@@ -664,29 +665,9 @@ export function MainTabs() {
   }, [chatSlide, subRoomSlide, communityByConversationId, openCommunity]);
 
   useEffect(() => {
-    const sub = DeviceEventEmitter.addListener('chat.open', (payload: any) => {
-      const convId = String(payload?.conversationId ?? payload?.id ?? '');
-      if (!convId) return;
-      // 'group' is InviteJoinScreen's kind for a joined chat group;
-      // 'channel' is a broadcast channel's underlying conversation (see
-      // GlobalSearchScreen.tsx/BroadcastFeedSection.tsx) - both are
-      // multi-party, non-direct conversations. Missing 'group' here (this
-      // used to check only 'channel') left isGroup/isGroupChat both false
-      // for a freshly-joined group, which made useConversationBootstrap's
-      // isDirectChat check wrongly true - a joined group got treated as a
-      // DM still needing a peer to select, so it opened stuck on "Select a
-      // chat to start messaging" with no way to send.
-      const isGroupKind = payload?.kind === 'group' || payload?.kind === 'channel';
-      const chat: Chat = {
-        id: convId,
-        conversationId: convId,
-        name: payload?.name ?? 'Chat',
-        kind: payload?.kind,
-        communityId: payload?.kind === 'community' ? convId : undefined,
-        isCommunityChat: payload?.kind === 'community',
-        isGroup: isGroupKind,
-        isGroupChat: isGroupKind,
-      };
+    const sub = DeviceEventEmitter.addListener('chat.open', async (payload: any) => {
+      const chat = await resolveChatOpenPayload(payload);
+      if (!chat) return;
       openChat(chat);
     });
     return () => {

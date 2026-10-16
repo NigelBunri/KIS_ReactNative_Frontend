@@ -607,6 +607,12 @@ export function useChatPersistence(
   const messagesRef = useRef<ChatMessage[]>([]);
   const roomIdRef = useRef<string>(roomId);
   const previousRoomIdRef = useRef<string | null>(null);
+  // Self-contained within the INITIAL LOAD effect below only - deliberately
+  // NOT shared with the REF SYNC effect's roomIdRef, which (being declared
+  // first) always updates to the NEW roomId before INITIAL LOAD's own
+  // effect body ever runs, so comparing against it there would never
+  // observe a change at all.
+  const lastLoadedRoomIdRef = useRef<string>(roomId);
   const flushInFlightRef = useRef(false);
   const retryAttemptsRef = useRef<Record<string, number>>({});
   const RETRY_KEY = `kis.retry_attempts.${roomId}.${currentUserId ?? 'anon'}`;
@@ -632,6 +638,27 @@ export function useChatPersistence(
 
   useEffect(() => {
     let mounted = true;
+
+    // CONFIRMED ROOT CAUSE of messages from one conversation briefly
+    // rendering inside another: this effect re-runs whenever `roomId`
+    // changes (switching conversations), but everything below is async -
+    // AsyncStorage/file reads, decrypt hydration - and `messages` state
+    // was left completely untouched until the very end of that chain
+    // (setMessages(sorted)). Since ChatRoomPage.tsx renders directly off
+    // `messages` with no gate on `isLoading` at all, the PREVIOUS room's
+    // messages stayed fully visible on screen for the entire duration of
+    // the new room's load - a real cross-conversation privacy leak, not
+    // just a rendering glitch. Snapshotting the prior in-memory list
+    // before clearing (rather than just clearing messagesRef.current
+    // directly) preserves it for the migration-merge logic a few lines
+    // down, which intentionally folds in-memory data from a just-replaced
+    // temporary/local roomId into the real server roomId's result.
+    const priorMessagesSnapshot = messagesRef.current;
+    if (lastLoadedRoomIdRef.current !== roomId) {
+      messagesRef.current = [];
+      setMessages([]);
+    }
+    lastLoadedRoomIdRef.current = roomId;
 
     setIsLoading(true);
 
@@ -659,7 +686,7 @@ export function useChatPersistence(
         );
         if (!mounted) return;
         const byIdentity = new Map<string, ChatMessage>();
-        [...hydrated, ...hydratedMigrated, ...messagesRef.current].forEach((m) => {
+        [...hydrated, ...hydratedMigrated, ...priorMessagesSnapshot].forEach((m) => {
           const convId = m.conversationId ?? m.roomId ?? '';
           const belongsToRoom = String(convId) === String(roomId) || String(m.roomId ?? '') === String(roomId);
           const migratedToRoom = previousRoomId && String(m.roomId ?? '') === String(previousRoomId) && String(convId) === String(roomId);

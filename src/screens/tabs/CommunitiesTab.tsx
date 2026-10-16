@@ -210,6 +210,7 @@ const CommunitiesTab = forwardRef<ScrollableHandle, CommunitiesTabProps>(functio
   const [discoverResults, setDiscoverResults] = useState<Community[]>([]);
   const [discoverLoading, setDiscoverLoading] = useState(false);
   const [groupCreateVisible, setGroupCreateVisible] = useState(false);
+  const [groupCreating, setGroupCreating] = useState(false);
   const [groupName, setGroupName] = useState('');
   const [groupContacts, setGroupContacts] = useState<KISContact[]>([]);
   const [groupContactsLoading, setGroupContactsLoading] = useState(false);
@@ -544,6 +545,9 @@ const CommunitiesTab = forwardRef<ScrollableHandle, CommunitiesTabProps>(functio
 
   const createGroup = useCallback(async () => {
     if (!selected) return;
+    // Prevent a double-tap from firing two concurrent POST /groups/create
+    // calls for one user action, which could create two real groups.
+    if (groupCreating) return;
     const name = groupName.trim();
     if (!name) {
       setGroupCreateError('Group name is required.');
@@ -554,48 +558,69 @@ const CommunitiesTab = forwardRef<ScrollableHandle, CommunitiesTabProps>(functio
       slug: `${name.toLowerCase().replace(/\s+/g, '-')}-${Date.now()}`,
       community: selected.id,
     };
-    let res: Awaited<ReturnType<typeof postRequest>>;
+    setGroupCreating(true);
     try {
-      res = await postRequest(ROUTES.groups.create, payload, {
-        errorMessage: 'Failed to create group',
-      });
-    } catch {
-      const netState = await NetInfo.fetch().catch(() => ({ isConnected: false }));
-      if (!netState.isConnected) {
-        await enqueueMutation({ method: 'POST', url: ROUTES.groups.create, payload });
-        setGroupCreateVisible(false);
-        Alert.alert('Saved offline', 'Group will be created when back online.');
+      let res: Awaited<ReturnType<typeof postRequest>>;
+      try {
+        res = await postRequest(ROUTES.groups.create, payload, {
+          errorMessage: 'Failed to create group',
+        });
+      } catch {
+        const netState = await NetInfo.fetch().catch(() => ({ isConnected: false }));
+        if (!netState.isConnected) {
+          await enqueueMutation({ method: 'POST', url: ROUTES.groups.create, payload });
+          setGroupCreateVisible(false);
+          Alert.alert('Saved offline', 'Group will be created when back online.');
+          return;
+        }
+        setGroupCreateError('Failed to create group.');
         return;
       }
-      setGroupCreateError('Failed to create group.');
-      return;
-    }
-    if (!res?.success || !res.data) {
-      console.warn('Create group failed', res);
-      setGroupCreateError(res?.message || 'Failed to create group.');
-      return;
-    }
-
-    const newGroup = res.data as Group;
-    setGroups((prev) => [newGroup, ...prev]);
-
-    const memberIds = Array.from(selectedMemberIds).filter(
-      (id) => id && id !== String(currentUserId ?? ''),
-    );
-    if (memberIds.length) {
-      const addRes = await postRequest(ROUTES.groups.addMembers(newGroup.id), {
-        userIds: memberIds,
-      });
-      if (!addRes?.success) {
-        console.warn('Add members failed', addRes);
+      if (!res?.success || !res.data) {
+        console.warn('Create group failed', res);
+        setGroupCreateError(res?.message || 'Failed to create group.');
+        return;
       }
-    }
 
-    setGroupCreateVisible(false);
-    setGroupName('');
-    setSelectedMemberIds(new Set());
-    setGroupCreateError('');
-  }, [selected, groupName, selectedMemberIds, currentUserId]);
+      const newGroup = res.data as Group;
+      setGroups((prev) => [newGroup, ...prev]);
+
+      const memberIds = Array.from(selectedMemberIds).filter(
+        (id) => id && id !== String(currentUserId ?? ''),
+      );
+      if (memberIds.length) {
+        const addRes = await postRequest(ROUTES.groups.addMembers(newGroup.id), {
+          userIds: memberIds,
+        });
+        if (!addRes?.success) {
+          console.warn('Add members failed', addRes);
+        }
+      }
+
+      setGroupCreateVisible(false);
+      setGroupName('');
+      setSelectedMemberIds(new Set());
+      setGroupCreateError('');
+      // Opens the group immediately using the real, just-returned id/name -
+      // previously this left the user back on the community screen with no
+      // indication the group was ready, and tapping it right afterward
+      // could hit openGroupChat's "doesn't have a chat room yet" path if
+      // conversation_id isn't populated on the create response.
+      if (newGroup?.conversation_id) {
+        onOpenChat?.({
+          id: String(newGroup.conversation_id),
+          conversationId: String(newGroup.conversation_id),
+          name: newGroup.name,
+          kind: 'group',
+          isGroup: true,
+          isGroupChat: true,
+          groupId: newGroup.id,
+        });
+      }
+    } finally {
+      setGroupCreating(false);
+    }
+  }, [selected, groupName, selectedMemberIds, currentUserId, groupCreating, onOpenChat]);
 
   const openGroupChat = useCallback(
     async (group: Group) => {
@@ -1218,8 +1243,8 @@ const CommunitiesTab = forwardRef<ScrollableHandle, CommunitiesTabProps>(functio
             )}
 
             <View style={[styles.modalRow, { gap: 10 }]}>
-              <KISButton title="Cancel" variant="outline" style={{ flex: 1 }} onPress={() => setGroupCreateVisible(false)} />
-              <KISButton title="Create" style={{ flex: 1 }} onPress={createGroup} />
+              <KISButton title="Cancel" variant="outline" style={{ flex: 1 }} onPress={() => setGroupCreateVisible(false)} disabled={groupCreating} />
+              <KISButton title="Create" style={{ flex: 1 }} onPress={createGroup} loading={groupCreating} />
             </View>
             </KeyboardAvoidingView>
           </View>

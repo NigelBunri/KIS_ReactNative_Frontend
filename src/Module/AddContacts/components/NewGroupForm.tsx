@@ -140,6 +140,12 @@ export const NewGroupForm: React.FC<NewGroupFormProps> = ({
   }, [initialChannelId, onChangeChannelId]);
 
   const handleSubmit = async () => {
+    // Prevent a double-tap (or a slow network making the button feel
+    // unresponsive, prompting a second tap) from firing two concurrent
+    // POST /groups/create calls, which could create two real, separate
+    // groups for one user action.
+    if (submitting) return;
+
     const trimmedName = name.trim();
     if (!trimmedName) {
       Alert.alert('Missing name', 'Please enter a group name.');
