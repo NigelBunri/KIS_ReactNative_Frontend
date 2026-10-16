@@ -72,7 +72,6 @@ type Props = {
   // New features
   onSendGif?: (gif: { url: string; previewUrl: string; width: number; height: number }) => void;
   onSendLocation?: (loc: LocationMessage) => void;
-  onSendPayment?: (payment: { amount: number; currency: string; note?: string }) => void;
   onScheduleSend?: (scheduledAt: string) => void;
   onStarMessage?: (message: ChatMessage) => void;
   onShowReadReceipts?: (message: ChatMessage) => void;
@@ -159,7 +158,6 @@ export default function ChatRoomBody({
   myJoinedAt,
   onSendGif,
   onSendLocation,
-  onSendPayment,
   onScheduleSend,
   onStarMessage,
   onShowReadReceipts,
@@ -326,7 +324,6 @@ export default function ChatRoomBody({
           conversationIdForMentions={conversationIdForMentions}
           onSendGif={onSendGif}
           onSendLocation={onSendLocation}
-          onSendPayment={onSendPayment}
           onScheduleSend={onScheduleSend}
           bottomInset={insets.bottom}
         />

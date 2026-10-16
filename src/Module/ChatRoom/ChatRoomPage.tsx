@@ -2082,14 +2082,6 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
     [ensureConversationId, sendRichMessage],
   );
 
-  const handleSendPayment = useCallback(
-    async (payment: { amount: number; currency: string; note?: string }) => {
-      await ensureConversationId();
-      sendRichMessage({ kind: 'payment', payment });
-    },
-    [ensureConversationId, sendRichMessage],
-  );
-
   const handleScheduleSend = useCallback(
     (scheduledAt: string) => {
       const text = draft.trim();
@@ -2682,7 +2674,6 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
           onCreateEvent={handleCreateEvent}
           onSendGif={handleSendGif}
           onSendLocation={handleSendLocation}
-          onSendPayment={handleSendPayment}
           onScheduleSend={handleScheduleSend}
           onStarMessage={handleStarMessage}
           onShowReadReceipts={handleShowReadReceipts}

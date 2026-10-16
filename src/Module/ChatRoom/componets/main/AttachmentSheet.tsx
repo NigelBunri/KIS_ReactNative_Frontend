@@ -91,8 +91,6 @@ type AttachmentSheetProps = {
   onShareLocation?: () => void;
   /** Called when the user scans a document and taps Send. */
   onSendScannedDocument?: (uri: string, mimeType: string, filename: string) => void;
-  /** Called when the user taps "Send payment" — opens payment modal in caller. */
-  onSendPayment?: () => void;
 };
 
 export const AttachmentSheet: React.FC<AttachmentSheetProps> = ({
@@ -105,7 +103,6 @@ export const AttachmentSheet: React.FC<AttachmentSheetProps> = ({
   onCreateEvent,
   onShareLocation,
   onSendScannedDocument,
-  onSendPayment,
 }) => {
   const cardRadius = kisRadius.xl ?? 20;
   const pickInProgressRef = useRef(false);
@@ -214,7 +211,7 @@ export const AttachmentSheet: React.FC<AttachmentSheetProps> = ({
 
     pickInProgressRef.current = true;
     // Dismiss the "Share more" sheet as soon as an option is picked, same as
-    // every other tile (contacts/poll/event/location/scan/payment). Without
+    // every other tile (contacts/poll/event/location/scan). Without
     // this the sheet stayed visible behind the native document picker until
     // the async pick() resolved, which read as "doesn't dismiss" (AND-027).
     onClose();
@@ -368,11 +365,6 @@ export const AttachmentSheet: React.FC<AttachmentSheetProps> = ({
     setScannerVisible(true);
   };
 
-  const handleSendPaymentPress = () => {
-    onClose();
-    onSendPayment?.();
-  };
-
   const attachments = [
     {
       key: 'files',
@@ -430,14 +422,6 @@ export const AttachmentSheet: React.FC<AttachmentSheetProps> = ({
       icon: 'file' as const,
       color: palette.warning ?? '#F59E0B',
       onPress: handleScanDocumentPress,
-    },
-    {
-      key: 'payment',
-      label: 'Send payment',
-      description: 'Transfer money to this contact',
-      icon: 'card' as const,
-      color: palette.success,
-      onPress: handleSendPaymentPress,
     },
   ];
 

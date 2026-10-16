@@ -226,18 +226,6 @@ type MessageComposerProps = {
   /** Called when the view-once toggle changes; parent attaches viewOnce to the message payload. */
   onViewOnceChange?: (enabled: boolean) => void;
 
-  /**
-   * GAP 4: Called when the user creates a payment message.
-   * Receives the payment fields; the parent is responsible for building and
-   * sending the ChatMessage with kind='payment'.
-   */
-  onSendPayment?: (payment: {
-    amount: number;
-    currency: string;
-    note?: string;
-    recipientId?: string;
-  }) => void;
-
   bottomInset?: number;
 
   /** Called whenever the detected link preview changes (or clears). Parent stores this and attaches it to the message on send. */
@@ -276,7 +264,6 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
   onSendLocation,
   onScheduleSend,
   onSendScannedDocument,
-  onSendPayment,
   onViewOnceChange,
   bottomInset = 0,
 }) => {
@@ -386,12 +373,6 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
 
   /* ----------------------------- SCHEDULE SHEET --------------------------- */
   const [scheduleSheetVisible, setScheduleSheetVisible] = useState(false);
-
-  /* ----------------------------- PAYMENT MODAL (GAP 4) -------------------- */
-  const [paymentModalVisible, setPaymentModalVisible] = useState(false);
-  const [paymentAmount, setPaymentAmount] = useState('');
-  const [paymentCurrency, setPaymentCurrency] = useState('USD');
-  const [paymentNote, setPaymentNote] = useState('');
 
   /* ----------------------------- STICKER STORAGE -------------------------- */
   const [stickers, setStickers] = useState<Sticker[]>([]);
@@ -1247,7 +1228,6 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
         }}
         onShareLocation={onSendLocation ? () => setLocationPickerVisible(true) : undefined}
         onSendScannedDocument={onSendScannedDocument}
-        onSendPayment={onSendPayment ? () => setPaymentModalVisible(true) : undefined}
       />
 
       {/* CAMERA FULL-SCREEN MODAL (ONLY source for images/videos) */}
@@ -1282,150 +1262,6 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
           setScheduleSheetVisible(false);
         }}
       />
-
-      {/* GAP 4: PAYMENT MODAL */}
-      <Modal
-        visible={paymentModalVisible}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setPaymentModalVisible(false)}
-      >
-        <Pressable
-          style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.38)', justifyContent: 'flex-end' }}
-          onPress={() => setPaymentModalVisible(false)}
-        >
-          <Pressable
-            style={{
-              backgroundColor: palette.surface,
-              borderTopLeftRadius: 22,
-              borderTopRightRadius: 22,
-              padding: 20,
-              paddingBottom: 32,
-            }}
-            onStartShouldSetResponder={() => true}
-          >
-            {/* Handle */}
-            <View style={{ width: 40, height: 4, borderRadius: 4, backgroundColor: palette.divider, alignSelf: 'center', marginBottom: 14 }} />
-
-            <Text style={{ fontSize: 17, fontWeight: '700', color: palette.text, marginBottom: 16 }}>
-              Send payment
-            </Text>
-
-            {/* Amount */}
-            <Text style={{ fontSize: 13, fontWeight: '600', color: palette.subtext, marginBottom: 6 }}>Amount</Text>
-            <TextInput
-              value={paymentAmount}
-              onChangeText={setPaymentAmount}
-              keyboardType="decimal-pad"
-              placeholder="0.00"
-              placeholderTextColor={palette.placeholder ?? palette.subtext}
-              style={{
-                borderWidth: 1,
-                borderColor: palette.inputBorder ?? palette.divider,
-                borderRadius: 10,
-                paddingHorizontal: 12,
-                paddingVertical: 10,
-                fontSize: 16,
-                color: palette.text,
-                backgroundColor: palette.input ?? palette.surfaceSoft ?? palette.surface,
-                marginBottom: 12,
-              }}
-            />
-
-            {/* Currency */}
-            <Text style={{ fontSize: 13, fontWeight: '600', color: palette.subtext, marginBottom: 6 }}>Currency</Text>
-            <TextInput
-              value={paymentCurrency}
-              onChangeText={(v) => setPaymentCurrency(v.toUpperCase().slice(0, 3))}
-              placeholder="USD"
-              placeholderTextColor={palette.placeholder ?? palette.subtext}
-              autoCapitalize="characters"
-              maxLength={3}
-              style={{
-                borderWidth: 1,
-                borderColor: palette.inputBorder ?? palette.divider,
-                borderRadius: 10,
-                paddingHorizontal: 12,
-                paddingVertical: 10,
-                fontSize: 16,
-                color: palette.text,
-                backgroundColor: palette.input ?? palette.surfaceSoft ?? palette.surface,
-                marginBottom: 12,
-              }}
-            />
-
-            {/* Note */}
-            <Text style={{ fontSize: 13, fontWeight: '600', color: palette.subtext, marginBottom: 6 }}>Note (optional)</Text>
-            <TextInput
-              value={paymentNote}
-              onChangeText={setPaymentNote}
-              placeholder="What's this for?"
-              placeholderTextColor={palette.placeholder ?? palette.subtext}
-              style={{
-                borderWidth: 1,
-                borderColor: palette.inputBorder ?? palette.divider,
-                borderRadius: 10,
-                paddingHorizontal: 12,
-                paddingVertical: 10,
-                fontSize: 15,
-                color: palette.text,
-                backgroundColor: palette.input ?? palette.surfaceSoft ?? palette.surface,
-                marginBottom: 20,
-              }}
-            />
-
-            <Pressable
-              onPress={() => {
-                const amount = parseFloat(paymentAmount.replace(',', '.'));
-                if (isNaN(amount) || amount <= 0) {
-                  Alert.alert('Invalid amount', 'Please enter a valid positive amount.');
-                  return;
-                }
-                if (!paymentCurrency.trim()) {
-                  Alert.alert('Currency required', 'Please enter a currency code.');
-                  return;
-                }
-                const currency = paymentCurrency.trim().toUpperCase();
-                const note = paymentNote.trim() || undefined;
-                // This moves real money - unlike every other attachment type
-                // in this sheet, it had no confirmation step at all between
-                // tapping "Send payment" and the transfer actually firing,
-                // so a mis-tap (or a pocket-tap landing on this button while
-                // the sheet happened to be open) sent money with no chance
-                // to review the amount first.
-                Alert.alert(
-                  'Send payment?',
-                  `Send ${currency} ${amount.toFixed(2)}${note ? ` — "${note}"` : ''} to this chat?`,
-                  [
-                    { text: 'Cancel', style: 'cancel' },
-                    {
-                      text: 'Send',
-                      onPress: () => {
-                        onSendPayment?.({ amount, currency, note });
-                        setPaymentAmount('');
-                        setPaymentCurrency('USD');
-                        setPaymentNote('');
-                        setPaymentModalVisible(false);
-                      },
-                    },
-                  ],
-                );
-              }}
-              style={({ pressed }) => ({
-                backgroundColor: palette.primary,
-                borderRadius: 14,
-                paddingVertical: 14,
-                alignItems: 'center',
-                opacity: pressed ? 0.75 : 1,
-              })}
-            >
-              <Text style={{ color: palette.onPrimary, fontSize: 15, fontWeight: '700' }}>
-                Send payment
-              </Text>
-            </Pressable>
-          </Pressable>
-        </Pressable>
-      </Modal>
     </View>
   );
 };
