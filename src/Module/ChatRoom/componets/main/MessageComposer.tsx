@@ -12,6 +12,7 @@ import {
   ScrollView,
 } from 'react-native';
 import { useKeyboardState } from 'react-native-keyboard-controller';
+import RNFS from 'react-native-fs';
 import { postRequest } from '@/network/post';
 import ROUTES from '@/network';
 
@@ -86,24 +87,42 @@ const StickerTile = ({
   const [uri, setUri] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
 
+  const resolveFromServer = async (cancelledRef: { current: boolean }) => {
+    try {
+      const resolved = await resolveStickerImageUrl(entry.sticker.assetId);
+      if (!cancelledRef.current) setUri(resolved);
+    } catch {
+      if (!cancelledRef.current) setFailed(true);
+    }
+  };
+
   useEffect(() => {
-    let cancelled = false;
+    const cancelledRef = { current: false };
     setUri(null);
     setFailed(false);
     (async () => {
+      // CONFIRMED ROOT CAUSE (2026-10-16) of "completely transparent box
+      // after refreshing the app": this used to trust a cached local
+      // file:// path on faith alone - if that file was ever missing
+      // (cache dir purged by the OS, a failed/partial write, anything
+      // that invalidates it between sessions), <Image> fails to load it
+      // and silently renders nothing at all - no broken-image icon, no
+      // error, because nothing here ever checked the load actually
+      // succeeded. Now verifies the file is really there before trusting
+      // it, and falls back to a fresh signed URL (and the Image's own
+      // onError below) rather than ever showing a dead local path.
       const cached = await getCachedLocalStickerFile(entry.sticker.id);
       if (cached) {
-        if (!cancelled) setUri(cached);
-        return;
+        const localPath = cached.startsWith('file://') ? cached.slice(7) : cached;
+        const stillExists = await RNFS.exists(localPath).catch(() => false);
+        if (stillExists) {
+          if (!cancelledRef.current) setUri(cached);
+          return;
+        }
       }
-      try {
-        const resolved = await resolveStickerImageUrl(entry.sticker.assetId);
-        if (!cancelled) setUri(resolved);
-      } catch {
-        if (!cancelled) setFailed(true);
-      }
+      await resolveFromServer(cancelledRef);
     })();
-    return () => { cancelled = true; };
+    return () => { cancelledRef.current = true; };
   }, [entry.sticker.id, entry.sticker.assetId]);
 
   return (
@@ -124,7 +143,19 @@ const StickerTile = ({
       }}
     >
       {uri ? (
-        <Image source={{ uri }} style={{ width: '100%', height: '100%' }} resizeMode="contain" />
+        <Image
+          source={{ uri }}
+          style={{ width: '100%', height: '100%' }}
+          resizeMode="contain"
+          onError={() => {
+            // The resolved uri itself failed to actually load (expired
+            // signed URL, corrupt/partial local file, etc.) - force one
+            // fresh server resolution rather than leaving a dead uri
+            // rendering a transparent box forever.
+            setUri(null);
+            void resolveFromServer({ current: false });
+          }}
+        />
       ) : failed ? (
         <KISIcon name="close" size={18} color={palette.subtext} />
       ) : (
