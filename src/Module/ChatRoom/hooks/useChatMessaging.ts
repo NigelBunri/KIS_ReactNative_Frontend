@@ -2615,7 +2615,9 @@ export function useChatMessaging({
       replaceMessagesRef.current(next);
     };
 
-    socket.on('chat.pin', onPin);
+    // Nest emits exactly 'chat.message_pinned' (EVT.MESSAGE_PINNED, see
+    // src/realtime/handlers/pins.ts) - 'chat.pin' was an unverified guess
+    // from a prior pass with no backend access; nothing ever emits it.
     socket.on('chat.message_pinned', onPin);
 
     // ── Poll votes (AND-030, confirmed 2026-10-16) ─────────────────────────
@@ -2715,7 +2717,6 @@ export function useChatMessaging({
       socket.off('chat.delete', onDelete);
       socket.off('chat.view_once', onViewOnceOpened);
       socket.off('chat.message_reaction', onReaction);
-      socket.off('chat.pin', onPin);
       socket.off('chat.message_pinned', onPin);
       socket.off('chat.poll_updated', onPollVoteUpdate);
       socket.off('chat.disappear.set', onDisappear);
@@ -2981,6 +2982,65 @@ export function useChatMessaging({
       });
       if (!ack.ok) {
         Alert.alert('Could not close poll', ack.error || 'Please try again.');
+      }
+    },
+    // Pin real-time fix (2026-10-16): this used to POST to
+    // ROUTES.pins.set, which pointed at the wrong Nest path entirely
+    // (/api/v1/pins/set - Nest sets no global /api/v1 prefix, the real
+    // mount point is /pins/set) and 404'd every single time with "Cannot
+    // POST ...". Separately, that REST path was never the right one to
+    // use anyway: only the socket path (chat.pin_set -> Nest's
+    // registerPinHandlers) broadcasts chat.message_pinned to the rest of
+    // the conversation afterward - the REST controller persists silently
+    // with no real-time propagation to anyone else. Switching to the
+    // socket emit fixes both the literal error and the missing real-time
+    // sync in one move.
+    setPinned: async (messageId: string, pinned: boolean) => {
+      const resolvedConvId =
+        conversationIdRef.current ??
+        String(storageRoomId);
+      if (!socket || !resolvedConvId || !messageId) return;
+
+      const before = messagesRef.current.find((m) => m.id === messageId || m.serverId === messageId);
+      const previousPinned = Boolean((before as any)?.isPinned);
+
+      const optimistic = messagesRef.current.map((m) =>
+        (m.id === messageId || m.serverId === messageId) ? { ...m, isPinned: pinned } : m,
+      );
+      replaceMessagesRef.current(optimistic);
+
+      const ack = await emitWithAck(socket, 'chat.pin_set', {
+        conversationId: String(resolvedConvId),
+        messageId,
+        pinned,
+      });
+      if (!ack.ok) {
+        const rolledBack = messagesRef.current.map((m) =>
+          (m.id === messageId || m.serverId === messageId) ? { ...m, isPinned: previousPinned } : m,
+        );
+        replaceMessagesRef.current(rolledBack);
+        Alert.alert('Error', ack.error || `Could not ${pinned ? 'pin' : 'unpin'} this message. Please try again.`);
+      }
+    },
+    // Pin real-time fix: bootstraps the persisted pinned state for this
+    // conversation - without this, a reopened room or a newly-joined
+    // participant has no way to ever learn what's pinned, since pin
+    // state lives in its own Mongo collection (Pin), never as a field on
+    // the Message document a normal history fetch would already include.
+    // Uses the REST GET /pins/list endpoint (PinsController.listPinned) -
+    // a one-shot bootstrap read has no real-time component, so there is
+    // no reason to add a second, socket-based way to fetch the same thing.
+    fetchPinnedMessageIds: async (conversationId: string): Promise<string[]> => {
+      if (!conversationId) return [];
+      try {
+        const res = await getRequest(ROUTES.pins.list, {
+          params: { conversationId },
+          errorMessage: '',
+        });
+        const ids = res?.data?.data?.messageIds ?? res?.data?.messageIds;
+        return Array.isArray(ids) ? ids.map(String) : [];
+      } catch {
+        return [];
       }
     },
     markMessagesRead,

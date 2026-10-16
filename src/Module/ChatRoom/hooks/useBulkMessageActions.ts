@@ -47,13 +47,13 @@ export function useBulkMessageActions({
     // for the pinning device: editMessage (useChatPersistence.ts) is a purely
     // local persist — it doesn't call the backend — so it gave the pinner an
     // instant "pinned" badge regardless of whether the real network request
-    // (onPinMessage -> Handlers.handleSetPinned -> POST pins.set) actually
-    // succeeded. Other participants only ever learn about a pin through the
-    // server's chat.pin/chat.message_pinned socket echo, so if that POST
-    // silently failed (handleSetPinned didn't check its response), the
-    // pinner would see a pinned message that no one else ever did. It also
-    // incorrectly stamped isEdited:true/status:QUEUED on the message as a
-    // side effect of reusing the text-edit path for a pin toggle.
+    // (onPinMessage -> useChatMessaging.ts's setPinned, a socket emit of
+    // chat.pin_set) actually succeeded. Other participants only ever learn
+    // about a pin through the server's chat.message_pinned socket echo, so a
+    // silently-failed request here is exactly how the pinner could see a
+    // pinned message that no one else ever did. It also incorrectly stamped
+    // isEdited:true/status:QUEUED on the message as a side effect of reusing
+    // the text-edit path for a pin toggle.
     // handlePinSingleMessage (ChatRoomPage.tsx) never had this local write —
     // it relies solely on the server round-trip — so align this bulk path
     // with that single-message path instead of carrying its own local state.

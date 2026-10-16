@@ -141,9 +141,14 @@ const socialRoutes = {
     block: `${NEST_API_BASE_URL}/api/v1/moderation/block`,
     report: `${NEST_API_BASE_URL}/api/v1/moderation/report`,
   },
+  // PinsController (Nestjs) is @Controller('pins') — mounted at /pins, NOT
+  // /api/v1/pins (Nest sets no global prefix; only Django's own API uses
+  // /api/v1). This previously pointed at the wrong path entirely, 404ing
+  // with "Cannot POST /api/v1/pins/set" every time - same bug class as the
+  // calls/moderation.mute routes nearby.
   pins: {
-    set: `${NEST_API_BASE_URL}/api/v1/pins/set`,
-    list: `${NEST_API_BASE_URL}/api/v1/pins/list`,
+    set: `${NEST_API_BASE_URL}/pins/set`,
+    list: `${NEST_API_BASE_URL}/pins/list`,
   },
   conversations: {
     broadcast: `${NEST_API_BASE_URL}/api/v1/conversations/broadcast`,

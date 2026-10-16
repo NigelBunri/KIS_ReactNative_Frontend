@@ -1,7 +1,9 @@
-// Regression coverage for AND-056 (mute hit a dead NestJS endpoint),
+// Regression coverage for AND-056 (mute hit a dead NestJS endpoint) and
 // AND-060 (blocking locked the conversation for BOTH participants instead
-// of being private to the blocker), and the "pin only visible to pinner"
-// half of AND-044 (handleSetPinned swallowed failed requests silently).
+// of being private to the blocker). handleSetPinned (AND-044) was removed
+// from this file entirely on 2026-10-16 - pinning now goes through
+// useChatMessaging.ts's setPinned (a socket emit), not a REST POST; see
+// that file's own comment for the full root cause.
 //
 // ChatRoomHandlers.tsx pulls in a lot of heavy, native-backed modules
 // (file upload, voice attachments, chat media storage) that aren't needed
@@ -49,9 +51,6 @@ jest.mock('@/network', () => ({
       mute: 'https://nest.example.com/api/v1/moderation/mute',
       block: 'https://nest.example.com/api/v1/moderation/block',
     },
-    pins: {
-      set: 'https://nest.example.com/api/v1/pins/set',
-    },
   },
   NEST_API_BASE_URL: 'https://nest.example.com',
 }));
@@ -61,7 +60,6 @@ import { postRequest } from '@/network/post';
 import {
   handleMuteConversation,
   handleBlockRequest,
-  handleSetPinned,
 } from '../ChatRoomHandlers';
 
 describe('handleMuteConversation (AND-056)', () => {
@@ -121,25 +119,3 @@ describe('handleBlockRequest (AND-060)', () => {
   });
 });
 
-describe('handleSetPinned (AND-044)', () => {
-  beforeEach(() => {
-    mockPostRequest.mockReset();
-    (Alert.alert as jest.Mock).mockReset();
-  });
-
-  it('surfaces a failed pin request instead of silently succeeding', async () => {
-    mockPostRequest.mockResolvedValue({ success: false, message: 'server rejected pin' });
-
-    await handleSetPinned({ conversationId: 'conv1', messageId: 'm1', pinned: true });
-
-    expect(Alert.alert).toHaveBeenCalledWith('Error', 'server rejected pin');
-  });
-
-  it('does not alert on success', async () => {
-    mockPostRequest.mockResolvedValue({ success: true });
-
-    await handleSetPinned({ conversationId: 'conv1', messageId: 'm1', pinned: true });
-
-    expect(Alert.alert).not.toHaveBeenCalled();
-  });
-});

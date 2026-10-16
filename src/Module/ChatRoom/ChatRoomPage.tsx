@@ -304,6 +304,8 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
     sendReaction,
     votePoll,
     closePoll,
+    setPinned,
+    fetchPinnedMessageIds,
     retryMessage,
     markMessagesRead,
     markAllMessagesRead,
@@ -674,6 +676,38 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
   }, [currentConvId, currentUserId]);
 
   useEffect(() => { void fetchCallData(); }, [fetchCallData]);
+
+  // ── Bootstrap persisted pinned state ─────────────────────────────────────
+  // Pin state lives in its own Mongo collection (Pin), never as a field on
+  // the Message document a normal history fetch already includes - without
+  // this, reopening the room (or a participant who just joined) would show
+  // zero pinned messages even though the server still has them, since
+  // nothing else ever populates isPinned from a persisted source.
+  const latestMessagesRef = useRef(messages);
+  latestMessagesRef.current = messages;
+
+  useEffect(() => {
+    if (!currentConvId) return;
+    let cancelled = false;
+    (async () => {
+      const pinnedIds = await fetchPinnedMessageIds(String(currentConvId));
+      if (cancelled) return;
+      const pinnedSet = new Set(pinnedIds.map(String));
+      const next = latestMessagesRef.current.map((m) => {
+        const id = String(m.serverId ?? m.id ?? '');
+        const shouldBePinned = pinnedSet.has(id);
+        if (Boolean((m as any).isPinned) === shouldBePinned) return m;
+        return { ...m, isPinned: shouldBePinned };
+      });
+      replaceMessages(next);
+    })();
+    return () => { cancelled = true; };
+    // Deliberately keyed only on the conversation id - this is a one-time
+    // bootstrap per room open, not meant to re-run (and clobber whatever
+    // chat.message_pinned has already applied) every time the message
+    // list itself changes for an unrelated reason.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentConvId, fetchPinnedMessageIds]);
 
   // Refresh call data on socket call events for this conversation.
   useEffect(() => {
@@ -1081,18 +1115,13 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
 
   const handlePinSingleMessage = useCallback(
     (message: ChatMessage) => {
-      const convId = message.conversationId ?? conversationId ?? chat?.id ?? null;
       const messageId =
         message.serverId ??
         (message.id && !message.id.startsWith('client_') ? message.id : null);
-      if (!convId || !messageId) return;
-      Handlers.handleSetPinned({
-        conversationId: String(convId),
-        messageId: String(messageId),
-        pinned: !(message as any).isPinned,
-      });
+      if (!messageId) return;
+      setPinned(String(messageId), !(message as any).isPinned);
     },
-    [conversationId, chat?.id],
+    [setPinned],
   );
   // ─────────────────────────────────────────────────────────────────────────
 
@@ -1158,17 +1187,11 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
       await softDeleteMessage(message.id);
     },
     onPinMessage: (message, pinned) => {
-      const convId =
-        message.conversationId ?? conversationId ?? chat?.id ?? null;
       const messageId =
         message.serverId ??
         (message.id && message.id.startsWith('client_') ? null : message.id);
-      if (!convId || !messageId) return;
-      Handlers.handleSetPinned({
-        conversationId: String(convId),
-        messageId: String(messageId),
-        pinned,
-      });
+      if (!messageId) return;
+      setPinned(String(messageId), pinned);
     },
     onContinueInSubRoom: async (message) => {
       const rootId =

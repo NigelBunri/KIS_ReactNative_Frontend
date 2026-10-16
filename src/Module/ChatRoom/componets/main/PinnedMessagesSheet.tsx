@@ -69,12 +69,31 @@ export const PinnedMessagesSheet: React.FC<PinnedMessagesSheetProps> = ({
     }
   };
 
+  const attachmentLabel = (item: ChatMessage): string => {
+    const first = (item as any).attachments?.[0] ?? (item as any).media?.attachments?.[0];
+    const mime: string = String(first?.mimeType ?? '').toLowerCase();
+    const kind: string = String(first?.kind ?? '').toLowerCase();
+    if (kind === 'image' || mime.startsWith('image/')) return '📷 Photo';
+    if (kind === 'video' || mime.startsWith('video/')) return '🎬 Video';
+    if (kind === 'audio' || mime.startsWith('audio/')) return '🎵 Audio';
+    return `📄 ${first?.originalName || 'Document'}`;
+  };
+
   const renderItem = ({ item }: { item: ChatMessage }) => {
+    // Covers every pinnable kind, not just text — an image/video/document/
+    // location/poll/event pinned with no fallback here previously showed
+    // a blank preview with no indication of what was actually pinned.
     const snippet =
       item.text ||
       item.styledText?.text ||
-      (item.sticker ? 'Sticker' : '') ||
-      (item.voice ? 'Voice message' : '') ||
+      (item.sticker ? '🏷️ Sticker' : '') ||
+      (item.voice ? '🎙️ Voice message' : '') ||
+      (item.location ? '📍 Location' : '') ||
+      (item.poll ? `📊 ${item.poll.question || 'Poll'}` : '') ||
+      (item.event ? `📅 ${item.event.title || 'Event'}` : '') ||
+      (((item as any).attachments?.length || (item as any).media?.attachments?.length)
+        ? attachmentLabel(item)
+        : '') ||
       '';
 
     const createdAt = new Date(item.createdAt);

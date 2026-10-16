@@ -810,35 +810,13 @@ export const handleSetGroupMemberRole = async ({
   }
 };
 
-export const handleSetPinned = async ({
-  conversationId,
-  messageId,
-  pinned,
-}: {
-  conversationId?: string;
-  messageId?: string;
-  pinned: boolean;
-}) => {
-  if (!conversationId || !messageId) return;
-  // Previously this result was never checked - a failed request (network
-  // error, 404, server rejection) looked identical to a success: the menu
-  // closed and nothing told the user the pin never actually happened. Since
-  // other participants only learn about a pin through the server's
-  // chat.pin/chat.message_pinned socket echo (there is no local-only
-  // fallback for this action — see useBulkMessageActions.ts), a silently
-  // failed request here is exactly how a message could end up "pinned" only
-  // on the pinning device. Surface the failure like every other mutating
-  // action in this file (handleArchiveRequest, handleLockConversation, etc.)
-  // instead of fabricating success.
-  const res = await postRequest(ROUTES.pins.set, {
-    conversationId,
-    messageId,
-    pinned,
-  });
-  if (res?.success === false) {
-    Alert.alert('Error', res?.message || `Could not ${pinned ? 'pin' : 'unpin'} this message. Please try again.`);
-  }
-};
+// Pin/unpin moved to useChatMessaging.ts's setPinned (socket emit of
+// chat.pin_set) - this REST-based version pointed at the wrong Nest path
+// (ROUTES.pins.set = /api/v1/pins/set; the real mount point is /pins/set,
+// Nest sets no global /api/v1 prefix) and 404'd on every call, and even
+// with the URL fixed, the REST controller never broadcasts to other
+// participants the way the socket path does. See
+// src/realtime/handlers/pins.ts.
 
 export const handleMuteConversation = async ({
   conversationId,
