@@ -70,22 +70,39 @@ export type TenorGif = {
   height: number;
 };
 
-export async function searchTenor(query: string, limit = 24): Promise<TenorGif[]> {
-  if (!TENOR_API_KEY) return [];
+export type SearchTenorResult = {
+  gifs: TenorGif[];
+  /** Opaque Tenor pagination cursor - pass back as `opts.pos` to load the next page. Empty once there's nothing more. */
+  next: string;
+  /** The actual (Christian-theme-biased) query Tenor was searched with - pass back as `opts.effectiveQuery` on a "load more" call so the theme bias stays consistent across pages. */
+  effectiveQuery: string;
+};
+
+export async function searchTenor(
+  query: string,
+  opts: { limit?: number; pos?: string; effectiveQuery?: string } = {},
+): Promise<SearchTenorResult> {
+  const { limit = 24, pos, effectiveQuery: overrideQuery } = opts;
+  if (!TENOR_API_KEY) return { gifs: [], next: '', effectiveQuery: '' };
   // Default/empty feed: never show Tenor's generic trending GIFs - always
   // search a faith theme instead. A query the user typed still gets a
   // faith term appended so results stay on-theme without forcing them to
-  // type "christian" themselves every time.
-  const effectiveQuery = buildChristianBiasedQuery(query);
+  // type "christian" themselves every time. On a "load more" page the
+  // caller passes back the SAME effectiveQuery from page 1 instead of
+  // re-rolling a random theme - Tenor's `pos` cursor is only meaningful
+  // for the exact query it was issued against.
+  const effectiveQuery = overrideQuery ?? buildChristianBiasedQuery(query);
   const endpoint =
     `${TENOR_BASE}/search?q=${encodeURIComponent(effectiveQuery)}&key=${TENOR_API_KEY}` +
-    `&limit=${limit}&media_filter=gif&contentfilter=high`;
+    `&limit=${limit}&media_filter=gif&contentfilter=high` +
+    (pos ? `&pos=${encodeURIComponent(pos)}` : '');
 
   const res = await fetch(endpoint);
-  if (!res.ok) return [];
+  if (!res.ok) return { gifs: [], next: '', effectiveQuery };
   const json = await res.json();
   const results = json?.results ?? [];
-  return results.map((item: any) => {
+  const next = typeof json?.next === 'string' ? json.next : '';
+  const gifs = results.map((item: any) => {
     const gif = item?.media_formats?.gif ?? item?.media?.[0]?.gif ?? {};
     const nano = item?.media_formats?.nanogif ?? item?.media_formats?.tinygif ?? gif;
     return {
@@ -97,6 +114,7 @@ export async function searchTenor(query: string, limit = 24): Promise<TenorGif[]
       height: gif.dims?.[1] ?? 200,
     };
   }).filter((g: TenorGif) => !!g.url);
+  return { gifs, next, effectiveQuery };
 }
 
 type Props = {
@@ -122,6 +140,9 @@ export const GifPickerSheet: React.FC<Props> = ({
   const [query, setQuery] = useState('');
   const [gifs, setGifs] = useState<TenorGif[]>([]);
   const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [nextCursor, setNextCursor] = useState('');
+  const [effectiveQuery, setEffectiveQuery] = useState('');
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -139,14 +160,31 @@ export const GifPickerSheet: React.FC<Props> = ({
   const fetchGifs = useCallback(async (q: string) => {
     setLoading(true);
     try {
-      const results = await searchTenor(q);
-      setGifs(results);
+      const result = await searchTenor(q);
+      setGifs(result.gifs);
+      setNextCursor(result.next);
+      setEffectiveQuery(result.effectiveQuery);
     } catch {
       setGifs([]);
+      setNextCursor('');
     } finally {
       setLoading(false);
     }
   }, []);
+
+  const loadMoreGifs = useCallback(async () => {
+    if (!nextCursor || loadingMore) return;
+    setLoadingMore(true);
+    try {
+      const result = await searchTenor(query, { pos: nextCursor, effectiveQuery });
+      setGifs((prev) => [...prev, ...result.gifs]);
+      setNextCursor(result.next);
+    } catch {
+      // Keep whatever already loaded; just stop offering more for now.
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [nextCursor, loadingMore, query, effectiveQuery]);
 
   const handleQueryChange = (text: string) => {
     setQuery(text);
@@ -243,6 +281,25 @@ export const GifPickerSheet: React.FC<Props> = ({
                 <Text style={{ color: palette.subtext, fontSize: 14 }}>No GIFs found</Text>
               </View>
             }
+            ListFooterComponent={
+              nextCursor && gifs.length > 0 ? (
+                <Pressable
+                  onPress={loadMoreGifs}
+                  disabled={loadingMore}
+                  style={[styles.loadMoreButton, { backgroundColor: palette.card ?? palette.surface }]}
+                  accessibilityRole="button"
+                  accessibilityLabel="Load more GIFs"
+                >
+                  {loadingMore ? (
+                    <ActivityIndicator color={palette.primary} size="small" />
+                  ) : (
+                    <Text style={{ color: palette.primary, fontWeight: '700', fontSize: 13 }}>
+                      Load more GIFs
+                    </Text>
+                  )}
+                </Pressable>
+              ) : null
+            }
           />
         )}
 
@@ -294,6 +351,14 @@ const styles = StyleSheet.create({
     minHeight: 80,
   },
   loaderContainer: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  loadMoreButton: {
+    marginHorizontal: 16,
+    marginTop: 8,
+    marginBottom: 4,
+    borderRadius: 12,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
   empty: { alignItems: 'center', padding: 40 },
   attribution: {
     textAlign: 'center',

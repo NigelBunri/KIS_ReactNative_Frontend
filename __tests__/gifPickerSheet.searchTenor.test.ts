@@ -24,9 +24,9 @@ describe('searchTenor (AND-034 key resolution)', () => {
     global.fetch = fetchSpy as any;
 
     const { searchTenor } = require('../src/Module/ChatRoom/componets/main/GifPickerSheet');
-    const results = await searchTenor('cats');
+    const result = await searchTenor('cats');
 
-    expect(results).toEqual([]);
+    expect(result).toEqual({ gifs: [], next: '', effectiveQuery: '' });
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
@@ -35,7 +35,9 @@ describe('searchTenor (AND-034 key resolution)', () => {
     (global as any).__DEV__ = false;
     jest.doMock('@/env', () => ({ APP_ENV: { KIS_TENOR_API_KEY: 'REAL_PROD_KEY' } }));
     const fetchSpy = jest.fn().mockResolvedValue({
+      ok: true,
       json: async () => ({
+        next: 'cursor-page-2',
         results: [
           {
             id: 'g1',
@@ -51,12 +53,13 @@ describe('searchTenor (AND-034 key resolution)', () => {
     global.fetch = fetchSpy as any;
 
     const { searchTenor } = require('../src/Module/ChatRoom/componets/main/GifPickerSheet');
-    const results = await searchTenor('cats');
+    const result = await searchTenor('cats');
 
     expect(fetchSpy).toHaveBeenCalledTimes(1);
     const calledUrl = fetchSpy.mock.calls[0][0] as string;
     expect(calledUrl).toContain('key=REAL_PROD_KEY');
-    expect(results).toEqual([
+    expect(result.next).toBe('cursor-page-2');
+    expect(result.gifs).toEqual([
       {
         id: 'g1',
         title: 'cat',
@@ -66,5 +69,27 @@ describe('searchTenor (AND-034 key resolution)', () => {
         height: 50,
       },
     ]);
+  });
+
+  // Pagination (requested follow-up to AND-034): Tenor's `pos` cursor is
+  // only meaningful for the exact query it was issued against, so a "load
+  // more" call must reuse page 1's Christian-theme-biased effectiveQuery
+  // rather than re-rolling a new random theme.
+  it('load-more reuses the same effectiveQuery and sends the pos cursor', async () => {
+    jest.resetModules();
+    (global as any).__DEV__ = false;
+    jest.doMock('@/env', () => ({ APP_ENV: { KIS_TENOR_API_KEY: 'REAL_PROD_KEY' } }));
+    const fetchSpy = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ next: '', results: [] }),
+    });
+    global.fetch = fetchSpy as any;
+
+    const { searchTenor } = require('../src/Module/ChatRoom/componets/main/GifPickerSheet');
+    await searchTenor('dance', { pos: 'cursor-page-2', effectiveQuery: 'dance worship' });
+
+    const calledUrl = fetchSpy.mock.calls[0][0] as string;
+    expect(calledUrl).toContain(`q=${encodeURIComponent('dance worship')}`);
+    expect(calledUrl).toContain('pos=cursor-page-2');
   });
 });

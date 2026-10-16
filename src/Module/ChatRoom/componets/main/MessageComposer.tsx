@@ -450,19 +450,39 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
   const [gifQuery, setGifQuery] = useState('');
   const [gifResults, setGifResults] = useState<TenorGif[]>([]);
   const [gifLoading, setGifLoading] = useState(false);
+  const [gifLoadingMore, setGifLoadingMore] = useState(false);
+  const [gifNextCursor, setGifNextCursor] = useState('');
+  const [gifEffectiveQuery, setGifEffectiveQuery] = useState('');
   const gifSearchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const fetchGifs = useCallback(async (q: string) => {
     setGifLoading(true);
     try {
-      const results = await searchTenor(q);
-      setGifResults(results);
+      const result = await searchTenor(q);
+      setGifResults(result.gifs);
+      setGifNextCursor(result.next);
+      setGifEffectiveQuery(result.effectiveQuery);
     } catch {
       setGifResults([]);
+      setGifNextCursor('');
     } finally {
       setGifLoading(false);
     }
   }, []);
+
+  const loadMoreGifs = useCallback(async () => {
+    if (!gifNextCursor || gifLoadingMore) return;
+    setGifLoadingMore(true);
+    try {
+      const result = await searchTenor(gifQuery, { pos: gifNextCursor, effectiveQuery: gifEffectiveQuery });
+      setGifResults((prev) => [...prev, ...result.gifs]);
+      setGifNextCursor(result.next);
+    } catch {
+      // Keep whatever already loaded; just stop offering more for now.
+    } finally {
+      setGifLoadingMore(false);
+    }
+  }, [gifNextCursor, gifLoadingMore, gifQuery, gifEffectiveQuery]);
 
   const handleGifQueryChange = (text: string) => {
     setGifQuery(text);
@@ -711,6 +731,31 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
                   );
                 }}
                 ListEmptyComponent={<Text style={{ color: palette.subtext, fontSize: 13, textAlign: 'center', marginTop: 16 }}>No GIFs found</Text>}
+                ListFooterComponent={
+                  gifNextCursor && gifResults.length > 0 ? (
+                    <Pressable
+                      onPress={loadMoreGifs}
+                      disabled={gifLoadingMore}
+                      style={{
+                        marginTop: 8,
+                        paddingVertical: 10,
+                        borderRadius: 10,
+                        alignItems: 'center',
+                        backgroundColor: palette.card ?? palette.surface,
+                      }}
+                      accessibilityRole="button"
+                      accessibilityLabel="Load more GIFs"
+                    >
+                      {gifLoadingMore ? (
+                        <ActivityIndicator color={palette.primary} size="small" />
+                      ) : (
+                        <Text style={{ color: palette.primary, fontWeight: '700', fontSize: 13 }}>
+                          Load more GIFs
+                        </Text>
+                      )}
+                    </Pressable>
+                  ) : null
+                }
               />
             )}
             <Text style={{ color: palette.subtext, fontSize: 10, textAlign: 'center', marginTop: 6 }}>Powered by Tenor</Text>
