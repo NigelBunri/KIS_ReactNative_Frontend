@@ -36,7 +36,17 @@ async function notifyMentions(
 }
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Sticker, STICKER_STORAGE_KEY } from './FroSticker/StickerEditor';
+import { Sticker } from './FroSticker/StickerEditor';
+import {
+  fetchStickerLibraryPage,
+  loadCachedLibraryPage,
+  removeStickerLibraryEntry,
+  getCachedLocalStickerFile,
+  ensureLocalStickerFile,
+  resolveStickerImageUrl,
+  type StickerLibraryEntry as StickerLibraryEntryT,
+  type StickerLibrarySection,
+} from './FroSticker/stickerLibrary';
 import { ChatMessage } from '../../chatTypes';
 import type { LocationMessage } from '../../chatTypes';
 import { AVATAR_OPTIONS, AvatarPicker } from '../AvatarPicker';
@@ -62,17 +72,170 @@ import { extractFirstUrl, isLinkSuspicious, LINK_BLOCK_MESSAGE } from '@/service
 /*                          STICKER PICKER (BOTTOM PANEL)                     */
 /* -------------------------------------------------------------------------- */
 
-const StickerPicker = ({
+const StickerTile = ({
   palette,
-  stickers,
-  onCreateStickerPress,
-  onSelectSticker,
+  entry,
+  onPress,
+  onLongPress,
 }: {
   palette: any;
-  stickers: Sticker[];
+  entry: StickerLibraryEntryT;
+  onPress: () => void;
+  onLongPress: () => void;
+}) => {
+  const [uri, setUri] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    setUri(null);
+    setFailed(false);
+    (async () => {
+      const cached = await getCachedLocalStickerFile(entry.sticker.id);
+      if (cached) {
+        if (!cancelled) setUri(cached);
+        return;
+      }
+      try {
+        const resolved = await resolveStickerImageUrl(entry.sticker.assetId);
+        if (!cancelled) setUri(resolved);
+      } catch {
+        if (!cancelled) setFailed(true);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [entry.sticker.id, entry.sticker.assetId]);
+
+  return (
+    <Pressable
+      onPress={onPress}
+      onLongPress={onLongPress}
+      accessibilityRole="button"
+      accessibilityLabel={entry.sticker.captionText ? `Sticker: ${entry.sticker.captionText}` : 'Sticker'}
+      style={{
+        width: 80,
+        height: 80,
+        margin: 6,
+        borderRadius: 12,
+        overflow: 'hidden',
+        backgroundColor: palette.surface,
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}
+    >
+      {uri ? (
+        <Image source={{ uri }} style={{ width: '100%', height: '100%' }} resizeMode="contain" />
+      ) : failed ? (
+        <KISIcon name="close" size={18} color={palette.subtext} />
+      ) : (
+        <ActivityIndicator size="small" color={palette.primary} />
+      )}
+    </Pressable>
+  );
+};
+
+const STICKER_LIBRARY_TABS: { id: StickerLibrarySection; label: string }[] = [
+  { id: 'created', label: 'My Stickers' },
+  { id: 'saved', label: 'Saved Stickers' },
+];
+
+const StickerPicker = ({
+  palette,
+  onCreateStickerPress,
+  onSelectSticker,
+  refreshKey,
+}: {
+  palette: any;
   onCreateStickerPress: () => void;
   onSelectSticker: (sticker: Sticker) => void;
+  /** Bump to force a fresh fetch — e.g. right after creating a new sticker. */
+  refreshKey: number;
 }) => {
+  const [section, setSection] = useState<StickerLibrarySection>('created');
+  const [entries, setEntries] = useState<StickerLibraryEntryT[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+
+  const load = useCallback(async (targetSection: StickerLibrarySection) => {
+    setLoading(true);
+    setError(null);
+    const cached = await loadCachedLibraryPage(targetSection);
+    if (cached.length) setEntries(cached);
+    try {
+      const result = await fetchStickerLibraryPage(targetSection, 1);
+      setEntries(result.entries);
+      setPage(result.page);
+      setTotalPages(result.totalPages);
+    } catch {
+      if (!cached.length) setError('Could not load your stickers. Pull down to try again.');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    load(section);
+  }, [section, refreshKey, load]);
+
+  const loadMore = async () => {
+    if (loadingMore || page >= totalPages) return;
+    setLoadingMore(true);
+    try {
+      const result = await fetchStickerLibraryPage(section, page + 1);
+      setEntries((prev) => [...prev, ...result.entries]);
+      setPage(result.page);
+      setTotalPages(result.totalPages);
+    } catch {
+      // Keep whatever already loaded; just stop offering more for now.
+    } finally {
+      setLoadingMore(false);
+    }
+  };
+
+  const handleRemove = (entry: StickerLibraryEntryT) => {
+    Alert.alert(
+      entry.isMine ? 'Remove sticker' : 'Remove from My Stickers',
+      entry.isMine
+        ? 'This removes it from your library. It stays available to anyone else who already saved it.'
+        : 'This only removes your saved copy — the original stays with whoever created it.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Remove',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await removeStickerLibraryEntry(entry.id);
+              setEntries((prev) => prev.filter((e) => e.id !== entry.id));
+            } catch {
+              Alert.alert('Could not remove sticker', 'Please try again.');
+            }
+          },
+        },
+      ],
+    );
+  };
+
+  const handleSelect = async (entry: StickerLibraryEntryT) => {
+    try {
+      const localUri = await ensureLocalStickerFile(entry.sticker.id, entry.sticker.assetId);
+      onSelectSticker({
+        id: entry.sticker.id,
+        uri: localUri,
+        text: entry.sticker.captionText || undefined,
+        fileType: 'kis-sticker',
+        mimeType: 'image/png',
+        extension: '.png',
+        metaPath: '',
+      });
+    } catch {
+      Alert.alert('Could not send sticker', 'Please check your connection and try again.');
+    }
+  };
+
   return (
     <View style={{ padding: 12 }}>
       {/* CREATE STICKER BUTTON */}
@@ -94,37 +257,70 @@ const StickerPicker = ({
         </Text>
       </Pressable>
 
-      {/* STICKER GRID */}
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
-        {stickers.length === 0 && (
-          <Text style={{ color: palette.subtext, fontSize: 13 }}>
-            No stickers yet. Create one!
-          </Text>
-        )}
-
-        {stickers.map((sticker) => (
-          <Pressable
-            key={sticker.id}
-            onPress={() => onSelectSticker(sticker)}
-            accessibilityRole="button"
-            accessibilityLabel={sticker.text ? `Sticker: ${sticker.text}` : 'Sticker'}
-            style={{
-              width: 80,
-              height: 80,
-              margin: 6,
-              borderRadius: 12,
-              overflow: 'hidden',
-              backgroundColor: palette.surface,
-            }}
-          >
-            <Image
-              source={{ uri: sticker.uri }}
-              style={{ width: '100%', height: '100%' }}
-              resizeMode="contain"
-            />
-          </Pressable>
-        ))}
+      {/* TABS */}
+      <View style={{ flexDirection: 'row', gap: 8, marginBottom: 10 }}>
+        {STICKER_LIBRARY_TABS.map((tab) => {
+          const active = section === tab.id;
+          return (
+            <Pressable
+              key={tab.id}
+              onPress={() => setSection(tab.id)}
+              style={{
+                paddingHorizontal: 12,
+                paddingVertical: 6,
+                borderRadius: 14,
+                backgroundColor: active ? (palette.primarySoft ?? palette.primary) : palette.card,
+                borderWidth: 2,
+                borderColor: active ? palette.primary : palette.inputBorder,
+              }}
+            >
+              <Text style={{ fontSize: 12, fontWeight: active ? '700' : '500', color: active ? palette.primary : palette.text }}>
+                {tab.label}
+              </Text>
+            </Pressable>
+          );
+        })}
       </View>
+
+      {/* STICKER GRID */}
+      {loading && entries.length === 0 ? (
+        <ActivityIndicator color={palette.primary} style={{ marginTop: 16 }} />
+      ) : error && entries.length === 0 ? (
+        <Text style={{ color: palette.danger, fontSize: 13 }}>{error}</Text>
+      ) : entries.length === 0 ? (
+        <Text style={{ color: palette.subtext, fontSize: 13 }}>
+          {section === 'created'
+            ? 'No stickers yet. Create one!'
+            : 'No saved stickers yet. Long-press a sticker in any chat to save it here.'}
+        </Text>
+      ) : (
+        <>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
+            {entries.map((entry) => (
+              <StickerTile
+                key={entry.id}
+                palette={palette}
+                entry={entry}
+                onPress={() => handleSelect(entry)}
+                onLongPress={() => handleRemove(entry)}
+              />
+            ))}
+          </View>
+          {page < totalPages && (
+            <Pressable
+              onPress={loadMore}
+              disabled={loadingMore}
+              style={{ marginTop: 6, paddingVertical: 10, borderRadius: 10, alignItems: 'center', backgroundColor: palette.card }}
+            >
+              {loadingMore ? (
+                <ActivityIndicator size="small" color={palette.primary} />
+              ) : (
+                <Text style={{ color: palette.primary, fontWeight: '700', fontSize: 13 }}>Load more</Text>
+              )}
+            </Pressable>
+          )}
+        </>
+      )}
     </View>
   );
 };
@@ -374,57 +570,6 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
   /* ----------------------------- SCHEDULE SHEET --------------------------- */
   const [scheduleSheetVisible, setScheduleSheetVisible] = useState(false);
 
-  /* ----------------------------- STICKER STORAGE -------------------------- */
-  const [stickers, setStickers] = useState<Sticker[]>([]);
-
-  const loadStickers = useCallback(async () => {
-    try {
-      const raw = await AsyncStorage.getItem(STICKER_STORAGE_KEY);
-
-      if (!raw) {
-        setStickers([]);
-        return;
-      }
-
-      let parsed: unknown;
-      try {
-        parsed = JSON.parse(raw);
-      } catch (e) {
-        console.warn('Failed to parse stickers from storage', e);
-        setStickers([]);
-        return;
-      }
-
-      const list = Array.isArray(parsed) ? parsed : [];
-
-      const cleaned: Sticker[] = list
-        .filter((s: any) => s && typeof s.uri === 'string')
-        .map((s: any, index: number) => ({
-          id: String(s.id ?? `local-${Date.now()}-${index}`),
-          uri: String(s.uri),
-          text: typeof s.text === 'string' ? s.text : undefined,
-          fileType: 'kis-sticker',
-          mimeType: 'image/png',
-          extension: '.png',
-          metaPath: (s.metaPath as string) ?? '',
-        }));
-
-      setStickers(cleaned);
-    } catch (err) {
-      console.warn('Failed to load stickers', err);
-      setStickers([]);
-    }
-  }, []);
-
-  /* ----------------------------- INITIAL LOAD ----------------------------- */
-  useEffect(() => {
-    loadStickers();
-  }, [loadStickers]);
-
-  useEffect(() => {
-    loadStickers();
-  }, [stickerVersion, loadStickers]);
-
   /* ----------------------------- KEYBOARD VISIBILITY ----------------------- */
   // bottomInset reserves space for the device's nav bar, but only while the
   // keyboard is closed — once it's open the keyboard already covers that
@@ -630,13 +775,10 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
   /* -------------------------------------------------------------------------- */
 
   useEffect(() => {
-    if (panelTab === 'stickers') {
-      loadStickers();
-    }
     if (panelTab === 'gif' && gifResults.length === 0) {
       fetchGifs('');
     }
-  }, [panelTab, loadStickers, gifResults.length, fetchGifs]);
+  }, [panelTab, gifResults.length, fetchGifs]);
 
   const renderPanelContent = () => {
     switch (panelTab) {
@@ -661,7 +803,7 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
         return (
           <StickerPicker
             palette={palette}
-            stickers={stickers}
+            refreshKey={stickerVersion}
             onCreateStickerPress={() => {
               if (onOpenStickerEditor) onOpenStickerEditor();
             }}

@@ -340,6 +340,17 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
   const [stickerLibraryVersion, setStickerLibraryVersion] =
     useState(0);
 
+  // MessageBubble's "Add to My Stickers" long-press action emits this on a
+  // successful save — same refresh signal onSaveSticker below already
+  // uses, so the picker's "Saved Stickers" tab reflects it without the
+  // user having to close and reopen the panel.
+  useEffect(() => {
+    const sub = DeviceEventEmitter.addListener('sticker.library.saved', () => {
+      setStickerLibraryVersion((v) => v + 1);
+    });
+    return () => sub.remove();
+  }, []);
+
   const [forwardSheetVisible, setForwardSheetVisible] =
     useState(false);
   const [pinnedSheetVisible, setPinnedSheetVisible] =

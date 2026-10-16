@@ -187,6 +187,10 @@ const socialRoutes = {
   },
   stickers: {
     packs: `${API_BASE_URL}/api/v1/stickers/packs/`,
+    create: `${API_BASE_URL}/api/v1/stickers/`,
+    library: `${API_BASE_URL}/api/v1/stickers/library/`,
+    save: (stickerId: string) => `${API_BASE_URL}/api/v1/stickers/${encodeURIComponent(stickerId)}/save/`,
+    removeLibraryEntry: (entryId: string) => `${API_BASE_URL}/api/v1/stickers/library/${encodeURIComponent(entryId)}/`,
   },
   jobs: {
     board: `${API_BASE_URL}/api/v1/partners/jobs/`,

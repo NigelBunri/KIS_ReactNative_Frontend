@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { View, Text, Pressable, Image, Dimensions, Modal, Linking, Platform, ActivityIndicator, DeviceEventEmitter } from 'react-native';
+import { View, Text, Pressable, Image, Dimensions, Modal, Linking, Platform, ActivityIndicator, DeviceEventEmitter, Alert } from 'react-native';
 import { SafeAreaView } from '@/components/common/SafeAreaViewWithTopPadding';
 import { useSafeTopInset } from '@/hooks/useSafeTopInset';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -27,6 +27,7 @@ import { API_BASE_URL, NEST_API_BASE_URL, resolveBackendAssetUrl } from '@/netwo
 import { AttachmentDownloadError, requestAttachmentDownloadUrl } from '../attachmentDownload';
 import { classifyVoicePlaybackReadiness, resolveEmbeddedVoicePlaybackUri } from '../voiceAttachment';
 import { cachedVoicePlaybackUrl, describeVoicePlaybackError, resolveFreshVoicePlaybackUrl } from '../voicePlaybackResolver';
+import { saveStickerToLibrary } from './main/FroSticker/stickerLibrary';
 import { ViewOnceViewerModal, type ViewOnceContentSnapshot } from './ViewOnceViewerModal';
 import { useMessageTranslation } from '../hooks/useMessageTranslation';
 import { MessageTranslationBlock } from './MessageTranslationBlock';
@@ -3887,12 +3888,42 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
               broken-image icon, no error surfaced, the sticker was simply
               invisible to both the sender (whose own optimistic render
               hits the exact same authenticated URL) and the receiver. */}
-          <Image
-            source={{ uri: sticker.uri, headers: mediaHeaders }}
-            style={{ width: stickerWidth, height: stickerHeight }}
-            resizeMode="contain"
-            resizeMethod="resize"
-          />
+          <Pressable
+            onLongPress={() => {
+              if (!sticker?.id) return;
+              Alert.alert(
+                'Save sticker',
+                'Add this to your own sticker library? You can send it in any chat afterward.',
+                [
+                  { text: 'Cancel', style: 'cancel' },
+                  {
+                    text: 'Add to My Stickers',
+                    onPress: async () => {
+                      try {
+                        await saveStickerToLibrary(String(sticker.id));
+                        DeviceEventEmitter.emit('sticker.library.saved');
+                        Alert.alert('Saved', 'This sticker is now in your library.');
+                      } catch {
+                        Alert.alert(
+                          'Could not save sticker',
+                          'This sticker may no longer be available, or you may already have it saved.',
+                        );
+                      }
+                    },
+                  },
+                ],
+              );
+            }}
+            accessibilityRole="button"
+            accessibilityLabel="Sticker — long-press to save to your library"
+          >
+            <Image
+              source={{ uri: sticker.uri, headers: mediaHeaders }}
+              style={{ width: stickerWidth, height: stickerHeight }}
+              resizeMode="contain"
+              resizeMethod="resize"
+            />
+          </Pressable>
 
           {renderReactionsRow()}
           {renderRetry()}

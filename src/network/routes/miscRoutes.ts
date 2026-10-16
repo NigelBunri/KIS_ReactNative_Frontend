@@ -88,6 +88,7 @@ const miscRoutes = {
   mediaAssets: {
     assets: `${API_BASE_URL}/api/v1/media/assets/`,
     asset: (id: string) => `${API_BASE_URL}/api/v1/media/assets/${id}/`,
+    signedUrl: (id: string) => `${API_BASE_URL}/api/v1/media/assets/${id}/signed-url/`,
     jobs: `${API_BASE_URL}/api/v1/media/jobs/`,
     safetyScan: (id: string) => `${API_BASE_URL}/api/v1/media/media-safety-scans/${id}/`,
   },

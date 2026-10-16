@@ -33,6 +33,8 @@ import {
   uninstallPack,
   type StickerPack,
 } from './StickerPackStore';
+import { uploadFileToBackend } from '../../../uploadFileToBackend';
+import { createSticker, cacheLocalStickerFile } from './stickerLibrary';
 
 export type Sticker = {
   id: string;
@@ -236,31 +238,6 @@ export const StickerEditor: React.FC<StickerEditorProps> = ({
     }
   };
 
-  const persistStickerLocally = async (sticker: Sticker) => {
-    try {
-      const existing = await AsyncStorage.getItem(STICKER_STORAGE_KEY);
-      let list: Sticker[] = [];
-
-      if (existing) {
-        try {
-          list = JSON.parse(existing);
-        } catch (e) {
-          console.warn('Failed to parse stored stickers, resetting list', e);
-          list = [];
-        }
-      }
-
-      const updated = [sticker, ...list];
-
-      await AsyncStorage.setItem(
-        STICKER_STORAGE_KEY,
-        JSON.stringify(updated),
-      );
-    } catch (err) {
-      console.warn('Error saving sticker to device', err);
-    }
-  };
-
   /* ------------------------------------------------------------- */
   /*                       SAVE STICKER                            */
   /* ------------------------------------------------------------- */
@@ -321,10 +298,36 @@ export const StickerEditor: React.FC<StickerEditorProps> = ({
         ? basePath
         : `file://${normalizedPath}`;
 
-      const stickerId = `${Date.now()}`;
       const trimmedText = text.trim();
 
-      // 5) Build sticker metadata — ONLY PNG
+      // 5) Upload the composed PNG to Django (context="sticker") and
+      // create the permanent, account-wide Sticker + library entry row.
+      // CONFIRMED ROOT CAUSE (2026-10-16) of "stickers don't reliably
+      // remain available": every step before this one used to end here —
+      // persistStickerLocally() below wrote only to this device's
+      // AsyncStorage/filesystem, with no server call at all, so nothing
+      // survived a reinstall or ever reached a second device.
+      const fileStat = await RNFS.stat(normalizedPath).catch(() => null);
+      const attachment = await uploadFileToBackend({
+        file: {
+          uri: finalImageUri,
+          name: `sticker_${Date.now()}.png`,
+          type: 'image/png',
+          size: fileStat ? Number(fileStat.size) : undefined,
+        },
+        context: 'sticker',
+      });
+      const assetId = attachment?.assetId || attachment?.mediaAssetId;
+      if (!assetId) {
+        throw new Error('Upload did not return an asset id.');
+      }
+      const entry = await createSticker(assetId, trimmedText);
+      const stickerId = entry.sticker.id;
+
+      // 6) Build sticker metadata — ONLY PNG. id is now the real, stable
+      // server sticker id (not a local timestamp placeholder), so sending
+      // this sticker into a chat carries an id other users can later call
+      // "Add to My Stickers" against.
       const sticker: Sticker = {
         id: stickerId,
         uri: finalImageUri,
@@ -335,15 +338,17 @@ export const StickerEditor: React.FC<StickerEditorProps> = ({
         metaPath: normalizedPath, // path to the PNG on disk
       };
 
-      // 6) Save to AsyncStorage for the library
-      await persistStickerLocally(sticker);
+      // Seed the local-file cache so sending this exact sticker (from this
+      // device, right after creating it) never needs to re-download its
+      // own image from the server first.
+      await cacheLocalStickerFile(stickerId, finalImageUri);
 
       // 7) Notify parent, then close
       onSaveSticker(sticker);
       onClose();
     } catch (err) {
       console.warn('Sticker capture error', err);
-      Alert.alert('Could not save sticker', 'Please try again.');
+      Alert.alert('Could not save sticker', 'Please check your connection and try again.');
     } finally {
       setSaving(false);
     }
