@@ -1,5 +1,5 @@
 // src/screens/calls/components/VideoGrid.tsx
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import {
   View,
   ScrollView,
@@ -12,6 +12,7 @@ import ParticipantTile from './ParticipantTile';
 import PaginatedTileGrid from './PaginatedTileGrid';
 import { resolveMainStageParticipants, computeGridColumns, computeTileCell } from '../callGridMath';
 import { useKISTheme } from '@/theme/useTheme';
+import { useIOSCallPiP } from '../hooks/useIOSCallPiP';
 
 type Props = {
   participants: CallParticipant[];
@@ -22,7 +23,28 @@ type Props = {
   onPinParticipant: (userId: string | null) => void;
   // availableHeight kept for backwards-compat but ignored; sizing is done via onLayout
   availableHeight?: number;
+  // Whether the call is actually connected right now - gates iOS PiP the
+  // same way VideoOneOnOneLayout's own effect does (ringing/dialing should
+  // never auto-enter PiP on background). Defaults to true for any existing
+  // caller that hasn't been updated to pass it, matching prior behavior of
+  // having no gate at all for this layout.
+  callActive?: boolean;
 };
+
+function pickPipParticipant(
+  participants: CallParticipant[],
+  pinnedUserId?: string | null,
+  activeSpeakerId?: string | null,
+): CallParticipant | null {
+  const hasVideo = (p: CallParticipant) => !!p.stream && !p.isVideoOff;
+  const pinned = participants.find(p => p.userId === pinnedUserId && hasVideo(p));
+  if (pinned) return pinned;
+  const speaking = participants.find(p => p.userId === activeSpeakerId && hasVideo(p));
+  if (speaking) return speaking;
+  const remote = participants.find(p => !p.isLocal && hasVideo(p));
+  if (remote) return remote;
+  return participants.find(hasVideo) ?? null;
+}
 
 const GAP = 4;
 const THUMB_H = 96; // height of the thumbnail strip in speaker layout
@@ -34,10 +56,17 @@ export default function VideoGrid({
   activeSpeakerId,
   isAudioOnly = false,
   onPinParticipant,
+  callActive = true,
 }: Props) {
   const { palette } = useKISTheme();
   const [containerW, setContainerW] = useState(0);
   const [containerH, setContainerH] = useState(0);
+
+  const pipParticipant = useMemo(
+    () => (isAudioOnly ? null : pickPipParticipant(participants, pinnedUserId, activeSpeakerId)),
+    [participants, pinnedUserId, activeSpeakerId, isAudioOnly],
+  );
+  const pipRef = useIOSCallPiP(callActive && !!pipParticipant);
 
   const onLayout = useCallback((e: LayoutChangeEvent) => {
     const { width, height } = e.nativeEvent.layout;
@@ -142,6 +171,8 @@ export default function VideoGrid({
                     cornerRadius={mainStage.length === 1 ? 0 : 12}
                     showName
                     onLongPress={() => onPinParticipant(null)}
+                    isPipSource={p.userId === pipParticipant?.userId}
+                    pipRef={pipRef}
                   />
                 ))}
               </View>
@@ -207,6 +238,8 @@ export default function VideoGrid({
               cornerRadius={12}
               onPress={() => onPinParticipant(p.userId === pinnedUserId ? null : p.userId)}
               showName
+              isPipSource={p.userId === pipParticipant?.userId}
+              pipRef={pipRef}
             />
           )}
         />

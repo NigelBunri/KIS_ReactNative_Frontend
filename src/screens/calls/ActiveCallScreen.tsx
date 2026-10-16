@@ -29,9 +29,10 @@ import { useResponsiveLayout } from '@/theme/responsive';
 
 import type { CallSession, CallLayout } from '@/services/calls/callTypes';
 import { hasVideo, isGroupCall, REACTION_EMOJIS, callTypeLabel } from '@/services/calls/callTypes';
-import { RTCView, RTCPIPView, startIOSPIP, stopIOSPIP } from '@/services/calls/webRTCService';
+import { RTCView, RTCPIPView } from '@/services/calls/webRTCService';
 import { audioRouteManager } from '@/services/calls/audioRouteManager';
 import { addCallPiPModeChangeListener } from '@/services/calls/callPiPService';
+import { useIOSCallPiP } from './hooks/useIOSCallPiP';
 
 import CallControls from './components/CallControls';
 import VideoGrid from './components/VideoGrid';
@@ -695,6 +696,7 @@ export default function ActiveCallScreen({ session, actions }: Props) {
                 activeSpeakerId={session.activeSpeakerId}
                 isAudioOnly={!withVideo}
                 onPinParticipant={actions.onPinParticipant}
+                callActive={session.state === 'active'}
               />
             )}
 
@@ -707,6 +709,7 @@ export default function ActiveCallScreen({ session, actions }: Props) {
                 activeSpeakerId={session.activeSpeakerId}
                 liveStartedAt={session.liveStartedAt}
                 onPressParticipant={uid => actions.onPinParticipant(uid)}
+                callActive={session.state === 'active'}
               />
             )}
 
@@ -1036,18 +1039,9 @@ function VideoOneOnOneLayout({ session, remoteParticipants, isConnecting, localS
   // view's sample buffer layer publishes, not a transformation of this
   // app's own window the way Android's enterPictureInPictureMode() is. This
   // screen keeps rendering completely normally underneath/behind it.
-  const pipRef = useRef<any>(null);
-  useEffect(() => {
-    const start = startIOSPIP;
-    const stop = stopIOSPIP;
-    if (Platform.OS !== 'ios' || !RTCPIPView || !start || !stop) return;
-    const sub = AppState.addEventListener('change', (state) => {
-      if (session.state !== 'active') return;
-      if (state === 'background') start(pipRef);
-      else if (state === 'active') stop(pipRef);
-    });
-    return () => sub.remove();
-  }, [session.state]);
+  // Shared with VideoGrid/BroadcastLayout via useIOSCallPiP so every video
+  // call type gets the same background/foreground behavior, not just 1:1.
+  const pipRef = useIOSCallPiP(session.state === 'active');
 
   const RemoteVideoView = RTCPIPView ?? RTCView;
   // Only RTCPIPView (iOS) understands iosPIP - spreading it onto the plain

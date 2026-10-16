@@ -12,6 +12,7 @@ import ParticipantTile from './ParticipantTile';
 import CallTimer from './CallTimer';
 import { useKISTheme } from '@/theme/useTheme';
 import { computeGridColumns, computeTileCell, resolveBroadcastMainStage } from '../callGridMath';
+import { useIOSCallPiP } from '../hooks/useIOSCallPiP';
 
 type Props = {
   participants: CallParticipant[];
@@ -22,6 +23,9 @@ type Props = {
   onPressParticipant?: (userId: string) => void;
   // kept for backwards-compat but ignored; layout uses onLayout
   availableHeight?: number;
+  // See VideoGrid's identical prop - gates iOS PiP to an actually-live
+  // broadcast, defaults true for callers that haven't been updated.
+  callActive?: boolean;
 };
 
 const TOP_BAR_H   = 44;   // LIVE indicator bar
@@ -41,6 +45,7 @@ export default function BroadcastLayout({
   activeSpeakerId,
   liveStartedAt,
   onPressParticipant,
+  callActive = true,
 }: Props) {
   const { palette } = useKISTheme();
   const styles = useBroadcastStyles(palette);
@@ -76,6 +81,13 @@ export default function BroadcastLayout({
   const mainStage = resolveBroadcastMainStage(primaryHost, onStage, MAIN_STAGE_CAP);
   const mainStageIds = new Set(mainStage.map(p => p.userId));
   const stageStrip = onStage.filter(p => !mainStageIds.has(p.userId));
+
+  // iOS PiP target: the primary host's camera if it's on, else whichever
+  // main-stage tile has video - mirrors "what's prominent on screen right
+  // now" the same way VideoGrid does for group calls.
+  const hasVideo = (p: CallParticipant | null) => !!p && !!p.stream && !p.isVideoOff;
+  const pipParticipant = hasVideo(primaryHost) ? primaryHost : mainStage.find(hasVideo) ?? null;
+  const pipRef = useIOSCallPiP(callActive && !!pipParticipant);
 
   // Main stage height = total container minus every section below it.
   const mainH = Math.max(
@@ -148,6 +160,8 @@ export default function BroadcastLayout({
                   cornerRadius={mainStage.length === 1 ? 0 : 12}
                   showName
                   onPress={p === primaryHost ? undefined : () => onPressParticipant?.(p.userId)}
+                  isPipSource={p.userId === pipParticipant?.userId}
+                  pipRef={pipRef}
                 />
               ))}
             </View>

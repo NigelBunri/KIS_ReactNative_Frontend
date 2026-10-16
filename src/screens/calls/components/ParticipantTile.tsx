@@ -11,7 +11,7 @@ import {
 import type { CallParticipant } from '@/services/calls/callTypes';
 import NetworkQualityBars from './NetworkQualityBars';
 import { KISIcon } from '@/constants/kisIcons';
-import { RTCView } from '@/services/calls/webRTCService';
+import { RTCView, RTCPIPView } from '@/services/calls/webRTCService';
 import { useKISTheme } from '@/theme/useTheme';
 
 type Props = {
@@ -31,6 +31,13 @@ type Props = {
   // this shape since the circle mask would clip them; callers render that
   // status themselves outside the tile instead.
   shape?: 'rounded' | 'circle';
+  // When true (iOS only) and this tile has video, renders RTCPIPView instead
+  // of the plain RTCView and attaches pipRef to it, so useIOSCallPiP's
+  // startIOSPIP/stopIOSPIP calls control THIS tile's video feed. Only one
+  // tile across the whole call screen should ever set this - iOS PiP shows a
+  // single video source at a time. See VideoGrid/BroadcastLayout callers.
+  isPipSource?: boolean;
+  pipRef?: React.RefObject<any>;
 };
 
 function initials(name: string): string {
@@ -53,6 +60,8 @@ export default React.memo(function ParticipantTile({
   isAudioOnly,
   cornerRadius = 16,
   shape = 'rounded',
+  isPipSource = false,
+  pipRef,
 }: Props) {
   const { palette } = useKISTheme();
   const showVideo = !isAudioOnly && !participant.isVideoOff && participant.stream && RTCView;
@@ -201,22 +210,34 @@ export default React.memo(function ParticipantTile({
           video frame fell back to initials regardless of whether the
           participant has a real profile photo. */}
       {showVideo && RTCView ? (
-        <RTCView
-          streamURL={participant.stream.toURL()}
-          style={StyleSheet.absoluteFill}
-          // "cover" crops/zooms a face feed, which is fine — but it does the
-          // same to a SHARED SCREEN, cutting off text/UI content, directly
-          // defeating "maintain readable shared content". "contain" fits
-          // the whole frame letterboxed/pillarboxed on the tile's own dark
-          // background (palette.royalInk, set on `styles.tile` above)
-          // instead. Automatic from the participant's own flag — no new
-          // prop needed, applies correctly everywhere this tile is used
-          // (1-on-1, group, broadcast, voice-call avatar tiles never show
-          // video at all so this branch doesn't apply there).
-          objectFit={participant.isScreenSharing ? 'contain' : 'cover'}
-          mirror={participant.isLocal}
-          zOrder={participant.isLocal ? 0 : 1}
-        />
+        (() => {
+          // Only swap in RTCPIPView (iOS-only, adds the iosPIP prop) for the
+          // single tile the caller has designated as the PiP source - every
+          // other tile keeps using plain RTCView, matching VideoOneOnOneLayout's
+          // fallback-to-RTCView behavior on Android/when the module is absent.
+          const VideoView = isPipSource && RTCPIPView ? RTCPIPView : RTCView;
+          const pipExtraProps = isPipSource && RTCPIPView ? { iosPIP: { enabled: true } } : {};
+          return (
+            <VideoView
+              ref={isPipSource ? pipRef : undefined}
+              streamURL={participant.stream.toURL()}
+              style={StyleSheet.absoluteFill}
+              // "cover" crops/zooms a face feed, which is fine — but it does the
+              // same to a SHARED SCREEN, cutting off text/UI content, directly
+              // defeating "maintain readable shared content". "contain" fits
+              // the whole frame letterboxed/pillarboxed on the tile's own dark
+              // background (palette.royalInk, set on `styles.tile` above)
+              // instead. Automatic from the participant's own flag — no new
+              // prop needed, applies correctly everywhere this tile is used
+              // (1-on-1, group, broadcast, voice-call avatar tiles never show
+              // video at all so this branch doesn't apply there).
+              objectFit={participant.isScreenSharing ? 'contain' : 'cover'}
+              mirror={participant.isLocal}
+              zOrder={participant.isLocal ? 0 : 1}
+              {...pipExtraProps}
+            />
+          );
+        })()
       ) : showAvatarPhoto ? (
         <Image
           source={{ uri: participant.avatarUrl! }}
