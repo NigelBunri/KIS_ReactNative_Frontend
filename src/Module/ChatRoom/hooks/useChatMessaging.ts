@@ -577,6 +577,16 @@ export function useChatMessaging({
   const replaceMessagesRef = useRef(replaceMessages);
   useEffect(() => { replaceMessagesRef.current = replaceMessages; }, [replaceMessages]);
 
+  // Kept fresh via its own effect (not read directly inside
+  // onIncomingMessage's useEffect below, whose own dependency array is
+  // [socket, storageRoomId, currentUserId] - `chat` isn't in it, and its
+  // isContactChat/kind fields can load in asynchronously after this
+  // screen's first render without storageRoomId itself changing, so a
+  // direct closure-captured `chat` could stay stale for the life of that
+  // effect). See the personal-block check below for why this matters.
+  const chatRef = useRef(chat);
+  useEffect(() => { chatRef.current = chat; }, [chat]);
+
   useEffect(() => {
     ensureDeviceId()
       .then((value) => {
@@ -2415,7 +2425,18 @@ export function useChatMessaging({
       // is written by handleBlockRequest in ChatRoomHandlers.tsx via
       // blockContact()/ROUTES.moderation.userBlocks - this is purely the
       // receive-side filter that makes blocking actually invisible.)
-      if (!msg.fromMe) {
+      //
+      // CONFIRMED gap: this had no conversation-type check at all, so
+      // blocking someone via a 1:1 DM also silently dropped their messages
+      // in any GROUP chat the blocker happens to share with them - a
+      // contact block is meant to be scoped to that direct relationship
+      // only (matching every mainstream chat app: blocking someone still
+      // lets their messages through in a shared group). Gate this on the
+      // conversation actually being a direct 1:1, not just "not fromMe".
+      const activeChat = chatRef.current as any;
+      const isDirectConversation =
+        !!activeChat?.isContactChat || activeChat?.kind === 'direct' || activeChat?.type === 'direct';
+      if (!msg.fromMe && isDirectConversation) {
         const senderId = String(
           (msg as any).senderId ?? serverMsg.senderId ?? serverMsg.sender_id ?? '',
         );
