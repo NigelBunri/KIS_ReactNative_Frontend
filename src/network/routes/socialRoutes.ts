@@ -153,9 +153,6 @@ const socialRoutes = {
   conversations: {
     broadcast: `${NEST_API_BASE_URL}/api/v1/conversations/broadcast`,
   },
-  nestNotifications: {
-    deviceTokenRegister: `${NEST_API_BASE_URL}/api/v1/notifications/tokens/register`,
-  },
   // ScheduledMessagesController (Nestjs) is @Controller('chat/scheduled-messages')
   // — mounted at /chat/scheduled-messages, no /api/v1 prefix (same rule as pins/calls above).
   scheduledMessages: {
