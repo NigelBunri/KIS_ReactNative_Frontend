@@ -23,7 +23,7 @@ import { useLanguage, useTranslation } from '@/languages';
 import { getAccessToken } from '@/security/authStorage';
 import { buildChatMediaPath, fileUriForPath, sanitizeChatMediaFileName, stripFileScheme } from '../chatMediaStorage';
 import { normalizeChatDisplayText } from '../safeChatText';
-import { API_BASE_URL, NEST_API_BASE_URL, resolveBackendAssetUrl } from '@/network';
+import { API_BASE_URL, NEST_API_BASE_URL, resolveBackendAssetUrl, useMediaHeaders } from '@/network';
 import { AttachmentDownloadError, requestAttachmentDownloadUrl } from '../attachmentDownload';
 import { classifyVoicePlaybackReadiness, resolveEmbeddedVoicePlaybackUri } from '../voiceAttachment';
 import { cachedVoicePlaybackUrl, describeVoicePlaybackError, resolveFreshVoicePlaybackUrl } from '../voicePlaybackResolver';
@@ -702,7 +702,22 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   const [imageFullscreenUri, setImageFullscreenUri] = useState<string | null>(null);
   const [pdfFullscreenUri, setPdfFullscreenUri] = useState<string | null>(null);
 
-  const [mediaHeaders, setMediaHeaders] = useState<Record<string, string>>({});
+  // CONFIRMED ROOT CAUSE (2026-10-16) of "stickers show a transparent box
+  // for a long time before appearing": this used to hand-roll its own
+  // token+deviceId fetch, always starting from EMPTY headers and only
+  // filling them in once an async EncryptedStorage read resolved - with
+  // no synchronous seed, every single bubble in the room (sticker or not)
+  // rendered its first image/video load attempt with no auth headers at
+  // all, which 401/403's and shows nothing, until this effect's own
+  // round trip finally resolved and the real headers arrived a beat
+  // later. Stickers have no other fallback (no localUri, no cached
+  // thumbnail) so they were the one case with nothing to show in that gap
+  // at all. useMediaHeaders (network/index.tsx) is the already-existing,
+  // correct version of exactly this: it seeds synchronously from
+  // getAccessTokenCached()/a module-level deviceId cache first, so the
+  // common case (anything opened after the very first screen this
+  // session) never has an empty-headers frame to begin with.
+  const mediaHeaders = useMediaHeaders();
 
   // A persisted localUri/localPath can point at a file that no longer exists
   // — e.g. after a fresh app install/reload wipes the sandbox container the
@@ -710,21 +725,6 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   // we stop trusting it (per-attachment) and fall back to the remote CDN url
   // instead of silently rendering a blank/black box forever.
   const [localMediaBroken, setLocalMediaBroken] = useState<Record<string, boolean>>({});
-
-  useEffect(() => {
-    let cancelled = false;
-    Promise.all([
-      getAccessToken().catch(() => null),
-      AsyncStorage.getItem('device_id').catch(() => null),
-    ]).then(([token, deviceId]) => {
-      if (cancelled) return;
-      const headers: Record<string, string> = {};
-      if (token) headers.Authorization = `Bearer ${token}`;
-      if (deviceId) headers['X-Device-Id'] = deviceId;
-      setMediaHeaders(headers);
-    });
-    return () => { cancelled = true; };
-  }, []);
 
   // Per-attachment download state (non-image files)
   const [downloadState, setDownloadState] = useState<Record<string, {
