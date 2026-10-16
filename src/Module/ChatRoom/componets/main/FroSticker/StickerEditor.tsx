@@ -451,7 +451,16 @@ export const StickerEditor: React.FC<StickerEditorProps> = ({
             style={{
               width: 260,
               height: 260,
-              borderRadius: 24,
+              // Rounding this container bakes rounded corners directly
+              // into the exported sticker PNG (ViewShot captures exactly
+              // this view) - for an ordinary rectangular photo with no
+              // background removed, the four corners clipped away by that
+              // rounding have nothing transparent behind them, so they
+              // render as a stark white square-behind-a-circle artifact
+              // once sent. Only round once the background is actually
+              // removed, where the corners are genuinely transparent and
+              // a soft frame looks intentional rather than like a bug.
+              borderRadius: bgRemoved ? 24 : 0,
               backgroundColor: '#00000055',
               overflow: 'hidden',
               justifyContent: 'center',
