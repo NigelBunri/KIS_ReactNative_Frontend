@@ -859,6 +859,20 @@ export function useChatMessaging({
             kind: parsed?.kind ?? mapped.kind,
             viewOnce: parsed?.viewOnce ?? mapped.viewOnce,
           };
+          if (__DEV__ && Array.isArray(decryptedPatch.attachments) && decryptedPatch.attachments.length) {
+            console.log('[useChatMessaging] decrypted attachment payload', {
+              messageId,
+              jsonParseOk: !!parsed,
+              attachments: (decryptedPatch.attachments as any[]).map((a) => ({
+                id: a?.id,
+                hasUrl: !!a?.url,
+                hasDisplayUrl: !!a?.displayUrl,
+                hasDownloadUrl: !!a?.downloadUrl,
+                hasLocalUri: !!a?.localUri,
+                mimeType: a?.mimeType,
+              })),
+            });
+          }
           await saveDecryptedMessage(String(currentUserId), mapped, decryptedPatch);
           await patchDecryptedMessage(String(mapped.serverId ?? mapped.id), decryptedPatch);
           return;
