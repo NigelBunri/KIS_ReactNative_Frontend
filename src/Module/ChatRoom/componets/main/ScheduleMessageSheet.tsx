@@ -12,6 +12,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { KISIcon } from '@/constants/kisIcons';
+import { useKISTheme } from '@/theme/useTheme';
 
 const QUICK_OPTIONS = [
   { label: 'In 1 hour', offsetMs: 60 * 60 * 1000 },
@@ -50,6 +51,7 @@ export const ScheduleMessageSheet: React.FC<Props> = ({
   palette,
 }) => {
   const insets = useSafeAreaInsets();
+  const { isDark } = useKISTheme();
   const slideAnim = useRef(new Animated.Value(0)).current;
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   // AND-049: this sheet previously offered only 4 fixed presets (1 hour,
@@ -175,6 +177,16 @@ export const ScheduleMessageSheet: React.FC<Props> = ({
             minimumDate={new Date()}
             onChange={handleCustomDateChange}
             onTouchCancel={() => setShowCustomDate(false)}
+            // iOS-only: the inline calendar's own day-number/selected-date
+            // text otherwise follows the SYSTEM light/dark setting, not
+            // this app's theme. When that doesn't match palette.surface
+            // (the sheet background it's drawn directly on top of here,
+            // with no separate card behind it), the text renders in a
+            // color that's invisible against it even though the calendar
+            // still responds to taps - same root cause already fixed once
+            // for KISDateTimeInput's own spinner.
+            themeVariant={isDark ? 'dark' : 'light'}
+            textColor={palette.text}
           />
         )}
         {showCustomTime && (
@@ -184,6 +196,8 @@ export const ScheduleMessageSheet: React.FC<Props> = ({
             display={Platform.OS === 'ios' ? 'spinner' : 'default'}
             onChange={handleCustomTimeChange}
             onTouchCancel={() => setShowCustomTime(false)}
+            themeVariant={isDark ? 'dark' : 'light'}
+            textColor={palette.text}
           />
         )}
         {Platform.OS === 'ios' && showCustomDate && (

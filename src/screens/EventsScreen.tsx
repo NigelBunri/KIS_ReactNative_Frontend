@@ -170,10 +170,11 @@ type DateFieldProps = {
   value: Date | null;
   onChange: (d: Date) => void;
   palette: ReturnType<typeof useKISTheme>['palette'];
+  isDark: boolean;
   minimumDate?: Date;
 };
 
-function DateField({ label, value, onChange, palette, minimumDate }: DateFieldProps) {
+function DateField({ label, value, onChange, palette, isDark, minimumDate }: DateFieldProps) {
   const [showDate, setShowDate] = useState(false);
   const [showTime, setShowTime] = useState(false);
   const working = useRef<Date>(value ?? new Date());
@@ -235,6 +236,13 @@ function DateField({ label, value, onChange, palette, minimumDate }: DateFieldPr
           minimumDate={minimumDate}
           onChange={handleDateChange}
           onTouchCancel={() => setShowDate(false)}
+          // iOS-only: without this the inline calendar's day-number/
+          // selected-date text follows the SYSTEM light/dark setting
+          // rather than this app's theme, so it can render invisible
+          // against palette.surface behind it - same fix already applied
+          // to KISDateTimeInput/ScheduleMessageSheet's own pickers.
+          themeVariant={isDark ? 'dark' : 'light'}
+          textColor={palette.text}
         />
       )}
       {/* On iOS: after date picker dismiss we show time; on Android handled via state sequence */}
@@ -245,6 +253,8 @@ function DateField({ label, value, onChange, palette, minimumDate }: DateFieldPr
           display={Platform.OS === 'ios' ? 'spinner' : 'default'}
           onChange={handleTimeChange}
           onTouchCancel={() => setShowTime(false)}
+          themeVariant={isDark ? 'dark' : 'light'}
+          textColor={palette.text}
         />
       )}
       {/* iOS: show both pickers inline using a confirm button approach */}
@@ -307,7 +317,7 @@ const badgeStyles = StyleSheet.create({
 // ---------------------------------------------------------------------------
 
 export default function EventsScreen() {
-  const { palette } = useKISTheme();
+  const { palette, isDark } = useKISTheme();
   const responsive = useResponsiveLayout();
   const insets = useSafeAreaInsets();
   const topInset = useSafeTopInset();
@@ -1014,6 +1024,7 @@ export default function EventsScreen() {
                   }))
                 }
                 palette={palette}
+                isDark={isDark}
               />
 
               {/* End datetime */}
@@ -1027,6 +1038,7 @@ export default function EventsScreen() {
                   }))
                 }
                 palette={palette}
+                isDark={isDark}
                 minimumDate={form.start_dt ?? undefined}
               />
 
