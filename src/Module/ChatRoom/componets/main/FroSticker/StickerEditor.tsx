@@ -33,7 +33,7 @@ import {
   uninstallPack,
   type StickerPack,
 } from './StickerPackStore';
-import { uploadFileToBackend } from '../../../uploadFileToBackend';
+import { uploadFileToBackend, isVerificationFailedError } from '../../../uploadFileToBackend';
 import { createSticker, cacheLocalStickerFile } from './stickerLibrary';
 
 export type Sticker = {
@@ -348,7 +348,23 @@ export const StickerEditor: React.FC<StickerEditorProps> = ({
       onClose();
     } catch (err) {
       console.warn('Sticker capture error', err);
-      Alert.alert('Could not save sticker', 'Please check your connection and try again.');
+      // Previously always showed "Please check your connection and try
+      // again" regardless of the actual cause - swallowing, for example,
+      // a real content-safety rejection (common right after background
+      // removal, since the cutout can trip the same explicit-content scan
+      // any other image upload goes through) behind a misleading network
+      // message that told neither the user nor anyone debugging it later
+      // what actually happened. Surfaces the real message the same way
+      // every other upload failure in this module already does (see
+      // ChatRoomHandlers.tsx's showMediaSafetyError).
+      const message =
+        err instanceof Error && err.message
+          ? err.message
+          : 'Please check your connection and try again.';
+      Alert.alert(
+        isVerificationFailedError(err) ? 'Media safety check' : 'Could not save sticker',
+        message,
+      );
     } finally {
       setSaving(false);
     }
