@@ -1167,17 +1167,26 @@ export function useChatMessaging({
               question: String(serverMsg.poll.question ?? ''),
               allowMultiple: !!serverMsg.poll.allowMultiple,
               expiresAt: serverMsg.poll.expiresAt ?? null,
+              closedAt: serverMsg.poll.closedAt ?? null,
               options: Array.isArray(serverMsg.poll.options)
                 ? serverMsg.poll.options.map((opt: any, idx: number) => ({
                     id: String(opt?.id ?? `opt_${idx + 1}`),
                     text: String(opt?.text ?? opt?.label ?? ''),
                     votes:
                       typeof opt?.votes === 'number' ? opt.votes : undefined,
-                    voterIds: Array.isArray(opt?.voter_ids)
-                      ? opt.voter_ids.map(String)
-                      : Array.isArray(opt?.voterIds)
-                        ? opt.voterIds.map(String)
-                        : undefined,
+                    // Nest's Poll schema stores this array as `voters` (see
+                    // message.schema.ts PollOption) - voter_ids/voterIds
+                    // were never the server's actual field name, so this
+                    // always came back undefined, meaning nothing could
+                    // ever tell whether the current user had already voted
+                    // once a message round-tripped through the server.
+                    voterIds: Array.isArray(opt?.voters)
+                      ? opt.voters.map(String)
+                      : Array.isArray(opt?.voter_ids)
+                        ? opt.voter_ids.map(String)
+                        : Array.isArray(opt?.voterIds)
+                          ? opt.voterIds.map(String)
+                          : undefined,
                   }))
                 : [],
             }
@@ -1936,7 +1945,23 @@ export function useChatMessaging({
 
       let payloadToSend: any;
       const isPublicRoom = (chat as any)?.kind === 'post' || (chat as any)?.kind === 'thread';
-      if (E2EE_ENABLED && chat && !isPublicRoom) {
+      // CONFIRMED ROOT CAUSE (poll real-time fix, 2026-10-16) of "poll
+      // results only ever update on the voting device": in an E2EE
+      // conversation every message - polls included - was sent with
+      // `kind` forced to 'text' and the real payload sealed only inside
+      // encryptionMeta (see payloadToSend below). The server never saw
+      // `poll` at all, so the stored Mongo doc had kind:'text', poll:
+      // undefined - votePoll() immediately threw "message is not a poll"
+      // for every single vote in any encrypted DM/group (nearly all of
+      // them), silently, because the client's vote emit never checked its
+      // ack either. A poll's question/options/vote tallies are not
+      // "content" the server can stay blind to like a text message's body
+      // - the server is the one that has to read and mutate vote state in
+      // real time for every participant, so unlike every other kind, a
+      // poll message travels in the same plaintext shell a public-room
+      // message already uses, never inside the encrypted envelope.
+      const mustStayPlaintext = isPublicRoom || message.kind === 'poll';
+      if (E2EE_ENABLED && chat && !mustStayPlaintext) {
         // Use freshParticipantsRef so newly added members are included
         // immediately without waiting for a parent re-render.
         const chatWithFreshParticipants = { ...chat, participants: freshParticipantsRef.current };
@@ -2593,20 +2618,16 @@ export function useChatMessaging({
     socket.on('chat.pin', onPin);
     socket.on('chat.message_pinned', onPin);
 
-    // ── Poll votes (AND-030) ──────────────────────────────────────────────
-    // votePoll() above only ever applies an OPTIMISTIC update to the
-    // voting device itself - it emits 'chat.vote_poll' and patches its own
-    // local poll.options, but until now nothing here ever listened for a
-    // server broadcast of the result. That's fine for the voter's own tap,
-    // but every OTHER participant viewing the same poll had no way to ever
-    // learn a vote happened: no listener meant no update, which is exactly
-    // "no real-time vote updates". The exact broadcast event name can't be
-    // confirmed from this client-only checkout (backend/Nestjs isn't
-    // present here) - every plausible name this backend's own naming
-    // convention could use is listened for (chat.react -> chat.
-    // message_reaction and chat.pin -> chat.message_pinned both rename the
-    // broadcast from the emit verb, so the vote broadcast most likely does
-    // too), so whichever one the server actually emits still take effect.
+    // ── Poll votes (AND-030, confirmed 2026-10-16) ─────────────────────────
+    // A prior pass guessed four plausible broadcast names here without
+    // access to backend/Nestjs - none of them matched. The server (see
+    // src/realtime/handlers/polls.ts, EVT.POLL_UPDATED) actually emits
+    // exactly 'chat.poll_updated' to the whole conversation room on every
+    // vote and on a manual/automatic close. That mismatch, combined with
+    // the E2EE-shell bug fixed above, is the full explanation for "poll
+    // results only ever update on the sender's device": the vote mostly
+    // never reached the server at all, and on the rare plaintext-room path
+    // where it did, nothing here would have picked up the broadcast either.
     // The handler accepts either a full replacement `poll` object, a bare
     // `options` array, or a single-vote delta ({ optionId, userId }) and
     // applies it idempotently via voterIds, matching the optimistic path's
@@ -2647,10 +2668,7 @@ export function useChatMessaging({
       replaceMessagesRef.current(next);
     };
 
-    socket.on('chat.poll_vote', onPollVoteUpdate);
-    socket.on('chat.vote_poll', onPollVoteUpdate);
-    socket.on('chat.message_poll_vote', onPollVoteUpdate);
-    socket.on('chat.poll_update', onPollVoteUpdate);
+    socket.on('chat.poll_updated', onPollVoteUpdate);
 
     // ── Disappearing-message setting update ───────────────────────────────
     const onDisappear = (payload: any) => {
@@ -2699,10 +2717,7 @@ export function useChatMessaging({
       socket.off('chat.message_reaction', onReaction);
       socket.off('chat.pin', onPin);
       socket.off('chat.message_pinned', onPin);
-      socket.off('chat.poll_vote', onPollVoteUpdate);
-      socket.off('chat.vote_poll', onPollVoteUpdate);
-      socket.off('chat.message_poll_vote', onPollVoteUpdate);
-      socket.off('chat.poll_update', onPollVoteUpdate);
+      socket.off('chat.poll_updated', onPollVoteUpdate);
       socket.off('chat.disappear.set', onDisappear);
       socket.off('chat.disappear.update', onDisappear);
       socket.off('chat.location_update', onLocationUpdate);
@@ -2874,16 +2889,20 @@ export function useChatMessaging({
       if (!resolvedConvId || !messageId) return;
       emitReactionRef.current(String(resolvedConvId), messageId, emoji, remove);
     },
-    votePoll: (messageId: string, optionId: string) => {
+    votePoll: async (messageId: string, optionId: string) => {
       const resolvedConvId =
         conversationIdRef.current ??
         String(storageRoomId);
       if (!socket || !resolvedConvId || !messageId) return;
-      socket.emit('chat.vote_poll', {
-        conversationId: String(resolvedConvId),
-        messageId,
-        optionId,
-      });
+
+      // Snapshot the pre-vote poll so a rejected vote (closed poll, not a
+      // member, invalid option) can be rolled back exactly - previously
+      // this emit was fire-and-forget with no ack at all, so a server
+      // rejection was invisible and the optimistic guess below just stuck
+      // forever, showing a vote that was never actually recorded.
+      const before = messagesRef.current.find((m) => m.id === messageId || m.serverId === messageId);
+      const previousPoll = before?.poll;
+
       // Optimistically add currentUserId to the voted option's voterIds
       if (currentUserId) {
         const next = messagesRef.current.map((m) => {
@@ -2904,6 +2923,64 @@ export function useChatMessaging({
           };
         });
         replaceMessagesRef.current(next);
+      }
+
+      const ack: any = await new Promise((resolve) => {
+        let settled = false;
+        const timer = setTimeout(() => {
+          if (settled) return;
+          settled = true;
+          resolve({ ok: false });
+        }, EMIT_ACK_TIMEOUT_MS);
+        try {
+          socket.emit(
+            'chat.vote_poll',
+            { conversationId: String(resolvedConvId), messageId, optionId },
+            (response: any) => {
+              if (settled) return;
+              settled = true;
+              clearTimeout(timer);
+              resolve(response);
+            },
+          );
+        } catch {
+          if (settled) return;
+          settled = true;
+          clearTimeout(timer);
+          resolve({ ok: false });
+        }
+      });
+
+      const resultPoll = ack?.data?.poll ?? ack?.poll;
+      if (ack?.ok !== false && resultPoll) {
+        // Reconcile with the server's authoritative result immediately -
+        // fixes the optimistic guess for allowMultiple/toggle semantics it
+        // can't fully replicate client-side, without waiting on the room
+        // broadcast this same client will also receive.
+        const reconciled = messagesRef.current.map((m) =>
+          (m.id === messageId || m.serverId === messageId) ? { ...m, poll: resultPoll } : m,
+        );
+        replaceMessagesRef.current(reconciled);
+      } else if (ack?.ok === false) {
+        // Roll back to the pre-vote snapshot and surface why.
+        const rolledBack = messagesRef.current.map((m) =>
+          (m.id === messageId || m.serverId === messageId) ? { ...m, poll: previousPoll } : m,
+        );
+        replaceMessagesRef.current(rolledBack);
+        Alert.alert('Could not record your vote', ack?.error || 'Please try again.');
+      }
+    },
+    closePoll: async (messageId: string) => {
+      const resolvedConvId =
+        conversationIdRef.current ??
+        String(storageRoomId);
+      if (!socket || !resolvedConvId || !messageId) return;
+      const ack = await emitWithAck(socket, 'chat.close_poll', {
+        conversationId: String(resolvedConvId),
+        messageId,
+      });
+      if (!ack.ok) {
+        Alert.alert('Could not close poll', ack.error || 'Please try again.');
       }
     },
     markMessagesRead,

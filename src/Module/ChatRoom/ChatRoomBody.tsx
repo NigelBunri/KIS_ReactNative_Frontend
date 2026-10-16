@@ -39,6 +39,7 @@ type Props = {
   onToggleSelect?: (message: ChatMessage) => void;
   onReactMessage: (message: ChatMessage, emoji: string) => void;
   onVotePoll?: (message: ChatMessage, optionId: string) => void;
+  onClosePoll?: (message: ChatMessage) => void;
   onRetryMessage: (message: ChatMessage) => void;
   onMessageLocatorReady: (helpers: {
     scrollToMessage: (messageId: string) => void;
@@ -130,6 +131,7 @@ export default function ChatRoomBody({
   onToggleSelect,
   onReactMessage,
   onVotePoll,
+  onClosePoll,
   onRetryMessage,
   onMessageLocatorReady,
   onVisibleMessageIds,
@@ -229,6 +231,7 @@ export default function ChatRoomBody({
         onToggleSelect={onToggleSelect}
         onReactMessage={onReactMessage}
         onVotePoll={onVotePoll}
+        onClosePoll={onClosePoll}
         onRetryMessage={onRetryMessage}
         onMessageLocatorReady={onMessageLocatorReady}
         autoScrollEnabled={autoScrollEnabled}

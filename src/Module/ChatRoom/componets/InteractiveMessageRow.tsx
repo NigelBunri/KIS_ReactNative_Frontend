@@ -37,6 +37,7 @@ type Props = {
   onPinMessage?: (message: ChatMessage) => void;
   onReactMessage?: (message: ChatMessage, emoji: string) => void;
   onVotePoll?: (message: ChatMessage, optionId: string) => void;
+  onClosePoll?: (message: ChatMessage) => void;
   onRetryMessage?: (message: ChatMessage) => void;
 
   replySource?: ChatMessage;
@@ -148,6 +149,7 @@ export const InteractiveMessageRow: React.FC<Props> = ({
   onPinMessage,
   onReactMessage,
   onVotePoll,
+  onClosePoll,
   onRetryMessage,
   replySource,
   onPressReplySource,
@@ -441,6 +443,7 @@ export const InteractiveMessageRow: React.FC<Props> = ({
             paneWidth={paneWidth}
             onReact={onReactMessage}
             onVotePoll={onVotePoll ? (msgId, optId) => onVotePoll(message, optId) : undefined}
+            onClosePoll={onClosePoll ? () => onClosePoll(message) : undefined}
             onRetry={onRetryMessage}
             replySource={replySource}
             onPressReplySource={() => {

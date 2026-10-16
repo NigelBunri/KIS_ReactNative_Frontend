@@ -578,6 +578,8 @@ export const handleCreatePoll = async ({
         id: `opt_${idx + 1}`,
         text: opt,
       })),
+      allowMultiple: poll.allowMultiple,
+      expiresAt: poll.expiresAt ?? null,
     },
   });
 };

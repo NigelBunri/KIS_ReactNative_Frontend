@@ -179,6 +179,7 @@ type MessageBubbleProps = {
   paneWidth?: number;
   onReact?: (message: ChatMessage, emoji: string) => void;
   onVotePoll?: (messageId: string, optionId: string) => void;
+  onClosePoll?: (messageId: string) => void;
   onRetry?: (message: ChatMessage) => void;
 
   // reply preview
@@ -245,6 +246,17 @@ const renderStatusIcon = (
   return null;
 };
 
+// Display-only mirror of the server's own isPollClosed() (messages.service.ts) -
+// never the actual enforcement, which always happens server-side on the vote
+// attempt itself. This just decides whether to show the vote UI as disabled/
+// "closed" so an obviously-expired poll doesn't still invite a tap, without
+// relying on a mobile timer or background task to ever flip a stored flag.
+export const isPollClosed = (poll: { expiresAt?: string | null; closedAt?: string | null }): boolean => {
+  if (poll.closedAt) return true;
+  if (poll.expiresAt && Date.now() >= new Date(poll.expiresAt).getTime()) return true;
+  return false;
+};
+
 export const MessageBubble: React.FC<MessageBubbleProps> = ({
   message,
   palette,
@@ -252,6 +264,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   paneWidth,
   onReact,
   onVotePoll,
+  onClosePoll,
   onRetry,
   replySource,
   onPressReplySource,
@@ -342,9 +355,10 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   const poll = (message as any).poll as
     | {
         question: string;
-        options: { id: string; text: string; votes?: number }[];
+        options: { id: string; text: string; votes?: number; voterIds?: string[] }[];
         allowMultiple?: boolean;
         expiresAt?: string | null;
+        closedAt?: string | null;
       }
     | undefined;
   const eventData = (message as any).event as
@@ -1188,6 +1202,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   // exists.
 
   const handlePollOptionPress = (optionKey: string, rawOptionId: string) => {
+    if (poll && isPollClosed(poll)) return;
     setSelectedPollOptionKey(optionKey);
     const messageId = (message as any).serverId ?? (message as any).id;
     if (messageId) {
@@ -2761,6 +2776,11 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
       (sum, o) => sum + (o.votes ?? 0),
       0,
     );
+    const closed = isPollClosed(poll);
+    // The creator is the only one allowed to close a poll manually
+    // (enforced again server-side in closePoll() - this only decides
+    // whether to show the button at all).
+    const canManuallyClose = isMe && !closed && typeof onClosePoll === 'function';
 
     return (
       <View
@@ -2815,13 +2835,20 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
               ? `poll-opt-${opt.id}`
               : `poll-opt-${idx}`;
 
-          const isSelected = selectedPollOptionKey === optionKey;
+          // Selection is derived from the server's own voterIds whenever
+          // present (so a reopened/reconnected room shows the user's real
+          // vote, not a reset local-only toggle), falling back to the
+          // just-tapped local key only for the instant before the first
+          // server round trip ever lands.
+          const votedByMe = !!currentUserId && !!opt.voterIds?.includes(String(currentUserId));
+          const isSelected = votedByMe || selectedPollOptionKey === optionKey;
 
           return (
             <Pressable
               key={optionKey}
+              disabled={closed}
               onPress={() => handlePollOptionPress(optionKey, rawOptionId)}
-              style={{ marginBottom: 6 }}
+              style={{ marginBottom: 6, opacity: closed && !isSelected ? 0.7 : 1 }}
             >
               <View
                 style={{
@@ -2886,10 +2913,28 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
           }}
         >
           {poll.allowMultiple ? 'Multiple choices allowed' : 'Single choice'}
-          {poll.expiresAt
-            ? ` • closes ${new Date(poll.expiresAt).toLocaleString()}`
-            : ''}
+          {closed
+            ? ' • Poll closed'
+            : poll.expiresAt
+              ? ` • closes ${new Date(poll.expiresAt).toLocaleString()}`
+              : ''}
         </Text>
+
+        {canManuallyClose && (
+          <Pressable
+            onPress={() => {
+              const messageId = (message as any).serverId ?? (message as any).id;
+              if (messageId) onClosePoll?.(messageId);
+            }}
+            style={{ marginTop: 6, alignSelf: 'flex-start' }}
+            accessibilityRole="button"
+            accessibilityLabel="Close poll"
+          >
+            <Text style={{ fontSize: 11, fontWeight: '700', color: metaTextColor }}>
+              Close poll
+            </Text>
+          </Pressable>
+        )}
       </View>
     );
   };

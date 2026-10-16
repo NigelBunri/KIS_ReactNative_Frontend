@@ -303,6 +303,7 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
     sendTyping,
     sendReaction,
     votePoll,
+    closePoll,
     retryMessage,
     markMessagesRead,
     markAllMessagesRead,
@@ -838,6 +839,19 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
       votePoll(messageId, optionId);
     },
     [votePoll],
+  );
+
+  const handleClosePoll = useCallback(
+    (message: ChatMessage) => {
+      const fallbackId =
+        message.id && message.id.startsWith('client_')
+          ? null
+          : message.id;
+      const messageId = message.serverId ?? fallbackId;
+      if (!messageId) return;
+      closePoll(messageId);
+    },
+    [closePoll],
   );
 
   /* ======================================================================== */
@@ -2643,6 +2657,7 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
           onToggleSelect={toggleSelectMessage}
           onReactMessage={handleReactMessage}
           onVotePoll={handleVotePoll}
+          onClosePoll={handleClosePoll}
           onRetryMessage={handleRetryMessage}
           onMessageLocatorReady={setMessageLocator}
           onVisibleMessageIds={handleVisibleMessageIds}

@@ -120,6 +120,7 @@ type MessageListProps = {
   onPinMessage?: (message: ChatMessage) => void;
   onReactMessage?: (message: ChatMessage, emoji: string) => void;
   onVotePoll?: (message: ChatMessage, optionId: string) => void;
+  onClosePoll?: (message: ChatMessage) => void;
   onRetryMessage?: (message: ChatMessage) => void;
 
   // Selection
@@ -194,6 +195,7 @@ export const MessageList: React.FC<MessageListProps> = ({
   onPinMessage,
   onReactMessage,
   onVotePoll,
+  onClosePoll,
   onRetryMessage,
   selectionMode = false,
   selectedMessageIds = [],
@@ -652,6 +654,7 @@ export const MessageList: React.FC<MessageListProps> = ({
             onPinMessage={onPinMessage}
             onReactMessage={onReactMessage}
             onVotePoll={onVotePoll}
+            onClosePoll={onClosePoll}
             onRetryMessage={onRetryMessage}
             onStartSelection={onStartSelection}
             onToggleSelect={onToggleSelect}
@@ -685,6 +688,7 @@ export const MessageList: React.FC<MessageListProps> = ({
       onPinMessage,
       onReactMessage,
       onVotePoll,
+      onClosePoll,
       onRetryMessage,
       onStartSelection,
       onToggleSelect,

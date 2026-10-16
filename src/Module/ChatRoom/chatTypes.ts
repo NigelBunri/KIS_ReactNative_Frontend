@@ -215,6 +215,8 @@ export type PollMessage = {
   options: PollOption[];
   allowMultiple?: boolean;
   expiresAt?: string | null;
+  /** Set server-side only once the poll is actually closed (deadline reached or creator closed it manually). */
+  closedAt?: string | null;
 };
 
 /* ============================================================================

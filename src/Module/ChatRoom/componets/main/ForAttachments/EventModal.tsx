@@ -16,6 +16,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { KISPalette, KIS_TOKENS, kisRadius } from '@/theme/constants';
 import usePullDownToClose from '@/hooks/usePullDownToClose';
+import KISDateTimeInput from '@/constants/KISDateTimeInput';
 
 const KIS_EVENT_REMINDERS_KEY = 'KIS_EVENT_REMINDERS';
 
@@ -27,6 +28,20 @@ export type EventDraft = {
   endsAt: string;
   reminderMinutes?: number;
 };
+
+// Exported for regression testing only (see __tests__/EventModal.timeRange.test.ts) -
+// mirrors assertValidEventPayload in the Nest messages.service.ts so the
+// client-side gate matches the server's independent re-check. Multi-day
+// events are deliberately allowed here - this only requires the end
+// INSTANT to be after the start instant, never that both fall on the same
+// calendar date.
+export function isEventTimeRangeValid(startIso: string | null, endIso: string | null): boolean {
+  if (!startIso || !endIso) return false;
+  const start = new Date(startIso).getTime();
+  const end = new Date(endIso).getTime();
+  if (Number.isNaN(start) || Number.isNaN(end)) return false;
+  return end > start;
+}
 
 type EventModalProps = {
   visible: boolean;
@@ -42,10 +57,8 @@ export const EventModal: React.FC<EventModalProps> = ({
   onCreateEvent,
 }) => {
   const [title, setTitle] = useState('');
-  const [startDate, setStartDate] = useState('');
-  const [startTime, setStartTime] = useState('');
-  const [endDate, setEndDate] = useState('');
-  const [endTime, setEndTime] = useState('');
+  const [startIsoDraft, setStartIsoDraft] = useState<string | null>(null);
+  const [endIsoDraft, setEndIsoDraft] = useState<string | null>(null);
   const [location, setLocation] = useState('');
   const [description, setDescription] = useState('');
   const [reminderMinutes, setReminderMinutes] = useState<number>(10);
@@ -71,30 +84,14 @@ export const EventModal: React.FC<EventModalProps> = ({
     { label: '1 day before', value: 1440 },
   ];
 
-  const isValidDate = (value: string) =>
-    /^\d{4}-\d{2}-\d{2}$/.test(value) &&
-    !Number.isNaN(new Date(`${value}T00:00:00`).getTime());
-
-  const isValidTime = (value: string) => {
-    if (!/^\d{2}:\d{2}$/.test(value)) return false;
-    const [h, m] = value.split(':').map(v => Number(v));
-    return h >= 0 && h < 24 && m >= 0 && m < 60;
-  };
-
-  const buildIso = (d: string, t: string) =>
-    new Date(`${d}T${t}:00`).toISOString();
-
-  const startValid = isValidDate(startDate) && isValidTime(startTime);
-  const endValid = isValidDate(endDate) && isValidTime(endTime);
+  const startValid = !!startIsoDraft && !Number.isNaN(new Date(startIsoDraft).getTime());
+  const endValid = !!endIsoDraft && !Number.isNaN(new Date(endIsoDraft).getTime());
   const titleValid = !!title.trim();
   const locationValid = !!location.trim();
   const descriptionValid = !!description.trim();
-  const startIso = startValid ? buildIso(startDate, startTime) : '';
-  const endIso = endValid ? buildIso(endDate, endTime) : '';
-  const endAfterStart =
-    startValid &&
-    endValid &&
-    new Date(endIso).getTime() > new Date(startIso).getTime();
+  const startIso = startValid ? String(startIsoDraft) : '';
+  const endIso = endValid ? String(endIsoDraft) : '';
+  const endAfterStart = isEventTimeRangeValid(startIso, endIso);
 
   const canSave =
     titleValid &&
@@ -148,10 +145,8 @@ export const EventModal: React.FC<EventModalProps> = ({
     onClose();
 
     setTitle('');
-    setStartDate('');
-    setStartTime('');
-    setEndDate('');
-    setEndTime('');
+    setStartIsoDraft(null);
+    setEndIsoDraft(null);
     setLocation('');
     setDescription('');
     setReminderMinutes(10);
@@ -234,73 +229,24 @@ export const EventModal: React.FC<EventModalProps> = ({
               style={inputStyle}
             />
 
-            <Text style={{ color: palette.subtext }}>Start date</Text>
-            <TextInput
-              value={startDate}
-              onChangeText={setStartDate}
-              placeholder="YYYY-MM-DD"
-              placeholderTextColor={palette.subtext}
-              style={inputStyle}
+            <KISDateTimeInput
+              label="Starts"
+              mode="datetime"
+              value={startIsoDraft}
+              onChange={setStartIsoDraft}
+              errorText={attempted && !startValid ? 'Pick a start date and time.' : undefined}
+              error={attempted && !startValid}
             />
 
-            {attempted && !isValidDate(startDate) && (
-              <Text
-                style={{ color: palette.danger, marginBottom: 8 }}
-              >
-                Enter a valid start date (YYYY-MM-DD).
-              </Text>
-            )}
-
-            <Text style={{ color: palette.subtext }}>Start time</Text>
-            <TextInput
-              value={startTime}
-              onChangeText={setStartTime}
-              placeholder="HH:MM"
-              placeholderTextColor={palette.subtext}
-              style={inputStyle}
+            <KISDateTimeInput
+              label="Ends"
+              mode="datetime"
+              value={endIsoDraft}
+              onChange={setEndIsoDraft}
+              minimumDate={startValid ? new Date(startIso) : undefined}
+              errorText={attempted && !endValid ? 'Pick an end date and time.' : undefined}
+              error={attempted && !endValid}
             />
-
-            {attempted && !isValidTime(startTime) && (
-              <Text
-                style={{ color: palette.danger, marginBottom: 8 }}
-              >
-                Enter a valid start time (HH:MM).
-              </Text>
-            )}
-
-            <Text style={{ color: palette.subtext }}>End date</Text>
-            <TextInput
-              value={endDate}
-              onChangeText={setEndDate}
-              placeholder="YYYY-MM-DD"
-              placeholderTextColor={palette.subtext}
-              style={inputStyle}
-            />
-
-            {attempted && !isValidDate(endDate) && (
-              <Text
-                style={{ color: palette.danger, marginBottom: 8 }}
-              >
-                Enter a valid end date (YYYY-MM-DD).
-              </Text>
-            )}
-
-            <Text style={{ color: palette.subtext }}>End time</Text>
-            <TextInput
-              value={endTime}
-              onChangeText={setEndTime}
-              placeholder="HH:MM"
-              placeholderTextColor={palette.subtext}
-              style={inputStyle}
-            />
-
-            {attempted && !isValidTime(endTime) && (
-              <Text
-                style={{ color: palette.danger, marginBottom: 8 }}
-              >
-                Enter a valid end time (HH:MM).
-              </Text>
-            )}
 
             {attempted && !endAfterStart && startValid && endValid && (
               <Text

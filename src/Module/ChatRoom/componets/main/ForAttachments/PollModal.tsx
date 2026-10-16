@@ -14,11 +14,56 @@ import {
 } from 'react-native';
 import { KISPalette, KIS_TOKENS, kisRadius } from '@/theme/constants';
 import usePullDownToClose from '@/hooks/usePullDownToClose';
+import KISDateTimeInput from '@/constants/KISDateTimeInput';
 
 export type PollDraft = {
   question: string;
   options: string[];
+  allowMultiple?: boolean;
+  /** ISO timestamp (UTC) the poll stops accepting votes, or null for no closing time. */
+  expiresAt?: string | null;
 };
+
+type ClosingMode = 'none' | '1h' | '6h' | '24h' | '3d' | '7d' | 'custom';
+
+const CLOSING_DURATIONS_MS: Record<Exclude<ClosingMode, 'none' | 'custom'>, number> = {
+  '1h': 60 * 60 * 1000,
+  '6h': 6 * 60 * 60 * 1000,
+  '24h': 24 * 60 * 60 * 1000,
+  '3d': 3 * 24 * 60 * 60 * 1000,
+  '7d': 7 * 24 * 60 * 60 * 1000,
+};
+
+const CLOSING_MODE_OPTIONS: { label: string; value: ClosingMode }[] = [
+  { label: 'No closing time', value: 'none' },
+  { label: '1 hour', value: '1h' },
+  { label: '6 hours', value: '6h' },
+  { label: '24 hours', value: '24h' },
+  { label: '3 days', value: '3d' },
+  { label: '7 days', value: '7d' },
+  { label: 'Custom', value: 'custom' },
+];
+
+// Exported for regression testing only (see __tests__/PollModal.closing.test.ts) -
+// every other caller stays internal to this component.
+export function computeExpiresAtForClosingMode(
+  mode: ClosingMode,
+  customClosesAt: string | null,
+  now: number = Date.now(),
+): string | null {
+  if (mode === 'none') return null;
+  if (mode === 'custom') return customClosesAt;
+  return new Date(now + CLOSING_DURATIONS_MS[mode]).toISOString();
+}
+
+export function isClosingTimeValid(
+  mode: ClosingMode,
+  computedExpiresAt: string | null,
+  now: number = Date.now(),
+): boolean {
+  if (mode === 'none') return true;
+  return !!computedExpiresAt && new Date(computedExpiresAt).getTime() > now;
+}
 
 type PollModalProps = {
   visible: boolean;
@@ -35,6 +80,9 @@ export const PollModal: React.FC<PollModalProps> = ({
 }) => {
   const [question, setQuestion] = useState('');
   const [options, setOptions] = useState<string[]>(['', '']);
+  const [allowMultiple, setAllowMultiple] = useState(false);
+  const [closingMode, setClosingMode] = useState<ClosingMode>('none');
+  const [customClosesAt, setCustomClosesAt] = useState<string | null>(null);
   const [attempted, setAttempted] = useState(false);
   const { dragY, panHandlers } = usePullDownToClose({
     enabled: visible,
@@ -60,7 +108,14 @@ export const PollModal: React.FC<PollModalProps> = ({
   const cleanedOptions = options.map(o => o.trim()).filter(Boolean);
   const questionValid = !!question.trim();
   const optionsValid = cleanedOptions.length >= 2;
-  const canCreate = questionValid && optionsValid;
+
+  // Requirement 1E: validate the closing time is in the future before it
+  // ever leaves this device - the server (assertValidPollPayload in
+  // messages.service.ts) re-checks this independently regardless.
+  const computedExpiresAt = computeExpiresAtForClosingMode(closingMode, customClosesAt);
+  const closingValid = isClosingTimeValid(closingMode, computedExpiresAt);
+
+  const canCreate = questionValid && optionsValid && closingValid;
 
   const handleCreate = () => {
     setAttempted(true);
@@ -75,11 +130,16 @@ export const PollModal: React.FC<PollModalProps> = ({
       onCreatePoll({
         question: question.trim(),
         options: cleanedOptions,
+        allowMultiple,
+        expiresAt: computedExpiresAt,
       });
     }
     onClose();
     setQuestion('');
     setOptions(['', '']);
+    setAllowMultiple(false);
+    setClosingMode('none');
+    setCustomClosesAt(null);
     setAttempted(false);
   };
 
@@ -240,6 +300,100 @@ export const PollModal: React.FC<PollModalProps> = ({
                 + Add option
               </Text>
             </Pressable>
+
+            <Pressable
+              onPress={() => setAllowMultiple(prev => !prev)}
+              accessibilityRole="button"
+              accessibilityLabel="Allow multiple answers"
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                paddingVertical: 10,
+                minHeight: 44,
+                marginTop: KIS_TOKENS.spacing.sm,
+              }}
+            >
+              <View
+                style={{
+                  width: 20,
+                  height: 20,
+                  borderRadius: 5,
+                  borderWidth: 2,
+                  borderColor: allowMultiple ? palette.primary : palette.inputBorder,
+                  backgroundColor: allowMultiple ? palette.primary : 'transparent',
+                  marginRight: KIS_TOKENS.spacing.sm,
+                }}
+              />
+              <Text style={{ color: palette.text }}>Allow multiple answers</Text>
+            </Pressable>
+
+            <Text
+              style={{
+                color: palette.subtext,
+                marginTop: KIS_TOKENS.spacing.md,
+                marginBottom: KIS_TOKENS.spacing.xs,
+              }}
+            >
+              Closing time
+            </Text>
+            <View
+              style={{
+                flexDirection: 'row',
+                flexWrap: 'wrap',
+                gap: KIS_TOKENS.spacing.xs,
+                marginBottom: KIS_TOKENS.spacing.sm,
+              }}
+            >
+              {CLOSING_MODE_OPTIONS.map(opt => {
+                const active = closingMode === opt.value;
+                return (
+                  <Pressable
+                    key={opt.value}
+                    onPress={() => setClosingMode(opt.value)}
+                    style={{
+                      paddingHorizontal: 10,
+                      paddingVertical: 6,
+                      borderRadius: 14,
+                      backgroundColor: active
+                        ? palette.primarySoft ?? palette.primary
+                        : palette.card,
+                      borderWidth: 2,
+                      borderColor: active
+                        ? palette.primary ?? palette.inputBorder
+                        : palette.inputBorder,
+                    }}
+                  >
+                    <Text
+                      style={{
+                        fontSize: 12,
+                        color: active ? palette.primary : palette.text,
+                        fontWeight: active ? '700' : '500',
+                      }}
+                    >
+                      {opt.label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+
+            {closingMode === 'custom' && (
+              <KISDateTimeInput
+                label="Closes at"
+                mode="datetime"
+                value={customClosesAt}
+                onChange={setCustomClosesAt}
+                minimumDate={new Date()}
+                errorText={attempted && !closingValid ? 'Pick a closing time in the future.' : undefined}
+                error={attempted && !closingValid}
+              />
+            )}
+
+            {closingMode !== 'custom' && closingMode !== 'none' && computedExpiresAt && (
+              <Text style={{ color: palette.subtext, fontSize: 12, marginBottom: KIS_TOKENS.spacing.sm }}>
+                Closes {new Date(computedExpiresAt).toLocaleString()}
+              </Text>
+            )}
           </ScrollView>
 
           {/* Actions */}

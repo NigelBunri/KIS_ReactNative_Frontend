@@ -93,12 +93,18 @@ export const mapBackendToChatMessage = (
           question: String(payload.poll.question ?? ''),
           allowMultiple: !!payload.poll.allowMultiple,
           expiresAt: payload.poll.expiresAt ?? null,
+          closedAt: payload.poll.closedAt ?? null,
           options: Array.isArray(payload.poll.options)
             ? payload.poll.options.map((opt: any, idx: number) => ({
                 id: String(opt?.id ?? `opt_${idx + 1}`),
                 text: String(opt?.text ?? opt?.label ?? ''),
                 votes:
                   typeof opt?.votes === 'number' ? opt.votes : undefined,
+                voterIds: Array.isArray(opt?.voters)
+                  ? opt.voters.map(String)
+                  : Array.isArray(opt?.voterIds)
+                    ? opt.voterIds.map(String)
+                    : undefined,
               }))
             : [],
         }
