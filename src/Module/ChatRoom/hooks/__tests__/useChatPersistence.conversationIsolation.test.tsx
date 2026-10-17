@@ -49,9 +49,9 @@ import type { ChatMessage } from '../../chatTypes';
 // observed to be flaky (occasionally not enough ticks) when this file ran
 // alongside the rest of the suite rather than in isolation.
 const flushMicrotasks = async () => {
-  await new Promise((resolve) => setImmediate(resolve));
-  await new Promise((resolve) => setImmediate(resolve));
-  await new Promise((resolve) => setImmediate(resolve));
+  await new Promise((resolve) => setImmediate(() => resolve(undefined)));
+  await new Promise((resolve) => setImmediate(() => resolve(undefined)));
+  await new Promise((resolve) => setImmediate(() => resolve(undefined)));
 };
 
 const msg = (id: string, conversationId: string): ChatMessage =>

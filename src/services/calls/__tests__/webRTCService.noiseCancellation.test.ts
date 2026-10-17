@@ -13,13 +13,22 @@ jest.mock('../sfuService', () => ({
   },
 }));
 
-jest.mock(
-  'react-native-webrtc',
-  () => ({
-    mediaDevices: { getUserMedia: jest.fn() },
-  }),
-  { virtual: true },
-);
+// `react-native-webrtc` is a real, installed package (not a module that
+// only exists as a type) — it must NOT be mocked with `{ virtual: true }`.
+// That flag is for specifiers with no real file to resolve to; using it
+// for a package that's also imported unmocked elsewhere (e.g. any test
+// that pulls in SocketProvider.tsx, which imports webRTCService/sfuService
+// for real) makes Jest's module resolution order-dependent: once some
+// other test file in the same worker has resolved the real package for
+// this specifier, a later virtual registration for the same specifier can
+// silently lose to the cached real resolution, leaving RNW.mediaDevices
+// as the real (native-less) implementation instead of this mock —
+// confirmed by bisecting cross-file pollution down to exactly this
+// ordering (decidePendingCallPresentation.test.ts, which transitively
+// requires the real package, run before this file in the same process).
+jest.mock('react-native-webrtc', () => ({
+  mediaDevices: { getUserMedia: jest.fn() },
+}));
 
 import { webRTCService } from '../webRTCService';
 import { sfuService } from '../sfuService';

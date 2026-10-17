@@ -140,6 +140,22 @@ const setupGetRequestMock = () => {
 
 describe('useProfileController phase-05 runtime flows', () => {
   beforeEach(() => {
+    // saveProfile()'s success path unconditionally calls closeSheet(), which
+    // kicks off a real Animated.timing(...).start(callback) (240ms) even
+    // though no sheet was ever opened in these tests. Without fake timers,
+    // that timer is scheduled on the REAL event loop and none of these
+    // tests ever unmount their renderer — so it fires ~240ms later, often
+    // after this test file has already finished, landing mid-way through
+    // whatever OTHER test file is running next in the same Jest worker
+    // process. That dangling callback calls setState outside act(), which
+    // crashes react-test-renderer's uncaught-error reporting (it expects a
+    // DOM `window` that doesn't exist here) and can take down the entire
+    // --runInBand run or corrupt an unrelated later test's mocks. Fake
+    // timers make that 240ms delay virtual and scoped to this file, so it
+    // either fires deterministically inside the test (see the
+    // advanceTimersByTime calls below) or is discarded when Jest tears
+    // down this file's environment — never leaking into another file.
+    jest.useFakeTimers();
     jest.clearAllMocks();
     setupGetRequestMock();
     mockedPatchRequest.mockResolvedValue({
@@ -170,6 +186,10 @@ describe('useProfileController phase-05 runtime flows', () => {
     jest.spyOn(Alert, 'alert').mockImplementation(jest.fn());
   });
 
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
   test('phone change save prompts forced re-login and clears session on continue', async () => {
     const setAuth = jest.fn();
     const setPhone = jest.fn();
@@ -194,6 +214,12 @@ describe('useProfileController phase-05 runtime flows', () => {
 
     await ReactTestRenderer.act(async () => {
       await ref.current?.saveProfile();
+    });
+    // Flush closeSheet()'s Animated.timing completion deterministically
+    // within this test instead of letting the real-time version of it
+    // fire later, unobserved, during a different test file.
+    ReactTestRenderer.act(() => {
+      jest.advanceTimersByTime(300);
     });
 
     expect(mockedPatchRequest).toHaveBeenCalledWith(
@@ -252,6 +278,12 @@ describe('useProfileController phase-05 runtime flows', () => {
 
     await ReactTestRenderer.act(async () => {
       await ref.current?.saveProfile();
+    });
+    // Flush closeSheet()'s Animated.timing completion deterministically
+    // within this test instead of letting the real-time version of it
+    // fire later, unobserved, during a different test file.
+    ReactTestRenderer.act(() => {
+      jest.advanceTimersByTime(300);
     });
 
     const calls = (Alert.alert as jest.Mock).mock.calls;
@@ -334,6 +366,12 @@ describe('useProfileController phase-05 runtime flows', () => {
     await ReactTestRenderer.act(async () => {
       await ref.current?.saveProfile();
     });
+    // Flush closeSheet()'s Animated.timing completion deterministically
+    // within this test instead of letting the real-time version of it
+    // fire later, unobserved, during a different test file.
+    ReactTestRenderer.act(() => {
+      jest.advanceTimersByTime(300);
+    });
 
     expect(mockedPatchRequest).toHaveBeenCalledWith(
       ROUTES.profiles.update('profile-1'),
@@ -373,6 +411,12 @@ describe('useProfileController phase-05 runtime flows', () => {
 
     await ReactTestRenderer.act(async () => {
       await ref.current?.saveProfile();
+    });
+    // Flush closeSheet()'s Animated.timing completion deterministically
+    // within this test instead of letting the real-time version of it
+    // fire later, unobserved, during a different test file.
+    ReactTestRenderer.act(() => {
+      jest.advanceTimersByTime(300);
     });
 
     expect(mockedUploadProfileImage).toHaveBeenCalledWith(
@@ -424,6 +468,12 @@ describe('useProfileController phase-05 runtime flows', () => {
 
     await ReactTestRenderer.act(async () => {
       await ref.current?.saveProfile();
+    });
+    // Flush closeSheet()'s Animated.timing completion deterministically
+    // within this test instead of letting the real-time version of it
+    // fire later, unobserved, during a different test file.
+    ReactTestRenderer.act(() => {
+      jest.advanceTimersByTime(300);
     });
 
     // Text fields still committed — the profile PATCH ran and succeeded.

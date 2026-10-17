@@ -34,12 +34,12 @@ const baseRouteItem = { ...mockRoute.params.item };
 
 // Patched in place with jest.spyOn rather than replaced wholesale
 // (`ReactNative.Share = {...}` / `ReactNative.DeviceEventEmitter = {...}`):
-// BroadcastDetailScreen renders a real (unmocked) ChatRoomPage overlay,
-// which captures its own reference to these singletons on import — a
-// fresh replacement object here wouldn't be seen by code that already
-// holds the original, so the emit/addListener spy would silently never
-// fire from the component's perspective. Spying on the existing objects'
-// methods keeps everyone pointed at the same instance.
+// BroadcastDetailScreen itself (not just the mocked ChatRoomPage below)
+// reads/writes these singletons on import — a fresh replacement object
+// here wouldn't be seen by code that already holds the original, so the
+// emit/addListener spy would silently never fire from the component's
+// perspective. Spying on the existing objects' methods keeps everyone
+// pointed at the same instance.
 const ReactNative = require('react-native');
 jest.spyOn(ReactNative.Share, 'share').mockResolvedValue({ action: 'sharedAction' });
 jest.spyOn(ReactNative.DeviceEventEmitter, 'emit').mockImplementation(() => {});
@@ -96,6 +96,31 @@ jest.mock('@/components/broadcast/BroadcastFeedVideoPreview', () => {
   };
 });
 
+// The comment button opens a real ChatRoomPage overlay (see
+// BroadcastDetailScreen's overlayChat/handleOpenComments). Mounting it
+// unmocked pulls in its full hook stack (useChatAuth, useChatPersistence,
+// useChatMessaging, customE2EE, SocketProvider) — none of that is this
+// test's concern (it only needs to verify BroadcastDetailScreen passes the
+// right `chat` prop), and several of those hooks kick off unawaited async
+// work on mount that genuinely never settles under Jest (no native
+// bridge), hanging react-test-renderer's act() indefinitely regardless of
+// test-level timeout — confirmed by bisecting every async chain in that
+// stack down to one that stays pending for the test's entire real-time
+// timeout with nothing left to log. Mocking it here (same pattern as
+// BroadcastFeedVideoPreview above) is the correct fix: this screen's own
+// tests shouldn't depend on ChatRoomPage's internals rendering at all.
+jest.mock('@/Module/ChatRoom/ChatRoomPage', () => {
+  const React = require('react');
+  const { View, Text } = require('react-native');
+  return function MockChatRoomPage(props: any) {
+    return React.createElement(
+      View,
+      { testID: 'broadcast-detail-chatroom-mock' },
+      React.createElement(Text, null, `chatroom:${props?.chat?.conversationId ?? ''}`),
+    );
+  };
+});
+
 jest.mock('@/network', () => ({
   __esModule: true,
   default: {
@@ -105,41 +130,23 @@ jest.mock('@/network', () => ({
       save: (id: string) => `/api/v1/broadcasts/${id}/save/`,
       share: (id: string) => `/api/v1/broadcasts/${id}/share/`,
     },
-    // The comment button opens a real ChatRoomPage overlay (see
-    // BroadcastDetailScreen's overlayChat), whose mark-as-read effect
-    // calls ROUTES.chat.markRead as soon as it mounts — needed here even
-    // though this test never asserts on it directly. conversationDetail
-    // is the same story for ChatRoomPage's disappearing-messages/
-    // retention-days fetch, added after this test file was last updated.
-    chat: {
-      markRead: (conversationId: string) => `/api/v1/chats/conversations/${conversationId}/mark-read/`,
-      conversationDetail: (conversationId: string) => `/api/v1/chats/conversations/${conversationId}/`,
-    },
   },
   resolveBackendAssetUrl: (value: string) => value,
 }));
 
-// ChatRoomPage (mounted unmocked via the comment overlay, see below) reads
-// top-inset spacing through useSafeAreaInsets() - react-native-safe-area-
-// context's real native module isn't linked under Jest, and with no
-// SafeAreaProvider ancestor in this tree its event-emitter registration
-// never settles, hanging the whole test. This is the package's own
-// official jest mock (same pattern as reanimated's above).
+// BroadcastDetailScreen itself (not just ChatRoomPage) reads top-inset
+// spacing through useSafeAreaInsets() - react-native-safe-area-context's
+// real native module isn't linked under Jest. Official package jest mock.
 jest.mock('react-native-safe-area-context', () => require('react-native-safe-area-context/jest/mock').default);
-// ChatRoomPage's auth/persistence hooks (useChatAuth, useChatPersistence)
-// read/write real AsyncStorage as soon as it mounts - no native module is
-// linked under Jest, so unmocked calls never resolve. Same official mock
-// used by gameStorage.stages.test.ts.
+// BroadcastDetailScreen seeds a draft via AsyncStorage before opening the
+// comment overlay (see handleOpenComments) - no native module is linked
+// under Jest, so unmocked calls never resolve. Same official mock used by
+// gameStorage.stages.test.ts.
 jest.mock('@react-native-async-storage/async-storage', () =>
   require('@react-native-async-storage/async-storage/jest/async-storage-mock'),
 );
 
 jest.mock('@/network/post', () => ({ postRequest: jest.fn() }));
-// ChatRoomPage's disappearing-messages/retention-days effect calls
-// getRequest(ROUTES.chat.conversationDetail(...)) as soon as it mounts
-// (added after this test file was last updated) - unmocked, it attempted
-// a real network call that never resolved within this environment,
-// hanging every test in this file until Jest's own timeout fired.
 jest.mock('@/network/get', () => ({ getRequest: jest.fn().mockResolvedValue({ success: true, data: {} }) }));
 
 const mockedPostRequest = postRequest as jest.MockedFunction<typeof postRequest>;
@@ -155,11 +162,6 @@ describe('broadcast detail screen', () => {
     mockedPostRequest
       .mockResolvedValueOnce({ success: true, data: { count: 3, reacted: true } } as any)
       .mockResolvedValueOnce({ success: true, data: { conversation_id: 'conversation-1' } } as any)
-      // Opening the comment room mounts a real (unmocked) ChatRoomPage
-      // overlay, whose mark-as-read effect fires its own postRequest call
-      // as soon as it mounts — one more queued response than the four
-      // user-initiated actions below.
-      .mockResolvedValueOnce({ success: true } as any)
       .mockResolvedValueOnce({ success: true } as any)
       .mockResolvedValueOnce({ success: true } as any);
 
@@ -217,7 +219,7 @@ describe('broadcast detail screen', () => {
       await pressables[2].props.onPress();
     });
     expect(mockedPostRequest).toHaveBeenNthCalledWith(
-      4,
+      3,
       '/api/v1/broadcasts/broadcast-1/save/',
       {},
       expect.objectContaining({ errorMessage: 'Unable to save broadcast.' }),
@@ -245,7 +247,7 @@ describe('broadcast detail screen', () => {
       await shareToAppButton!.props.onPress();
     });
     expect(mockedPostRequest).toHaveBeenNthCalledWith(
-      5,
+      4,
       '/api/v1/broadcasts/broadcast-1/share/',
       { platform: 'app' },
       expect.objectContaining({ errorMessage: 'Unable to log share.' }),
