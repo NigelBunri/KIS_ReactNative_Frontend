@@ -31,6 +31,7 @@ import { directConversationAvatar, participantsToIds } from './messagesUtils';
 import ROUTES, { CHAT_BASE_URL } from '@/network';
 import { getRequest } from '@/network/get';
 import { postRequest } from '@/network/post';
+import { patchRequest } from '@/network/patch';
 import { handleRemoveGroupMember } from './ChatRoomHandlers';
 import { loadMessages } from './Storage/chatStorage';
 import apiService from '@/services/apiService';
@@ -256,15 +257,35 @@ export const ChatInfoPage: React.FC<ChatInfoPageProps> = ({
     return resolveUserId(directContact.user);
   }, [directContact]);
 
-  const roomId = String(chat.conversationId ?? chat.id ?? '');
-
-  // GAP 3 (new): load reactionsAdminOnly from AsyncStorage
+  // Real server-side state for the four Group settings toggles below -
+  // previously these all initialized from chat.messagingRestricted/etc
+  // (fields nothing ever actually sets on the Chat object) or, for
+  // reactionsAdminOnly, a per-device AsyncStorage key - neither reflects
+  // what's actually saved server-side (ConversationSettings.send_policy/
+  // info_edit_policy/reactions_admin_only), so every toggle displayed the
+  // wrong initial state on a fresh install or second device. One fetch of
+  // the real ConversationDetailSerializer.settings replaces all of that.
   useEffect(() => {
-    if (!roomId) return;
-    AsyncStorage.getItem(`KIS_REACTIONS_ADMIN_ONLY_${roomId}`)
-      .then((val) => { if (val === 'true') setReactionsAdminOnly(true); })
-      .catch(() => {});
-  }, [roomId]);
+    if (!isGroup || !conversationId) return;
+    getRequest(ROUTES.chat.conversationDetail(conversationId)).then((res) => {
+      const settings = (res?.data ?? res)?.settings;
+      if (!settings) return;
+      setMessagingRestricted(settings.send_policy === 'admins_only');
+      setEditInfoRestricted(settings.info_edit_policy === 'admins_only');
+      setReactionsAdminOnly(Boolean(settings.reactions_admin_only));
+    }).catch(() => {});
+  }, [isGroup, conversationId]);
+
+  // "Approval required to join" is a Group-level setting (join_policy),
+  // not a ConversationSettings field - see GroupDetailSerializer, only
+  // reachable once groupId has resolved above.
+  useEffect(() => {
+    if (!groupId) return;
+    getRequest(ROUTES.groups.detail(groupId)).then((res) => {
+      const data = res?.data ?? res;
+      if (data?.join_policy) setApprovalRequired(data.join_policy === 'request');
+    }).catch(() => {});
+  }, [groupId]);
 
   const handleStartCall = async (media: 'voice' | 'video') => {
     if (!startCall) {
@@ -394,26 +415,58 @@ export const ChatInfoPage: React.FC<ChatInfoPageProps> = ({
   const isAdmin = isOwner || role === 'admin' || role === 'moderator';
 
   // ── Setting toggle helper ─────────────────────────────────────────────────
-  const emitGroupSetting = (key: string, value: boolean) => {
-    try { socket?.emit('group.update_settings', { roomId, [key]: value }); } catch {}
-  };
-
   const patchConversationSettings = async (payload: Record<string, unknown>) => {
     try {
       await postRequest(ROUTES.chat.updateSettings(conversationId), payload, {});
     } catch { /* best-effort */ }
   };
 
+  // field/trueValue/falseValue are ConversationSettings' REAL field names
+  // and enum values (send_policy: 'admins_only'|'all_members', etc) - the
+  // mobile UI's boolean toggle has to translate to those exactly, since
+  // DRF silently ignores any key in a PATCH body that isn't a real
+  // serializer field (no error, no save - which is exactly why these
+  // toggles previously appeared to work: the local `next` state flipped
+  // and the request "succeeded", but nothing was ever actually persisted
+  // under a key like "messaging_restricted", because that key doesn't
+  // exist on ConversationSettings at all).
   const handleToggleSetting = async (
-    key: string,
+    field: string,
+    trueValue: string,
+    falseValue: string,
     current: boolean,
     setter: (v: boolean) => void,
   ) => {
     if (!isAdmin) return;
     const next = !current;
     setter(next);
-    emitGroupSetting(key, next);
-    await patchConversationSettings({ [key]: next });
+    await patchConversationSettings({ [field]: next ? trueValue : falseValue });
+  };
+
+  // "Only admins can react" - reactions_admin_only is a plain boolean
+  // field (not an enum like send_policy/info_edit_policy), so it doesn't
+  // need the trueValue/falseValue translation above.
+  const handleToggleReactionsAdminOnly = async () => {
+    if (!isAdmin) return;
+    const next = !reactionsAdminOnly;
+    setReactionsAdminOnly(next);
+    await patchConversationSettings({ reactions_admin_only: next });
+  };
+
+  // "Approval required to join" lives on the Group itself (join_policy),
+  // not ConversationSettings - see GroupDetailSerializer. Previously sent
+  // to patchConversationSettings as "approval_required", a key that
+  // exists on neither model, so it was a double no-op (wrong endpoint AND
+  // wrong field).
+  const handleToggleApprovalRequired = async () => {
+    if (!isAdmin || !groupId) return;
+    const next = !approvalRequired;
+    setApprovalRequired(next);
+    try {
+      await patchRequest(ROUTES.groups.detail(groupId), {
+        join_policy: next ? 'request' : 'open',
+      }, {});
+    } catch { /* best-effort, matches patchConversationSettings' posture */ }
   };
 
   // ── Save group name ────────────────────────────────────────────────────────
@@ -628,14 +681,21 @@ export const ChatInfoPage: React.FC<ChatInfoPageProps> = ({
     }
   };
 
+  // GET, not POST: the backend action (apps/groups/views.py's invite_link)
+  // treats every POST as a hard regenerate, invalidating the link for
+  // everyone who already has it. GET returns the existing link (creating
+  // one on first call) without ever revoking it - the right semantics for
+  // "show/share the current link", and the one any active member is
+  // allowed to call (previously admin-only server-side for either verb,
+  // which is what made this unreachable for a plain member regardless of
+  // what the mobile UI gated on).
   const handleFetchInviteLink = async () => {
     if (!groupId || inviteLinkLoading) return;
     setInviteLinkLoading(true);
     try {
-      const res = await postRequest(
+      const res = await getRequest(
         ROUTES.groups.inviteLink(groupId),
-        {},
-        { errorMessage: 'Failed to generate invite link' },
+        { errorMessage: 'Failed to load invite link' },
       );
       const link =
         res?.data?.link ??
@@ -649,6 +709,31 @@ export const ChatInfoPage: React.FC<ChatInfoPageProps> = ({
       }
     } catch {
       Alert.alert('Error', 'Failed to fetch invite link.');
+    } finally {
+      setInviteLinkLoading(false);
+    }
+  };
+
+  // Admin-only (enforced server-side too) - revokes the link everyone else
+  // already has, so this stays a deliberate, separate action from the
+  // view/share flow above, not something a plain member can trigger.
+  const handleRegenerateInviteLink = async () => {
+    if (!groupId || !isAdmin || inviteLinkLoading) return;
+    setInviteLinkLoading(true);
+    try {
+      const res = await postRequest(
+        ROUTES.groups.inviteLink(groupId),
+        {},
+        { errorMessage: 'Failed to regenerate invite link' },
+      );
+      const link =
+        res?.data?.link ??
+        res?.data?.invite_link ??
+        res?.data?.url ??
+        (typeof res?.data === 'string' ? res.data : null);
+      if (link) setInviteLink(String(link));
+    } catch {
+      Alert.alert('Error', 'Failed to regenerate invite link.');
     } finally {
       setInviteLinkLoading(false);
     }
@@ -1446,6 +1531,29 @@ export const ChatInfoPage: React.FC<ChatInfoPageProps> = ({
                         Share
                       </Text>
                     </Pressable>
+                    {isAdmin && (
+                      <Pressable
+                        onPress={() =>
+                          Alert.alert(
+                            'Regenerate invite link',
+                            'The current link will stop working for anyone who already has it. Continue?',
+                            [
+                              { text: 'Cancel', style: 'cancel' },
+                              { text: 'Regenerate', style: 'destructive', onPress: handleRegenerateInviteLink },
+                            ],
+                          )
+                        }
+                        style={({ pressed }) => [
+                          styles.inviteLinkBtn,
+                          { backgroundColor: palette.surface, borderWidth: 1, borderColor: palette.divider, opacity: pressed || inviteLinkLoading ? 0.7 : 1 },
+                        ]}
+                      >
+                        <KISIcon name="refresh" size={14} color={palette.text} />
+                        <Text style={[styles.inviteLinkBtnText, { color: palette.text }]}>
+                          Regenerate
+                        </Text>
+                      </Pressable>
+                    )}
                   </View>
                 </>
               ) : (
@@ -1587,19 +1695,19 @@ export const ChatInfoPage: React.FC<ChatInfoPageProps> = ({
                   label="Only admins can send"
                   sublabel="Members can read but not send messages"
                   value={messagingRestricted}
-                  onToggle={() => void handleToggleSetting('messaging_restricted', messagingRestricted, setMessagingRestricted)}
+                  onToggle={() => void handleToggleSetting('send_policy', 'admins_only', 'all_members', messagingRestricted, setMessagingRestricted)}
                 />
                 <SettingRow
                   label="Only admins can edit info"
                   sublabel="Only admins can change group name, photo & description"
                   value={editInfoRestricted}
-                  onToggle={() => void handleToggleSetting('edit_info_restricted', editInfoRestricted, setEditInfoRestricted)}
+                  onToggle={() => void handleToggleSetting('info_edit_policy', 'admins_only', 'all_members', editInfoRestricted, setEditInfoRestricted)}
                 />
                 <SettingRow
                   label="Approval required to join"
                   sublabel="Admin must approve join requests from invite links"
                   value={approvalRequired}
-                  onToggle={() => void handleToggleSetting('approval_required', approvalRequired, setApprovalRequired)}
+                  onToggle={() => void handleToggleApprovalRequired()}
                 />
                 <View style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 12 }}>
                   <View style={{ flex: 1, marginRight: 12 }}>
@@ -1608,12 +1716,7 @@ export const ChatInfoPage: React.FC<ChatInfoPageProps> = ({
                   </View>
                   <Toggle
                     value={reactionsAdminOnly}
-                    onToggle={() => {
-                      const next = !reactionsAdminOnly;
-                      setReactionsAdminOnly(next);
-                      AsyncStorage.setItem(`KIS_REACTIONS_ADMIN_ONLY_${roomId}`, next ? 'true' : 'false').catch(() => {});
-                      emitGroupSetting('reactionsAdminOnly', next);
-                    }}
+                    onToggle={() => void handleToggleReactionsAdminOnly()}
                   />
                 </View>
               </View>

@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   Alert,
   Animated,
+  BackHandler,
   FlatList,
   Image,
   KeyboardAvoidingView,
@@ -65,6 +66,7 @@ type StatusItem = {
   documentName?: string;
   durationMs?: number;
   createdAt?: string;
+  expiresAt?: string;
   viewed?: boolean;
   visibility?: StatusVisibility;
   audienceUserIds?: string[];
@@ -388,7 +390,7 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
   useImperativeHandle(ref, () => ({
     scrollTo: (opts) => scrollRef.current?.scrollTo(opts),
   }), []);
-  const { currentUserId } = useSocket();
+  const { currentUserId, socket, isConnected } = useSocket();
   const mediaHeaders = useMediaHeaders();
   const [channels, setChannels] = useState<any[]>([]);
   const [channelsLoading, setChannelsLoading] = useState(false);
@@ -519,6 +521,45 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
   // right next to their name in the same list instead of needing a
   // separate sheet/tab for "who reacted" vs "who viewed".
   const [seenByReactions, setSeenByReactions] = useState<Record<string, string>>({});
+
+  // ── Status interaction sheet (Reactions / Replies) ───────────────────────
+  // Replaces the old flow where tapping react/reply delivered the action as
+  // a real chat message into a DM with the status's author (apps/statuses/
+  // services.py::deliver_status_reply_message) - that both polluted the
+  // viewer's and author's ordinary chat history with every status
+  // interaction, and made sending depend on a synchronous Django->Nest HTTP
+  // call that had never actually worked in production. Reactions/comments
+  // now persist directly via StatusReaction/StatusComment, surfaced here.
+  const [interactionTab, setInteractionTab] = useState<'reactions' | 'replies' | null>(null);
+  const [interactionExpanded, setInteractionExpanded] = useState(false);
+  const interactionSheetDragY = useRef(new Animated.Value(0)).current;
+  const [reactionGroups, setReactionGroups] = useState<
+    { emoji: string; count: number; users: { id: string; display_name: string; avatar_url?: string | null }[] }[]
+  >([]);
+  const [myReaction, setMyReaction] = useState<string | null>(null);
+  const [reactionsLoading, setReactionsLoading] = useState(false);
+  const [reactionsError, setReactionsError] = useState<string | null>(null);
+  const [activeReactionGroup, setActiveReactionGroup] = useState<string | null>(null);
+
+  type StatusComment = {
+    id: string;
+    parent_id: string | null;
+    author: { id: string; display_name: string; avatar_url?: string | null };
+    text: string;
+    created_at: string;
+    reply_count: number;
+    is_mine: boolean;
+  };
+  const [topLevelComments, setTopLevelComments] = useState<StatusComment[]>([]);
+  const [repliesByParent, setRepliesByParent] = useState<Record<string, StatusComment[]>>({});
+  const [expandedParents, setExpandedParents] = useState<Record<string, boolean>>({});
+  const [commentsLoading, setCommentsLoading] = useState(false);
+  const [commentsError, setCommentsError] = useState<string | null>(null);
+  const [commentsHasMore, setCommentsHasMore] = useState(false);
+  const [commentText, setCommentText] = useState('');
+  const [commentSubmitting, setCommentSubmitting] = useState(false);
+  const [replyingTo, setReplyingTo] = useState<{ id: string; authorName: string } | null>(null);
+  const commentClientIdRef = useRef<string | null>(null);
   // Hold-to-pause: every world-standard story viewer pauses playback while
   // the viewer is pressed down anywhere on the media (not just the
   // dedicated video/audio controls this screen already had) and resumes on
@@ -882,6 +923,7 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
                   text: item.text ?? undefined,
                   durationMs: item.duration_ms ?? undefined,
                   createdAt: item.created_at ?? undefined,
+                  expiresAt: item.expires_at ?? undefined,
                   documentName: item.original_filename ?? undefined,
                   style: item.style ?? undefined,
                   viewed: Boolean(item.viewed),
@@ -1208,7 +1250,42 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
     setViewerUserId(null);
     setViewerIndex(0);
     setViewerProgress(0);
+    // Closing the whole viewer must also tear down the interaction sheet's
+    // state - otherwise reopening a different status could briefly show
+    // the previous one's reactions/replies before the fresh fetch lands.
+    setInteractionTab(null);
+    setInteractionExpanded(false);
+    setActiveReactionGroup(null);
+    setReplyingTo(null);
+    setCommentText('');
+    setReactionGroups([]);
+    setMyReaction(null);
+    setTopLevelComments([]);
+    setRepliesByParent({});
+    setExpandedParents({});
   }, [stopTimer]);
+
+  // Manual pause (reply typing, "Read more" expanded, interaction sheet
+  // open) - same underlying pause/elapsed-time-accounting mechanism as
+  // hold-to-pause, just started and ended explicitly instead of on
+  // press-in/press-out. Moved above handleStatusActionMenu/the
+  // interaction-sheet helpers below so both can reference it without a
+  // "used before declaration" ordering error.
+  const beginManualPause = useCallback(() => {
+    manualPauseRef.current = true;
+    if (!mediaPausedRef.current) {
+      pauseBeganAtRef.current = Date.now();
+      setMediaPaused(true);
+    }
+  }, []);
+  const endManualPause = useCallback(() => {
+    manualPauseRef.current = false;
+    if (pauseBeganAtRef.current) {
+      pausedMsRef.current += Date.now() - pauseBeganAtRef.current;
+      pauseBeganAtRef.current = null;
+    }
+    setMediaPaused(false);
+  }, []);
 
   const handleStatusAudienceToggle = useCallback((userId: string) => {
     setStatusDraftTargetUserIds(prev =>
@@ -1258,6 +1335,27 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
           },
         },
         {
+          // Per-viewer, per-item "not interested in this one" - distinct
+          // from mute above (hides every status from this author, not just
+          // this one) and persisted server-side (StatusHide), so it
+          // survives an app restart or signing in on another device - see
+          // apps/statuses/views.py's hide_status().
+          key: 'hide',
+          label: 'Hide this status',
+          icon: 'eye-closed',
+          onPress: async () => {
+            setActionSheet(null);
+            const res = await postRequest(
+              ROUTES.statuses.hide(currentItem.id),
+              {},
+              { errorMessage: 'Unable to hide this status.' },
+            );
+            if (!res?.success) return;
+            closeViewer();
+            await loadStatuses(true);
+          },
+        },
+        {
           key: 'report',
           label: 'Report status',
           icon: 'report',
@@ -1278,16 +1376,33 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
           label: 'Block user',
           icon: 'shield',
           destructive: true,
-          onPress: async () => {
+          onPress: () => {
             setActionSheet(null);
-            const res = await postRequest(
-              ROUTES.moderation.userBlocks,
-              { blocked: statusAuthorId, reason: 'status_block' },
-              { errorMessage: 'Unable to block this user.' },
+            // Blocking is irreversible-feeling and affects every chat/call
+            // with this person, not just their statuses - confirm first,
+            // same as every other "Block" entry point in the app
+            // (ChatRoomPage's handleBlockChat uses the identical pattern).
+            Alert.alert(
+              'Block user',
+              `Block ${activeUser.name}? They won't be able to message or call you, and you won't see their statuses anymore.`,
+              [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                  text: 'Block',
+                  style: 'destructive',
+                  onPress: async () => {
+                    const res = await postRequest(
+                      ROUTES.moderation.userBlocks,
+                      { blocked: statusAuthorId, reason: 'status_block' },
+                      { errorMessage: 'Unable to block this user.' },
+                    );
+                    if (!res?.success) return;
+                    closeViewer();
+                    await loadStatuses(true);
+                  },
+                },
+              ],
             );
-            if (!res?.success) return;
-            closeViewer();
-            await loadStatuses(true);
           },
         },
       ],
@@ -1445,11 +1560,22 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
   const handleSendReaction = useCallback(
     async (emoji: string) => {
       if (!currentItem?.id) return;
+      // Tapping the SAME emoji again removes it (toggle), matching the
+      // "tap again to un-heart" convention this quick-reaction row is
+      // modeled on - react() alone can only ever replace, never clear.
+      if (myReaction === emoji) {
+        setMyReaction(null);
+        try {
+          await postRequest(ROUTES.statuses.unreact(currentItem.id), {});
+        } catch {}
+        return;
+      }
       try {
         await postRequest(ROUTES.statuses.react(currentItem.id), {
           emoji,
           client_id: `client_${Date.now()}_${Math.random().toString(36).slice(2)}`,
         });
+        setMyReaction(emoji);
         setReactionSentEmoji(emoji);
         setTimeout(() => setReactionSentEmoji(prev => (prev === emoji ? null : prev)), 1200);
       } catch {
@@ -1457,8 +1583,222 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
         // interrupting the story viewer with an alert over.
       }
     },
-    [currentItem?.id],
+    [currentItem?.id, myReaction],
   );
+
+  // ── Interaction sheet data + actions ──────────────────────────────────────
+
+  const closeInteractionSheet = useCallback(() => {
+    setInteractionTab(null);
+    setInteractionExpanded(false);
+    setActiveReactionGroup(null);
+    setReplyingTo(null);
+    setCommentText('');
+    endManualPause();
+  }, []);
+
+  // A 404 from any discussion endpoint while the sheet is open means the
+  // status itself is now gone from under the viewer (expired mid-view, or
+  // removed) - every one of those endpoints 404s a missing/expired/
+  // unauthorized status identically (see _get_viewable_status_or_404 on
+  // the Django side), so this is the one place that distinguishes "really
+  // gone" from an ordinary transient failure, instead of each call site
+  // guessing from a generic error message.
+  const handleStatusGoneIfExpired = useCallback(
+    (res: { status?: number } | null | undefined): boolean => {
+      if (res?.status !== 404) return false;
+      closeInteractionSheet();
+      closeViewer();
+      Alert.alert('Status unavailable', 'This status is no longer available.');
+      return true;
+    },
+    [closeInteractionSheet, closeViewer],
+  );
+
+  const loadReactions = useCallback(async (statusId: string) => {
+    setReactionsLoading(true);
+    setReactionsError(null);
+    try {
+      const res = await getRequest(ROUTES.statuses.reactions(statusId), {});
+      if (handleStatusGoneIfExpired(res)) return;
+      if (!res?.success) {
+        setReactionsError(res?.message || 'Unable to load reactions.');
+        return;
+      }
+      setReactionGroups(Array.isArray(res?.data?.groups) ? res.data.groups : []);
+      setMyReaction(res?.data?.my_reaction ?? null);
+    } catch {
+      setReactionsError('Unable to load reactions.');
+    } finally {
+      setReactionsLoading(false);
+    }
+  }, [handleStatusGoneIfExpired]);
+
+  const loadComments = useCallback(async (statusId: string) => {
+    setCommentsLoading(true);
+    setCommentsError(null);
+    try {
+      const res = await getRequest(ROUTES.statuses.comments(statusId), {});
+      if (handleStatusGoneIfExpired(res)) return;
+      if (!res?.success) {
+        setCommentsError(res?.message || 'Unable to load replies.');
+        return;
+      }
+      setTopLevelComments(Array.isArray(res?.data?.results) ? res.data.results : []);
+      setCommentsHasMore(Boolean(res?.data?.has_more));
+    } catch {
+      setCommentsError('Unable to load replies.');
+    } finally {
+      setCommentsLoading(false);
+    }
+  }, [handleStatusGoneIfExpired]);
+
+  const loadReplies = useCallback(async (statusId: string, parentId: string) => {
+    const url = `${ROUTES.statuses.comments(statusId)}?parent_id=${encodeURIComponent(parentId)}`;
+    const res = await getRequest(url, {});
+    if (res?.success) {
+      setRepliesByParent(prev => ({
+        ...prev,
+        [parentId]: Array.isArray(res?.data?.results) ? res.data.results : [],
+      }));
+    }
+  }, []);
+
+  const toggleReplyExpanded = useCallback(
+    (comment: StatusComment) => {
+      if (!currentItem?.id) return;
+      setExpandedParents(prev => {
+        const next = { ...prev, [comment.id]: !prev[comment.id] };
+        return next;
+      });
+      if (!repliesByParent[comment.id]) {
+        loadReplies(currentItem.id, comment.id);
+      }
+    },
+    [currentItem?.id, loadReplies, repliesByParent],
+  );
+
+  const reactionSummaryLabel = useMemo(() => {
+    const totalReactions = reactionGroups.reduce((sum, g) => sum + g.count, 0);
+    const totalReplies = topLevelComments.length;
+    if (!totalReactions && !totalReplies) return 'React or reply';
+    const parts: string[] = [];
+    if (totalReactions) parts.push(`${totalReactions} reaction${totalReactions === 1 ? '' : 's'}`);
+    if (totalReplies) parts.push(`${totalReplies} repl${totalReplies === 1 ? 'y' : 'ies'}`);
+    return parts.join(' · ');
+  }, [reactionGroups, topLevelComments.length]);
+
+  const openInteractionSheet = useCallback(
+    (tab: 'reactions' | 'replies') => {
+      if (!currentItem?.id) return;
+      beginManualPause();
+      setInteractionTab(tab);
+      setActiveReactionGroup(null);
+      interactionSheetDragY.setValue(0);
+      loadReactions(currentItem.id);
+      loadComments(currentItem.id);
+    },
+    [currentItem?.id, loadComments, loadReactions, interactionSheetDragY],
+  );
+
+  // Android back button closes the sheet (or the active reaction-group
+  // drill-down first) instead of falling through to the OS default of
+  // closing the whole screen/app.
+  React.useEffect(() => {
+    if (!interactionTab) return;
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (activeReactionGroup) {
+        setActiveReactionGroup(null);
+        return true;
+      }
+      closeInteractionSheet();
+      return true;
+    });
+    return () => sub.remove();
+  }, [interactionTab, activeReactionGroup, closeInteractionSheet]);
+
+  // Join the status's realtime discussion room while the sheet is open, so
+  // a reaction/comment from someone else lands live - see
+  // realtime/handlers/statusDiscussions.ts on the Nest side. Best-effort
+  // only: if the socket is down or the join is denied, the sheet still
+  // works from its own initial fetch above, just without live updates
+  // until the next manual reopen.
+  React.useEffect(() => {
+    if (!interactionTab || !currentItem?.id || !socket || !isConnected) return;
+    const statusId = currentItem.id;
+    socket.emit('status.join', { statusId });
+
+    const onReactionChanged = (payload: any) => {
+      if (String(payload?.status_id) !== String(statusId)) return;
+      loadReactions(statusId);
+    };
+    const onCommentAdded = (payload: any) => {
+      if (!payload?.id) return;
+      if (payload.parent_id) {
+        setRepliesByParent(prev => {
+          if (!prev[payload.parent_id]) return prev;
+          if (prev[payload.parent_id].some(c => c.id === payload.id)) return prev;
+          return { ...prev, [payload.parent_id]: [...prev[payload.parent_id], payload] };
+        });
+        setTopLevelComments(prev =>
+          prev.map(c => (c.id === payload.parent_id ? { ...c, reply_count: c.reply_count + 1 } : c)),
+        );
+      } else {
+        setTopLevelComments(prev => (prev.some(c => c.id === payload.id) ? prev : [...prev, payload]));
+      }
+    };
+    socket.on('status.reaction_changed', onReactionChanged);
+    socket.on('status.comment_added', onCommentAdded);
+
+    return () => {
+      socket.emit('status.leave', { statusId });
+      socket.off('status.reaction_changed', onReactionChanged);
+      socket.off('status.comment_added', onCommentAdded);
+    };
+  }, [interactionTab, currentItem?.id, socket, isConnected, loadReactions]);
+
+  const handleSubmitComment = useCallback(async () => {
+    const text = commentText.trim();
+    if (!text || !currentItem?.id) return;
+    setCommentSubmitting(true);
+    try {
+      if (!commentClientIdRef.current) {
+        commentClientIdRef.current = `client_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+      }
+      const res = await postRequest(
+        ROUTES.statuses.comments(currentItem.id),
+        {
+          text,
+          client_id: commentClientIdRef.current,
+          ...(replyingTo ? { parent_id: replyingTo.id } : {}),
+        },
+        { errorMessage: 'Unable to send your reply.' },
+      );
+      if (handleStatusGoneIfExpired(res)) return;
+      if (!res?.success) {
+        Alert.alert('Reply', res?.message || 'Unable to send your reply.');
+        return;
+      }
+      commentClientIdRef.current = null;
+      setCommentText('');
+      if (replyingTo) {
+        const parentId = replyingTo.id;
+        setReplyingTo(null);
+        setRepliesByParent(prev => ({
+          ...prev,
+          [parentId]: [...(prev[parentId] ?? []), res.data],
+        }));
+        setTopLevelComments(prev =>
+          prev.map(c => (c.id === parentId ? { ...c, reply_count: c.reply_count + 1 } : c)),
+        );
+        setExpandedParents(prev => ({ ...prev, [parentId]: true }));
+      } else {
+        setTopLevelComments(prev => [...prev, res.data]);
+      }
+    } finally {
+      setCommentSubmitting(false);
+    }
+  }, [commentText, currentItem?.id, replyingTo, handleStatusGoneIfExpired]);
 
   const seekPanResponder = useMemo(() => {
     if (currentItem?.type !== 'video') return null;
@@ -1516,24 +1856,6 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
     navigate();
   }, []);
 
-  // Manual pause (reply typing, "Read more" expanded) - same underlying
-  // pause/elapsed-time-accounting mechanism as hold-to-pause, just started
-  // and ended explicitly instead of on press-in/press-out.
-  const beginManualPause = useCallback(() => {
-    manualPauseRef.current = true;
-    if (!mediaPausedRef.current) {
-      pauseBeganAtRef.current = Date.now();
-      setMediaPaused(true);
-    }
-  }, []);
-  const endManualPause = useCallback(() => {
-    manualPauseRef.current = false;
-    if (pauseBeganAtRef.current) {
-      pausedMsRef.current += Date.now() - pauseBeganAtRef.current;
-      pauseBeganAtRef.current = null;
-    }
-    setMediaPaused(false);
-  }, []);
 
   // Swipe-down-to-dismiss - the other world-standard story-viewer gesture
   // this screen had no equivalent of (close button only, before). Only
@@ -1570,6 +1892,47 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
         },
       }),
     [closeViewer, viewerDragY],
+  );
+
+  // Drag handle on the interaction sheet (Reactions/Replies): dragging down
+  // past a threshold dismisses the whole sheet (same gesture/threshold
+  // convention as dismissPanResponder above); dragging up past a threshold
+  // expands it from ~40% to ~85% of the screen. Anything short of either
+  // threshold springs back to where it started - this only claims the
+  // gesture once a real, dominant vertical drag is underway
+  // (onMoveShouldSetPanResponderCapture, not onStartShouldSetPanResponder),
+  // so ordinary taps/scrolling on comments beneath it pass straight through.
+  const interactionSheetPanResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onStartShouldSetPanResponder: () => false,
+        onMoveShouldSetPanResponderCapture: (_evt, gesture) =>
+          Math.abs(gesture.dy) > 10 && Math.abs(gesture.dy) > Math.abs(gesture.dx) * 1.5,
+        onPanResponderMove: (_evt, gesture) => {
+          interactionSheetDragY.setValue(gesture.dy);
+        },
+        onPanResponderRelease: (_evt, gesture) => {
+          if (gesture.dy > 100) {
+            Animated.timing(interactionSheetDragY, {
+              toValue: 600,
+              duration: 180,
+              useNativeDriver: true,
+            }).start(() => {
+              interactionSheetDragY.setValue(0);
+              closeInteractionSheet();
+            });
+            return;
+          }
+          if (gesture.dy < -60 && !interactionExpanded) {
+            setInteractionExpanded(true);
+          }
+          Animated.spring(interactionSheetDragY, { toValue: 0, useNativeDriver: true, bounciness: 4 }).start();
+        },
+        onPanResponderTerminate: () => {
+          Animated.spring(interactionSheetDragY, { toValue: 0, useNativeDriver: true, bounciness: 4 }).start();
+        },
+      }),
+    [closeInteractionSheet, interactionExpanded, interactionSheetDragY],
   );
 
   React.useEffect(() => {
@@ -1623,6 +1986,49 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
     };
     markViewed();
   }, [viewerOpen, currentItem?.id, activeUser?.id]);
+
+  // 72-hour status expiry: the server is authoritative (every read/write
+  // endpoint already excludes an expired status - see StatusItem.
+  // MAX_LIFETIME_HOURS and _get_viewable_status_or_404 on the Django
+  // side), but a status already loaded into this screen's local state
+  // before it expired would otherwise sit there, fully interactive, until
+  // the next full list refresh. This polls the CURRENTLY OPEN item's own
+  // expires_at locally so expiry is reflected live while someone's
+  // actually looking at it, without waiting on a server round trip.
+  React.useEffect(() => {
+    if (!viewerOpen || !currentItem?.id || !currentItem.expiresAt) return;
+    const statusId = currentItem.id;
+    const expiresAtMs = new Date(currentItem.expiresAt).getTime();
+
+    const handleExpired = () => {
+      setStatusUsers(prev =>
+        prev
+          .map(u => ({ ...u, items: u.items.filter(item => item.id !== statusId) }))
+          .filter(u => u.items.length > 0 || u.id === 'me'),
+      );
+      closeInteractionSheet();
+      closeViewer();
+      Alert.alert('Status expired', 'This status is no longer available.');
+    };
+
+    const msRemaining = expiresAtMs - Date.now();
+    if (msRemaining <= 0) {
+      handleExpired();
+      return;
+    }
+    // Capped at 60s: Date.now() isn't trustworthy enough (device clock
+    // drift/change) to schedule a single setTimeout for however long is
+    // left and trust it to fire at exactly the right moment - polling
+    // means a skewed clock self-corrects within one tick instead of
+    // leaving the status interactive indefinitely or expiring early.
+    const intervalMs = Math.min(60_000, Math.max(5_000, msRemaining));
+    const interval = setInterval(() => {
+      if (new Date(currentItem.expiresAt as string).getTime() - Date.now() <= 0) {
+        handleExpired();
+      }
+    }, intervalMs);
+    return () => clearInterval(interval);
+  }, [viewerOpen, currentItem?.id, currentItem?.expiresAt, closeViewer, closeInteractionSheet]);
 
   // Same story-ring convention on every thumb below: a bold accent ring
   // means there's something new to see, a plain divider frame means it's
@@ -3569,12 +3975,15 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
                   : Array.isArray(viewersRes?.data)
                   ? viewersRes.data
                   : [];
-                const reactions: any[] = Array.isArray(reactionsRes?.data?.results)
-                  ? reactionsRes.data.results
-                  : [];
+                // reactions() now returns {groups: [{emoji, count, users}], my_reaction}
+                // instead of a flat {results: [...]} - grouped by emoji, with
+                // per-group participant previews (see apps/statuses/views.py).
+                const groups: any[] = Array.isArray(reactionsRes?.data?.groups) ? reactionsRes.data.groups : [];
                 const reactionMap: Record<string, string> = {};
-                reactions.forEach(r => {
-                  if (r?.id) reactionMap[String(r.id)] = r.emoji;
+                groups.forEach(group => {
+                  (group?.users ?? []).forEach((u: any) => {
+                    if (u?.id) reactionMap[String(u.id)] = group.emoji;
+                  });
                 });
                 setSeenByViewers(viewers);
                 setSeenByReactions(reactionMap);
@@ -3587,116 +3996,397 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
               </Text>
             </Pressable>
           )}
+
+          {/* Opens the Reactions/Replies interaction sheet - available to
+              every viewer (not just the owner), since reactions/comments are
+              now a real, persisted discussion anyone in the status's
+              audience can read, not just an owner-only aggregate. */}
+          {currentItem?.id && (
+            <Pressable
+              style={styles.viewerInteractionChip}
+              onPress={() => openInteractionSheet('reactions')}
+              accessibilityRole="button"
+              accessibilityLabel="View reactions and replies"
+            >
+              <KISIcon name="message-square" size={14} color={palette.ivory} />
+              <Text style={{ color: palette.ivory, fontSize: 12, marginLeft: 4 }}>
+                {reactionSummaryLabel}
+              </Text>
+            </Pressable>
+          )}
           </View>
+
+          {renderInteractionSheet()}
+          {renderActionSheetOverlay()}
+          {renderSeenBySheetOverlay()}
         </Animated.View>
       </Modal>
 
-      {/* Themed replacement for the native Alert.alert(...) this screen used
-          for the status "More" menu and the delete-confirmation - a plain
-          system dialog looked jarring popping up over a custom full-bleed
-          dark viewer. */}
-      <Modal visible={Boolean(actionSheet)} transparent animationType="fade" onRequestClose={() => setActionSheet(null)}>
-        <Pressable style={styles.sheetBackdrop} onPress={() => setActionSheet(null)}>
-          <Pressable style={[styles.sheetCard, { backgroundColor: palette.surfaceElevated }]} onPress={() => {}}>
-            {actionSheet?.title ? (
-              <Text style={[styles.sheetTitle, { color: palette.text }]}>{actionSheet.title}</Text>
-            ) : null}
-            {actionSheet?.subtitle ? (
-              <Text style={[styles.sheetSubtitle, { color: palette.subtext }]}>{actionSheet.subtitle}</Text>
-            ) : null}
-            {(actionSheet?.options ?? []).map(option => (
-              <Pressable
-                key={option.key}
-                onPress={option.onPress}
-                style={({ pressed }) => [
-                  styles.sheetOptionRow,
-                  { borderColor: palette.inputBorder, opacity: pressed ? 0.7 : 1 },
-                ]}
-              >
-                {option.icon ? (
-                  <KISIcon name={option.icon} size={18} color={option.destructive ? palette.danger : palette.text} />
-                ) : null}
-                <Text
-                  style={[
-                    styles.sheetOptionLabel,
-                    { color: option.destructive ? palette.danger : palette.text },
-                  ]}
-                >
-                  {option.label}
-                </Text>
-              </Pressable>
-            ))}
-            <Pressable
-              onPress={() => setActionSheet(null)}
-              style={({ pressed }) => [styles.sheetCancelRow, { opacity: pressed ? 0.7 : 1 }]}
-            >
-              <Text style={[styles.sheetOptionLabel, { color: palette.subtext, fontWeight: '700' }]}>Cancel</Text>
-            </Pressable>
-          </Pressable>
-        </Pressable>
-      </Modal>
-
-      {/* Themed replacement for the native Alert.alert(...) "Seen by" this
-          screen used to just join viewer names with '\n' - a real list with
-          avatars and relative view times instead. */}
-      <Modal visible={seenBySheetOpen} transparent animationType="fade" onRequestClose={() => setSeenBySheetOpen(false)}>
-        <Pressable style={styles.sheetBackdrop} onPress={() => setSeenBySheetOpen(false)}>
-          <Pressable style={[styles.sheetCard, { backgroundColor: palette.surfaceElevated, maxHeight: '70%' }]} onPress={() => {}}>
-            <Text style={[styles.sheetTitle, { color: palette.text }]}>
-              {seenByLoading ? 'Seen by…' : `Seen by ${seenByViewers.length}`}
-            </Text>
-            {!seenByLoading && Object.keys(seenByReactions).length > 0 ? (
-              <Text style={[styles.sheetSubtitle, { color: palette.subtext }]}>
-                {Object.keys(seenByReactions).length} reacted
-              </Text>
-            ) : null}
-            {seenByLoading ? (
-              <ActivityIndicator color={palette.primaryStrong} style={{ marginVertical: 20 }} />
-            ) : seenByViewers.length === 0 ? (
-              <View style={{ alignItems: 'center', gap: 8, marginVertical: 16 }}>
-                <KISIcon name="eye" size={22} color={palette.subtext} />
-                <Text style={[styles.sheetSubtitle, { color: palette.subtext }]}>
-                  No one has viewed this status yet.
-                </Text>
-              </View>
-            ) : (
-              <ScrollView showsVerticalScrollIndicator={false} style={{ marginTop: 4 }}>
-                {seenByViewers.map((viewer: any, idx: number) => {
-                  const name = viewer.display_name ?? viewer.viewer_name ?? viewer.viewer_id ?? 'Someone';
-                  return (
-                    <View key={viewer.id ?? viewer.viewer_id ?? idx} style={styles.seenByRow}>
-                      <View style={[styles.seenByAvatar, { backgroundColor: palette.card }]}>
-                        <Text style={{ color: palette.text, fontWeight: '800', fontSize: 13 }}>
-                          {String(name).trim().charAt(0).toUpperCase()}
-                        </Text>
-                      </View>
-                      <Text style={{ color: palette.text, fontSize: 14, flex: 1 }} numberOfLines={1}>
-                        {name}
-                      </Text>
-                      {seenByReactions[String(viewer.id ?? viewer.viewer_id)] ? (
-                        <Text style={{ fontSize: 16, marginRight: 6 }}>
-                          {seenByReactions[String(viewer.id ?? viewer.viewer_id)]}
-                        </Text>
-                      ) : null}
-                      {viewer.viewed_at ? (
-                        <Text style={{ color: palette.subtext, fontSize: 12 }}>{timeAgo(viewer.viewed_at)}</Text>
-                      ) : null}
-                    </View>
-                  );
-                })}
-              </ScrollView>
-            )}
-            <Pressable
-              onPress={() => setSeenBySheetOpen(false)}
-              style={({ pressed }) => [styles.sheetCancelRow, { opacity: pressed ? 0.7 : 1 }]}
-            >
-              <Text style={[styles.sheetOptionLabel, { color: palette.subtext, fontWeight: '700' }]}>Close</Text>
-            </Pressable>
-          </Pressable>
-        </Pressable>
-      </Modal>
     </View>
   );
+
+  // ── Overlay render functions ──────────────────────────────────────────────
+  // All three (action sheet, seen-by sheet, interaction sheet) render INSIDE
+  // the status viewer's own <Modal> (called from within its JSX above),
+  // as plain absolutely-positioned overlays rather than their own nested
+  // <Modal> - stacking two native Modals at once is unreliable on Android
+  // (the OS's single-Dialog-window model means a second simultaneously-
+  // visible RN Modal frequently never becomes visible/interactive at all),
+  // which is exactly why the three-dot "status options" menu previously
+  // opened nothing: handleStatusActionMenu's setActionSheet(...) was always
+  // firing correctly, but the action-sheet Modal it displayed was a sibling
+  // of the already-open viewer Modal, not a child of it.
+
+  function renderActionSheetOverlay() {
+    if (!actionSheet) return null;
+    return (
+      <Pressable style={styles.sheetBackdrop} onPress={() => setActionSheet(null)}>
+        <Pressable style={[styles.sheetCard, { backgroundColor: palette.surfaceElevated }]} onPress={() => {}}>
+          {actionSheet.title ? (
+            <Text style={[styles.sheetTitle, { color: palette.text }]}>{actionSheet.title}</Text>
+          ) : null}
+          {actionSheet.subtitle ? (
+            <Text style={[styles.sheetSubtitle, { color: palette.subtext }]}>{actionSheet.subtitle}</Text>
+          ) : null}
+          {actionSheet.options.map(option => (
+            <Pressable
+              key={option.key}
+              onPress={option.onPress}
+              style={({ pressed }) => [
+                styles.sheetOptionRow,
+                { borderColor: palette.inputBorder, opacity: pressed ? 0.7 : 1 },
+              ]}
+            >
+              {option.icon ? (
+                <KISIcon name={option.icon} size={18} color={option.destructive ? palette.danger : palette.text} />
+              ) : null}
+              <Text
+                style={[
+                  styles.sheetOptionLabel,
+                  { color: option.destructive ? palette.danger : palette.text },
+                ]}
+              >
+                {option.label}
+              </Text>
+            </Pressable>
+          ))}
+          <Pressable
+            onPress={() => setActionSheet(null)}
+            style={({ pressed }) => [styles.sheetCancelRow, { opacity: pressed ? 0.7 : 1 }]}
+          >
+            <Text style={[styles.sheetOptionLabel, { color: palette.subtext, fontWeight: '700' }]}>Cancel</Text>
+          </Pressable>
+        </Pressable>
+      </Pressable>
+    );
+  }
+
+  function renderSeenBySheetOverlay() {
+    if (!seenBySheetOpen) return null;
+    return (
+      <Pressable style={styles.sheetBackdrop} onPress={() => setSeenBySheetOpen(false)}>
+        <Pressable style={[styles.sheetCard, { backgroundColor: palette.surfaceElevated, maxHeight: '70%' }]} onPress={() => {}}>
+          <Text style={[styles.sheetTitle, { color: palette.text }]}>
+            {seenByLoading ? 'Seen by…' : `Seen by ${seenByViewers.length}`}
+          </Text>
+          {!seenByLoading && Object.keys(seenByReactions).length > 0 ? (
+            <Text style={[styles.sheetSubtitle, { color: palette.subtext }]}>
+              {Object.keys(seenByReactions).length} reacted
+            </Text>
+          ) : null}
+          {seenByLoading ? (
+            <ActivityIndicator color={palette.primaryStrong} style={{ marginVertical: 20 }} />
+          ) : seenByViewers.length === 0 ? (
+            <View style={{ alignItems: 'center', gap: 8, marginVertical: 16 }}>
+              <KISIcon name="eye" size={22} color={palette.subtext} />
+              <Text style={[styles.sheetSubtitle, { color: palette.subtext }]}>
+                No one has viewed this status yet.
+              </Text>
+            </View>
+          ) : (
+            <ScrollView showsVerticalScrollIndicator={false} style={{ marginTop: 4 }}>
+              {seenByViewers.map((viewer: any, idx: number) => {
+                const name = viewer.display_name ?? viewer.viewer_name ?? viewer.viewer_id ?? 'Someone';
+                return (
+                  <View key={viewer.id ?? viewer.viewer_id ?? idx} style={styles.seenByRow}>
+                    <View style={[styles.seenByAvatar, { backgroundColor: palette.card }]}>
+                      <Text style={{ color: palette.text, fontWeight: '800', fontSize: 13 }}>
+                        {String(name).trim().charAt(0).toUpperCase()}
+                      </Text>
+                    </View>
+                    <Text style={{ color: palette.text, fontSize: 14, flex: 1 }} numberOfLines={1}>
+                      {name}
+                    </Text>
+                    {seenByReactions[String(viewer.id ?? viewer.viewer_id)] ? (
+                      <Text style={{ fontSize: 16, marginRight: 6 }}>
+                        {seenByReactions[String(viewer.id ?? viewer.viewer_id)]}
+                      </Text>
+                    ) : null}
+                    {viewer.viewed_at ? (
+                      <Text style={{ color: palette.subtext, fontSize: 12 }}>{timeAgo(viewer.viewed_at)}</Text>
+                    ) : null}
+                  </View>
+                );
+              })}
+            </ScrollView>
+          )}
+          <Pressable
+            onPress={() => setSeenBySheetOpen(false)}
+            style={({ pressed }) => [styles.sheetCancelRow, { opacity: pressed ? 0.7 : 1 }]}
+          >
+            <Text style={[styles.sheetOptionLabel, { color: palette.subtext, fontWeight: '700' }]}>Close</Text>
+          </Pressable>
+        </Pressable>
+      </Pressable>
+    );
+  }
+
+  // The dedicated Reactions/Replies bottom sheet (section 3/4 of the status
+  // interaction redesign): ~40% of screen height on open, draggable to
+  // expand or dismiss, two tabs. Renders as a plain overlay inside the
+  // viewer's own Modal - see the note at the top of this section for why.
+  function renderInteractionSheet() {
+    if (!interactionTab || !currentItem) return null;
+    const sheetHeightPct = interactionExpanded ? '85%' : '40%';
+
+    const renderReactionsTab = () => {
+      if (activeReactionGroup) {
+        const group = reactionGroups.find(g => g.emoji === activeReactionGroup);
+        return (
+          <View style={{ flex: 1 }}>
+            <Pressable
+              onPress={() => setActiveReactionGroup(null)}
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 8 }}
+              accessibilityRole="button"
+              accessibilityLabel="Back to all reactions"
+            >
+              <KISIcon name="chevron-left" size={16} color={palette.text} />
+              <Text style={{ fontSize: 16 }}>{activeReactionGroup}</Text>
+              <Text style={{ color: palette.subtext, fontSize: 13 }}>{group?.count ?? 0}</Text>
+            </Pressable>
+            <FlatList
+              data={group?.users ?? []}
+              keyExtractor={u => u.id}
+              renderItem={({ item: user }) => (
+                <View style={styles.interactionUserRow}>
+                  {user.avatar_url ? (
+                    <Image source={{ uri: user.avatar_url }} style={styles.interactionAvatar} />
+                  ) : (
+                    <View style={[styles.interactionAvatar, { backgroundColor: palette.card, alignItems: 'center', justifyContent: 'center' }]}>
+                      <Text style={{ color: palette.text, fontWeight: '700' }}>
+                        {(user.display_name || '?').trim().charAt(0).toUpperCase()}
+                      </Text>
+                    </View>
+                  )}
+                  <Text style={{ color: palette.text, fontSize: 14, flex: 1 }} numberOfLines={1}>
+                    {user.display_name}
+                  </Text>
+                </View>
+              )}
+            />
+          </View>
+        );
+      }
+
+      if (reactionsLoading && reactionGroups.length === 0) {
+        return <ActivityIndicator color={palette.primaryStrong} style={{ marginTop: 24 }} />;
+      }
+      if (reactionsError) {
+        return (
+          <View style={styles.interactionEmptyState}>
+            <Text style={{ color: palette.danger, fontSize: 13 }}>{reactionsError}</Text>
+            <Pressable onPress={() => loadReactions(currentItem.id)}>
+              <Text style={{ color: palette.primary, fontSize: 13, fontWeight: '600', marginTop: 6 }}>Retry</Text>
+            </Pressable>
+          </View>
+        );
+      }
+      if (reactionGroups.length === 0) {
+        return (
+          <View style={styles.interactionEmptyState}>
+            <Text style={{ color: palette.subtext, fontSize: 13 }}>No reactions yet. Be the first!</Text>
+          </View>
+        );
+      }
+      return (
+        <FlatList
+          data={reactionGroups}
+          keyExtractor={g => g.emoji}
+          renderItem={({ item: group }) => (
+            <Pressable
+              style={styles.reactionGroupRow}
+              onPress={() => setActiveReactionGroup(group.emoji)}
+              accessibilityRole="button"
+              accessibilityLabel={`${group.count} reacted with ${group.emoji}`}
+            >
+              <Text style={{ fontSize: 22 }}>{group.emoji}</Text>
+              <Text style={{ color: palette.text, fontSize: 14, marginLeft: 8, flex: 1 }}>
+                {group.count} {group.count === 1 ? 'person' : 'people'}
+              </Text>
+              <KISIcon name="chevron-right" size={16} color={palette.subtext} />
+            </Pressable>
+          )}
+        />
+      );
+    };
+
+    const renderCommentRow = (comment: StatusComment, isReply: boolean) => (
+      <View key={comment.id} style={[styles.commentRow, isReply && { marginLeft: 32 }]}>
+        <View style={[styles.interactionAvatar, { width: 28, height: 28, backgroundColor: palette.card, alignItems: 'center', justifyContent: 'center' }]}>
+          {comment.author.avatar_url ? (
+            <Image source={{ uri: comment.author.avatar_url }} style={{ width: 28, height: 28, borderRadius: 14 }} />
+          ) : (
+            <Text style={{ color: palette.text, fontWeight: '700', fontSize: 12 }}>
+              {(comment.author.display_name || '?').trim().charAt(0).toUpperCase()}
+            </Text>
+          )}
+        </View>
+        <View style={{ flex: 1, marginLeft: 8 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6 }}>
+            <Text style={{ color: palette.text, fontWeight: '700', fontSize: 13 }}>{comment.author.display_name}</Text>
+            <Text style={{ color: palette.subtext, fontSize: 11 }}>{timeAgo(comment.created_at)}</Text>
+          </View>
+          <Text style={{ color: palette.text, fontSize: 14, marginTop: 2 }}>{comment.text}</Text>
+          <View style={{ flexDirection: 'row', gap: 16, marginTop: 4 }}>
+            {!isReply && (
+              <Pressable
+                onPress={() => setReplyingTo({ id: comment.id, authorName: comment.author.display_name })}
+                accessibilityRole="button"
+                accessibilityLabel={`Reply to ${comment.author.display_name}`}
+              >
+                <Text style={{ color: palette.subtext, fontSize: 12, fontWeight: '600' }}>Reply</Text>
+              </Pressable>
+            )}
+            {!isReply && comment.reply_count > 0 && (
+              <Pressable onPress={() => toggleReplyExpanded(comment)}>
+                <Text style={{ color: palette.primary, fontSize: 12, fontWeight: '600' }}>
+                  {expandedParents[comment.id] ? 'Hide replies' : `View ${comment.reply_count} replies`}
+                </Text>
+              </Pressable>
+            )}
+          </View>
+          {!isReply && expandedParents[comment.id] && (repliesByParent[comment.id] ?? []).map(reply => renderCommentRow(reply, true))}
+        </View>
+      </View>
+    );
+
+    const renderRepliesTab = () => {
+      if (commentsLoading && topLevelComments.length === 0) {
+        return <ActivityIndicator color={palette.primaryStrong} style={{ marginTop: 24 }} />;
+      }
+      if (commentsError) {
+        return (
+          <View style={styles.interactionEmptyState}>
+            <Text style={{ color: palette.danger, fontSize: 13 }}>{commentsError}</Text>
+            <Pressable onPress={() => loadComments(currentItem.id)}>
+              <Text style={{ color: palette.primary, fontSize: 13, fontWeight: '600', marginTop: 6 }}>Retry</Text>
+            </Pressable>
+          </View>
+        );
+      }
+      if (topLevelComments.length === 0) {
+        return (
+          <View style={styles.interactionEmptyState}>
+            <Text style={{ color: palette.subtext, fontSize: 13 }}>No replies yet. Start the conversation!</Text>
+          </View>
+        );
+      }
+      return (
+        <FlatList
+          data={topLevelComments}
+          keyExtractor={c => c.id}
+          renderItem={({ item }) => renderCommentRow(item, false)}
+        />
+      );
+    };
+
+    return (
+      <>
+        <Pressable
+          style={StyleSheet.absoluteFillObject}
+          onPress={closeInteractionSheet}
+          accessibilityLabel="Dismiss"
+        />
+        <Animated.View
+          style={[
+            styles.interactionSheet,
+            {
+              height: sheetHeightPct,
+              backgroundColor: palette.surfaceElevated,
+              transform: [{ translateY: interactionSheetDragY }],
+            },
+          ]}
+          {...interactionSheetPanResponder.panHandlers}
+        >
+          <View style={styles.interactionSheetHandle} />
+          <View style={styles.interactionTabRow}>
+            <Pressable
+              style={[styles.interactionTabButton, interactionTab === 'reactions' && styles.interactionTabButtonActive]}
+              onPress={() => setInteractionTab('reactions')}
+              accessibilityRole="tab"
+              accessibilityState={{ selected: interactionTab === 'reactions' }}
+            >
+              <Text style={{ color: interactionTab === 'reactions' ? palette.primary : palette.subtext, fontWeight: '700' }}>
+                Reactions{reactionGroups.length ? ` (${reactionGroups.reduce((s, g) => s + g.count, 0)})` : ''}
+              </Text>
+            </Pressable>
+            <Pressable
+              style={[styles.interactionTabButton, interactionTab === 'replies' && styles.interactionTabButtonActive]}
+              onPress={() => setInteractionTab('replies')}
+              accessibilityRole="tab"
+              accessibilityState={{ selected: interactionTab === 'replies' }}
+            >
+              <Text style={{ color: interactionTab === 'replies' ? palette.primary : palette.subtext, fontWeight: '700' }}>
+                Replies{topLevelComments.length ? ` (${topLevelComments.length})` : ''}
+              </Text>
+            </Pressable>
+            <Pressable onPress={closeInteractionSheet} hitSlop={8} accessibilityRole="button" accessibilityLabel="Close">
+              <KISIcon name="close" size={18} color={palette.subtext} />
+            </Pressable>
+          </View>
+
+          <View style={{ flex: 1, paddingHorizontal: 16 }}>
+            {interactionTab === 'reactions' ? renderReactionsTab() : renderRepliesTab()}
+          </View>
+
+          {interactionTab === 'replies' && currentItem.replyPermission !== 'nobody' && (
+            <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+              {replyingTo && (
+                <View style={styles.replyingToBanner}>
+                  <Text style={{ color: palette.subtext, fontSize: 12, flex: 1 }} numberOfLines={1}>
+                    Replying to {replyingTo.authorName}
+                  </Text>
+                  <Pressable onPress={() => setReplyingTo(null)} hitSlop={6}>
+                    <KISIcon name="close" size={14} color={palette.subtext} />
+                  </Pressable>
+                </View>
+              )}
+              <View style={[styles.interactionComposerRow, { borderColor: palette.inputBorder }]}>
+                <TextInput
+                  value={commentText}
+                  onChangeText={setCommentText}
+                  placeholder={replyingTo ? `Reply to ${replyingTo.authorName}…` : 'Write a reply…'}
+                  placeholderTextColor={palette.subtext}
+                  style={[styles.interactionComposerInput, { color: palette.text }]}
+                  multiline
+                  maxLength={2000}
+                />
+                <Pressable
+                  onPress={handleSubmitComment}
+                  disabled={commentSubmitting || !commentText.trim()}
+                  style={[styles.viewerReplySend, { backgroundColor: palette.primary, opacity: commentSubmitting || !commentText.trim() ? 0.5 : 1 }]}
+                  accessibilityRole="button"
+                  accessibilityLabel="Send reply"
+                >
+                  <KISIcon name="send" size={16} color={palette.onPrimary} />
+                </Pressable>
+              </View>
+            </KeyboardAvoidingView>
+          )}
+        </Animated.View>
+      </>
+    );
+  }
 });
 
 export default UpdatesTab;
@@ -4106,6 +4796,103 @@ const styles = StyleSheet.create({
     paddingBottom: 12,
     minHeight: 44,
     zIndex: 15,
+  },
+  viewerInteractionChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+    minHeight: 32,
+    zIndex: 15,
+  },
+  // ── Status interaction sheet (Reactions / Replies) ──────────────────────
+  interactionSheet: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingTop: 8,
+    zIndex: 30,
+    elevation: 30,
+  },
+  interactionSheetHandle: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: 'rgba(120,120,120,0.5)',
+    alignSelf: 'center',
+    marginBottom: 8,
+  },
+  interactionTabRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingBottom: 8,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: 'rgba(120,120,120,0.25)',
+    gap: 8,
+  },
+  interactionTabButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 4,
+    borderBottomWidth: 2,
+    borderBottomColor: 'transparent',
+  },
+  interactionTabButtonActive: {
+    borderBottomColor: '#F59E0B',
+  },
+  interactionEmptyState: {
+    alignItems: 'center',
+    marginTop: 32,
+    paddingHorizontal: 24,
+  },
+  interactionUserRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    gap: 10,
+  },
+  interactionAvatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+  },
+  reactionGroupRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: 'rgba(120,120,120,0.2)',
+  },
+  commentRow: {
+    flexDirection: 'row',
+    paddingVertical: 10,
+  },
+  replyingToBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+    backgroundColor: 'rgba(120,120,120,0.12)',
+  },
+  interactionComposerRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    gap: 8,
+  },
+  interactionComposerInput: {
+    flex: 1,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(120,120,120,0.3)',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    fontSize: 14,
+    maxHeight: 100,
   },
   viewerContent: {
     flex: 1,

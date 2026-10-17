@@ -44,6 +44,7 @@ import { useSocket } from '../../../SocketProvider';
 import { useAuth } from '../../../App';
 import { loadMessages, upsertMessage } from '@/Module/ChatRoom/Storage/chatStorage';
 import { normalizePhoneKey, participantsToIds } from '@/Module/ChatRoom/messagesUtils';
+import { unblockContact } from '@/screens/tabs/BlockedContactsScreen';
 import { refreshFromDeviceAndBackend } from '@/Module/AddContacts/contactsService';
 import { decryptFromUser, ensureDeviceId } from '@/security/e2ee';
 import { FilterManager, ToggleChip } from '@/components/messaging/Filters';
@@ -1590,6 +1591,31 @@ const handleArchiveSelected = useCallback(() => {
   handleClearSelection();
 }, [conversationActionUrl, handleClearSelection, selectedChat, selectedConversationIds, updateSelectedConversations]);
 
+// Only reachable from the Blocked filter chip - unblocks every selected
+// contact (both the account-level UserBlock and that conversation's own
+// moderation-block/lock flags - see unblockContact's own docstring for why
+// all three have to be undone together). Mirrors handleArchiveSelected's
+// shape but has no optimistic local Chat-field flip to make, since
+// unblocking just makes the chat reappear in the general list on the next
+// filter re-apply (isBlocked is recomputed from AsyncStorage, not a field
+// this screen tracks per-conversation the way isPinned/isMuted/isArchived are).
+const handleUnblockSelected = useCallback(() => {
+  if (!selectedChat.length) return;
+  const targets = selectedChat
+    .map(chat => {
+      const otherIds = participantsToIds(chat.participants ?? []).filter(
+        id => id !== effectiveCurrentUserId,
+      );
+      const convId = String((chat as any).conversationId ?? chat.id ?? '');
+      return otherIds[0] ? { userId: otherIds[0], conversationId: convId } : null;
+    })
+    .filter((t): t is { userId: string; conversationId: string } => Boolean(t));
+  void Promise.allSettled(
+    targets.map(({ userId, conversationId }) => unblockContact(userId, conversationId)),
+  );
+  handleClearSelection();
+}, [effectiveCurrentUserId, handleClearSelection, selectedChat]);
+
 const handleMarkReadSelected = useCallback(() => {
   if (!selectedConversationIds.length) return;
   updateSelectedConversations(chat => ({ ...chat, unreadCount: 0 }));
@@ -2214,6 +2240,11 @@ const handleOpenChatFromAddContacts = useCallback((chat: Chat) => {
 
             <View style={[styles.appBarRight, isTinyDevice && { gap: 4 }]}>
               {[
+                // Only reachable from the Blocked filter chip - that's the
+                // only place a blocked chat is ever visible to select.
+                ...(activeQuick.has('Blocked' as any)
+                  ? [{ key: 'unblock', icon: 'shield', onPress: handleUnblockSelected, label: 'Unblock selected contacts' }]
+                  : []),
                 { key: 'archive', icon: 'download', onPress: handleArchiveSelected, label: 'Archive selected chats' },
                 { key: 'pin', icon: 'pin', onPress: handlePinSelected, label: 'Pin selected chats' },
                 { key: 'mute', icon: 'mute', onPress: handleMuteSelected, label: 'Mute selected chats' },
@@ -2398,6 +2429,9 @@ const handleOpenChatFromAddContacts = useCallback((chat: Chat) => {
                 { key: 'select-all', label: 'Select all', onPress: handleSelectAllChats },
                 { key: 'mark-read', label: 'Mark as read', onPress: handleMarkReadSelected },
                 { key: 'archive', label: 'Archive', onPress: handleArchiveSelected },
+                ...(activeQuick.has('Blocked' as any)
+                  ? [{ key: 'unblock', label: 'Unblock', onPress: handleUnblockSelected }]
+                  : []),
               ]
             : menuItems.map((m) => ({
                 ...m,

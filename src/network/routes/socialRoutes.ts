@@ -104,9 +104,20 @@ const socialRoutes = {
     view: (id: string) => `${API_BASE_URL}/api/v1/statuses/${id}/view/`,
     viewers: (id: string) => `${API_BASE_URL}/api/v1/statuses/${id}/viewers/`,
     report: (id: string) => `${API_BASE_URL}/api/v1/statuses/${id}/report/`,
+    // Back-compat alias for the original quick-reply box - creates a
+    // top-level StatusComment. New code should use `comments` below, which
+    // also supports parent_id (threaded replies) and pagination.
     reply: (id: string) => `${API_BASE_URL}/api/v1/statuses/${id}/reply/`,
     react: (id: string) => `${API_BASE_URL}/api/v1/statuses/${id}/react/`,
+    unreact: (id: string) => `${API_BASE_URL}/api/v1/statuses/${id}/unreact/`,
+    // Grouped by emoji, with per-group participant previews - see
+    // apps/statuses/views.py's reactions() action.
     reactions: (id: string) => `${API_BASE_URL}/api/v1/statuses/${id}/reactions/`,
+    // GET ?parent_id=<comment_id> for a comment's replies, omit for
+    // top-level comments; POST with optional parent_id to reply.
+    comments: (id: string) => `${API_BASE_URL}/api/v1/statuses/${id}/comments/`,
+    hide: (id: string) => `${API_BASE_URL}/api/v1/statuses/${id}/hide/`,
+    unhide: (id: string) => `${API_BASE_URL}/api/v1/statuses/${id}/unhide/`,
     // Owner-only real deletion (soft-delete + underlying file removed
     // server-side — see apps/statuses/views.py's destroy() override).
     delete: (id: string) => `${API_BASE_URL}/api/v1/statuses/${id}/`,

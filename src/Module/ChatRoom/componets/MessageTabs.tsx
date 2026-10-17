@@ -609,8 +609,29 @@ export const ChatsTab = forwardRef<ScrollableHandle, ChatsTabProps>(function Cha
    * NORMALIZE RAW BACKEND CONVERSATIONS → SAFE Chat objects
    * ------------------------------------------------------------ */
   const normalizedChats: Chat[] = useMemo(() => {
-    return conversations.map((c) => normalizeConversation(c, currentUserId));
-  }, [conversations, currentUserId]);
+    return conversations.map((c) => {
+      const chat = normalizeConversation(c, currentUserId);
+      // normalizeConversation's own isBlocked reflects ConversationMember.
+      // is_blocked - a distinct, moderator-driven per-conversation flag
+      // (e.g. muting a disruptive group member), NOT "I blocked this
+      // contact" (see apps/chat/views.py's ws_perms comment for the full
+      // AND-060 history on why those two must stay separate). The
+      // "Blocked" filter chip and the on-row "Blocked" badge below are
+      // about the latter - overwrite isBlocked here with the real signal
+      // (the local block list also used to hide these DMs from the
+      // general list, a few lines down) so both actually agree with each
+      // other instead of one checking a field nothing in this app's real
+      // blocking flow ever sets.
+      if (!chat.isGroup && !chat.isGroupChat && blockedUserIds.size > 0) {
+        const ids = participantsToIds(chat.participants ?? []);
+        const otherIds = currentUserId ? ids.filter((id) => id !== currentUserId) : ids;
+        chat.isBlocked = otherIds.some((id) => blockedUserIds.has(id));
+      } else {
+        chat.isBlocked = false;
+      }
+      return chat;
+    });
+  }, [conversations, currentUserId, blockedUserIds]);
 
   /* ------------------------------------------------------------
    * ACTIVE CUSTOM FILTER RULES
@@ -659,12 +680,14 @@ export const ChatsTab = forwardRef<ScrollableHandle, ChatsTabProps>(function Cha
       const convId = String((c as any).conversationId ?? c.id);
       if (c.isGroup && c.communityId) return false;
       if (communityGroupConversationIds?.has(convId)) return false;
-      // Hide direct chats with blocked users
-      if (!c.isGroup && !c.isGroupChat && blockedUserIds.size > 0) {
-        const ids = participantsToIds(c.participants ?? []);
-        const otherIds = currentUserId ? ids.filter((id) => id !== currentUserId) : ids;
-        if (otherIds.some((id) => blockedUserIds.has(id))) return false;
-      }
+      // Hide direct chats with blocked users from the general list - same
+      // "unless its own chip is active" pattern as Archived right above.
+      // This used to be unconditional, which meant the Blocked chip itself
+      // was unreachable: a blocked chat was hidden from literally every
+      // view, including Blocked, and reappeared in the general list on
+      // refresh because blockedUserIds loads async after the first render
+      // (this filter ran with an empty set on that first pass).
+      if (c.isBlocked && !activeQuick.has('Blocked' as any)) return false;
       const isCommunityConv =
         c.isCommunityChat ||
         c.kind === 'community' ||
