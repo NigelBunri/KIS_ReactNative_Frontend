@@ -2002,7 +2002,17 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
       )
     : [];
 
-  const INVITE_PATH_RE = /\/join\/(group|community)\/([A-Za-z0-9_-]+)/;
+  // 'call'/'broadcast-call' included alongside group/community: a shared
+  // call-invite link (SocketProvider.tsx's getCallInviteLink, shape
+  // /join/call/:token) tapped from WITHIN a message previously fell
+  // through to the generic Linking.openURL(...) branch below, which always
+  // hands off to the OS browser — unlike an OS-level deep link (tapped
+  // from outside the app, or cold start), which already routes through
+  // InviteJoinScreen's existing type==='call' redirect straight into
+  // CallJoinScreen (see InviteJoinScreen.tsx). Matching the same path
+  // shape here reuses that same working redirect instead of leaving the
+  // app for a link this app already knows how to handle itself.
+  const INVITE_PATH_RE = /\/join\/(group|community|call|broadcast-call)\/([A-Za-z0-9_-]+)/;
   // kis:// alongside http(s):// so an in-app-shared custom-scheme deep
   // link (e.g. a Bible verse's external link - see buildBibleDeepLink in
   // bibleReference.ts) renders as a real tappable link here too, not just
@@ -2155,7 +2165,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
                   onPress={() => {
                     closeChatOverlay?.();
                     navigation.navigate('InviteJoin', {
-                      type: inviteMatch[1] as 'group' | 'community',
+                      type: inviteMatch[1] as 'group' | 'community' | 'call' | 'broadcast-call',
                       token: inviteMatch[2],
                     });
                   }}

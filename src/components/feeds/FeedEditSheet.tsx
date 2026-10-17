@@ -22,6 +22,7 @@ import usePullDownToClose from '@/hooks/usePullDownToClose';
 import { patchRequest } from '@/network/patch';
 import { uploadFileToBackend } from '@/Module/ChatRoom/uploadFileToBackend';
 import { getAccessToken } from '@/security/authStorage';
+import { CHAT_BASE_URL } from '@/network';
 import type { FeedPost } from './FeedScreen';
 
 type Props = {
@@ -84,6 +85,7 @@ export default function FeedEditSheet({ visible, post, editEndpoint, onClose, on
       const uploaded = await uploadFileToBackend({
         file: { uri: a.uri, name: a.fileName ?? 'thumb.jpg', type: a.type ?? 'image/jpeg', size: a.fileSize },
         authToken: token,
+        baseUrl: CHAT_BASE_URL,
       });
       setThumbUri(uploaded.url ?? a.uri);
     } catch {

@@ -26,6 +26,7 @@ import ROUTES, {
   buildMediaSource,
   resolveBackendAssetUrl,
   useMediaHeaders,
+  CHAT_BASE_URL,
   type MediaSource,
   type MediaHeaders,
 } from '@/network';
@@ -190,9 +191,15 @@ const uploadFeedAttachment = async (attachment: any, token: string): Promise<any
     fileSize: file.size,
   });
   try {
+    // Direct-to-S3 (see uploadFileToBackend's isNestChatBackend comment) —
+    // without baseUrl this fell back to API_BASE_URL (Django), which routes
+    // through Django's legacy multipart proxy instead of the presigned-PUT
+    // handshake every other upload in the app (chat attachments, avatars,
+    // broadcast video) already uses.
     const uploaded = await uploadFileToBackend({
       file,
       authToken: token,
+      baseUrl: CHAT_BASE_URL,
       context: 'feed',
     });
     console.log('[FeedScreen] uploadFeedAttachment succeeded', { fileName: file.name, assetId: uploaded?.assetId ?? uploaded?.id });
@@ -840,6 +847,7 @@ export default function FeedScreen<T extends FeedPost>({
     const attachment = await uploadFileToBackend({
       file: { uri, name: `kis-share-${Date.now()}.png`, type: 'image/png' },
       authToken: token,
+      baseUrl: CHAT_BASE_URL,
       context: 'share',
     });
     return attachment?.url ?? null;
