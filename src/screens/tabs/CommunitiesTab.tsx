@@ -58,6 +58,7 @@ type Community = {
   is_member?: boolean;
   is_owner?: boolean;
   current_user_role?: string | null;
+  join_policy?: 'open' | 'request' | 'invite_only';
 };
 
 type Post = {
@@ -163,7 +164,7 @@ const CommunitiesTab = forwardRef<ScrollableHandle, CommunitiesTabProps>(functio
   const topInset = useSafeTopInset();
   const { width } = useWindowDimensions();
   const responsive = useResponsiveLayout();
-  const { currentUserId } = useSocket();
+  const { socket, currentUserId } = useSocket();
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [communities, setCommunities] = useState<Community[]>([]);
@@ -330,6 +331,45 @@ const CommunitiesTab = forwardRef<ScrollableHandle, CommunitiesTabProps>(functio
     }
   }, []);
 
+  // Refetches just the open community's posts — unlike loadCommunityDetail,
+  // doesn't touch groups or force the tab back to 'feed', so it's safe to
+  // call from a live socket event while the user might be on the 'groups'
+  // tab or mid-scroll.
+  const refreshSelectedCommunityPosts = useCallback(async (communityId: string) => {
+    try {
+      const postsRes = await getRequest(`${ROUTES.community.posts}?community=${communityId}`, {
+        errorMessage: '',
+      });
+      const list = Array.isArray(postsRes?.data?.results)
+        ? postsRes.data.results
+        : Array.isArray(postsRes?.results)
+        ? postsRes.results
+        : postsRes?.data ?? postsRes ?? [];
+      setPosts(Array.isArray(list) ? list : []);
+    } catch { /* silent — next manual refresh or event retries */ }
+  }, []);
+
+  // Live feed updates — without this, a community's feed only ever
+  // reflected other members' posts/comments after the user manually
+  // reopened the screen. CommunityInfoPage.tsx already listens for these
+  // same community.* events (it refetches everything, including the
+  // member list), but that's a different screen from the one a member
+  // actually reads the feed in - this tab never subscribed to anything at
+  // all despite already holding a socket reference.
+  useEffect(() => {
+    if (!socket || !selected?.id) return undefined;
+    const communityId = selected.id;
+    const handler = (payload: any) => {
+      if (String(payload?.communityId ?? '') !== String(communityId)) return;
+      void refreshSelectedCommunityPosts(communityId);
+    };
+    const events = ['community.post_created', 'community.post_updated', 'community.post_deleted', 'community.comment_created'];
+    events.forEach((eventName) => socket.on(eventName, handler));
+    return () => {
+      events.forEach((eventName) => socket.off(eventName, handler));
+    };
+  }, [socket, selected?.id, refreshSelectedCommunityPosts]);
+
   const createCommunity = useCallback(async () => {
     if (!createName.trim() || creatingCommunity) return;
     setCreatingCommunity(true);
@@ -458,6 +498,34 @@ const CommunitiesTab = forwardRef<ScrollableHandle, CommunitiesTabProps>(functio
 
   const joinCommunity = useCallback(async (community: Community) => {
     if (community.is_member || community.is_owner) return;
+
+    // join_policy defaults to 'request' server-side (Django model
+    // default) — most communities aren't open to direct join. This
+    // previously always called join(), which 400s for anything but an
+    // OPEN community, so the only feedback was a generic "Failed to join
+    // community" alert and no actual request was ever sent — the entire
+    // join-request flow (fully built and correctly permission-checked
+    // server-side) was unreachable from this screen.
+    if (community.join_policy === 'invite_only') {
+      Alert.alert('Invite only', 'This community can only be joined with an invite link.');
+      return;
+    }
+    if (community.join_policy === 'request') {
+      try {
+        const res = await postRequest(ROUTES.community.requestJoin(community.id), {}, {
+          errorMessage: 'Failed to request to join',
+        });
+        if (res?.success) {
+          Alert.alert('Request sent', 'An admin will review your request to join.');
+        } else {
+          Alert.alert('Join request', res?.message || 'Failed to request to join.');
+        }
+      } catch {
+        Alert.alert('Join request', 'Failed to request to join.');
+      }
+      return;
+    }
+
     try {
       const res = await postRequest(ROUTES.community.join(community.id), {}, {
         errorMessage: 'Failed to join community',
@@ -468,7 +536,14 @@ const CommunitiesTab = forwardRef<ScrollableHandle, CommunitiesTabProps>(functio
         setDiscoverResults((items) =>
           items.map((item) => item.id === joined.id ? joined : item),
         );
-        loadCommunityDetail(joined);
+        // Opens the same CommunityRoomPage every other "view a community"
+        // path uses (tapping it in the list, deep-linking via invite),
+        // not this screen's own separate inline feed render (the
+        // `selected` branch below) - that one has no comment UI at all
+        // (CommunityRoomPage's CommunityFeedScreen does, via
+        // CommunityCommentThreadPanel) and was a second, inferior
+        // implementation of "view a community" reachable only from here.
+        openCommunity(joined);
       } else {
         // Previously silent when online but rejected (e.g. invite-only,
         // already full) — nothing happened and the user had no idea why
@@ -482,7 +557,7 @@ const CommunitiesTab = forwardRef<ScrollableHandle, CommunitiesTabProps>(functio
         Alert.alert('Saved offline', 'You will join this community when back online.');
       }
     }
-  }, [loadCommunityDetail]);
+  }, [openCommunity]);
 
   const searchPublicCommunities = useCallback(async (q: string) => {
     setDiscoverLoading(true);

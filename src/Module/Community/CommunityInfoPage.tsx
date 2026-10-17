@@ -26,6 +26,7 @@ import ImagePlaceholder from '@/components/common/ImagePlaceholder';
 import ROUTES, { CHAT_BASE_URL } from '@/network';
 import { getRequest } from '@/network/get';
 import { postRequest } from '@/network/post';
+import { patchRequest } from '@/network/patch';
 import { deleteRequest } from '@/network/delete';
 import apiService from '@/services/apiService';
 import { uploadFileToBackend } from '@/Module/ChatRoom/uploadFileToBackend';
@@ -56,6 +57,14 @@ type CommunityPost = {
   text_preview?: string;
   created_at?: string;
   author?: { display_name?: string | null };
+};
+
+type CommunityJoinRequestItem = {
+  id: number | string;
+  user?: MemberUser | number | string | null;
+  message?: string;
+  status?: string;
+  created_at?: string;
 };
 
 type CommunityInfoPageProps = {
@@ -91,14 +100,32 @@ export const CommunityInfoPage: React.FC<CommunityInfoPageProps> = ({
   const { palette } = useKISTheme();
   const insets = useSafeAreaInsets();
 
+  const [name, setName] = useState<string>(communityName);
   const [avatarUrl, setAvatarUrl] = useState<string | undefined>(undefined);
   const [description, setDescription] = useState<string>('');
   const [members, setMembers] = useState<CommunityMember[]>([]);
+  const [memberCount, setMemberCount] = useState<number>(0);
   const [posts, setPosts] = useState<CommunityPost[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [inviteLink, setInviteLink] = useState<string | null>(null);
   const [inviteLinkLoading, setInviteLinkLoading] = useState(false);
+
+  // Edit community (name/description) — avatar already had its own upload
+  // flow; name/description had no edit UI at all even though the backend
+  // (PATCH .../chat-communities/{id}/, owner/admin-gated) already supports
+  // both.
+  const [editModalVisible, setEditModalVisible] = useState(false);
+  const [editName, setEditName] = useState('');
+  const [editDescription, setEditDescription] = useState('');
+  const [editSaving, setEditSaving] = useState(false);
+
+  // Join requests (pending approval) — approve_request/reject_request were
+  // fully built and permission-checked server-side but unreachable: there
+  // was no endpoint to even list pending requests, and no UI anywhere to
+  // call approve/reject with a request_id.
+  const [joinRequests, setJoinRequests] = useState<CommunityJoinRequestItem[]>([]);
+  const [joinRequestsLoading, setJoinRequestsLoading] = useState(false);
 
   // "Can't generate an invite link nor add members" — the invite link half
   // was actually a visibility bug (isAdmin always computed false, see the
@@ -128,6 +155,7 @@ export const CommunityInfoPage: React.FC<CommunityInfoPageProps> = ({
       });
       const detailData = detail?.data ?? detail ?? {};
       if (mountedRef.current) {
+        setName(detailData.name ?? communityName);
         setAvatarUrl(detailData.avatar_url ?? detailData.avatarUrl ?? undefined);
         setDescription(detailData.description ?? '');
       }
@@ -143,6 +171,11 @@ export const CommunityInfoPage: React.FC<CommunityInfoPageProps> = ({
         [];
       if (mountedRef.current) {
         setMembers(Array.isArray(list) ? list : []);
+        // DRF's default pagination wraps the real list in {count, results}
+        // — count is the TRUE total, not just this page's length (this
+        // screen only ever loads a single page of members).
+        const totalCount = membersRes?.data?.count ?? membersRes?.count;
+        setMemberCount(typeof totalCount === 'number' ? totalCount : (Array.isArray(list) ? list.length : 0));
       }
 
       const postsRes = await getRequest(`${ROUTES.community.posts}?community=${communityId}`, {
@@ -160,7 +193,7 @@ export const CommunityInfoPage: React.FC<CommunityInfoPageProps> = ({
     } finally {
       if (mountedRef.current) setLoading(false);
     }
-  }, [communityId]);
+  }, [communityId, communityName]);
 
   useEffect(() => {
     loadCommunity();
@@ -230,7 +263,11 @@ export const CommunityInfoPage: React.FC<CommunityInfoPageProps> = ({
     const label = member.display_name || resolveUserName(member.user) || 'Member';
     const memberRole = String(member.role ?? member.base_role ?? '').toLowerCase();
     const isOwner = memberRole === 'owner';
-    const isMemberAdmin = memberRole === 'admin' || memberRole === 'owner' || memberRole === 'moderator';
+    // Django's CommunityRole only ever produces 'mod', never 'moderator' —
+    // this previously never matched a real mod's role, so the action
+    // sheet offered "Promote to admin" (promoting them further) instead
+    // of "Demote from admin" for anyone already holding the mod role.
+    const isMemberAdmin = memberRole === 'admin' || memberRole === 'owner' || memberRole === 'mod';
 
     const options: string[] = [];
     const actions: (() => void)[] = [];
@@ -506,6 +543,87 @@ export const CommunityInfoPage: React.FC<CommunityInfoPageProps> = ({
     }
   };
 
+  const openEditModal = useCallback(() => {
+    setEditName(name);
+    setEditDescription(description);
+    setEditModalVisible(true);
+  }, [name, description]);
+
+  const handleSaveEdit = useCallback(async () => {
+    const trimmedName = editName.trim();
+    if (!trimmedName) {
+      Alert.alert('Name required', 'Please enter a community name.');
+      return;
+    }
+    setEditSaving(true);
+    try {
+      const res = await patchRequest(
+        ROUTES.community.detail(communityId),
+        { name: trimmedName, description: editDescription },
+        { errorMessage: 'Failed to update community' },
+      );
+      if (res?.success) {
+        setName(trimmedName);
+        setDescription(editDescription);
+        setEditModalVisible(false);
+      } else {
+        Alert.alert('Update failed', res?.message || 'Unable to update community.');
+      }
+    } catch (err: any) {
+      Alert.alert('Update failed', err?.message || 'Unable to update community.');
+    } finally {
+      setEditSaving(false);
+    }
+  }, [communityId, editName, editDescription]);
+
+  const loadJoinRequests = useCallback(async () => {
+    setJoinRequestsLoading(true);
+    try {
+      const res = await getRequest(ROUTES.community.joinRequests(communityId), { errorMessage: '' });
+      const list = res?.data?.results ?? res?.data ?? [];
+      if (mountedRef.current) setJoinRequests(Array.isArray(list) ? list : []);
+    } catch {
+      if (mountedRef.current) setJoinRequests([]);
+    } finally {
+      if (mountedRef.current) setJoinRequestsLoading(false);
+    }
+  }, [communityId]);
+
+  useEffect(() => {
+    if (isAdmin) void loadJoinRequests();
+    // Also refreshed by the community.join_request_created/_decided socket
+    // listener above (via loadCommunity -> ... no, that doesn't cover
+    // this list) - re-run whenever a join-request event fires for this
+    // community while this screen is open.
+  }, [isAdmin, loadJoinRequests]);
+
+  useEffect(() => {
+    if (!socket || !communityId || !isAdmin) return undefined;
+    const handler = (payload: any) => {
+      if (String(payload?.communityId ?? '') !== String(communityId)) return;
+      void loadJoinRequests();
+    };
+    socket.on('community.join_request_created', handler);
+    socket.on('community.join_request_decided', handler);
+    return () => {
+      socket.off('community.join_request_created', handler);
+      socket.off('community.join_request_decided', handler);
+    };
+  }, [socket, communityId, isAdmin, loadJoinRequests]);
+
+  const handleDecideJoinRequest = useCallback(async (request: CommunityJoinRequestItem, approve: boolean) => {
+    const route = approve ? ROUTES.community.approveRequest(communityId) : ROUTES.community.rejectRequest(communityId);
+    const res = await postRequest(route, { request_id: request.id }, {
+      errorMessage: approve ? 'Failed to approve request' : 'Failed to reject request',
+    });
+    if (res?.success) {
+      setJoinRequests((prev) => prev.filter((r) => r.id !== request.id));
+      if (approve) await loadCommunity();
+    } else {
+      Alert.alert('Error', res?.message || 'Unable to process this request.');
+    }
+  }, [communityId, loadCommunity]);
+
   const handleDeletePost = useCallback((post: CommunityPost) => {
     Alert.alert('Delete post?', 'This removes the post from the community feed.', [
       { text: 'Cancel', style: 'cancel' },
@@ -551,7 +669,7 @@ export const CommunityInfoPage: React.FC<CommunityInfoPageProps> = ({
             <ImagePlaceholder size={88} radius={44} style={styles.avatar} />
           )}
           <Text style={[styles.name, { color: palette.text }]} numberOfLines={1}>
-            {communityName}
+            {name}
           </Text>
           {description ? (
             <Text style={[styles.subtitle, { color: palette.subtext }]} numberOfLines={2}>
@@ -560,27 +678,45 @@ export const CommunityInfoPage: React.FC<CommunityInfoPageProps> = ({
           ) : null}
 
           {isAdmin && (
-            <Pressable
-              onPress={handleChangeAvatar}
-              style={({ pressed }) => [
-                styles.editButton,
-                {
-                  backgroundColor: palette.primary,
-                  opacity: pressed || saving ? 0.7 : 1,
-                },
-              ]}
-            >
-              <KISIcon name="camera" size={16} color={palette.onPrimary} />
-              <Text style={[styles.editButtonText, { color: palette.onPrimary }]}>
-                {saving ? 'Updating...' : 'Change community photo'}
-              </Text>
-            </Pressable>
+            <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
+              <Pressable
+                onPress={handleChangeAvatar}
+                style={({ pressed }) => [
+                  styles.editButton,
+                  {
+                    backgroundColor: palette.primary,
+                    opacity: pressed || saving ? 0.7 : 1,
+                  },
+                ]}
+              >
+                <KISIcon name="camera" size={16} color={palette.onPrimary} />
+                <Text style={[styles.editButtonText, { color: palette.onPrimary }]}>
+                  {saving ? 'Updating...' : 'Change photo'}
+                </Text>
+              </Pressable>
+              <Pressable
+                onPress={openEditModal}
+                style={({ pressed }) => [
+                  styles.editButton,
+                  {
+                    borderWidth: 1,
+                    borderColor: palette.border,
+                    opacity: pressed ? 0.7 : 1,
+                  },
+                ]}
+              >
+                <KISIcon name="edit" size={16} color={palette.text} />
+                <Text style={[styles.editButtonText, { color: palette.text }]}>
+                  Edit name & description
+                </Text>
+              </Pressable>
+            </View>
           )}
         </View>
 
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: palette.text }]}>
-            Members
+            Members{memberCount > 0 ? ` (${memberCount})` : ''}
           </Text>
           {loading ? (
             <Text style={[styles.emptyText, { color: palette.subtext }]}>
@@ -667,6 +803,58 @@ export const CommunityInfoPage: React.FC<CommunityInfoPageProps> = ({
             )}
           </View>
         ) : null}
+
+        {isAdmin && (
+          <View style={styles.section}>
+            <Text style={[styles.sectionTitle, { color: palette.text }]}>
+              Join requests{joinRequests.length > 0 ? ` (${joinRequests.length})` : ''}
+            </Text>
+            {joinRequestsLoading ? (
+              <Text style={[styles.emptyText, { color: palette.subtext }]}>Loading...</Text>
+            ) : joinRequests.length === 0 ? (
+              <Text style={[styles.emptyText, { color: palette.subtext }]}>No pending requests.</Text>
+            ) : (
+              joinRequests.map((req) => {
+                const label = resolveUserName(req.user) || 'User';
+                return (
+                  <View
+                    key={String(req.id)}
+                    style={[styles.memberRow, { borderBottomColor: palette.divider }]}
+                  >
+                    <View style={styles.memberInfo}>
+                      <Text style={[styles.memberName, { color: palette.text }]} numberOfLines={1}>
+                        {label}
+                      </Text>
+                      {req.message ? (
+                        <Text style={[styles.memberRole, { color: palette.subtext }]} numberOfLines={2}>
+                          {req.message}
+                        </Text>
+                      ) : null}
+                    </View>
+                    <Pressable
+                      onPress={() => handleDecideJoinRequest(req, true)}
+                      hitSlop={8}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Approve ${label}`}
+                      style={[styles.inviteLinkBtn, { backgroundColor: palette.primary, marginRight: 6 }]}
+                    >
+                      <Text style={[styles.inviteLinkBtnText, { color: palette.onPrimary }]}>Approve</Text>
+                    </Pressable>
+                    <Pressable
+                      onPress={() => handleDecideJoinRequest(req, false)}
+                      hitSlop={8}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Reject ${label}`}
+                      style={[styles.inviteLinkBtn, { borderWidth: 1, borderColor: palette.danger }]}
+                    >
+                      <Text style={[styles.inviteLinkBtnText, { color: palette.danger }]}>Reject</Text>
+                    </Pressable>
+                  </View>
+                );
+              })
+            )}
+          </View>
+        )}
 
         {isAdmin && (
           <View style={styles.section}>
@@ -826,6 +1014,86 @@ export const CommunityInfoPage: React.FC<CommunityInfoPageProps> = ({
               style={({ pressed }) => ({ paddingVertical: 12, borderRadius: 14, borderWidth: 1.5, borderColor: palette.divider ?? palette.border, alignItems: 'center', opacity: pressed ? 0.7 : 1 })}
             >
               <Text style={{ color: palette.text, fontSize: 15, fontWeight: '600' }}>Close</Text>
+            </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      <Modal
+        visible={editModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setEditModalVisible(false)}
+      >
+        <Pressable
+          style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center', padding: 24 }}
+          onPress={() => setEditModalVisible(false)}
+        >
+          <Pressable
+            onPress={() => {}}
+            style={{ width: '100%', maxHeight: '80%', borderRadius: 20, backgroundColor: palette.surface ?? palette.card, padding: 24, gap: 14 }}
+          >
+            <Text style={{ fontSize: 17, fontWeight: '700', color: palette.text }}>Edit community</Text>
+            <View>
+              <Text style={{ fontSize: 12, fontWeight: '600', color: palette.subtext, marginBottom: 6 }}>Name</Text>
+              <TextInput
+                value={editName}
+                onChangeText={setEditName}
+                placeholder="Community name"
+                placeholderTextColor={palette.subtext}
+                style={{
+                  borderWidth: 1,
+                  borderColor: palette.border ?? palette.divider,
+                  borderRadius: 12,
+                  paddingHorizontal: 12,
+                  paddingVertical: 10,
+                  color: palette.text,
+                  fontSize: 15,
+                }}
+              />
+            </View>
+            <View>
+              <Text style={{ fontSize: 12, fontWeight: '600', color: palette.subtext, marginBottom: 6 }}>Description</Text>
+              <TextInput
+                value={editDescription}
+                onChangeText={setEditDescription}
+                placeholder="What's this community about?"
+                placeholderTextColor={palette.subtext}
+                multiline
+                numberOfLines={3}
+                style={{
+                  borderWidth: 1,
+                  borderColor: palette.border ?? palette.divider,
+                  borderRadius: 12,
+                  paddingHorizontal: 12,
+                  paddingVertical: 10,
+                  color: palette.text,
+                  fontSize: 15,
+                  minHeight: 80,
+                  textAlignVertical: 'top',
+                }}
+              />
+            </View>
+            <Pressable
+              onPress={handleSaveEdit}
+              disabled={editSaving}
+              style={({ pressed }) => ({
+                paddingVertical: 12,
+                borderRadius: 14,
+                backgroundColor: palette.primary,
+                alignItems: 'center',
+                opacity: pressed || editSaving ? 0.7 : 1,
+              })}
+            >
+              <Text style={{ color: palette.onPrimary, fontSize: 15, fontWeight: '700' }}>
+                {editSaving ? 'Saving...' : 'Save changes'}
+              </Text>
+            </Pressable>
+            <Pressable
+              onPress={() => setEditModalVisible(false)}
+              style={({ pressed }) => ({ paddingVertical: 12, borderRadius: 14, borderWidth: 1.5, borderColor: palette.divider ?? palette.border, alignItems: 'center', opacity: pressed ? 0.7 : 1 })}
+            >
+              <Text style={{ color: palette.text, fontSize: 15, fontWeight: '600' }}>Cancel</Text>
             </Pressable>
           </Pressable>
         </Pressable>
