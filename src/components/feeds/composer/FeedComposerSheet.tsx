@@ -328,11 +328,11 @@ export default function FeedComposerSheet({
     try {
       await onSubmit(payload);
       // Only reached if onSubmit resolved without throwing — every current
-      // onSubmit implementation (FeedScreen/CommunityFeedPage/
-      // PartnerFeedPage/ProfileScreen's handleCreate-family callbacks)
-      // already shows its own Alert and throws on failure (a server
-      // success:false response as well as a thrown network error), so
-      // reaching this line means the post genuinely succeeded.
+      // onSubmit implementation (FeedScreen/ProfileScreen's
+      // handleCreate-family callbacks) already shows its own Alert and
+      // throws on failure (a server success:false response as well as a
+      // thrown network error), so reaching this line means the post
+      // genuinely succeeded.
       closeSheet();
     } catch {
       // Deliberately not closing here (unlike the try branch above) — the

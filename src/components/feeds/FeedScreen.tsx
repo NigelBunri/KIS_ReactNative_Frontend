@@ -117,6 +117,11 @@ type FeedScreenProps<T extends FeedPost> = {
   shareSubtitle: string;
   shareWatermarkColor: string;
   onBack: () => void;
+  // When this screen is embedded inside a parent that already renders its
+  // own header/chrome (e.g. OrganizationAppScreen's partner mini-app tabs),
+  // the parent passes hideHeader to suppress FeedScreen's own app bar
+  // instead of showing two stacked headers.
+  hideHeader?: boolean;
   composerEndpoint: string;
   composerContext?: ComposerContext;
   composerErrorMessage?: string;
@@ -299,6 +304,7 @@ export default function FeedScreen<T extends FeedPost>({
   shareSubtitle,
   shareWatermarkColor,
   onBack,
+  hideHeader = false,
   composerEndpoint,
   composerContext,
   composerErrorMessage,
@@ -1071,43 +1077,47 @@ export default function FeedScreen<T extends FeedPost>({
           rendered directly inside a full-height (top:0) overlay pane in
           both the Communities and Partners tabs, with nothing above it
           reserving the safe-area top inset, so this bar has to add its
-          own via topInset. */}
-      <View
-        style={[
-          styles.appBar,
-          {
-            paddingTop: topInset + 2,
-            backgroundColor: palette.card,
-          },
-        ]}
-      >
-        <Pressable
-          onPress={onBack}
-          style={[styles.appBarCloseBtn, { backgroundColor: palette.selectedBg, borderColor: palette.inputBorder }]}
-          accessibilityRole="button"
-          accessibilityLabel="Close"
-          hitSlop={8}
+          own via topInset. Suppressed via hideHeader when a parent
+          (e.g. OrganizationAppScreen's partner mini-app tabs) already
+          renders its own header/chrome above this screen. */}
+      {!hideHeader && (
+        <View
+          style={[
+            styles.appBar,
+            {
+              paddingTop: topInset + 2,
+              backgroundColor: palette.card,
+            },
+          ]}
         >
-          <KISIcon name="close" size={20} color={palette.text} />
-        </Pressable>
+          <Pressable
+            onPress={onBack}
+            style={[styles.appBarCloseBtn, { backgroundColor: palette.selectedBg, borderColor: palette.inputBorder }]}
+            accessibilityRole="button"
+            accessibilityLabel="Close"
+            hitSlop={8}
+          >
+            <KISIcon name="close" size={20} color={palette.text} />
+          </Pressable>
 
-        <Text style={[styles.appBarTitle, { color: palette.text }]} numberOfLines={1}>
-          {entityTitle}
-        </Text>
+          <Text style={[styles.appBarTitle, { color: palette.text }]} numberOfLines={1}>
+            {entityTitle}
+          </Text>
 
-        <Pressable
-          onPress={() => {
-            // optional: hook to notifications later
-          }}
-          style={styles.appBarIconBtn}
-          hitSlop={10}
-          accessibilityRole="button"
-          accessibilityLabel="Notifications"
-        >
-          {/* If your icon set uses a different name, swap here (e.g. "notifications") */}
-          <KISIcon name="bell" size={22} color={palette.text} />
-        </Pressable>
-      </View>
+          <Pressable
+            onPress={() => {
+              // optional: hook to notifications later
+            }}
+            style={styles.appBarIconBtn}
+            hitSlop={10}
+            accessibilityRole="button"
+            accessibilityLabel="Notifications"
+          >
+            {/* If your icon set uses a different name, swap here (e.g. "notifications") */}
+            <KISIcon name="bell" size={22} color={palette.text} />
+          </Pressable>
+        </View>
+      )}
 
       {loading ? (
         <View style={{ paddingHorizontal: 16, paddingTop: 14 }}>

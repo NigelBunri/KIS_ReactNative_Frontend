@@ -98,8 +98,38 @@ export default function FeedEditSheet({ visible, post, editEndpoint, onClose, on
     if (!post || submitting) return;
     setSubmitting(true);
     try {
-      const body: any = { text_plain: text.trim() || undefined };
-      if (thumbUri) body.thumbnail_url = thumbUri;
+      // `text_plain`/`text_preview` are read-only on both
+      // CommunityPostSerializer and PartnerPostSerializer — they're
+      // derived server-side FROM `text` (a ProseMirror-style rich-text
+      // doc) by prepare_*_rich_text_attrs(), which never reads a client-
+      // submitted text_plain at all. PATCHing text_plain directly used to
+      // return 200 OK (DRF silently drops unknown/read-only fields) while
+      // never actually changing the post's content — confirmed via a real
+      // Django test. The `styled_text: {text}` shortcut referenced in that
+      // same server-side helper is itself dead code on both serializers
+      // (neither declares `styled_text` as an actual field, so DRF strips
+      // it before validate() ever sees it) — also confirmed directly.
+      // `text` is the one field that genuinely reaches the server; build
+      // the same minimal single-paragraph document
+      // common.rich_text.build_plain_text_document would produce.
+      const body: any = {};
+      const trimmed = text.trim();
+      if (trimmed) {
+        body.text = {
+          type: 'doc',
+          content: [{ type: 'paragraph', content: [{ type: 'text', text: trimmed }] }],
+        };
+      }
+      // Same story for the thumbnail: there is no top-level
+      // `thumbnail_url` field on either model/serializer — the real
+      // field is `attachments[0].thumb_url`. Preserve every other
+      // attachment field (url, kind, etc.) and every other attachment in
+      // the array; only the first attachment's thumbnail changes.
+      if (thumbUri && Array.isArray(post.attachments) && post.attachments.length > 0) {
+        body.attachments = post.attachments.map((att: any, index: number) =>
+          index === 0 ? { ...att, thumb_url: thumbUri, thumbUrl: thumbUri } : att,
+        );
+      }
 
       const res = await patchRequest(editEndpoint(post.id), body, {
         errorMessage: 'Unable to update post.',
@@ -110,7 +140,7 @@ export default function FeedEditSheet({ visible, post, editEndpoint, onClose, on
         return;
       }
 
-      onUpdated({ id: post.id, text_plain: text.trim() || undefined });
+      onUpdated({ id: post.id, text_plain: trimmed || undefined });
       closeSheet();
     } finally {
       setSubmitting(false);
@@ -214,6 +244,8 @@ export default function FeedEditSheet({ visible, post, editEndpoint, onClose, on
           {/* Save button */}
           <Pressable
             onPress={submitting ? undefined : handleSave}
+            accessibilityRole="button"
+            accessibilityLabel="Save changes"
             style={[
               styles.saveBtn,
               { backgroundColor: palette.primary, opacity: submitting ? 0.7 : 1 },

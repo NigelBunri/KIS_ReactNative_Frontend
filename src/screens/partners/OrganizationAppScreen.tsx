@@ -32,7 +32,7 @@ import type {
   PartnerOrganizationAppTab,
 } from '@/screens/tabs/partners/hooks/usePartnerOrganizationApps';
 import LocationAttendanceTemplate from '@/components/partners/LocationAttendanceTemplate';
-import PartnerFeedPage from '@/components/partners/PartnerFeedPage';
+import PartnerFeedScreen from '@/components/feeds/PartnerFeedScreen';
 import PartnerMessagingView from '@/components/partners/PartnerMessagingView';
 import PartnerBibleScreen from '@/components/partners/PartnerBibleScreen';
 import DashboardTab from '@/components/partners/DashboardTab';
@@ -110,7 +110,7 @@ function EmbeddedPartnerFeed({
   partnerName: string;
 }) {
   return (
-    <PartnerFeedPage
+    <PartnerFeedScreen
       partner={{ id: partnerId, name: partnerName }}
       onBack={() => {}}
       hideHeader

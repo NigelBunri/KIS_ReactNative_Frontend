@@ -338,8 +338,14 @@ const broadcastRoutes = {
       `${API_BASE_URL}/api/v1/partners/posts/${id}/react/`,
     postDelete: (id: string) =>
       `${API_BASE_URL}/api/v1/partners/posts/${id}/delete/`,
+    // Standard DRF detail route (PATCH), not a custom .../edit/ action —
+    // that path never existed on the backend (confirmed), so every edit
+    // attempt from the partner feed 404'd. Mirrors community.postUpdate's
+    // identical fix (see apps.communities.views.CommunityPostViewSet
+    // .update/.partial_update and the matching apps.partners.views
+    // .PartnerPostViewSet overrides added alongside this).
     postUpdate: (id: string) =>
-      `${API_BASE_URL}/api/v1/partners/posts/${id}/edit/`,
+      `${API_BASE_URL}/api/v1/partners/posts/${id}/`,
     postBroadcast: (id: string) =>
       `${API_BASE_URL}/api/v1/partners/posts/${id}/broadcast/`,
     // Broadcast Center & Announcement Scheduler — see PartnerBroadcastCenterPanel.tsx.
