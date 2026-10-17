@@ -30,6 +30,12 @@ type Props = {
   onToggleMute: () => Promise<void>;
   onOpenSearch: () => void;
   onOpenAddMember: () => void;
+  addMemberContacts: { userId?: string; id: string; name: string; phone: string; isRegistered: boolean }[];
+  addMemberContactsLoading: boolean;
+  addMemberSearch: string;
+  onChangeAddMemberSearch: (value: string) => void;
+  addMemberSubmitting: boolean;
+  onSubmitAddMemberContact: (contact: { userId?: string; id: string; name: string; phone: string; isRegistered: boolean }) => Promise<void> | void;
   onOpenRemoveMember: () => void;
   onOpenSetRole: () => void;
   onClearChat: () => void;
@@ -69,6 +75,12 @@ export default function ChatRoomOverlays({
   onToggleMute,
   onOpenSearch,
   onOpenAddMember,
+  addMemberContacts,
+  addMemberContactsLoading,
+  addMemberSearch,
+  onChangeAddMemberSearch,
+  addMemberSubmitting,
+  onSubmitAddMemberContact,
   onOpenRemoveMember,
   onOpenSetRole,
   onClearChat,
@@ -121,6 +133,12 @@ export default function ChatRoomOverlays({
         onChangeGroupRole={onChangeGroupRole}
         onCloseGroupAction={onCloseGroupAction}
         onSubmitGroupAction={onSubmitGroupAction}
+        addMemberContacts={addMemberContacts}
+        addMemberContactsLoading={addMemberContactsLoading}
+        addMemberSearch={addMemberSearch}
+        onChangeAddMemberSearch={onChangeAddMemberSearch}
+        addMemberSubmitting={addMemberSubmitting}
+        onSubmitAddMemberContact={onSubmitAddMemberContact}
         searchVisible={searchVisible}
         searchQuery={searchQuery}
         onChangeSearchQuery={onChangeSearchQuery}

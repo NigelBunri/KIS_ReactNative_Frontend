@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import {
+  ActivityIndicator,
+  FlatList,
   Modal,
   Pressable,
   ScrollView,
@@ -55,6 +57,12 @@ type Props = {
   onChangeGroupRole: (value: string) => void;
   onCloseGroupAction: () => void;
   onSubmitGroupAction: () => void;
+  addMemberContacts: { userId?: string; id: string; name: string; phone: string; isRegistered: boolean }[];
+  addMemberContactsLoading: boolean;
+  addMemberSearch: string;
+  onChangeAddMemberSearch: (value: string) => void;
+  addMemberSubmitting: boolean;
+  onSubmitAddMemberContact: (contact: { userId?: string; id: string; name: string; phone: string; isRegistered: boolean }) => Promise<void> | void;
   searchVisible: boolean;
   searchQuery: string;
   onChangeSearchQuery: (value: string) => void;
@@ -80,6 +88,12 @@ export default function ChatRoomModals({
   onChangeGroupRole,
   onCloseGroupAction,
   onSubmitGroupAction,
+  addMemberContacts,
+  addMemberContactsLoading,
+  addMemberSearch,
+  onChangeAddMemberSearch,
+  addMemberSubmitting,
+  onSubmitAddMemberContact,
   searchVisible,
   searchQuery,
   onChangeSearchQuery,
@@ -139,49 +153,115 @@ export default function ChatRoomModals({
                 : 'Set member role'}
             </Text>
 
-            <TextInput
-              value={groupUserIdInput}
-              onChangeText={onChangeGroupUserId}
-              placeholder="User ID"
-              placeholderTextColor={palette.subtext}
-              style={[
-                localStyles.modalInput,
-                { color: palette.text, borderColor: palette.inputBorder },
-              ]}
-              autoCapitalize="none"
-            />
+            {groupAction === 'add' ? (
+              <>
+                <Text style={{ fontSize: 13, color: palette.subtext, marginBottom: 4 }}>
+                  Pick a contact with a KIS account to add to this group.
+                </Text>
+                <TextInput
+                  value={addMemberSearch}
+                  onChangeText={onChangeAddMemberSearch}
+                  placeholder="Search contacts by name or phone"
+                  placeholderTextColor={palette.subtext}
+                  style={[
+                    localStyles.modalInput,
+                    { color: palette.text, borderColor: palette.inputBorder },
+                  ]}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  returnKeyType="search"
+                />
+                {addMemberContactsLoading ? (
+                  <View style={{ paddingVertical: 24, alignItems: 'center' }}>
+                    <ActivityIndicator color={palette.primary} />
+                  </View>
+                ) : addMemberContacts.length === 0 ? (
+                  <Text style={{ color: palette.subtext, fontSize: 13, paddingVertical: 12 }}>
+                    No contacts match. Only contacts with a KIS account can be added.
+                  </Text>
+                ) : (
+                  <FlatList
+                    data={addMemberContacts}
+                    keyExtractor={(c) => c.userId ?? c.id ?? c.name}
+                    style={{ maxHeight: 320 }}
+                    renderItem={({ item }) => (
+                      <Pressable
+                        onPress={() => onSubmitAddMemberContact(item)}
+                        disabled={addMemberSubmitting}
+                        style={({ pressed }) => ({
+                          flexDirection: 'row',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          paddingVertical: 12,
+                          borderBottomWidth: StyleSheet.hairlineWidth,
+                          borderBottomColor: palette.divider,
+                          opacity: pressed || addMemberSubmitting ? 0.6 : 1,
+                        })}
+                      >
+                        <View>
+                          <Text style={{ color: palette.text, fontSize: 15, fontWeight: '600' }}>{item.name}</Text>
+                          <Text style={{ color: palette.subtext, fontSize: 12 }}>{item.phone}</Text>
+                        </View>
+                      </Pressable>
+                    )}
+                  />
+                )}
+                <View style={localStyles.modalActions}>
+                  <Pressable
+                    onPress={onCloseGroupAction}
+                    style={[localStyles.modalButton, { borderColor: palette.inputBorder }]}
+                  >
+                    <Text style={{ color: palette.text }}>Cancel</Text>
+                  </Pressable>
+                </View>
+              </>
+            ) : (
+              <>
+                <TextInput
+                  value={groupUserIdInput}
+                  onChangeText={onChangeGroupUserId}
+                  placeholder="User ID"
+                  placeholderTextColor={palette.subtext}
+                  style={[
+                    localStyles.modalInput,
+                    { color: palette.text, borderColor: palette.inputBorder },
+                  ]}
+                  autoCapitalize="none"
+                />
 
-            {groupAction !== 'remove' && (
-              <TextInput
-                value={groupRoleInput}
-                onChangeText={onChangeGroupRole}
-                placeholder="Role (member/admin/owner)"
-                placeholderTextColor={palette.subtext}
-                style={[
-                  localStyles.modalInput,
-                  { color: palette.text, borderColor: palette.inputBorder },
-                ]}
-                autoCapitalize="none"
-              />
+                {groupAction !== 'remove' && (
+                  <TextInput
+                    value={groupRoleInput}
+                    onChangeText={onChangeGroupRole}
+                    placeholder="Role (member/admin/owner)"
+                    placeholderTextColor={palette.subtext}
+                    style={[
+                      localStyles.modalInput,
+                      { color: palette.text, borderColor: palette.inputBorder },
+                    ]}
+                    autoCapitalize="none"
+                  />
+                )}
+
+                <View style={localStyles.modalActions}>
+                  <Pressable
+                    onPress={onCloseGroupAction}
+                    style={[localStyles.modalButton, { borderColor: palette.inputBorder }]}
+                  >
+                    <Text style={{ color: palette.text }}>Cancel</Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={onSubmitGroupAction}
+                    style={[
+                      localStyles.modalButton,
+                      { backgroundColor: palette.primary, borderColor: palette.primary },
+                    ]}
+                  >
+                    <Text style={{ color: palette.onPrimary }}>Confirm</Text>
+                  </Pressable>
+                </View>
+              </>
             )}
-
-            <View style={localStyles.modalActions}>
-              <Pressable
-                onPress={onCloseGroupAction}
-                style={[localStyles.modalButton, { borderColor: palette.inputBorder }]}
-              >
-                <Text style={{ color: palette.text }}>Cancel</Text>
-              </Pressable>
-              <Pressable
-                onPress={onSubmitGroupAction}
-                style={[
-                  localStyles.modalButton,
-                  { backgroundColor: palette.primary, borderColor: palette.primary },
-                ]}
-              >
-                <Text style={{ color: palette.onPrimary }}>Confirm</Text>
-              </Pressable>
-            </View>
           </View>
         </Pressable>
       </Modal>

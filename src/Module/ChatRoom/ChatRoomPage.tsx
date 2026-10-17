@@ -125,6 +125,7 @@ import { QuickRepliesBar } from './componets/main/QuickRepliesBar';
 import { normalizeChatDisplayText, normalizeChatSendText } from './safeChatText';
 import { useRawTopInset } from '@/hooks/useSafeTopInset';
 import { dismissNotificationsForConversation } from '@/services/pushNotificationDismissal';
+import { refreshFromDeviceAndBackend, type KISContact } from '@/Module/AddContacts/contactsService';
 
 /* -------------------------------------------------------------------------- */
 /*                                   HELPERS                                  */
@@ -768,6 +769,56 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
   const [groupAction, setGroupAction] = useState<'add' | 'remove' | 'role' | null>(null);
   const [groupUserIdInput, setGroupUserIdInput] = useState('');
   const [groupRoleInput, setGroupRoleInput] = useState('member');
+  // "Add member" picks from the device's registered contacts, the same flow
+  // ChatInfoPage already uses - typing a raw user ID (the old flow here) was
+  // a dead end for a normal user, who has no way to know anyone's ID: tapping
+  // Confirm with an empty field silently no-op'd (see handleGroupActionSubmit's
+  // `if (!userId) return`), which read as the button doing nothing at all.
+  const [addMemberContacts, setAddMemberContacts] = useState<KISContact[]>([]);
+  const [addMemberContactsLoading, setAddMemberContactsLoading] = useState(false);
+  const [addMemberSearch, setAddMemberSearch] = useState('');
+  const [addMemberSubmitting, setAddMemberSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (groupAction !== 'add') return;
+    let cancelled = false;
+    setAddMemberContactsLoading(true);
+    refreshFromDeviceAndBackend()
+      .then((contacts) => {
+        if (cancelled) return;
+        setAddMemberContacts(contacts.filter((c) => c.isRegistered && !!c.userId));
+      })
+      .catch(() => { if (!cancelled) setAddMemberContacts([]); })
+      .finally(() => { if (!cancelled) setAddMemberContactsLoading(false); });
+    return () => { cancelled = true; };
+  }, [groupAction]);
+
+  const filteredAddMemberContacts = useMemo(() => {
+    const q = addMemberSearch.trim().toLowerCase();
+    if (!q) return addMemberContacts;
+    return addMemberContacts.filter(
+      (c) => c.name.toLowerCase().includes(q) || c.phone.includes(q),
+    );
+  }, [addMemberContacts, addMemberSearch]);
+
+  const handleAddMemberContactSubmit = async (contact: KISContact) => {
+    const convId = conversationId ?? chat?.id;
+    const userId = contact.userId;
+    if (!convId || !userId) return;
+    setAddMemberSubmitting(true);
+    try {
+      await Handlers.handleAddGroupMember({
+        conversationId: String(convId),
+        userId,
+        baseRole: 'member',
+      });
+      setAddMemberSearch('');
+      setGroupAction(null);
+      DeviceEventEmitter.emit('conversation.participants_changed', { conversationId: String(convId) });
+    } finally {
+      setAddMemberSubmitting(false);
+    }
+  };
 
   const handleOpenSubRoom = useCallback(
     (subRoom: SubRoom) => {
@@ -1814,14 +1865,13 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
   const handleGroupActionSubmit = async () => {
     const convId = conversationId ?? chat?.id;
     const userId = groupUserIdInput.trim();
-    if (!convId || !userId || !groupAction) return;
-
-    if (groupAction === 'add') {
-      await Handlers.handleAddGroupMember({
-        conversationId: String(convId),
-        userId,
-        baseRole: groupRoleInput.trim() || 'member',
-      });
+    if (!convId || !groupAction) return;
+    // "Add member" now uses the contact picker (handleAddMemberContactSubmit)
+    // instead of this raw-ID field - nothing left to submit here for it.
+    if (groupAction === 'add') return;
+    if (!userId) {
+      Alert.alert(groupAction === 'remove' ? 'Remove member' : 'Set member role', 'Enter a user ID first.');
+      return;
     }
 
     if (groupAction === 'remove') {
@@ -2605,9 +2655,15 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
             setSearchHasMore(true);
           }}
           onOpenAddMember={() => {
-            setGroupRoleInput('member');
+            setAddMemberSearch('');
             setGroupAction('add');
           }}
+          addMemberContacts={filteredAddMemberContacts}
+          addMemberContactsLoading={addMemberContactsLoading}
+          addMemberSearch={addMemberSearch}
+          onChangeAddMemberSearch={setAddMemberSearch}
+          addMemberSubmitting={addMemberSubmitting}
+          onSubmitAddMemberContact={handleAddMemberContactSubmit}
           onOpenRemoveMember={() => setGroupAction('remove')}
           onOpenSetRole={() => {
             setGroupRoleInput('admin');
