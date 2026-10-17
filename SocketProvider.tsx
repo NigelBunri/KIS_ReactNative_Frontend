@@ -114,7 +114,7 @@ type SocketContextValue = {
   /** Leave without ending the call for other participants. */
   leaveCall?: () => Promise<void>;
   /** Join an already-active call started by someone else. */
-  joinExistingCall?: (info: { callId: string; conversationId: string; callType: CallType; title: string }) => Promise<boolean>;
+  joinExistingCall?: (info: { callId: string; conversationId: string; callType: CallType; title: string; silentOnFailure?: boolean }) => Promise<boolean>;
   /** End the call for ALL participants (host action). */
   endCallForAll?: () => Promise<void>;
   /** @deprecated use leaveCall or endCallForAll */
@@ -146,9 +146,9 @@ type SocketContextValue = {
   /** Fetch or generate an invite link for the current call (all call types). */
   getCallInviteLink?: () => Promise<string | null>;
   /** Non-host: enter the real waiting room for a scheduled call before the host starts it. */
-  joinWaitingRoom?: (info: { callId: string; conversationId: string; callType: CallType; title: string }) => Promise<boolean>;
+  joinWaitingRoom?: (info: { callId: string; conversationId: string; callType: CallType; title: string; silentOnFailure?: boolean }) => Promise<boolean>;
   /** Host: start a previously-scheduled call (reuses its existing callId). */
-  startScheduledCall?: (info: { callId: string; conversationId: string; callType: CallType; title: string }) => Promise<boolean>;
+  startScheduledCall?: (info: { callId: string; conversationId: string; callType: CallType; title: string; silentOnFailure?: boolean }) => Promise<boolean>;
 };
 
 type StartCallArgs = {
@@ -658,6 +658,14 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     conversationId: string;
     callType: CallType;
     title: string;
+    // CallJoinScreen.tsx already shows its own dedicated, dismissible
+    // "Can't join" screen (with the real reason and a Go Home button) for
+    // a failed join — passes true so this function's own generic native
+    // Alert doesn't ALSO fire and stack a second dialog on top of it. The
+    // other three callers (ChatRoomPage, CallsTab, PartnerChannelsPanel)
+    // have no dedicated failure UI of their own, so they keep relying on
+    // this Alert by leaving the flag unset.
+    silentOnFailure?: boolean;
   }): Promise<boolean> => {
     const s = socketRef.current;
     const myUserId = currentUserIdRef.current;
@@ -738,13 +746,31 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     startOutgoingCall({ callUUID: info.callId, callerName: safeDisplayName(info.title, 'Call'), callType: info.callType });
     reportCallAnswered(info.callId);
 
-    s.emit('call.answer', {
-      conversationId: info.conversationId,
-      callId: info.callId,
-      callType: info.callType,
-      media: needsVideo ? 'video' : 'voice',
-    }, (ack?: any) => {
-      if (ack?.ok) return;
+    // AWAITED, not fire-and-forget: this used to resolve `true` immediately
+    // after emitting, before the server's ack for call.answer ever came
+    // back. Every caller (CallJoinScreen.handleJoin in particular) treated
+    // that as "joined successfully" and navigated away on the spot — so
+    // when the ack arrived moments later with ok:false (e.g. a valid
+    // invite-link joiner who isn't a Django conversation member, now fixed
+    // server-side, but any future genuine join failure hits the same path),
+    // the callback below tore down WebRTC and showed "Call ended" AFTER the
+    // caller had already navigated on the assumption the join had
+    // succeeded — exactly the "joins, then immediately looks like it
+    // ended" symptom. Awaiting the real ack here means `joined` (and the
+    // Alert below) always reflects what actually happened before any
+    // caller acts on the result.
+    const ack: any = await new Promise((resolve) => {
+      s.emit('call.answer', {
+        conversationId: info.conversationId,
+        callId: info.callId,
+        callType: info.callType,
+        media: needsVideo ? 'video' : 'voice',
+      }, resolve);
+    });
+
+    _answeringRef.current = false;
+
+    if (!ack?.ok) {
       // Same stale-answer protection as answerCall — the backend is
       // authoritative on whether this call is still joinable.
       webRTCService.closeAll();
@@ -756,10 +782,12 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         endedAt: new Date().toISOString(),
       } : prev);
       reportCallEnded(info.callId, 'missed');
-      Alert.alert('Call ended', 'This call is no longer available.');
-    });
+      if (!info.silentOnFailure) {
+        Alert.alert('Call ended', 'This call is no longer available.');
+      }
+      return false;
+    }
 
-    _answeringRef.current = false;
     DeviceEventEmitter.emit('calls.refresh');
     return true;
   }, [requestCallPermissions, setupWebRTC, fetchAndApplyIceServers]);
@@ -777,18 +805,23 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     conversationId: string;
     callType: CallType;
     title: string;
+    // See joinExistingCall's identical flag — CallJoinScreen.tsx shows its
+    // own dedicated failure screen, so it opts out of this generic Alert.
+    silentOnFailure?: boolean;
   }): Promise<boolean> => {
     const s = socketRef.current;
     const myUserId = currentUserIdRef.current;
     if (!s || !myUserId) {
-      Alert.alert('Unavailable', 'Connection not ready yet.');
+      if (!info.silentOnFailure) Alert.alert('Unavailable', 'Connection not ready yet.');
       return false;
     }
     const ack: any = await new Promise(resolve => {
       s.emit('call.waiting.join', { conversationId: info.conversationId, callId: info.callId }, resolve);
     });
     if (!ack?.ok) {
-      Alert.alert('Unable to join', ack?.error ?? 'This call is no longer available.');
+      if (!info.silentOnFailure) {
+        Alert.alert('Unable to join', ack?.error ?? 'This call is no longer available.');
+      }
       return false;
     }
 
@@ -847,11 +880,14 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     conversationId: string;
     callType: CallType;
     title: string;
+    // See joinExistingCall's identical flag — CallJoinScreen.tsx shows its
+    // own dedicated failure screen, so it opts out of this generic Alert.
+    silentOnFailure?: boolean;
   }): Promise<boolean> => {
     const s = socketRef.current;
     const myUserId = currentUserIdRef.current;
     if (!s || !myUserId) {
-      Alert.alert('Call unavailable', 'Connection not ready yet.');
+      if (!info.silentOnFailure) Alert.alert('Call unavailable', 'Connection not ready yet.');
       return false;
     }
     if (_answeringRef.current) return false;
@@ -865,7 +901,9 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     });
     if (!ack?.ok) {
       _answeringRef.current = false;
-      Alert.alert('Unable to start call', ack?.error ?? 'This scheduled call could not be started.');
+      if (!info.silentOnFailure) {
+        Alert.alert('Unable to start call', ack?.error ?? 'This scheduled call could not be started.');
+      }
       return false;
     }
 

@@ -40,6 +40,7 @@ import BroadcastScreen from '../screens/tabs/BroadcastScreen';
 import ProfileScreen from '../screens/tabs/ProfileScreen';
 import { Chat } from '@/Module/ChatRoom/messagesUtils';
 import { resolveChatOpenPayload } from './resolveChatOpenPayload';
+import { hasUsableConversationKey } from './chatOverlayGuard';
 import { useSocket } from '../../SocketProvider';
 import ROUTES from '@/network';
 import { getRequest } from '@/network/get';
@@ -624,6 +625,21 @@ export function MainTabs() {
   }, [communitySlide]);
 
   const openChat = useCallback((chat: Chat) => {
+    // Single chokepoint for every way a chat room becomes visible — the
+    // 'chat.open' DeviceEventEmitter listener below already validates via
+    // resolveChatOpenPayload before calling this, but `openChat` is also
+    // handed out directly as the `onOpenChat` prop to ChatRoomPage/
+    // CommunityRoomPage/etc (e.g. ChatRoomPage's handleOpenSubRoom, which
+    // builds its own Chat object from a sub-room entry) — those callers
+    // had no equivalent guard, so a sub-room with a missing/empty
+    // conversationId could push straight into chatHistory and render the
+    // "Select a chat to start messaging" empty room, fully visible and
+    // with no real conversation behind it. Validating here protects every
+    // caller uniformly instead of requiring each one to remember to check.
+    if (!hasUsableConversationKey(chat)) {
+      if (__DEV__) console.warn('[openChat] ignored — chat has no usable conversationId', chat);
+      return;
+    }
     const conversationKey = chat?.conversationId ?? chat?.id;
     const communityEntry =
       conversationKey && communityByConversationId[String(conversationKey)]

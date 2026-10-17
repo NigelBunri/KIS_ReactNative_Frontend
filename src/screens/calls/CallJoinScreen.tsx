@@ -94,6 +94,10 @@ export default function CallJoinScreen({ route, navigation }: Props) {
           conversationId: callInfo.conversationId,
           callType: callInfo.callType,
           title: callInfo.title ?? callTypeLabel(callInfo.callType),
+          // This screen's own 'error' phase below already shows a
+          // dedicated, dismissible failure state — without this,
+          // joinExistingCall's generic native Alert fired on top of it too.
+          silentOnFailure: true,
         });
       } else if (isScheduledCallHost(callInfo, currentUserId) && startScheduledCall) {
         // The host opening their own scheduled call's invite link starts
@@ -104,6 +108,7 @@ export default function CallJoinScreen({ route, navigation }: Props) {
           conversationId: callInfo.conversationId,
           callType: callInfo.callType,
           title: callInfo.title ?? callTypeLabel(callInfo.callType),
+          silentOnFailure: true,
         });
       } else if (joinWaitingRoom) {
         // Anyone else opening a not-yet-started scheduled call's link
@@ -114,6 +119,7 @@ export default function CallJoinScreen({ route, navigation }: Props) {
           conversationId: callInfo.conversationId,
           callType: callInfo.callType,
           title: callInfo.title ?? callTypeLabel(callInfo.callType),
+          silentOnFailure: true,
         });
       }
 
