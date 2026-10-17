@@ -4657,7 +4657,13 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 42,
     right: 56,
-    zIndex: 3,
+    // Must be above viewerTapZone's zIndex (5) — the invisible left/right
+    // tap-to-advance zones span the full viewer height (top: 0 to
+    // bottom: viewerFooterHeight) and sit directly under this button's
+    // position. With a lower zIndex here, the right-half tap zone
+    // intercepted every tap meant for this button and advanced to the
+    // next status instead of opening the options menu.
+    zIndex: 10,
     borderWidth: 1,
     borderRadius: 999,
     paddingHorizontal: 12,
