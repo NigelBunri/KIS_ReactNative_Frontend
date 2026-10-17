@@ -18,7 +18,49 @@
 //   proc.stop();
 
 import { useRef, useEffect, useState, useCallback } from 'react';
+import { NativeModules } from 'react-native';
 import { captureRef } from 'react-native-view-shot';
+import { webRTCService } from './webRTCService';
+
+// Real, on-device segmentation applied to the OUTGOING video track (feature
+// F) — see android/app/src/main/java/com/kingdom/impact/virtualbg/ and
+// ios/KISVirtualBackground/ for the native Vision (iOS) / ML Kit Selfie
+// Segmentation (Android) pipelines this drives. Both plug into
+// react-native-webrtc's VideoFrameProcessorDelegate extension point, which
+// sits between the camera capturer and RTCVideoSource — every remote
+// participant (P2P or SFU) sees the processed frame, not just the local
+// preview built below by VirtualBgProcessor/captureRef.
+const NativeVirtualBg = NativeModules.KISVirtualBackgroundModule as
+  | { configure(mode: string, blurRadius: number, imageUri: string | null): Promise<boolean>; clear(): Promise<boolean>; isAvailable(): Promise<boolean> }
+  | undefined;
+
+export const virtualBackgroundNativeAvailable = !!NativeVirtualBg;
+
+/**
+ * Pushes the current mode/blur/background-image config to the native
+ * module, then activates (or deactivates) the registered video-effect
+ * processor on the actual local video track — this is the one call that
+ * makes the effect visible to remote participants, not just this device's
+ * own local preview. Safe no-op on platforms/builds without the native
+ * module (e.g. a dev build predating this feature, or web).
+ */
+export async function applyVirtualBackgroundToTrack(config: VirtualBgConfig): Promise<void> {
+  if (!NativeVirtualBg) return;
+  const track = webRTCService.getLocalStream()?.getVideoTracks?.()?.[0];
+  if (!track) return;
+
+  try {
+    if (config.mode === 'none') {
+      track._setVideoEffects?.([]);
+      await NativeVirtualBg.clear();
+      return;
+    }
+    await NativeVirtualBg.configure(config.mode, config.blurRadius ?? 12, config.imageUri ?? null);
+    track._setVideoEffect?.('kis-virtualbg');
+  } catch (err) {
+    console.warn('[virtualBg] applyVirtualBackgroundToTrack failed:', err);
+  }
+}
 
 export type VirtualBgConfig = {
   mode: 'none' | 'blur' | 'image';
@@ -107,6 +149,7 @@ export function useVirtualBg(viewRef: React.RefObject<any>) {
     } else {
       processor.current.start(c);
     }
+    void applyVirtualBackgroundToTrack(c);
   }, []);
 
   return { frameUri, config, setConfig, processor: processor.current };

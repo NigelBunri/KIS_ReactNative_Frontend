@@ -1,4 +1,4 @@
-import { resolveCallbackInvitees } from '../callsTabHelpers';
+import { resolveCallbackInvitees, isScheduledCallHost } from '../callsTabHelpers';
 
 // Regression coverage for FAILURE A: "call history record cannot initiate a
 // call". Root cause was resolveCallbackInvitees's predecessor trusting
@@ -49,5 +49,28 @@ describe('resolveCallbackInvitees', () => {
     // nobody else" vs "we don't know yet" being indistinguishable here by
     // design — falls back to the record so a real invitee isn't dropped.
     expect(result).toEqual(['other-1']);
+  });
+});
+
+// Regression coverage for the "schedule a future call" root cause: tapping
+// "Join" on a scheduled call used to always call startCall() with a brand
+// new callId and an empty invitee list, abandoning the original scheduled
+// call and everyone holding its invite link. The fix branches on whether
+// the current user is the call's host — this helper is that decision,
+// isolated from the async start/wait side effects so it's cheap to test.
+describe('isScheduledCallHost', () => {
+  it('trusts the server-provided isHost flag when present', () => {
+    expect(isScheduledCallHost({ isHost: true, createdBy: 'someone-else' }, 'me')).toBe(true);
+    expect(isScheduledCallHost({ isHost: false, createdBy: 'me' }, 'me')).toBe(false);
+  });
+
+  it('falls back to comparing createdBy to the current user when isHost is absent (older cached response)', () => {
+    expect(isScheduledCallHost({ createdBy: 'me' }, 'me')).toBe(true);
+    expect(isScheduledCallHost({ createdBy: 'someone-else' }, 'me')).toBe(false);
+  });
+
+  it('defaults to false (safe: enter the waiting room, not start the call) when neither signal is available', () => {
+    expect(isScheduledCallHost({}, 'me')).toBe(false);
+    expect(isScheduledCallHost({ createdBy: 'me' }, null)).toBe(false);
   });
 });

@@ -35,7 +35,7 @@ import { callTypeLabel, callTypeIcon, formatDuration } from '@/services/calls/ca
 import ScheduleCallSheet, { type StandaloneCallResult } from '@/screens/calls/ScheduleCallSheet';
 import { loadCallHistory, saveCallHistory } from '@/services/calls/callHistoryStorage';
 import { useSafeTopInset } from '@/hooks/useSafeTopInset';
-import { resolveCallbackInvitees } from './callsTabHelpers';
+import { resolveCallbackInvitees, isScheduledCallHost } from './callsTabHelpers';
 import CallDiagnosticsModal from '@/screens/calls/CallDiagnosticsModal';
 
 type CallsTabProps = {
@@ -98,7 +98,7 @@ const CallsTab = forwardRef<ScrollableHandle, CallsTabProps>(function CallsTab({
   useImperativeHandle(ref, () => ({
     scrollTo: ({ y, animated }) => listRef.current?.getScrollResponder()?.scrollTo({ y, animated }),
   }), []);
-  const { currentUserId, startCall, joinExistingCall, socket } = useSocket();
+  const { currentUserId, startCall, joinExistingCall, joinWaitingRoom, startScheduledCall, socket } = useSocket();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [calls, setCalls] = useState<CallHistoryItem[]>([]);
@@ -400,15 +400,30 @@ const CallsTab = forwardRef<ScrollableHandle, CallsTabProps>(function CallsTab({
   }, [startCall, loadCalls]);
 
   const handleJoinScheduled = useCallback(async (item: ScheduledCallItem) => {
-    if (!startCall) return;
-    await startCall({
-      conversationId: item.conversationId,
-      title: item.title ?? 'Call',
-      callType: item.callType as CallType,
-      inviteeUserIds: [],
-      inviteToken: item.inviteToken ?? undefined,
-    });
-  }, [startCall]);
+    // The host starts the SAME scheduled call (reusing its callId so every
+    // invitee/invite-link holder connects to the real thing); anyone else
+    // enters the real waiting room until the host does. Previously this
+    // always called startCall(), which fabricated a brand-new callId/empty
+    // invitee list — the original scheduled call (and anyone already
+    // holding its invite link) was silently abandoned.
+    const isHost = isScheduledCallHost(item, currentUserId);
+    if (isHost && startScheduledCall) {
+      await startScheduledCall({
+        callId: item.callId,
+        conversationId: item.conversationId,
+        callType: item.callType as CallType,
+        title: item.title ?? 'Call',
+      });
+    } else if (joinWaitingRoom) {
+      await joinWaitingRoom({
+        callId: item.callId,
+        conversationId: item.conversationId,
+        callType: item.callType as CallType,
+        title: item.title ?? 'Call',
+      });
+    }
+    loadCalls();
+  }, [startScheduledCall, joinWaitingRoom, currentUserId, loadCalls]);
 
   const renderHistoryItem = ({ item }: { item: CallHistoryItem }) => {
     const isStandalone = item.isStandalone || item.conversationId?.startsWith('standalone:');

@@ -1,4 +1,23 @@
-import type { CallHistoryItem } from '@/services/calls/callTypes';
+import type { CallHistoryItem, ScheduledCallItem } from '@/services/calls/callTypes';
+
+/**
+ * Decide whether tapping "Join" on a scheduled call should START it (the
+ * host's own action — reuses the scheduled call's existing callId) or
+ * enter the WAITING ROOM (everyone else, before the host has started it).
+ *
+ * Prefers the server's authoritative `isHost` flag (added to the
+ * GET /calls/scheduled response) since it's computed server-side from the
+ * real `createdBy` field; falls back to comparing `createdBy` to the local
+ * user id for any older cached response that predates that flag.
+ */
+export function isScheduledCallHost(
+  item: Pick<ScheduledCallItem, 'isHost' | 'createdBy'>,
+  currentUserId: string | null | undefined,
+): boolean {
+  if (typeof item.isHost === 'boolean') return item.isHost;
+  if (!item.createdBy || !currentUserId) return false;
+  return item.createdBy === currentUserId;
+}
 
 /**
  * Resolve who to invite when calling back a call-history record.

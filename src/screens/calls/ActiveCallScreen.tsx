@@ -43,6 +43,7 @@ import InCallChatSheet from './components/InCallChatSheet';
 import ParticipantsSheet from './components/ParticipantsSheet';
 import CallTimer from './components/CallTimer';
 import NetworkQualityBars from './components/NetworkQualityBars';
+import CallStatsPanel from './CallStatsPanel';
 import NetworkQualityBanner from './components/NetworkQualityBanner';
 import WaitingRoomPanel from './components/WaitingRoomPanel';
 import InviteLinkCard from './components/InviteLinkCard';
@@ -51,7 +52,7 @@ import InCallPollSheet from './components/InCallPollSheet';
 import InCallQASheet from './components/InCallQASheet';
 import BreakoutRoomsSheet from './components/BreakoutRoomsSheet';
 import VirtualBackgroundSheet, { type VirtualBgOption, VirtualBgPreview } from './components/VirtualBackgroundSheet';
-import { useVirtualBg } from '@/services/calls/virtualBgService';
+import { useVirtualBg, virtualBackgroundNativeAvailable } from '@/services/calls/virtualBgService';
 import RtmpSheet from './components/RtmpSheet';
 import InCallWhiteboardSheet from './components/InCallWhiteboardSheet';
 import IOSScreenSharePicker from './components/IOSScreenSharePicker';
@@ -139,6 +140,7 @@ export default function ActiveCallScreen({ session, actions }: Props) {
   const [showVirtualBg, setShowVirtualBg] = useState(false);
   const [showRtmp, setShowRtmp] = useState(false);
   const [showWhiteboard, setShowWhiteboard] = useState(false);
+  const [showStatsPanel, setShowStatsPanel] = useState(false);
   const [captionSending, setCaptionSending] = useState(false);
   // Keep captionSending in sync with captionsEnabled — if captions get toggled off externally, stop sending
   useEffect(() => {
@@ -150,7 +152,7 @@ export default function ActiveCallScreen({ session, actions }: Props) {
   const { frameUri, setConfig: setVbConfig } = useVirtualBg(selfPreviewRef);
   const [addParticipantInput, setAddParticipantInput] = useState('');
   const [showAddParticipant, setShowAddParticipant] = useState(false);
-  const addParticipantCb = useRef<((userIds: string[]) => void) | null>(null);
+  const addParticipantCb = useRef<((userIds: string[]) => Promise<{ ok: boolean; error?: string }>) | null>(null);
   const controlsOpacity = useRef(new Animated.Value(1)).current;
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -173,7 +175,7 @@ export default function ActiveCallScreen({ session, actions }: Props) {
   // Android: listen for add-participant request emitted from SocketProvider
   useEffect(() => {
     if (Platform.OS === 'ios') return;
-    const sub = DeviceEventEmitter.addListener('call.add_participant.request', ({ inviteToCall }: { inviteToCall: (ids: string[]) => void }) => {
+    const sub = DeviceEventEmitter.addListener('call.add_participant.request', ({ inviteToCall }: { inviteToCall: (ids: string[]) => Promise<{ ok: boolean; error?: string }> }) => {
       addParticipantCb.current = inviteToCall;
       setAddParticipantInput('');
       setShowAddParticipant(true);
@@ -772,7 +774,14 @@ export default function ActiveCallScreen({ session, actions }: Props) {
                 <Text style={{ fontSize: 18 }}>🔒</Text>
               </Pressable>
             )}
-            <NetworkQualityBars quality={session.networkQuality} size={16} />
+            <Pressable
+              onPress={() => setShowStatsPanel(true)}
+              hitSlop={10}
+              accessibilityLabel="Call diagnostics"
+              accessibilityRole="button"
+            >
+              <NetworkQualityBars quality={session.networkQuality} size={16} />
+            </Pressable>
             <Text style={styles.callTypeChip}>{callTypeLabel(session.callType)}</Text>
           </View>
         </Animated.View>
@@ -821,10 +830,17 @@ export default function ActiveCallScreen({ session, actions }: Props) {
 
       </View>
 
+      {/* Real WebRTC call-quality diagnostics (feature K) */}
+      <CallStatsPanel
+        visible={showStatsPanel}
+        onClose={() => setShowStatsPanel(false)}
+        participants={session.participants}
+      />
+
       {/* Invite link sheet */}
       <InviteLinkCard
         visible={showInviteLink}
-        inviteLink={resolvedInviteLink ?? session.inviteLink ?? `kis://call/join/${session.inviteToken ?? ''}`}
+        inviteLink={resolvedInviteLink ?? session.inviteLink ?? `https://kingdomimpactventures.org/join/call/${session.inviteToken ?? ''}`}
         callTitle={session.title}
         onClose={() => setShowInviteLink(false)}
       />
@@ -880,7 +896,7 @@ export default function ActiveCallScreen({ session, actions }: Props) {
         visible={showVirtualBg}
         onClose={() => setShowVirtualBg(false)}
         current={virtualBg}
-        nativeProcessorAvailable={false}
+        nativeProcessorAvailable={virtualBackgroundNativeAvailable}
         onSelect={opt => {
           setVirtualBg(opt);
           setVbConfig({ mode: opt.mode, blurRadius: opt.blurRadius, imageUri: opt.uri });
@@ -937,7 +953,13 @@ export default function ActiveCallScreen({ session, actions }: Props) {
               <Pressable
                 onPress={() => {
                   const uid = addParticipantInput.trim();
-                  if (uid && addParticipantCb.current) addParticipantCb.current([uid]);
+                  if (uid && addParticipantCb.current) {
+                    void Promise.resolve(addParticipantCb.current([uid])).then((result: any) => {
+                      if (result && result.ok === false) {
+                        Alert.alert('Could not add participant', result.error ?? 'Please try again.');
+                      }
+                    });
+                  }
                   setShowAddParticipant(false);
                 }}
                 accessibilityRole="button"

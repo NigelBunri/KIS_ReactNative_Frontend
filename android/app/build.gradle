@@ -159,6 +159,14 @@ dependencies {
     implementation("com.google.mlkit:translate:17.0.3")
     implementation("com.google.mlkit:language-id:17.0.6")
 
+    // Real on-device person segmentation for virtual backgrounds (feature F
+    // — see VirtualBackgroundProcessor.kt). Runs entirely on-device, same
+    // privacy model as the ML Kit translate/language-id usage above. Wired
+    // into react-native-webrtc's VideoFrameProcessor extension point so the
+    // blurred/replaced background is baked into the OUTGOING video track
+    // itself (every remote participant sees it), not just a local preview.
+    implementation("com.google.mlkit:segmentation-selfie:16.0.0-beta6")
+
     if (hermesEnabled.toBoolean()) {
         implementation("com.facebook.react:hermes-android")
     } else {

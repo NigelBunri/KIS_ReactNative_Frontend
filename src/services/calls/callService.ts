@@ -4,6 +4,7 @@
 
 import { Platform } from 'react-native';
 import { webRTCService, presentIOSScreenCapturePicker } from './webRTCService';
+import { sfuService } from './sfuService';
 
 /** Ref to the mounted, invisible ScreenCapturePickerView (see
  * ActiveCallScreen's IOSScreenSharePicker) — registered by whichever screen
@@ -46,7 +47,7 @@ export function setScreenShareCallbacks(cb: { onScreenShareEnded?: ScreenShareEn
  * tells the server sharing stopped, and notifies onScreenShareEnded so the
  * UI's button/badge state resyncs even when nothing called toggleScreenShare
  * to trigger this. */
-function stopScreenShareInternal(sessionId: string, socket: any | null, reason: 'manual' | 'track-ended') {
+async function stopScreenShareInternal(sessionId: string, socket: any | null, reason: 'manual' | 'track-ended') {
   const localStream = webRTCService.getLocalStream();
 
   // Stop ONLY the screen-capture track. Previously this stopped EVERY video
@@ -71,6 +72,12 @@ function stopScreenShareInternal(sessionId: string, socket: any | null, reason: 
           if (videoSender) videoSender.replaceTrack(_originalVideoTrack);
         } catch { /* ignore */ }
       });
+      // Same restore on the SFU side for a call that's upgraded to group
+      // media — see the matching comment in the toggle-on path below for
+      // why this is required, not optional.
+      if (sfuService.isJoined) {
+        await sfuService.replaceTrack('video', _originalVideoTrack);
+      }
     } catch { /* ignore */ }
     _originalVideoTrack = null;
   }
@@ -120,7 +127,7 @@ export async function toggleScreenShare(
 
   if (isCurrentlySharing) {
     // ── TOGGLE OFF ──────────────────────────────────────────────────────────
-    stopScreenShareInternal(sessionId, socket, 'manual');
+    await stopScreenShareInternal(sessionId, socket, 'manual');
     return false;
   }
 
@@ -199,7 +206,7 @@ export async function toggleScreenShare(
         try {
           const handleEnded = () => {
             if (!_screenShareState[sessionId]) return; // already cleaned up (manual toggle-off)
-            stopScreenShareInternal(sessionId, _activeShareSocket, 'track-ended');
+            void stopScreenShareInternal(sessionId, _activeShareSocket, 'track-ended');
           };
           if (typeof screenVideoTrack.addEventListener === 'function') {
             screenVideoTrack.addEventListener('ended', handleEnded);
@@ -218,6 +225,16 @@ export async function toggleScreenShare(
             if (videoSender) videoSender.replaceTrack(screenVideoTrack);
           } catch { /* ignore */ }
         });
+        // A group call that's upgraded to the SFU sends video through a
+        // mediasoup producer, not direct peer connections — without this,
+        // starting screen share only ever reached the P2P mesh (empty/
+        // irrelevant once a call has upgraded), so every participant
+        // reached via the SFU kept seeing the camera feed instead of the
+        // shared screen. Same dual-path requirement as noise cancellation
+        // (see webRTCService.ts's setNoiseCancellation).
+        if (sfuService.isJoined) {
+          await sfuService.replaceTrack('video', screenVideoTrack);
+        }
       }
     }
   } catch (err) {

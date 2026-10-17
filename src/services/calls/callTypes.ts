@@ -205,6 +205,8 @@ export type ScheduledCallItem = {
   isStandalone: boolean;
   inviteToken: string | null;
   participantCount: number;
+  createdBy?: string;
+  isHost?: boolean;
 };
 
 export type CallHistoryItem = {

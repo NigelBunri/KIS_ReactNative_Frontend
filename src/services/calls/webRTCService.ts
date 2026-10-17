@@ -1,6 +1,8 @@
 // src/services/calls/webRTCService.ts
 // Loads react-native-webrtc dynamically to avoid hard compile dependency.
 
+import { sfuService } from './sfuService';
+
 let RNW: any = null;
 try {
   RNW = require('react-native-webrtc');
@@ -147,6 +149,129 @@ export type PeerStats = {
   networkQuality: 1 | 2 | 3 | 4;
 };
 
+/** Real, measured per-peer connection diagnostics — feature K's data source.
+ * Every field is either read directly off a getStats() report or derived
+ * from two real samples (bitrate); a field whose source stat wasn't present
+ * in this report is `null`, never a fabricated/placeholder value. */
+export type DetailedPeerStats = {
+  packetsLost: number;
+  rttMs: number;
+  audioLevel: number;
+  networkQuality: 1 | 2 | 3 | 4;
+  jitterMs: number | null;
+  bitrateOutKbps: number | null;
+  bitrateInKbps: number | null;
+  videoWidth: number | null;
+  videoHeight: number | null;
+  fps: number | null;
+  iceConnectionState: string | null;
+  /** 'host' | 'srflx' | 'relay' | 'prflx' from the active ICE candidate pair's local candidate — tells the user whether this leg is direct, NAT-traversed, or relayed via TURN. */
+  candidateType: string | null;
+  codec: string | null;
+  updatedAt: number;
+};
+
+type StatsSample = { timestamp: number; bytesSent: number; bytesReceived: number };
+
+/**
+ * Pure parser for an RTCPeerConnection's getStats() report — isolated from
+ * the class so it's directly unit-testable with a plain stub report
+ * (anything exposing .forEach over plain stat objects) instead of a real
+ * native peer connection. Bitrate requires two samples over time, so the
+ * previous sample is passed in and the new one returned for the next call.
+ */
+export function parseStatsReport(
+  statsReport: { forEach: (cb: (r: any) => void) => void },
+  prevSample: StatsSample | null,
+  now: number = Date.now(),
+): { stats: DetailedPeerStats; sample: StatsSample } {
+  let packetsLost = 0;
+  let rttMs = 0;
+  let audioLevel = 0;
+  let jitterMs: number | null = null;
+  let bytesSent = 0;
+  let bytesReceived = 0;
+  let videoWidth: number | null = null;
+  let videoHeight: number | null = null;
+  let fps: number | null = null;
+  let iceConnectionState: string | null = null;
+  let candidateType: string | null = null;
+  let codecMimeType: string | null = null;
+  let selectedLocalCandidateId: string | null = null;
+  const candidatesById = new Map<string, any>();
+
+  statsReport.forEach((r: any) => {
+    if (r.type === 'inbound-rtp' && r.kind === 'audio') {
+      packetsLost += r.packetsLost ?? 0;
+      audioLevel = Math.max(audioLevel, r.audioLevel ?? 0);
+      if (typeof r.jitter === 'number') jitterMs = r.jitter * 1000;
+      bytesReceived += r.bytesReceived ?? 0;
+    }
+    if (r.type === 'inbound-rtp' && r.kind === 'video') {
+      bytesReceived += r.bytesReceived ?? 0;
+      if (typeof r.frameWidth === 'number') videoWidth = r.frameWidth;
+      if (typeof r.frameHeight === 'number') videoHeight = r.frameHeight;
+      if (typeof r.framesPerSecond === 'number') fps = r.framesPerSecond;
+    }
+    if (r.type === 'outbound-rtp') {
+      bytesSent += r.bytesSent ?? 0;
+    }
+    if (r.type === 'candidate-pair' && r.state === 'succeeded') {
+      rttMs = (r.currentRoundTripTime ?? 0) * 1000;
+      selectedLocalCandidateId = r.localCandidateId ?? null;
+    }
+    if (r.type === 'local-candidate') {
+      candidatesById.set(r.id, r);
+    }
+    if (r.type === 'transport' && typeof r.iceState === 'string') {
+      iceConnectionState = r.iceState;
+    }
+    if (r.type === 'codec' && typeof r.mimeType === 'string' && !codecMimeType) {
+      codecMimeType = r.mimeType;
+    }
+  });
+
+  if (selectedLocalCandidateId) {
+    const cand = candidatesById.get(selectedLocalCandidateId);
+    if (cand?.candidateType) candidateType = cand.candidateType;
+  }
+
+  let nq: 1 | 2 | 3 | 4 = 4;
+  if (packetsLost > 20 || rttMs > 500) nq = 1;
+  else if (packetsLost > 10 || rttMs > 250) nq = 2;
+  else if (packetsLost > 3 || rttMs > 120) nq = 3;
+
+  let bitrateOutKbps: number | null = null;
+  let bitrateInKbps: number | null = null;
+  if (prevSample) {
+    const dtSec = (now - prevSample.timestamp) / 1000;
+    if (dtSec > 0) {
+      bitrateOutKbps = Math.max(0, ((bytesSent - prevSample.bytesSent) * 8) / dtSec / 1000);
+      bitrateInKbps = Math.max(0, ((bytesReceived - prevSample.bytesReceived) * 8) / dtSec / 1000);
+    }
+  }
+
+  return {
+    stats: {
+      packetsLost,
+      rttMs,
+      audioLevel,
+      networkQuality: nq,
+      jitterMs,
+      bitrateOutKbps,
+      bitrateInKbps,
+      videoWidth,
+      videoHeight,
+      fps,
+      iceConnectionState,
+      candidateType,
+      codec: codecMimeType,
+      updatedAt: now,
+    },
+    sample: { timestamp: now, bytesSent, bytesReceived },
+  };
+}
+
 // Maximum ICE candidates queued per peer before older ones are dropped.
 // Prevents unbounded memory growth if setRemoteDescription is never called.
 const MAX_ICE_QUEUE = 50;
@@ -164,6 +289,10 @@ class WebRTCService {
   private _isAudioOnlyMode = false;
   // Per-peer quality history - keyed by peerId; value is the last observed quality
   private _peerQuality = new Map<string, 1 | 2 | 3 | 4>();
+  // Latest real diagnostics per peer (feature K) and the raw byte/time
+  // sample needed to compute the NEXT bitrate delta.
+  private _detailedStats = new Map<string, DetailedPeerStats>();
+  private _statsSamples = new Map<string, StatsSample>();
   // Consecutive poor-quality readings (using the worst peer) before stepping down
   private _poorQualityCount = 0;
   // Cached aggregate quality (worst peer wins)
@@ -292,12 +421,21 @@ class WebRTCService {
       });
       const newAudioTrack = newAudio.getAudioTracks?.()?.[0];
       if (!newAudioTrack) return;
-      // Replace track in all peer connections
+      // Replace track in all P2P peer connections
       this.peers.forEach((pc: any) => {
         const senders: any[] = pc.getSenders?.() ?? [];
         const audioSender = senders.find((s: any) => s.track?.kind === 'audio');
         if (audioSender) audioSender.replaceTrack(newAudioTrack);
       });
+      // Group calls that have upgraded to the SFU send audio through a
+      // mediasoup producer instead of (or in addition to) direct peer
+      // connections — without this, toggling noise cancellation mid-call
+      // only ever reached the P2P mesh and had no effect once a call was
+      // large enough to have upgraded, exactly like the dual-path pattern
+      // toggleMute/toggleVideo already use for the same reason.
+      if (sfuService.isJoined) {
+        await sfuService.replaceTrack('audio', newAudioTrack);
+      }
       // Swap in local stream
       const oldTracks: any[] = this.localStream.getAudioTracks?.() ?? [];
       oldTracks.forEach((t: any) => { try { t.stop(); } catch {} });
@@ -563,31 +701,32 @@ class WebRTCService {
         // Guard again after the await - closeAll() may have fired during getStats().
         if (this._generation !== startGen) return;
 
-        let packetsLost = 0;
-        let rttMs = 0;
-        let audioLevel = 0;
-        statsReport.forEach((r: any) => {
-          if (r.type === 'inbound-rtp' && r.kind === 'audio') {
-            packetsLost += r.packetsLost ?? 0;
-            audioLevel = Math.max(audioLevel, r.audioLevel ?? 0);
-          }
-          if (r.type === 'candidate-pair' && r.state === 'succeeded') {
-            rttMs = (r.currentRoundTripTime ?? 0) * 1000;
-          }
-        });
-        let nq: 1 | 2 | 3 | 4 = 4;
-        if (packetsLost > 20 || rttMs > 500) nq = 1;
-        else if (packetsLost > 10 || rttMs > 250) nq = 2;
-        else if (packetsLost > 3 || rttMs > 120) nq = 3;
+        const { stats, sample } = parseStatsReport(statsReport, this._statsSamples.get(peerId) ?? null);
+        this._statsSamples.set(peerId, sample);
+        this._detailedStats.set(peerId, stats);
 
-        this.onStats(peerId, { packetsLost, rttMs, audioLevel, networkQuality: nq });
-        this.onSpeaking(peerId, audioLevel > 0.02);
-        this.applyNetworkQuality(peerId, nq);
+        this.onStats(peerId, {
+          packetsLost: stats.packetsLost,
+          rttMs: stats.rttMs,
+          audioLevel: stats.audioLevel,
+          networkQuality: stats.networkQuality,
+        });
+        this.onSpeaking(peerId, stats.audioLevel > 0.02);
+        this.applyNetworkQuality(peerId, stats.networkQuality);
       } catch {
         // getStats() can throw if the peer was closed mid-flight - safe to ignore.
       }
     }, 2500);
     this.statsIntervals.set(peerId, interval);
+  }
+
+  /** Real per-peer diagnostics (feature K) — never invented, always sourced
+   * from the most recent getStats() poll. Empty until the first poll tick
+   * (~2.5s after the peer connects) has run. */
+  getDetailedStats(): Record<string, DetailedPeerStats> {
+    const out: Record<string, DetailedPeerStats> = {};
+    this._detailedStats.forEach((v, k) => { out[k] = v; });
+    return out;
   }
 
   /** Close peer by ID and remove its quality tracking entry. */
@@ -600,6 +739,8 @@ class WebRTCService {
     if (pc) { try { pc.close(); } catch {} this.peers.delete(peerId); }
     this.iceCandidateQueues.delete(peerId);
     this._peerQuality.delete(peerId);
+    this._detailedStats.delete(peerId);
+    this._statsSamples.delete(peerId);
   }
 
   /**
@@ -619,6 +760,8 @@ class WebRTCService {
     this.peers.clear();
     this.iceCandidateQueues.clear();
     this._peerQuality.clear();
+    this._detailedStats.clear();
+    this._statsSamples.clear();
   }
 
   closeAll() {
@@ -637,6 +780,8 @@ class WebRTCService {
     this.peers.clear();
     this.iceCandidateQueues.clear();
     this._peerQuality.clear();
+    this._detailedStats.clear();
+    this._statsSamples.clear();
     try {
       this.localStream?.getTracks?.()?.forEach?.((t: any) => t.stop());
     } catch {}

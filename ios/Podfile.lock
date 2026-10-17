@@ -81,6 +81,9 @@ PODS:
     - hermes-engine/Pre-built (= 0.82.1)
   - hermes-engine/Pre-built (0.82.1)
   - JitsiWebRTC (124.0.2)
+  - KISVirtualBackground (1.0.0):
+    - React-Core
+    - react-native-webrtc
   - nanopb (3.30910.0):
     - nanopb/decode (= 3.30910.0)
     - nanopb/encode (= 3.30910.0)
@@ -3696,6 +3699,7 @@ DEPENDENCIES:
   - glog (from `../node_modules/react-native/third-party-podspecs/glog.podspec`)
   - GoogleUtilities
   - hermes-engine (from `../node_modules/react-native/sdks/hermes-engine/hermes-engine.podspec`)
+  - KISVirtualBackground (from `./KISVirtualBackground`)
   - nanopb
   - NitroModules (from `../node_modules/react-native-nitro-modules`)
   - NitroSound (from `../node_modules/react-native-nitro-sound`)
@@ -3847,6 +3851,8 @@ EXTERNAL SOURCES:
   hermes-engine:
     :podspec: "../node_modules/react-native/sdks/hermes-engine/hermes-engine.podspec"
     :tag: hermes-2025-09-01-RNv0.82.0-265ef62ff3eb7289d17e366664ac0da82303e101
+  KISVirtualBackground:
+    :path: "./KISVirtualBackground"
   NitroModules:
     :path: "../node_modules/react-native-nitro-modules"
   NitroSound:
@@ -4090,6 +4096,7 @@ SPEC CHECKSUMS:
   GoogleUtilities: 4e0c2ad9fa0d0d18b5c4df8bf57b461cba35b0bb
   hermes-engine: 273e30e7fb618279934b0b95ffab60ecedb7acf5
   JitsiWebRTC: b47805ab5668be38e7ee60e2258f49badfe8e1d0
+  KISVirtualBackground: 9a157a8c3930f5273c935b1010889d19bbe75ca6
   nanopb: fad817b59e0457d11a5dfbde799381cd727c1275
   NitroModules: 8ab2b6936d6d3b6283d22b3e1394ab141c6cb8c2
   NitroSound: 91b49322a131b50204c9642fd5b50f63a3d4664f
@@ -4207,6 +4214,6 @@ SPEC CHECKSUMS:
   TextToSpeech: 89b239221ec378d213af422d14789a729705360b
   Yoga: 689c8e04277f3ad631e60fe2a08e41d411daf8eb
 
-PODFILE CHECKSUM: 5a2130882248f411540f4b664d7f9e9c876e34c9
+PODFILE CHECKSUM: 3ad9b28e4d13369a811206a7f3bfe0dbb0cb6987
 
 COCOAPODS: 1.17.0

@@ -25,6 +25,7 @@ import { useSocket } from '../../../SocketProvider';
 import { callTypeLabel, callTypeIcon } from '@/services/calls/callTypes';
 import type { CallType } from '@/services/calls/callTypes';
 import { useSafeTopInset } from '@/hooks/useSafeTopInset';
+import { isScheduledCallHost } from '@/screens/tabs/MesssagingSubTabs/callsTabHelpers';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'CallJoin'>;
 
@@ -36,6 +37,8 @@ type CallInfo = {
   status: string;
   isStandalone: boolean;
   participantCount: number;
+  createdBy?: string;
+  isHost?: boolean;
 };
 
 export default function CallJoinScreen({ route, navigation }: Props) {
@@ -43,7 +46,7 @@ export default function CallJoinScreen({ route, navigation }: Props) {
   const { palette } = useKISTheme();
   const responsive = useResponsiveLayout();
   const topInset = useSafeTopInset();
-  const { joinExistingCall, startCall } = useSocket();
+  const { joinExistingCall, startScheduledCall, joinWaitingRoom, currentUserId } = useSocket();
 
   const [phase, setPhase] = useState<'loading' | 'preview' | 'joining' | 'error'>('loading');
   const [callInfo, setCallInfo] = useState<CallInfo | null>(null);
@@ -92,13 +95,25 @@ export default function CallJoinScreen({ route, navigation }: Props) {
           callType: callInfo.callType,
           title: callInfo.title ?? callTypeLabel(callInfo.callType),
         });
-      } else if (startCall) {
-        joined = await startCall({
+      } else if (isScheduledCallHost(callInfo, currentUserId) && startScheduledCall) {
+        // The host opening their own scheduled call's invite link starts
+        // THAT call (same callId, rings every stored invitee) — not a
+        // brand-new one, which is what the old startCall() call here did.
+        joined = await startScheduledCall({
+          callId: callInfo.callId,
           conversationId: callInfo.conversationId,
-          title: callInfo.title ?? callTypeLabel(callInfo.callType),
           callType: callInfo.callType,
-          inviteeUserIds: [],
-          inviteToken: token,
+          title: callInfo.title ?? callTypeLabel(callInfo.callType),
+        });
+      } else if (joinWaitingRoom) {
+        // Anyone else opening a not-yet-started scheduled call's link
+        // enters the real waiting room (no media access) until the host
+        // starts it — see call.waiting.join / CALL_HOST_JOINED.
+        joined = await joinWaitingRoom({
+          callId: callInfo.callId,
+          conversationId: callInfo.conversationId,
+          callType: callInfo.callType,
+          title: callInfo.title ?? callTypeLabel(callInfo.callType),
         });
       }
 
@@ -112,7 +127,7 @@ export default function CallJoinScreen({ route, navigation }: Props) {
       setErrorMsg('Something went wrong joining the call.');
       setPhase('error');
     }
-  }, [callInfo, joinExistingCall, startCall, token, navigation]);
+  }, [callInfo, joinExistingCall, startScheduledCall, joinWaitingRoom, currentUserId, navigation]);
 
   const icon = callInfo ? callTypeIcon(callInfo.callType) : 'phone';
   const typeLabel = callInfo ? callTypeLabel(callInfo.callType) : '';

@@ -72,6 +72,22 @@
     <!-- ─── Boot (restore registered phone accounts after device reboot) ─────── -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
+    <!-- ─── Package visibility (API 30+) ──────────────────────────────────────── -->
+    <!-- @react-native-voice/voice's SpeechRecognizer.isRecognitionAvailable()
+         queries the OS for any component handling android.speech
+         .RecognitionService. Starting at API 30, apps cannot see other
+         packages' components by default (the "package visibility" /
+         queries restriction) - without this declaration, availability
+         checks and recognizer binding can silently fail/return false on
+         real Android 11+ devices even when a speech-recognition service is
+         genuinely installed, making live captions (real STT) unreliable
+         for exactly the devices most users are actually on. -->
+    <queries>
+        <intent>
+            <action android:name="android.speech.RecognitionService" />
+        </intent>
+    </queries>
+
     <application
       android:name=".MainApplication"
       android:label="@string/app_name"

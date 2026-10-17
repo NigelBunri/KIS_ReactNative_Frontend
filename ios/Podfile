@@ -70,6 +70,24 @@ target 'KIS' do
   pod 'PromisesObjC', :modular_headers => true
   pod 'nanopb', :modular_headers => true
 
+  # Real on-device virtual-background segmentation (feature F) — see
+  # ios/KISVirtualBackground/VirtualBackgroundProcessor.swift. A local pod
+  # (not a main-target source file) specifically so it doesn't need manual
+  # project.pbxproj edits — `pod install` wires it into the build entirely
+  # via the generated Pods project.
+  #
+  # react-native-webrtc defines no Clang module of its own, which this
+  # pod's Swift code needs (`import react_native_webrtc`, to see
+  # ProcessorProvider/VideoFrameProcessorDelegate) when building as a
+  # static library. Re-declaring it here with the SAME :path autolinking
+  # already resolves (confirmed via `pod install`'s own dependency-analysis
+  # error output) plus :modular_headers avoids CocoaPods' "multiple
+  # dependencies with different sources" conflict that a bare
+  # `pod 'react-native-webrtc', :modular_headers => true` (no :path) causes
+  # against use_react_native!'s autolinked entry below.
+  pod 'react-native-webrtc', :path => '../node_modules/react-native-webrtc', :modular_headers => true
+  pod 'KISVirtualBackground', :path => './KISVirtualBackground'
+
   use_react_native!(
     :path => config[:reactNativePath],
     :app_path => "#{Pod::Config.instance.installation_root}/.."

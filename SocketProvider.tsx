@@ -145,6 +145,10 @@ type SocketContextValue = {
   wbClear?: () => void;
   /** Fetch or generate an invite link for the current call (all call types). */
   getCallInviteLink?: () => Promise<string | null>;
+  /** Non-host: enter the real waiting room for a scheduled call before the host starts it. */
+  joinWaitingRoom?: (info: { callId: string; conversationId: string; callType: CallType; title: string }) => Promise<boolean>;
+  /** Host: start a previously-scheduled call (reuses its existing callId). */
+  startScheduledCall?: (info: { callId: string; conversationId: string; callType: CallType; title: string }) => Promise<boolean>;
 };
 
 type StartCallArgs = {
@@ -754,6 +758,167 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       reportCallEnded(info.callId, 'missed');
       Alert.alert('Call ended', 'This call is no longer available.');
     });
+
+    _answeringRef.current = false;
+    DeviceEventEmitter.emit('calls.refresh');
+    return true;
+  }, [requestCallPermissions, setupWebRTC, fetchAndApplyIceServers]);
+
+  /**
+   * joinWaitingRoom — a non-host participant opens a scheduled call before
+   * the host has started it. Enters the real 'waiting-for-host' state (no
+   * WebRTC/local-stream setup, no media access) and tells the server via
+   * call.waiting.join so it can notify us the moment the host starts (see
+   * the call.host.joined listener, and the 'wasWaiting' auto-answer inside
+   * the call.offer listener, both already wired to this state).
+   */
+  const joinWaitingRoom = useCallback(async (info: {
+    callId: string;
+    conversationId: string;
+    callType: CallType;
+    title: string;
+  }): Promise<boolean> => {
+    const s = socketRef.current;
+    const myUserId = currentUserIdRef.current;
+    if (!s || !myUserId) {
+      Alert.alert('Unavailable', 'Connection not ready yet.');
+      return false;
+    }
+    const ack: any = await new Promise(resolve => {
+      s.emit('call.waiting.join', { conversationId: info.conversationId, callId: info.callId }, resolve);
+    });
+    if (!ack?.ok) {
+      Alert.alert('Unable to join', ack?.error ?? 'This call is no longer available.');
+      return false;
+    }
+
+    const localParticipant = makeParticipant({
+      userId: myUserId,
+      displayName: 'You',
+      isLocal: true,
+      role: 'audience',
+    });
+
+    setCallMinimised(false);
+    setActiveCall({
+      callId: info.callId,
+      conversationId: info.conversationId,
+      callType: info.callType,
+      title: safeDisplayName(ack?.data?.title ?? info.title, 'Call'),
+      state: 'waiting-for-host',
+      participants: [localParticipant],
+      localUserId: myUserId,
+      initiatedBy: null,
+      startedAt: new Date().toISOString(),
+      isMuted: false,
+      isVideoEnabled: hasVideo(info.callType),
+      isSpeakerOn: false,
+      isFrontCamera: true,
+      isScreenSharing: false,
+      layout: isGroupCall(info.callType) ? 'speaker' : 'gallery',
+      pinnedUserId: null,
+      activeSpeakerId: null,
+      isControlsVisible: true,
+      chatMessages: [],
+      raisedHands: [],
+      reactions: [],
+      networkQuality: 4,
+      unreadChatCount: 0,
+      viewerCount: 0,
+      isRecording: false,
+      knockingUsers: [],
+      isAudioOnly: false,
+      isNoiseCancellationOn: true,
+    });
+    DeviceEventEmitter.emit('calls.refresh');
+    return true;
+  }, []);
+
+  /**
+   * startScheduledCall — the HOST starts a call that was previously
+   * scheduled. Reuses the original callId/conversationId (the server
+   * transitions the SAME CallSession from 'pending' to 'ringing' and rings
+   * the invitees it already has on file) rather than creating a new call,
+   * so anyone holding the invite link or already waiting ends up connected
+   * to this exact call.
+   */
+  const startScheduledCall = useCallback(async (info: {
+    callId: string;
+    conversationId: string;
+    callType: CallType;
+    title: string;
+  }): Promise<boolean> => {
+    const s = socketRef.current;
+    const myUserId = currentUserIdRef.current;
+    if (!s || !myUserId) {
+      Alert.alert('Call unavailable', 'Connection not ready yet.');
+      return false;
+    }
+    if (_answeringRef.current) return false;
+    _answeringRef.current = true;
+
+    const granted = await requestCallPermissions(info.callType);
+    if (!granted) { _answeringRef.current = false; return false; }
+
+    const ack: any = await new Promise(resolve => {
+      s.emit('call.scheduled.start', { conversationId: info.conversationId, callId: info.callId }, resolve);
+    });
+    if (!ack?.ok) {
+      _answeringRef.current = false;
+      Alert.alert('Unable to start call', ack?.error ?? 'This scheduled call could not be started.');
+      return false;
+    }
+
+    const needsVideo = hasVideo(info.callType);
+    await fetchAndApplyIceServers();
+    audioRouteManager.start(needsVideo ? 'video' : 'voice');
+    await webRTCService.startLocalStream(needsVideo);
+    _offeredPeersRef.current.clear();
+    setupWebRTC(info.callType);
+
+    const localParticipant = makeParticipant({
+      userId: myUserId,
+      displayName: 'You',
+      isLocal: true,
+      isMuted: false,
+      isVideoOff: !needsVideo,
+      stream: webRTCService.getLocalStream(),
+      role: 'host',
+    });
+
+    setCallMinimised(false);
+    setActiveCall({
+      callId: info.callId,
+      conversationId: info.conversationId,
+      callType: info.callType,
+      title: safeDisplayName(ack?.data?.title ?? info.title, 'Call'),
+      state: 'active',
+      participants: [localParticipant],
+      localUserId: myUserId,
+      initiatedBy: myUserId,
+      startedAt: new Date().toISOString(),
+      isMuted: false,
+      isVideoEnabled: needsVideo,
+      isSpeakerOn: needsVideo,
+      isFrontCamera: true,
+      isScreenSharing: false,
+      layout: isGroupCall(info.callType) ? 'speaker' : 'gallery',
+      pinnedUserId: null,
+      activeSpeakerId: null,
+      isControlsVisible: true,
+      chatMessages: [],
+      raisedHands: [],
+      reactions: [],
+      networkQuality: 4,
+      unreadChatCount: 0,
+      viewerCount: 0,
+      isRecording: false,
+      knockingUsers: [],
+      isAudioOnly: false,
+      isNoiseCancellationOn: true,
+    });
+    startOutgoingCall({ callUUID: info.callId, callerName: safeDisplayName(info.title, 'Call'), callType: info.callType });
+    reportCallAnswered(info.callId);
 
     _answeringRef.current = false;
     DeviceEventEmitter.emit('calls.refresh');
@@ -1434,13 +1599,23 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     });
   }, []);
 
-  const inviteToCall = useCallback((userIds: string[]) => {
+  const inviteToCall = useCallback((userIds: string[]): Promise<{ ok: boolean; error?: string; invitedCount?: number }> => {
     const session = activeCallRef.current;
-    if (!session || !socketRef.current) return;
-    socketRef.current.emit('call.invite', {
-      callId: session.callId,
-      conversationId: session.conversationId,
-      inviteeUserIds: userIds,
+    if (!session || !socketRef.current) {
+      return Promise.resolve({ ok: false, error: 'Not currently in a call' });
+    }
+    return new Promise(resolve => {
+      socketRef.current!.emit('call.invite', {
+        callId: session.callId,
+        conversationId: session.conversationId,
+        inviteeUserIds: userIds,
+      }, (ack?: any) => {
+        if (ack?.ok) {
+          resolve({ ok: true, invitedCount: ack?.data?.invitedCount });
+        } else {
+          resolve({ ok: false, error: ack?.error ?? 'Failed to invite' });
+        }
+      });
     });
   }, []);
 
@@ -1455,7 +1630,16 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     // Already have one — return immediately.
     if (session.inviteLink) return session.inviteLink;
     if (session.inviteToken) {
-      const link = `kis://call/join/${session.inviteToken}`;
+      // Must be the real https:// Universal Link / App Link form — matching
+      // both the website's own generic join/:type/:token page (which can
+      // serve as the install/fallback target) and this app's own
+      // InviteJoin route (App.tsx's linking config), which redirects a
+      // 'call' type straight into CallJoinScreen's real resolve+join flow.
+      // A bare kis:// custom-scheme link only works from inside the app
+      // (e.g. a native share sheet already running KIS) — tapped from
+      // Messages/Mail/another app it does nothing, which a shared call
+      // invite must not depend on.
+      const link = `https://kingdomimpactventures.org/join/call/${session.inviteToken}`;
       setActiveCall(prev => prev ? { ...prev, inviteLink: link } : prev);
       return link;
     }
@@ -3321,7 +3505,9 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     wbClear,
     joinExistingCall,
     getCallInviteLink,
-  }), [socket, isConnected, isNetworkOnline, currentUserId, typingByConversation, typingDisplayNames, presenceByUser, activeCall, startCall, startVoiceChannel, answerCall, rejectCall, leaveCall, endCallForAll, endCall, dismissCallUi, knockOnCall, admitKnocker, denyKnocker, promoteParticipant, toggleNoiseCancellation, toggleCaptions, sendCaption, selectVirtualBg, toggleRecording, createPoll, votePoll, closePoll, submitQuestion, dismissQuestion, markAnswered, createBreakoutRooms, returnToMainRoom, closeBreakoutRooms, startRtmp, stopRtmp, wbStroke, wbUndo, wbClear, joinExistingCall, getCallInviteLink]);
+    joinWaitingRoom,
+    startScheduledCall,
+  }), [socket, isConnected, isNetworkOnline, currentUserId, typingByConversation, typingDisplayNames, presenceByUser, activeCall, startCall, startVoiceChannel, answerCall, rejectCall, leaveCall, endCallForAll, endCall, dismissCallUi, knockOnCall, admitKnocker, denyKnocker, promoteParticipant, toggleNoiseCancellation, toggleCaptions, sendCaption, selectVirtualBg, toggleRecording, createPoll, votePoll, closePoll, submitQuestion, dismissQuestion, markAnswered, createBreakoutRooms, returnToMainRoom, closeBreakoutRooms, startRtmp, stopRtmp, wbStroke, wbUndo, wbClear, joinExistingCall, getCallInviteLink, joinWaitingRoom, startScheduledCall]);
 
   /* ─── Render call screens ───────────────────────────────────────────────── */
 
@@ -3477,7 +3663,10 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                       text: 'Invite',
                       onPress: (value?: string) => {
                         const uid = (value ?? '').trim();
-                        if (uid) inviteToCall([uid]);
+                        if (!uid) return;
+                        void inviteToCall([uid]).then(result => {
+                          if (!result.ok) Alert.alert('Could not add participant', result.error ?? 'Please try again.');
+                        });
                       },
                     },
                   ],

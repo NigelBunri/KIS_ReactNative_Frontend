@@ -6,6 +6,7 @@ import com.facebook.react.ReactApplication
 import com.facebook.react.ReactHost
 import com.facebook.react.ReactNativeApplicationEntryPoint.loadReactNative
 import com.facebook.react.defaults.DefaultReactHost.getDefaultReactHost
+import com.kingdom.impact.virtualbg.VirtualBackgroundPackage
 
 class MainApplication : Application(), ReactApplication {
 
@@ -20,6 +21,7 @@ class MainApplication : Application(), ReactApplication {
           add(RestoreCredentialPackage())
           add(CallPiPPackage())
           add(TranslationPackage())
+          add(VirtualBackgroundPackage())
         },
     )
   }

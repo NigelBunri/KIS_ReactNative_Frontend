@@ -15,19 +15,19 @@ import {
 import type { Caption } from '@/services/calls/callTypes';
 import { useKISTheme } from '@/theme/useTheme';
 
-// Voice STT requires @react-native-voice/voice + pod install + microphone
-// permission in Info.plist. Disabled by default to prevent native crashes.
-// Steps to enable:
-//   1. pnpm add @react-native-voice/voice
-//   2. Add to Info.plist: NSMicrophoneUsageDescription, NSSpeechRecognitionUsageDescription
-//   3. cd ios && pod install && rebuild
-//   4. Set VOICE_STT_ENABLED = true below
-const VOICE_STT_ENABLED = false;
-
+// Real on-device STT via @react-native-voice/voice. All native
+// prerequisites are already satisfied: the dependency is installed and
+// pod-installed (ios/Podfile.lock), NSMicrophoneUsageDescription +
+// NSSpeechRecognitionUsageDescription are declared in ios/KIS/Info.plist,
+// and RECORD_AUDIO is declared in the Android manifest (which also now
+// declares a <queries> block for android.speech.RecognitionService — see
+// AndroidManifest.xml — required for SpeechRecognizer.isRecognitionAvailable
+// to return a reliable result under API 30+'s package-visibility rules).
+// require() is still wrapped in try/catch so a build that genuinely lacks
+// the native module (e.g. an Expo Go-style environment) degrades to
+// relay-only captions instead of crashing.
 let Voice: any = null;
-if (VOICE_STT_ENABLED) {
-  try { Voice = require('@react-native-voice/voice').default; } catch {}
-}
+try { Voice = require('@react-native-voice/voice').default; } catch {}
 
 export const voiceSTTAvailable = !!Voice;
 

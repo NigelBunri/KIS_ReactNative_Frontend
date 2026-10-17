@@ -1,13 +1,21 @@
 // src/screens/calls/components/VirtualBackgroundSheet.tsx
 // Virtual background / blur selection UI.
 //
-// The `VirtualBgProcessor` in virtualBgService.ts captures the local RTCView
-// at 10fps via react-native-view-shot. The captured frame is displayed here
-// with an SVG feGaussianBlur filter (blur mode) or composited with a background
-// image (image mode), replacing the raw RTCView in the local preview.
+// Two independent things happen when an option is selected:
+//  1. Local preview: `VirtualBgProcessor` in virtualBgService.ts captures
+//     the local RTCView at 10fps via react-native-view-shot, rendered here
+//     with an SVG feGaussianBlur filter (blur) or composited background
+//     image — fast visual feedback, local-only.
+//  2. The REAL effect: virtualBgService.ts's applyVirtualBackgroundToTrack()
+//     configures the native on-device segmentation pipeline (Android ML
+//     Kit Selfie Segmentation / iOS Vision — see android/.../virtualbg and
+//     ios/KISVirtualBackground) and activates it on the actual outgoing
+//     MediaStreamTrack via react-native-webrtc's video-effect extension
+//     point. This is what remote participants (P2P or SFU) actually see.
 //
-// Peers receive the unmodified stream. For transmitted-stream blur, wire in a
-// react-native-vision-camera frame processor (see `nativeProcessorAvailable`).
+// `nativeProcessorAvailable` reflects whether (2) is present in this build
+// — true on-device segmentation. When false (native module missing), only
+// the local preview applies and peers see the raw stream.
 
 import React, { useRef, useEffect, useState } from 'react';
 import {

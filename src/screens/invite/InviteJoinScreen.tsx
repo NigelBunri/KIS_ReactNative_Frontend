@@ -44,6 +44,18 @@ export default function InviteJoinScreen({ route, navigation }: Props) {
     }).start();
 
     const join = async () => {
+      // A call/broadcast-call link is NOT a group/community membership —
+      // it needs the real call-resolution + host-vs-waiting-room join
+      // logic in CallJoinScreen. This is the one real, reachable path for
+      // the Universal Link the website generates (kingdomimpactventures.org
+      // /join/call/:token, matching this screen's own 'join/:type/:token'
+      // route) — CallJoinScreen's own 'call/join/:token' route is never hit
+      // by any link anyone actually shares, so redirect into it here
+      // instead of duplicating its resolve/join logic.
+      if (type === 'call' || type === 'broadcast-call') {
+        navigation.replace('CallJoin', { token });
+        return;
+      }
       if (type === 'referral') {
         // A referral code only ever applies at registration
         // (apps.referrals.models.Referral.referred_user is a
