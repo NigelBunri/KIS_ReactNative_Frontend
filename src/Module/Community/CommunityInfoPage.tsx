@@ -18,6 +18,7 @@ import {
 import Clipboard from '@react-native-clipboard/clipboard';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { launchImageLibrary } from 'react-native-image-picker';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useKISTheme } from '@/theme/useTheme';
 import { KISIcon } from '@/constants/kisIcons';
@@ -88,6 +89,7 @@ export const CommunityInfoPage: React.FC<CommunityInfoPageProps> = ({
   onBack,
 }) => {
   const { palette } = useKISTheme();
+  const insets = useSafeAreaInsets();
 
   const [avatarUrl, setAvatarUrl] = useState<string | undefined>(undefined);
   const [description, setDescription] = useState<string>('');
@@ -526,7 +528,7 @@ export const CommunityInfoPage: React.FC<CommunityInfoPageProps> = ({
 
   return (
     <View style={[styles.root, { backgroundColor: palette.bg }]}>
-      <View style={[styles.header, { borderBottomColor: palette.divider }]}>
+      <View style={[styles.header, { paddingTop: insets.top + 10, borderBottomColor: palette.divider }]}>
         <Pressable
           onPress={onBack}
           style={[styles.backBtn, { backgroundColor: palette.selectedBg, borderColor: palette.inputBorder }]}
@@ -835,10 +837,11 @@ export const CommunityInfoPage: React.FC<CommunityInfoPageProps> = ({
 const styles = StyleSheet.create({
   root: { flex: 1 },
   header: {
-    height: 56,
+    minHeight: 56,
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 12,
+    paddingBottom: 10,
     borderBottomWidth: 1,
   },
   backBtn: {

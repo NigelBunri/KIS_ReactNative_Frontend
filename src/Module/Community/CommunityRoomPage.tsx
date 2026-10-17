@@ -203,7 +203,7 @@ export default function CommunityRoomPage({
 
   return (
     <View style={[styles.root, { backgroundColor: palette.bg }]}>
-      <View style={[styles.header, { borderBottomColor: palette.divider, backgroundColor: palette.card }]}>
+      <View style={[styles.header, { paddingTop: insets.top + 10, borderBottomColor: palette.divider, backgroundColor: palette.card }]}>
         <Pressable
           onPress={onBack}
           style={[styles.headerButton, { backgroundColor: palette.selectedBg, borderColor: palette.inputBorder }]}
@@ -384,10 +384,11 @@ export default function CommunityRoomPage({
 const styles = StyleSheet.create({
   root: { flex: 1 },
   header: {
-    height: 56,
+    minHeight: 56,
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
+    paddingBottom: 10,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
   headerButton: {
