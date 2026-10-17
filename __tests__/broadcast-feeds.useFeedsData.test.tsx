@@ -97,8 +97,11 @@ describe('broadcast feeds useFeedsData', () => {
       ReactTestRenderer.create(<HookHarness ref={ref} q="alpha" code="broadcast_feed_entry" />);
     });
 
+    // limit=50, not 20: useFeedsData's first-page fetch was bumped from
+    // 20 to 50 per page (commit ebd0205) to match the backend's own
+    // default page size; this assertion predates that change.
     expect(mockedGetRequest).toHaveBeenCalledWith(
-      expect.stringContaining('/api/v1/broadcasts/?q=alpha&code=broadcast_feed_entry&limit=20&offset=0'),
+      expect.stringContaining('/api/v1/broadcasts/?q=alpha&code=broadcast_feed_entry&limit=50&offset=0'),
       expect.objectContaining({ errorMessage: 'Unable to load feeds.' }),
     );
     // loadFirstPage runs results through shuffleFeedItems (an unseeded

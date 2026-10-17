@@ -66,6 +66,16 @@ jest.mock('@/theme/useTheme', () => ({
       surface: '#f4f4f4',
       bar: '#ccc',
     },
+    // CameraCaptureModal's empty-state render (reached transitively via
+    // BroadcastDetailScreen's comment/attachment flow) reads
+    // gradients.header/.tabSelected directly - both 4-stop gradient
+    // tuples, matching the real useKISTheme's shape
+    // (KISAccentGradients in src/theme/constants.ts - those two keys are
+    // the whole type, nothing else to add here).
+    gradients: {
+      header: ['#111', '#222', '#333', '#444'],
+      tabSelected: ['#111', '#222', '#333', '#444'],
+    },
   }),
 }));
 
@@ -98,15 +108,39 @@ jest.mock('@/network', () => ({
     // The comment button opens a real ChatRoomPage overlay (see
     // BroadcastDetailScreen's overlayChat), whose mark-as-read effect
     // calls ROUTES.chat.markRead as soon as it mounts — needed here even
-    // though this test never asserts on it directly.
+    // though this test never asserts on it directly. conversationDetail
+    // is the same story for ChatRoomPage's disappearing-messages/
+    // retention-days fetch, added after this test file was last updated.
     chat: {
       markRead: (conversationId: string) => `/api/v1/chats/conversations/${conversationId}/mark-read/`,
+      conversationDetail: (conversationId: string) => `/api/v1/chats/conversations/${conversationId}/`,
     },
   },
   resolveBackendAssetUrl: (value: string) => value,
 }));
 
+// ChatRoomPage (mounted unmocked via the comment overlay, see below) reads
+// top-inset spacing through useSafeAreaInsets() - react-native-safe-area-
+// context's real native module isn't linked under Jest, and with no
+// SafeAreaProvider ancestor in this tree its event-emitter registration
+// never settles, hanging the whole test. This is the package's own
+// official jest mock (same pattern as reanimated's above).
+jest.mock('react-native-safe-area-context', () => require('react-native-safe-area-context/jest/mock').default);
+// ChatRoomPage's auth/persistence hooks (useChatAuth, useChatPersistence)
+// read/write real AsyncStorage as soon as it mounts - no native module is
+// linked under Jest, so unmocked calls never resolve. Same official mock
+// used by gameStorage.stages.test.ts.
+jest.mock('@react-native-async-storage/async-storage', () =>
+  require('@react-native-async-storage/async-storage/jest/async-storage-mock'),
+);
+
 jest.mock('@/network/post', () => ({ postRequest: jest.fn() }));
+// ChatRoomPage's disappearing-messages/retention-days effect calls
+// getRequest(ROUTES.chat.conversationDetail(...)) as soon as it mounts
+// (added after this test file was last updated) - unmocked, it attempted
+// a real network call that never resolved within this environment,
+// hanging every test in this file until Jest's own timeout fired.
+jest.mock('@/network/get', () => ({ getRequest: jest.fn().mockResolvedValue({ success: true, data: {} }) }));
 
 const mockedPostRequest = postRequest as jest.MockedFunction<typeof postRequest>;
 

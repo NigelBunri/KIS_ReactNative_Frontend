@@ -28,10 +28,6 @@ jest.mock('@react-navigation/native', () => ({
   useIsFocused: () => true,
 }));
 
-jest.mock('@/hooks/useResponsibleFeedLimit', () => ({
-  useResponsibleFeedLimit: () => ({ status: null, refreshStatus: jest.fn() }),
-}));
-
 jest.mock('@/theme/useTheme', () => ({
   useKISTheme: () => ({
     palette: {
@@ -93,6 +89,19 @@ jest.mock('@/screens/broadcast/feeds/sections/TrendingClipsSection', () => {
       { testID: 'trending-section' },
       React.createElement(Text, null, `trending:${(props.items || []).length}`),
     );
+  };
+});
+
+// Added by the broadcast-feeds redesign (commit 17c6836) after this test
+// file was last updated - fetches its own data via a real (unmocked)
+// getRequest call, which isn't what this page-level test exists to cover.
+// Stubbed the same way FeedsMainListSection/TrendingClipsSection already
+// are above.
+jest.mock('@/screens/broadcast/feeds/sections/BroadcastersRow', () => {
+  const React = require('react');
+  const { View } = require('react-native');
+  return function MockBroadcastersRow() {
+    return React.createElement(View, { testID: 'broadcasters-row' });
   };
 });
 
@@ -196,15 +205,20 @@ describe('broadcast feeds discover page', () => {
     await ReactTestRenderer.act(async () => {
       mainSectionProps.onOpenItem(item);
     });
-    // handleOpenItem also passes the active feed list + the tapped item's
-    // position in it now (see FeedsDiscoverPage.tsx), so BroadcastDetail
-    // can page between items without a round trip back through this
-    // screen — not just the single tapped item.
-    expect(mockNavigate).toHaveBeenCalledWith('BroadcastDetail', {
-      id: 'broadcast-1',
-      item,
+    // Updated for the broadcast-feeds redesign (commit 17c6836): tapping
+    // an item now opens the TikTok-style full-screen viewer
+    // (BroadcastFeedFullScreenScreen) instead of the old BroadcastDetail
+    // screen - a different route name and a different params shape
+    // (items/index + per-action callbacks, no standalone id/item keys).
+    expect(mockNavigate).toHaveBeenCalledWith('BroadcastFeedFullScreen', {
       items: hookValue.items,
       index: 0,
+      initialAttachmentIndex: undefined,
+      onLike: expect.any(Function),
+      onShare: expect.any(Function),
+      onComment: expect.any(Function),
+      onSave: expect.any(Function),
+      onSubscribe: expect.any(Function),
     });
 
     await ReactTestRenderer.act(async () => {

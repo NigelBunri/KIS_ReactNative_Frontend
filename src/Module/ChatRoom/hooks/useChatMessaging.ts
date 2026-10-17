@@ -1701,17 +1701,36 @@ export function useChatMessaging({
     [conversationId, storageRoomId, replaceMessages, currentUserId, msgBelongsToConv],
   );
 
-  useEffect(() => {
-    if (!isLoading && conversationId) {
-      void markAllMessagesRead();
-    }
-  }, [conversationId, isLoading, markAllMessagesRead]);
-
+  // CONFIRMED gap (remaining-risk follow-up): this used to be one effect
+  // depending on [..., isLoading, ...] whose body ALSO called
+  // joinConversation()/leaveConversation(). Since isLoading flips true ->
+  // false exactly once per conversation load, that dependency made the
+  // whole effect re-run right as loading finished: cleanup fired first
+  // (leaveConversation - actually LEAVING the socket room), then the new
+  // effect body re-ran (joinConversation - rejoining). Harmless in that it
+  // always immediately rejoined, but it meant every single chat open did
+  // a pointless leave+rejoin round-trip to the server, and briefly (during
+  // that gap) this socket wasn't a member of the room at all - a window
+  // where a live event for this exact conversation, arriving at the wrong
+  // instant, could be missed instead of delivered. Splitting the room
+  // join/leave lifecycle (which only genuinely needs socket/conversationId)
+  // from the "run once loading finishes" sync actions below removes both
+  // the churn and that window.
   useEffect(() => {
     if (!socket || !(isConnected || socket.connected) || !conversationId)
       return;
 
     joinConversation(conversationId);
+
+    return () => {
+      leaveConversation(conversationId);
+    };
+  }, [socket, isConnected, conversationId, joinConversation, leaveConversation]);
+
+  useEffect(() => {
+    if (!socket || !(isConnected || socket.connected) || !conversationId)
+      return;
+    if (isLoading) return;
 
     // Wait for local storage load to complete before reconciling with the
     // server. This ensures mergeMessages can find the existing cached
@@ -1735,21 +1754,13 @@ export function useChatMessaging({
     // was lost by deleting the old implementation outright instead of
     // leaving it as dead code - it's still there in git history if useful
     // as a reference.
-    if (!isLoading) {
-      void markAllMessagesRead();
-      syncHistory();
-    }
-
-    return () => {
-      leaveConversation(conversationId);
-    };
+    void markAllMessagesRead();
+    syncHistory();
   }, [
     socket,
     isConnected,
     conversationId,
     isLoading,
-    joinConversation,
-    leaveConversation,
     replaceMessages,
     mapServerMessage,
     storageRoomId,

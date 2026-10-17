@@ -68,8 +68,11 @@ describe('gameStorage stage/partition system', () => {
     expect(isGameCompleted(completed)).toBe(true);
 
     // Calling again past the final stage must not overshoot.
+    // completeCurrentStage returns { progress, ok } (ok reports whether the
+    // write actually persisted - see its own docblock), not the bare
+    // progress object.
     const again = await completeCurrentStage('verse-race');
-    expect(again.stagesCompleted).toBe(STAGES_PER_GAME);
+    expect(again.progress.stagesCompleted).toBe(STAGES_PER_GAME);
   });
 
   it('getCurrentStageVerses returns real, non-empty verses for the game/stage the player is on', async () => {
@@ -210,7 +213,10 @@ describe('gameStorage stage/partition system', () => {
   describe('finishStage', () => {
     it('forward play on the current stage advances progress and records a stage score', async () => {
       const outcome = await finishStage('chapter-sprint', 0, 7);
-      expect(outcome).toEqual({ stagesCompleted: 1, isFinalStage: false, isNewCompletion: true });
+      // persisted reports whether the write actually succeeded (see
+      // StageOutcome's own docblock in gameStorage.ts) - true here since
+      // the mocked AsyncStorage write succeeds.
+      expect(outcome).toEqual({ stagesCompleted: 1, isFinalStage: false, isNewCompletion: true, persisted: true });
       const progress = await getGameProgress('chapter-sprint');
       expect(progress).toEqual({ currentStage: 1, stagesCompleted: 1 });
       expect((await getStageScores('chapter-sprint'))[0]).toBe(7);
@@ -221,7 +227,7 @@ describe('gameStorage stage/partition system', () => {
       for (let i = 0; i < STAGES_PER_GAME; i++) {
         outcome = await finishStage('chapter-sprint', i, 5);
       }
-      expect(outcome).toEqual({ stagesCompleted: STAGES_PER_GAME, isFinalStage: true, isNewCompletion: true });
+      expect(outcome).toEqual({ stagesCompleted: STAGES_PER_GAME, isFinalStage: true, isNewCompletion: true, persisted: true });
     });
 
     it('replaying an already-completed stage updates its score but never advances or double-counts progress', async () => {

@@ -20,8 +20,19 @@ module.exports = {
   // react-native-inappbrowser-reborn ships an unbuilt ESM `import type` in
   // its entry point too (src/security/kisAuthBrowser.ts pulls it in
   // directly) — same fix, same reason.
+  // react-native-contacts' entry point is unbuilt TypeScript (its index.ts,
+  // not a compiled index.js) — same story again, reached via
+  // src/Module/AddContacts/contactsService.ts, which several chat/feed
+  // screens pull in transitively (ChatRoomPage.tsx -> ... -> AttachmentSheet
+  // -> ContactsModal -> contactsService; BroadcastDetailScreen.tsx the same
+  // way via its own chat-adjacent imports).
+  // react-native-safe-area-context's own jest/mock.tsx (its officially
+  // documented jest stand-in) is unbuilt TS with a bare `import { jest } from
+  // '@jest/globals'` — same pnpm unbuilt-source story again, needed wherever
+  // a test mocks this package to avoid the real native module hanging under
+  // Jest (e.g. ChatRoomPage mounted unmocked via a comment overlay).
   transformIgnorePatterns: [
-    'node_modules/(?!\\.pnpm/[^/]*/node_modules/((jest-)?react-native|@react-native(-community)?|@react-navigation|react-native-reanimated|react-native-worklets|react-native-inappbrowser-reborn)/|((jest-)?react-native|@react-native(-community)?|@react-navigation|react-native-reanimated|react-native-worklets|react-native-inappbrowser-reborn)/)',
+    'node_modules/(?!\\.pnpm/[^/]*/node_modules/((jest-)?react-native|@react-native(-community)?|@react-navigation|react-native-reanimated|react-native-worklets|react-native-inappbrowser-reborn|react-native-contacts|react-native-safe-area-context)/|((jest-)?react-native|@react-native(-community)?|@react-navigation|react-native-reanimated|react-native-worklets|react-native-inappbrowser-reborn|react-native-contacts|react-native-safe-area-context)/)',
   ],
   // 20+ files import `useAuth` straight from App.tsx (App.tsx being the
   // app's root component, that pulls the entire navigation stack and every

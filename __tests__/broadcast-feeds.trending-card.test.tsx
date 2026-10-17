@@ -3,7 +3,15 @@ import './phase5.jest.setup';
 import React from 'react';
 import ReactTestRenderer from 'react-test-renderer';
 
+import { Image } from 'react-native';
 import FeedItemCard from '@/components/broadcast/FeedItemCard';
+
+// FeedItemCard's slideshow mode prefetches upcoming attachment images
+// (Image.prefetch(uri).catch(...)) - RN's jest preset doesn't stub
+// Image.prefetch to return a real Promise, so the unmocked call returned
+// undefined and .catch() crashed. Only needs to resolve; nothing here
+// asserts on prefetch itself.
+jest.spyOn(Image, 'prefetch').mockResolvedValue(true);
 
 jest.mock('@/theme/useTheme', () => ({
   useKISTheme: () => ({

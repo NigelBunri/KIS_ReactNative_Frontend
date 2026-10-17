@@ -20,6 +20,14 @@ jest.mock('@/theme/useTheme', () => ({
       bar: '#ccc',
     },
     tokens: {},
+    // The YouTube-style play-cue circle (added by the broadcast-feeds
+    // redesign, commit 17c6836) reads gradients.tabSelected directly - a
+    // 4-stop gradient tuple, matching the real useKISTheme's shape
+    // (KISAccentGradients in src/theme/constants.ts).
+    gradients: {
+      header: ['#111', '#222', '#333', '#444'],
+      tabSelected: ['#111', '#222', '#333', '#444'],
+    },
   }),
 }));
 
@@ -79,15 +87,15 @@ describe('broadcast feed card video cues', () => {
       );
     });
 
-    // BroadcastFeedCard's own "Play video" text pill (styles.playText) is
-    // now only a fallback for the rare case where an attachment couldn't
-    // be resolved to a raw record — see the comment above its render
-    // condition in BroadcastFeedCard.tsx. This attachment resolves fine,
-    // so BroadcastFeedVideoPreview renders its own (icon-only, no text)
-    // poster instead; the equivalent, current "play cue" to assert on is
-    // that the player mounts paused (autoPlay defaults to false here),
-    // which is what makes that poster/tap-to-play affordance show at all.
-    const video = renderer!.root.findByProps({ testID: 'mock-video' });
-    expect(video.props.paused).toBe(true);
+    // Updated for the current BroadcastFeedCard.tsx (post commit 17c6836):
+    // BroadcastFeedVideoPreview (the actual <Video> player) no longer
+    // mounts at all until the user taps play - it's gated behind local
+    // `inlinePlaying` state (setInlinePlaying(true) on press), not mounted
+    // paused upfront. Until then, the card shows a static poster plus this
+    // accessible play-cue button - that affordance IS the "play cue" this
+    // test exists to verify, so assert on it directly instead of reaching
+    // into a player that isn't there yet.
+    const playButton = renderer!.root.findByProps({ accessibilityLabel: 'Play' });
+    expect(playButton.props.accessibilityRole).toBe('button');
   });
 });
