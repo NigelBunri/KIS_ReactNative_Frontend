@@ -17,6 +17,7 @@ import { useResponsiveLayout } from '@/theme/responsive';
 import { KISIcon } from '@/constants/kisIcons';
 import type { RootStackParamList } from '@/navigation/types';
 import { fetchUserClips, shareChannelClip, deleteChannelContentClip } from '@/screens/broadcast/channels/hooks/useChannelsData';
+import QrCodeShareModal from '@/components/common/QrCodeShareModal';
 
 type Clip = {
   id: string;
@@ -68,6 +69,17 @@ export default function ClipsListScreen() {
     }
   }, []);
 
+  const [qrUrl, setQrUrl] = useState<string | null>(null);
+  const [showQr, setShowQr] = useState(false);
+  const handleQr = useCallback((clip: Clip) => {
+    if (!clip.clip_url || clip.status !== 'ready') {
+      Alert.alert('Not ready', 'This clip is still processing. Please try again shortly.');
+      return;
+    }
+    setQrUrl(clip.clip_url);
+    setShowQr(true);
+  }, []);
+
   const handleDelete = useCallback((clip: Clip) => {
     Alert.alert('Delete clip', 'Delete this clip permanently?', [
       { text: 'Cancel', style: 'cancel' },
@@ -112,6 +124,14 @@ export default function ClipsListScreen() {
           <KISIcon name="share" size={16} color={palette.primaryStrong} />
         </Pressable>
         <Pressable
+          onPress={() => handleQr(item)}
+          accessibilityRole="button"
+          accessibilityLabel="QR code for clip"
+          style={[styles.shareBtn, { borderColor: palette.border, marginLeft: 6, width: minTouchTarget, height: minTouchTarget, borderRadius: minTouchTarget / 2 }]}
+        >
+          <KISIcon name="qr-code" size={16} color={palette.primaryStrong} />
+        </Pressable>
+        <Pressable
           onPress={() => handleDelete(item)}
           accessibilityRole="button"
           accessibilityLabel="Delete clip"
@@ -121,7 +141,7 @@ export default function ClipsListScreen() {
         </Pressable>
       </View>
     );
-  }, [palette, handleShare, handleDelete, cardGap, labelFontSize, bodyFontSize, minTouchTarget]);
+  }, [palette, handleShare, handleQr, handleDelete, cardGap, labelFontSize, bodyFontSize, minTouchTarget]);
 
   return (
     <SafeAreaView style={[styles.screen, { backgroundColor: palette.bg, }]} edges={['top']}>
@@ -164,6 +184,14 @@ export default function ClipsListScreen() {
           }
         />
       )}
+
+      <QrCodeShareModal
+        visible={showQr}
+        onClose={() => setShowQr(false)}
+        link={qrUrl ?? ''}
+        title="Clip QR code"
+        subtitle="Anyone who scans this can watch this clip."
+      />
     </SafeAreaView>
   );
 }

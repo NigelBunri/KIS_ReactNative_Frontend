@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Alert, Pressable, ScrollView, Share, Text, View } from 'react-native';
 import Clipboard from '@react-native-clipboard/clipboard';
 import { SafeAreaView } from '@/components/common/SafeAreaViewWithTopPadding';
@@ -13,6 +13,7 @@ import { recordWatchHistory } from '@/screens/broadcast/channels/hooks/useChanne
 import { postRequest } from '@/network/post';
 import ROUTES from '@/network';
 import { emitMainTabBadgeRefresh } from '@/services/mainTabNotificationBadges';
+import QrCodeShareModal from '@/components/common/QrCodeShareModal';
 
 // Comms migration (Sep 2026): notifications like GIFT_READY_TO_SHARE and
 // GUEST_INVITATION_READY_TO_SHARE embed a share link directly in their body
@@ -121,6 +122,7 @@ export default function ProfileNotificationDetailScreen() {
   }, [notification, navigation]);
 
   const shareLink = useMemo(() => extractLink(notification?.body), [notification]);
+  const [showQr, setShowQr] = useState(false);
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg, }} edges={['top']}>
@@ -196,6 +198,15 @@ export default function ProfileNotificationDetailScreen() {
               >
                 <Text style={{ color: palette.onPrimary, fontWeight: '700', fontSize: 13 }}>Share</Text>
               </Pressable>
+              <Pressable
+                onPress={() => setShowQr(true)}
+                style={{
+                  flex: 1, borderWidth: 1.5, borderColor: palette.border ?? palette.divider,
+                  borderRadius: 10, paddingVertical: 12, alignItems: 'center',
+                }}
+              >
+                <Text style={{ color: palette.text, fontWeight: '700', fontSize: 13 }}>QR</Text>
+              </Pressable>
             </View>
           </View>
         ) : null}
@@ -218,6 +229,13 @@ export default function ProfileNotificationDetailScreen() {
           </Pressable>
         ) : null}
       </ScrollView>
+
+      <QrCodeShareModal
+        visible={showQr}
+        onClose={() => setShowQr(false)}
+        link={shareLink ?? ''}
+        title="QR code"
+      />
     </SafeAreaView>
   );
 }

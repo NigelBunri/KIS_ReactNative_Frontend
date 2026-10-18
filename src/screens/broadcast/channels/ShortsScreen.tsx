@@ -28,6 +28,7 @@ import { getRequest } from '@/network/get';
 import { postRequest } from '@/network/post';
 import { FEEDS_ENDPOINT } from '@/network';
 import { KISVideo } from '@/Module/vieo';
+import QrCodeShareModal from '@/components/common/QrCodeShareModal';
 import { resolveBackendAssetUrl } from '@/network';
 import type { BroadcastChannelContent } from '@/screens/broadcast/channels/api/channels.types';
 import { reactToChannelContent, shareChannelContent, toggleChannelSubscription } from '@/screens/broadcast/channels/hooks/useChannelsData';
@@ -63,6 +64,7 @@ type ShortCardProps = {
   onLike: (id: string) => void;
   onDislike: (id: string) => void;
   onShare: (item: ShortsItem) => void;
+  onQr: (item: ShortsItem) => void;
   onCommentPress: (id: string) => void;
   onSubscribe: (channelId: string) => void;
   subscribedChannels: Set<string>;
@@ -73,7 +75,7 @@ type ShortCardProps = {
   headerBottom: number;
 };
 
-function ShortCard({ item, isVisible, shouldPreload, onLike, onDislike, onShare, onCommentPress, onSubscribe, subscribedChannels, headerBottom }: ShortCardProps) {
+function ShortCard({ item, isVisible, shouldPreload, onLike, onDislike, onShare, onQr, onCommentPress, onSubscribe, subscribedChannels, headerBottom }: ShortCardProps) {
   const { palette } = useKISTheme();
   const { minTouchTarget } = useResponsiveLayout();
   const { height: screenHeight } = useWindowDimensions();
@@ -216,6 +218,9 @@ function ShortCard({ item, isVisible, shouldPreload, onLike, onDislike, onShare,
           <Pressable style={styles.actionBtn} onPress={() => onShare(item)} accessibilityRole="button" accessibilityLabel="Share">
             <KISIcon name="share" size={24} color={palette.ivory} />
           </Pressable>
+          <Pressable style={styles.actionBtn} onPress={() => onQr(item)} accessibilityRole="button" accessibilityLabel="QR code">
+            <KISIcon name="qr-code" size={24} color={palette.ivory} />
+          </Pressable>
         </View>
       </View>
     </View>
@@ -296,6 +301,13 @@ export default function ShortsScreen() {
     const url = `https://kis.app/shorts/${item.id}`;
     await Share.share({ message: item.title || 'Check out this short!', url, title: item.title || 'KIS Short' });
     void shareChannelContent(item.id, true);
+  }, []);
+
+  const [qrUrl, setQrUrl] = useState<string | null>(null);
+  const [showQr, setShowQr] = useState(false);
+  const handleQr = useCallback((item: ShortsItem) => {
+    setQrUrl(`https://kis.app/shorts/${item.id}`);
+    setShowQr(true);
   }, []);
 
   const handleSubscribe = useCallback((channelId: string) => {
@@ -385,6 +397,7 @@ export default function ShortsScreen() {
             onLike={handleLike}
             onDislike={handleDislike}
             onShare={handleShare}
+            onQr={handleQr}
             onCommentPress={openComments}
             onSubscribe={handleSubscribe}
             subscribedChannels={subscribedChannels}
@@ -454,6 +467,14 @@ export default function ShortsScreen() {
           </Animated.View>
         </Modal>
       )}
+
+      <QrCodeShareModal
+        visible={showQr}
+        onClose={() => setShowQr(false)}
+        link={qrUrl ?? ''}
+        title="Short QR code"
+        subtitle="Anyone who scans this can watch this short."
+      />
     </View>
   );
 }

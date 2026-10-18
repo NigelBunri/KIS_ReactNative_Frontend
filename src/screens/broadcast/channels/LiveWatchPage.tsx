@@ -34,6 +34,7 @@ import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { KISIcon } from '@/constants/kisIcons';
+import QrCodeShareModal from '@/components/common/QrCodeShareModal';
 import KISButton from '@/constants/KISButton';
 import { resolveBackendAssetUrl } from '@/network';
 import type { RootStackParamList } from '@/navigation/types';
@@ -281,13 +282,21 @@ export default function LiveWatchPage() {
   }, [SCREEN_W]);
 
   // ── Share ───────────────────────────────────────────────────────────────────
+  // No public URL was ever actually passed to Share.share here — previously
+  // message-only, so the share sheet (and anything downstream of it, like a
+  // QR code) had nothing real to point at.
+  const streamShareUrl = streamId ? `https://kis.app/live/${streamId}` : '';
+
   const handleShare = useCallback(async () => {
     if (!stream) return;
     await Share.share({
       title: stream.title,
-      message: `Watch "${stream.title}" live on KIS`,
+      message: `Watch "${stream.title}" live on KIS${streamShareUrl ? `: ${streamShareUrl}` : ''}`,
+      url: streamShareUrl || undefined,
     });
-  }, [stream]);
+  }, [stream, streamShareUrl]);
+
+  const [showQr, setShowQr] = useState(false);
 
   // ── Loading / initial state ─────────────────────────────────────────────────
   if (loading && !stream) {
@@ -493,6 +502,10 @@ export default function LiveWatchPage() {
           <KISIcon name="share" size={22} color={palette.ivory} />
           <Text style={styles.actionLabel}>Share</Text>
         </Pressable>
+        <Pressable style={styles.actionBtn} onPress={() => setShowQr(true)} accessibilityRole="button" accessibilityLabel="QR code for stream">
+          <KISIcon name="qr-code" size={22} color={palette.ivory} />
+          <Text style={styles.actionLabel}>QR</Text>
+        </Pressable>
         {isLive && streamId ? (
           <Pressable style={styles.actionBtn} onPress={() => setSuperChatOpen(true)} accessibilityRole="button" accessibilityLabel="Send Super Chat">
             <KISIcon name="star" size={22} color={palette.gold} />
@@ -658,6 +671,14 @@ export default function LiveWatchPage() {
           onClose={() => setSuperChatOpen(false)}
         />
       ) : null}
+
+      <QrCodeShareModal
+        visible={showQr}
+        onClose={() => setShowQr(false)}
+        link={streamShareUrl}
+        title="Stream QR code"
+        subtitle={`Anyone who scans this can watch "${stream?.title || 'this stream'}".`}
+      />
     </View>
   );
 }

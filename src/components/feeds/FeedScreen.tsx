@@ -36,6 +36,7 @@ import { queueMediaUpload } from '@/services/mediaTransferQueue';
 import { prepareBroadcastVideoPayload } from './videoAttachmentHelpers';
 import FeedPostActionsSheet from './FeedPostActionsSheet';
 import ShareRenderer, { type SharePayload } from './ShareRenderer';
+import QrCodeShareModal from '@/components/common/QrCodeShareModal';
 import ImagePlaceholder from '@/components/common/ImagePlaceholder';
 import Skeleton from '@/components/common/Skeleton';
 import { uploadFileToBackend } from '@/Module/ChatRoom/uploadFileToBackend';
@@ -911,16 +912,27 @@ export default function FeedScreen<T extends FeedPost>({
     [captureShareImage, shareSubtitle, shareWatermarkColor, uploadShareAsset],
   );
 
-  const copyPostLink = useCallback((post: T) => {
+  const resolvePostPermalink = useCallback((post: T) => {
     const fallback = `https://kis.app/posts/${post.id}`;
-    const permalink =
+    return (
       (post as any).permalink ??
       (post as any).url ??
       (post as any).link ??
-      fallback;
-    Clipboard.setString(permalink);
-    Alert.alert('Link copied', 'Post link saved to clipboard.');
+      fallback
+    );
   }, []);
+
+  const copyPostLink = useCallback((post: T) => {
+    Clipboard.setString(resolvePostPermalink(post));
+    Alert.alert('Link copied', 'Post link saved to clipboard.');
+  }, [resolvePostPermalink]);
+
+  const [qrPostUrl, setQrPostUrl] = useState<string | null>(null);
+  const [showPostQr, setShowPostQr] = useState(false);
+  const showPostQrCode = useCallback((post: T) => {
+    setQrPostUrl(resolvePostPermalink(post));
+    setShowPostQr(true);
+  }, [resolvePostPermalink]);
 
   const handleEditUpdated = useCallback((updated: Partial<T>) => {
     setPosts((prev) =>
@@ -1609,12 +1621,21 @@ export default function FeedScreen<T extends FeedPost>({
       <FeedComposerSheet visible={composerVisible} onClose={() => setComposerVisible(false)} onSubmit={handleCreate} />
       <ShareRenderer ref={shareShotRef} payload={sharePayload} />
 
+      <QrCodeShareModal
+        visible={showPostQr}
+        onClose={() => setShowPostQr(false)}
+        link={qrPostUrl ?? ''}
+        title="Post QR code"
+        subtitle="Anyone who scans this can open this post."
+      />
+
       <FeedPostActionsSheet
         visible={actionsVisible}
         onClose={() => setActionsVisible(false)}
         actions={[
           { key: 'share', label: 'Share', onPress: () => activePost && handleShare(activePost) },
           { key: 'copy-link', label: 'Copy link', onPress: () => activePost && copyPostLink(activePost) },
+          { key: 'qr-code', label: 'QR code', onPress: () => activePost && showPostQrCode(activePost) },
           ...(editEndpoint
             ? [{ key: 'edit', label: 'Edit post', onPress: () => { if (activePost) { setEditPost(activePost); setEditVisible(true); } } }]
             : []),
