@@ -149,6 +149,15 @@ jest.mock('@react-native-async-storage/async-storage', () =>
 jest.mock('@/network/post', () => ({ postRequest: jest.fn() }));
 jest.mock('@/network/get', () => ({ getRequest: jest.fn().mockResolvedValue({ success: true, data: {} }) }));
 
+// AND-039 regression: ChatRoomPage's "Forward to..." picker only ever
+// lists whatever is passed via `allChats` — this screen has no chat list
+// of its own loaded, so handleOpenComments/openChatOverlay must fetch one
+// itself rather than leaving the prop to default to [].
+const mockFetchConversations = jest.fn();
+jest.mock('@/Module/ChatRoom/normalizeConversation', () => ({
+  fetchConversationsForCurrentUser: (...args: any[]) => mockFetchConversations(...args),
+}));
+
 const mockedPostRequest = postRequest as jest.MockedFunction<typeof postRequest>;
 
 describe('broadcast detail screen', () => {
@@ -164,6 +173,9 @@ describe('broadcast detail screen', () => {
       .mockResolvedValueOnce({ success: true, data: { conversation_id: 'conversation-1' } } as any)
       .mockResolvedValueOnce({ success: true } as any)
       .mockResolvedValueOnce({ success: true } as any);
+    mockFetchConversations.mockResolvedValue([
+      { id: 'other-1', conversationId: 'other-1', name: 'Other Chat' },
+    ]);
 
     let renderer: ReactTestRenderer.ReactTestRenderer;
     await ReactTestRenderer.act(async () => {
@@ -214,6 +226,18 @@ describe('broadcast detail screen', () => {
     expect(chatOverlay.props.chat).toEqual(
       expect.objectContaining({ conversationId: 'conversation-1' }),
     );
+
+    // AND-039 regression: the overlay must be handed a real chat list to
+    // forward into, not the [] default ChatRoomPage's own allChats prop
+    // falls back to when omitted.
+    expect(mockFetchConversations).toHaveBeenCalled();
+    await ReactTestRenderer.act(async () => {
+      await Promise.resolve();
+    });
+    const chatOverlayAfterFetch = renderer!.root.findByType(ChatRoomPage);
+    expect(chatOverlayAfterFetch.props.allChats).toEqual([
+      expect.objectContaining({ conversationId: 'other-1' }),
+    ]);
 
     await ReactTestRenderer.act(async () => {
       await pressables[2].props.onPress();

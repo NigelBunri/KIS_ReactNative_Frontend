@@ -42,6 +42,7 @@ import BroadcastScreen from '@/screens/tabs/BroadcastScreen';
 import ProfileScreen from '@/screens/tabs/ProfileScreen';
 import { ChatRoomPage } from '@/Module/ChatRoom/ChatRoomPage';
 import type { Chat } from '@/Module/ChatRoom/messagesUtils';
+import { fetchConversationsForCurrentUser } from '@/Module/ChatRoom/normalizeConversation';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -128,16 +129,28 @@ function EmbeddedMessaging({
   sheenColor?: string;
 }) {
   const [activeChat, setActiveChat] = React.useState<Chat | null>(null);
+  // ChatRoomPage's "Forward to..." picker (ForwardChatSheet) only ever
+  // lists whatever is passed in via its `allChats` prop. Opening a chat
+  // here unmounts MessagesScreen entirely (it's replaced by the bare
+  // ChatRoomPage below), losing access to MessagesScreen's own internal
+  // conversations list - so forwarding from inside this embedded
+  // messaging tab had nothing to pick from (same gap already fixed for
+  // PartnerMessagingView/PartnersMessagesPane/BroadcastDetailScreen under
+  // AND-039). Fetch the list independently the moment a chat opens.
+  const [forwardTargets, setForwardTargets] = React.useState<Chat[]>([]);
   if (activeChat) {
     return (
       <View style={{ flex: 1 }}>
-        <ChatRoomPage chat={activeChat} onBack={() => setActiveChat(null)} />
+        <ChatRoomPage chat={activeChat} onBack={() => setActiveChat(null)} allChats={forwardTargets} />
       </View>
     );
   }
   return (
     <MessagesScreen
-      onOpenChat={(chat) => setActiveChat(chat)}
+      onOpenChat={(chat) => {
+        setActiveChat(chat);
+        fetchConversationsForCurrentUser().then(setForwardTargets).catch(() => {});
+      }}
       onOpenInfo={() => {}}
       appName={appName}
       headerGradient={headerGradient}

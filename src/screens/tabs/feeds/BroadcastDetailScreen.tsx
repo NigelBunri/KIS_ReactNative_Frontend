@@ -39,6 +39,7 @@ import { useSafeTopInset } from '@/hooks/useSafeTopInset';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import ChatRoomPage from '@/Module/ChatRoom/ChatRoomPage';
 import { Chat } from '@/Module/ChatRoom/messagesUtils';
+import { fetchConversationsForCurrentUser } from '@/Module/ChatRoom/normalizeConversation';
 import { TabletDialogOverlay } from '@/components/shell';
 import ShareToChatModal from '@/components/broadcast/ShareToChatModal';
 
@@ -537,6 +538,15 @@ export default function BroadcastDetailScreen() {
   const overlaySlide = React.useRef(new Animated.Value(0)).current;
   const [overlayChat, setOverlayChat] = useState<Chat | null>(null);
   const [overlayVisible, setOverlayVisible] = useState(false);
+  // ChatRoomPage's "Forward to..." picker (ForwardChatSheet) only ever
+  // lists whatever is passed in via its `allChats` prop - it has no other
+  // data source (ChatRoomPage.tsx's forwardTargets memo defaults to []
+  // when the prop is omitted, same gap already fixed for
+  // PartnerMessagingView/PartnersMessagesPane under AND-039). This screen
+  // has no chat list of its own loaded (it's a feed detail screen, not a
+  // messages list), so fetch one lazily the first time the comment
+  // overlay opens rather than on every mount.
+  const [forwardTargets, setForwardTargets] = useState<Chat[]>([]);
 
   const closeChatOverlay = useCallback(() => {
     setOverlayVisible(false);
@@ -558,6 +568,7 @@ export default function BroadcastDetailScreen() {
       duration: 260,
       useNativeDriver: true,
     }).start();
+    fetchConversationsForCurrentUser().then(setForwardTargets).catch(() => {});
   }, [overlaySlide]);
 
   const handleOpenComments = useCallback(async () => {
@@ -1341,7 +1352,7 @@ export default function BroadcastDetailScreen() {
           both the comments button and "share to a chat". */}
       <TabletDialogOverlay visible={overlayVisible} progress={overlaySlide} zIndex={50}>
         {overlayChat ? (
-          <ChatRoomPage chat={overlayChat} onBack={closeChatOverlay} />
+          <ChatRoomPage chat={overlayChat} onBack={closeChatOverlay} allChats={forwardTargets} />
         ) : null}
       </TabletDialogOverlay>
 
