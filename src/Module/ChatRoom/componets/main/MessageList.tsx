@@ -704,19 +704,7 @@ export const MessageList: React.FC<MessageListProps> = ({
   );
 
   if (isEmpty) {
-    return (
-      <View style={styles.emptyStateContainer}>
-        <Text
-          style={{
-            color: palette.subtext,
-            fontSize: 13,
-            textAlign: 'center',
-          }}
-        >
-          Select a chat to start messaging.
-        </Text>
-      </View>
-    );
+    return null;
   }
 
   // Rendered as ListFooterComponent — in an inverted list that's the visual
