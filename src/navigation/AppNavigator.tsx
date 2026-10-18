@@ -740,6 +740,27 @@ export function MainTabs() {
     return () => sub.remove();
   }, [closeAllChats]);
 
+  // Mirrors chat.close_all - CommunityInfoPage's leave/delete-community
+  // actions need to close BOTH this info overlay and the community room
+  // overlay underneath it, not just themselves (onBack alone left the
+  // just-left community's room fully visible and composable, the same
+  // bug chat.close_all already exists to prevent for groups/DMs).
+  const closeAllCommunity = useCallback(() => {
+    RNAnimated.timing(communityInfoSlide, { toValue: 0, duration: 0, useNativeDriver: true }).start(() => {
+      setCommunityInfoVisible(false);
+      setActiveCommunityInfo(null);
+    });
+    RNAnimated.timing(communitySlide, { toValue: 0, duration: 0, useNativeDriver: true }).start(() => {
+      setCommunityVisible(false);
+      setActiveCommunity(null);
+    });
+  }, [communityInfoSlide, communitySlide]);
+
+  useEffect(() => {
+    const sub = DeviceEventEmitter.addListener('community.close_all', closeAllCommunity);
+    return () => sub.remove();
+  }, [closeAllCommunity]);
+
   const openInfo = useCallback((payload: { chat: Chat | null; currentUserId: string | null }) => {
     if (!payload.chat) return;
     setActiveInfo({ chat: payload.chat, currentUserId: payload.currentUserId });

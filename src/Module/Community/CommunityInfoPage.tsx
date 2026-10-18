@@ -3,6 +3,7 @@ import {
   ActionSheetIOS,
   ActivityIndicator,
   Alert,
+  DeviceEventEmitter,
   FlatList,
   Image,
   Modal,
@@ -110,6 +111,12 @@ export const CommunityInfoPage: React.FC<CommunityInfoPageProps> = ({
   const [saving, setSaving] = useState(false);
   const [inviteLink, setInviteLink] = useState<string | null>(null);
   const [inviteLinkLoading, setInviteLinkLoading] = useState(false);
+  // Authoritative, pagination-independent role signal from the community
+  // detail response itself (CommunityDetailSerializer.is_owner/
+  // current_user_role — a direct per-request DB lookup, not derived from
+  // scanning any list). See the `me`/`isAdmin` memo below for why this
+  // exists.
+  const [viewerRole, setViewerRole] = useState<string | null>(null);
 
   // Edit community (name/description) — avatar already had its own upload
   // flow; name/description had no edit UI at all even though the backend
@@ -158,24 +165,44 @@ export const CommunityInfoPage: React.FC<CommunityInfoPageProps> = ({
         setName(detailData.name ?? communityName);
         setAvatarUrl(detailData.avatar_url ?? detailData.avatarUrl ?? undefined);
         setDescription(detailData.description ?? '');
+        setViewerRole(
+          detailData.is_owner ? 'owner' : (detailData.current_user_role ?? null),
+        );
       }
 
-      const membersRes = await getRequest(ROUTES.community.members(communityId), {
-        errorMessage: 'Failed to load members',
-      });
-      const list =
-        membersRes?.data?.results ??
-        membersRes?.results ??
-        membersRes?.data ??
-        membersRes ??
-        [];
+      // CONFIRMED ROOT CAUSE of "I can't see other members" for any
+      // community past one page: this only ever fetched page 1
+      // (membersRes?.data?.count was also reading the wrong shape - the
+      // real pagination class, common.pagination.StandardResultsSetPagination,
+      // nests it under meta.count/meta.total_pages, not a bare `count`/
+      // `next`, so that check silently always fell through to the
+      // page's own .length anyway). Members are ordered newest-first
+      // (-joined_at), so the OWNER — who joined before everyone else —
+      // sits on the LAST page, never fetched here before. Request the
+      // max allowed page_size first; only loop for the rare community
+      // that still exceeds it (bounded well past any realistic size, so
+      // a malformed response can't spin forever).
+      const allMembers: CommunityMember[] = [];
+      let totalCount = 0;
+      let page = 1;
+      const MAX_PAGES = 50;
+      while (page <= MAX_PAGES) {
+        const membersRes = await getRequest(
+          `${ROUTES.community.members(communityId)}?page_size=100&page=${page}`,
+          { errorMessage: 'Failed to load members' },
+        );
+        const body = membersRes?.data ?? membersRes ?? {};
+        const list = body.results ?? (Array.isArray(body) ? body : []);
+        if (!Array.isArray(list) || list.length === 0) break;
+        allMembers.push(...list);
+        totalCount = typeof body?.meta?.count === 'number' ? body.meta.count : allMembers.length;
+        const totalPages = body?.meta?.total_pages;
+        if (typeof totalPages === 'number' ? page >= totalPages : list.length < 100) break;
+        page += 1;
+      }
       if (mountedRef.current) {
-        setMembers(Array.isArray(list) ? list : []);
-        // DRF's default pagination wraps the real list in {count, results}
-        // — count is the TRUE total, not just this page's length (this
-        // screen only ever loads a single page of members).
-        const totalCount = membersRes?.data?.count ?? membersRes?.count;
-        setMemberCount(typeof totalCount === 'number' ? totalCount : (Array.isArray(list) ? list.length : 0));
+        setMembers(allMembers);
+        setMemberCount(totalCount || allMembers.length);
       }
 
       const postsRes = await getRequest(`${ROUTES.community.posts}?community=${communityId}`, {
@@ -254,7 +281,20 @@ export const CommunityInfoPage: React.FC<CommunityInfoPageProps> = ({
     return members.find((m) => resolveUserId(m) === String(currentUserId)) ?? null;
   }, [members, currentUserId]);
 
-  const role = String(me?.role ?? me?.base_role ?? '').toLowerCase();
+  // CONFIRMED ROOT CAUSE of "as owner I still can't see community settings/
+  // members/owner actions": `me` is found by scanning `members`, which is
+  // only ever the FIRST page of CommunityViewSet.members (order_by
+  // "-joined_at", i.e. newest-first) - this screen never fetches further
+  // pages. For any community with more active members than one page
+  // (PAGE_SIZE=25), the owner - who joined before everyone else, so has
+  // the OLDEST joined_at - is sorted onto a LATER page that's never
+  // fetched, making `me` null and isAdmin false regardless of their real
+  // role. viewerRole comes from the community detail response's own
+  // is_owner/current_user_role fields (CommunityDetailSerializer), a
+  // direct per-request DB lookup with no pagination involved - prefer it,
+  // falling back to the member-list scan only if the detail response
+  // hasn't loaded yet.
+  const role = String(viewerRole ?? me?.role ?? me?.base_role ?? '').toLowerCase();
   const isAdmin = role === 'owner' || role === 'admin' || role === 'mod' || role === 'moderator';
 
   const handleMemberAction = (member: CommunityMember) => {
@@ -378,23 +418,31 @@ export const CommunityInfoPage: React.FC<CommunityInfoPageProps> = ({
           text: 'Leave',
           style: 'destructive',
           onPress: async () => {
+            // Leaving must close this info panel AND the community room
+            // overlay underneath it (community.close_all, mirroring
+            // chat.close_all's identical gap for groups/DMs), and refresh
+            // the Messages list (conversation.refresh) - otherwise the
+            // user stayed on this same screen with just the member list
+            // locally filtered, and the community's room stayed fully
+            // visible and composable despite the backend having already
+            // deactivated both CommunityMembership and ConversationMember.
+            const closeAndRefresh = () => {
+              DeviceEventEmitter.emit('community.close_all');
+              DeviceEventEmitter.emit('conversation.refresh');
+              onBack?.();
+            };
             try {
               await deleteRequest(ROUTES.community.leave(communityId), {
                 errorMessage: 'Failed to leave community',
               });
-              // Remove self from the members list
-              setMembers((prev) =>
-                prev.filter((m) => resolveUserId(m) !== String(currentUserId ?? '')),
-              );
+              closeAndRefresh();
             } catch {
               // Some backends use POST for leave
               try {
                 await postRequest(ROUTES.community.leave(communityId), {}, {
                   errorMessage: 'Failed to leave community',
                 });
-                setMembers((prev) =>
-                  prev.filter((m) => resolveUserId(m) !== String(currentUserId ?? '')),
-                );
+                closeAndRefresh();
               } catch (err2: any) {
                 Alert.alert('Error', err2?.message || 'Unable to leave community.');
               }

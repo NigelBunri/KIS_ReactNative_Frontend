@@ -30,6 +30,7 @@ export default function InviteJoinScreen({ route, navigation }: Props) {
   const topInset = useSafeTopInset();
   const { isAuth } = useAuth();
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
+  const [isPendingApproval, setIsPendingApproval] = useState(false);
   const [message, setMessage] = useState('');
   const [groupName, setGroupName] = useState('');
   const [conversationId, setConversationId] = useState<string | null>(null);
@@ -98,10 +99,33 @@ export default function InviteJoinScreen({ route, navigation }: Props) {
 
       const res = await postRequest(url, { invite_token: token });
       const data = res?.data ?? res;
+      // CONFIRMED ROOT CAUSE of "I still can't join the group via link":
+      // a group with the default join_policy (REQUEST, "approval
+      // required") resolves the invite link into a pending
+      // GroupJoinRequest, not real membership - apps.groups.views
+      // .GroupViewSet.join_by_invite returns 202 + { pending: true,
+      // detail: "Join request sent for approval." } for that case. 202 is
+      // itself a success status, so `res?.success` alone (the old check)
+      // was true here too - this screen showed "You have joined the
+      // group!" and a working-looking "Open Chat" button for a join that
+      // never actually happened. `pending` is the one authoritative
+      // signal every join_by_invite response already carries; prefer it
+      // over fuzzy string-matching the detail message.
+      const isPending = data?.pending === true;
       const joinedOrAlready =
-        res?.success ||
-        String(data?.detail ?? '').toLowerCase().includes('joined') ||
-        String(data?.detail ?? '').toLowerCase().includes('already');
+        !isPending &&
+        (res?.success ||
+          String(data?.detail ?? '').toLowerCase().includes('joined') ||
+          String(data?.detail ?? '').toLowerCase().includes('already'));
+
+      if (isPending) {
+        setIsPendingApproval(true);
+        setStatus('success');
+        setMessage(
+          `Your request to join this ${type} has been sent and is waiting for an admin to approve it.`,
+        );
+        return;
+      }
 
       if (joinedOrAlready) {
         const entityId: string | null = data?.group_id ?? data?.community_id ?? null;
@@ -191,8 +215,17 @@ export default function InviteJoinScreen({ route, navigation }: Props) {
 
         {status === 'success' && (
           <>
-            <KISIcon name="checkmark-circle" size={64} color={palette.success} />
-            <Text style={[styles.title, { color: palette.text }]}>Welcome!</Text>
+            {/* 'call-history' is the only registered KISIcon name mapped to
+                a clock glyph (ionicons 'time') - no dedicated pending/
+                hourglass icon exists yet. */}
+            <KISIcon
+              name={isPendingApproval ? 'call-history' : 'checkmark-circle'}
+              size={64}
+              color={isPendingApproval ? palette.subtext : palette.success}
+            />
+            <Text style={[styles.title, { color: palette.text }]}>
+              {isPendingApproval ? 'Request sent' : 'Welcome!'}
+            </Text>
             <Text style={[styles.subtitle, { color: palette.subtext }]}>
               {message}{groupName ? `\n${displayName}` : ''}
             </Text>

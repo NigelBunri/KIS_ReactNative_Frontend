@@ -771,6 +771,19 @@ export const ChatInfoPage: React.FC<ChatInfoPageProps> = ({
           onPress: async () => {
             try {
               await postRequest(ROUTES.groups.leave(groupId), {}, {});
+              // onBack alone only closed this info overlay, leaving the
+              // still-open chat room underneath it fully visible and
+              // composable - the user could keep typing into a group
+              // they'd just left, and the group stayed in the Messages
+              // list until an unrelated refresh happened to occur (the
+              // list endpoint itself already excludes left conversations
+              // - apps.chat.views.ConversationViewSet.get_queryset filters
+              // on memberships__left_at__isnull=True - this was purely a
+              // mobile-side gap). close_all closes the entire chat room
+              // stack (not just this info panel), and conversation.refresh
+              // is the same event MessagesScreen already listens for.
+              DeviceEventEmitter.emit('chat.close_all');
+              DeviceEventEmitter.emit('conversation.refresh');
               onBack?.();
             } catch {
               Alert.alert('Error', 'Could not leave the group. Please try again.');
@@ -801,6 +814,10 @@ export const ChatInfoPage: React.FC<ChatInfoPageProps> = ({
               if (deviceId) headers['X-Device-Id'] = deviceId;
               const res = await apiService.delete(ROUTES.groups.detail(groupId), headers);
               if (!res.ok) throw new Error();
+              // Same gap as handleLeaveGroup above — onBack alone left the
+              // (now-deleted) group's chat room open and composable.
+              DeviceEventEmitter.emit('chat.close_all');
+              DeviceEventEmitter.emit('conversation.refresh');
               onBack?.();
             } catch {
               Alert.alert('Error', 'Could not delete the group. Please try again.');
