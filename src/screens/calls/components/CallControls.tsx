@@ -90,7 +90,14 @@ export default function CallControls({
   const insets = useSafeAreaInsets();
   const topInset = useSafeTopInset();
   const ACCENT = buildAccent(palette);
-  const isGroup = isGroupCall(session.callType);
+  // A 1:1 call (voice/video) that's had someone added mid-call via the
+  // 'add-participant' button genuinely has 3+ people on it now, even
+  // though session.callType is still the original 1:1 type (callType
+  // never changes after the call starts) — treat that the same as a call
+  // that started as voice-group/video-group/broadcast, so "People",
+  // layout, raise-hand etc all correctly turn on the moment it actually
+  // becomes a group call, not only when it started as one.
+  const isGroup = isGroupCall(session.callType) || session.participants.length > 2;
   const withVideo = hasVideo(session.callType);
   const isBroadcast = session.callType === 'broadcast';
   const localParticipant = session.participants.find(p => p.isLocal);
@@ -158,15 +165,17 @@ export default function CallControls({
       // No host/co-host gate here — the backend's call.invite handler has
       // none either (any conversation member can invite another), so
       // restricting this to hosts client-side would just hide a button
-      // that works fine for a plain participant who taps it. Still
-      // group/broadcast-only: 1:1 voice/video calls render through
-      // VoiceOneOnOneLayout/VideoOneOnOneLayout, which only ever show a
-      // single remote participant tile and have no layout for a 3rd.
+      // that works fine for a plain participant who taps it. Available on
+      // 1:1 calls too (not isGroup-gated) — ActiveCallScreen's layout
+      // switch (isGroup above, derived from participants.length too) means
+      // a 1:1 call that picks up a 3rd participant here correctly
+      // re-renders through VideoGrid/VoiceCallGrid instead of staying on
+      // VoiceOneOnOneLayout/VideoOneOnOneLayout, which can only ever show
+      // one remote tile.
       id: 'add-participant',
       icon: 'user-plus',
       label: 'Add',
       overrideAccent: palette.gold,
-      hidden: !isGroup,
     },
     {
       // AND-097: this button DID correctly flip session.layout and

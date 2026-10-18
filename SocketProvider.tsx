@@ -2821,8 +2821,15 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           session.callId === callId &&
           !sfuService.isJoined &&
           !_sfuJoiningRef.current &&
-          session.participants.length >= SFU_THRESHOLD &&
-          isGroupCall(session.callType)
+          // No isGroupCall(session.callType) check here — callType is set
+          // once at call creation and never changes, so a 1:1 call that
+          // picked up extra participants via add-participant would stay
+          // 'voice'/'video' forever and could never cross this gate even
+          // once it had just as many real participants as any call that
+          // started as voice-group/video-group. Once participant count
+          // alone crosses SFU_THRESHOLD, it needs the SFU regardless of
+          // what the call was originally created as.
+          session.participants.length >= SFU_THRESHOLD
         ) {
           _sfuJoiningRef.current = true;
           try {

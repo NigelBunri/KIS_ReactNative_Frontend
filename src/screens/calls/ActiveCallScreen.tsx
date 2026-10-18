@@ -300,7 +300,13 @@ export default function ActiveCallScreen({ session, actions }: Props) {
   }, [addParticipantChats, addParticipantCurrentUserId, session?.participants]);
   const isHostOrCoHost = localParticipant?.role === 'host' || localParticipant?.role === 'co-host';
   const withVideo = session ? hasVideo(session.callType) : false;
-  const isGroup = session ? isGroupCall(session.callType) : false;
+  // A 1:1 call that picks up a 3rd participant via the add-participant
+  // sheet is genuinely a group call now even though callType (set once at
+  // call creation) still says 'voice'/'video' — same reasoning as
+  // CallControls' own isGroup, kept in sync so the layout switch below and
+  // the controls row agree on when a call is "a group call" for UI
+  // purposes.
+  const isGroup = session ? (isGroupCall(session.callType) || session.participants.length > 2) : false;
   const isBroadcast = session?.callType === 'broadcast';
   const isActive = session?.state === 'active';
   const isConnecting = session?.state === 'connecting' || session?.state === 'dialing' || session?.state === 'ringing' || session?.state === 'reconnecting';
@@ -702,19 +708,27 @@ export default function ActiveCallScreen({ session, actions }: Props) {
               />
             )}
 
-            {/* ── VOICE GROUP ── a true voice call, never video-capable, gets
+            {/* ── VOICE GROUP ── a call with no video capability at all gets
                 its own always-multi-participant avatar-tile grid rather than
-                VideoGrid's single-big-avatar network-degraded fallback. */}
-            {isGroup && !isBroadcast && session.callType === 'voice-group' && (
+                VideoGrid's single-big-avatar network-degraded fallback. Keyed
+                on withVideo rather than session.callType === 'voice-group' so
+                a plain 1:1 voice call that just picked up a 3rd participant
+                via add-participant (callType stays 'voice' — it's set once at
+                call creation and never changes) lands here too, not in
+                VideoGrid's isAudioOnly branch. */}
+            {isGroup && !isBroadcast && !withVideo && (
               <VoiceCallGrid
                 participants={session.participants}
                 activeSpeakerId={session.activeSpeakerId}
               />
             )}
 
-            {/* ── VIDEO GROUP ── isAudioOnly here means "this video call's
-                adaptive layer disabled video", not "this is a voice call". */}
-            {isGroup && !isBroadcast && session.callType !== 'voice-group' && (
+            {/* ── VIDEO GROUP ── also reached by a 1:1 video call once a 3rd
+                participant joins (same callType-never-changes reasoning as
+                above) — VideoGrid already renders the local participant's
+                own tile as part of the grid, so no extra wiring is needed
+                for the newly-multi-party case. */}
+            {isGroup && !isBroadcast && withVideo && (
               <VideoGrid
                 participants={session.participants}
                 layout={session.layout}
