@@ -121,9 +121,13 @@ type SocketContextValue = {
   endCall?: (reason?: string) => Promise<void>;
   dismissCallUi?: () => void;
   knockOnCall?: () => void;
-  admitKnocker?: (userId: string) => void;
-  denyKnocker?: (userId: string) => void;
+  /** Resolves true only once the backend confirms the admission; false on failure (request stays pending). */
+  admitKnocker?: (userId: string) => Promise<boolean>;
+  /** Resolves true only once the backend confirms the decline; false on failure (request stays pending). */
+  denyKnocker?: (userId: string) => Promise<boolean>;
   promoteParticipant?: (userId: string, role: string) => void;
+  /** Broadcast only: move a participant between the panelist grid and participant strip. */
+  setParticipantPanelist?: (userId: string, isPanelist: boolean) => void;
   toggleNoiseCancellation?: () => void;
   toggleCaptions?: () => void;
   sendCaption?: (text: string) => void;
@@ -147,6 +151,16 @@ type SocketContextValue = {
   getCallInviteLink?: () => Promise<string | null>;
   /** Non-host: enter the real waiting room for a scheduled call before the host starts it. */
   joinWaitingRoom?: (info: { callId: string; conversationId: string; callType: CallType; title: string; silentOnFailure?: boolean }) => Promise<boolean>;
+  /**
+   * Cold-start admission request: opening an approval-required call link
+   * with no pre-existing activeCall session (unlike knockOnCall, which only
+   * acts on a session that's already set up). Enters 'knocking' state with
+   * no media access and no WebRTC setup until the host admits (see the
+   * call.knock.admitted listener, which performs the actual join only then).
+   */
+  requestCallAdmission?: (info: { callId: string; conversationId: string; callType: CallType; title: string; silentOnFailure?: boolean }) => Promise<boolean>;
+  /** Withdraw a pending admission request raised by requestCallAdmission/knockOnCall. */
+  cancelAdmissionRequest?: () => void;
   /** Host: start a previously-scheduled call (reuses its existing callId). */
   startScheduledCall?: (info: { callId: string; conversationId: string; callType: CallType; title: string; silentOnFailure?: boolean }) => Promise<boolean>;
   /** Invite users directly into the currently-active call (requires activeCall to already be set — e.g. the host's own standalone call right after starting it). */
@@ -172,6 +186,8 @@ type StartCallArgs = {
    * existingById idempotent branch, which succeeds.
    */
   callId?: string;
+  /** Broadcast only: does the local user (the caller) appear in their own panelist grid? Default true. */
+  hostIsPanelist?: boolean;
 };
 
 /* ============================================================================
@@ -215,6 +231,28 @@ export function resolveEndCallAction(args: {
   // cancel the outgoing call for everyone so callees' IncomingCallScreen /
   // ring-tone is dismissed immediately.
   return 'endAll';
+}
+
+/**
+ * Pure decision for the call.offer listener's duplicate-offer guard,
+ * extracted for unit-testability. A duplicate/resent call.offer for the
+ * SAME callId we're already on (e.g. a queued emit flushed after a socket
+ * reconnect) must be idempotent — it must NOT reset an already-answered
+ * call back to a ring screen, and must NOT re-trigger the native
+ * incoming-call UI a second time. A call we haven't acted on yet
+ * ('incoming'/'lobby'/'waiting-for-host') is safe to re-render from a fresh
+ * copy, and so is a call whose local session already concluded
+ * ('ended'/'missed') — that callId is reused by call.invite when the host
+ * re-adds the same contact to an already-active call (e.g. a contact who
+ * declined/missed the first ring, invited again), and this is a genuinely
+ * new ring, not a stale duplicate of one still in flight.
+ */
+export function shouldIgnoreDuplicateCallOffer(
+  existing: { callId: string; state: CallState } | null | undefined,
+  incomingCallId: string,
+): boolean {
+  if (!existing || existing.callId !== incomingCallId) return false;
+  return !['incoming', 'lobby', 'waiting-for-host', 'ended', 'missed'].includes(existing.state);
 }
 
 /**
@@ -343,6 +381,7 @@ function makeParticipant(overrides: Partial<CallParticipant> & { userId: string 
     isSpeaking: false,
     networkQuality: 4,
     role: 'audience',
+    isPanelist: false,
     handRaised: false,
     joinedAt: new Date().toISOString(),
     stream: null,
@@ -882,6 +921,88 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   }, []);
 
   /**
+   * requestCallAdmission — a user opens an approval-required call link with
+   * no pre-existing activeCall session. Enters 'knocking' (no media access,
+   * no WebRTC setup — see the call.knock.admitted listener, which only
+   * performs the real join once the host admits). Mirrors joinWaitingRoom's
+   * shape/flow, but for admission-gated calls rather than not-yet-started
+   * scheduled ones.
+   */
+  const requestCallAdmission = useCallback(async (info: {
+    callId: string;
+    conversationId: string;
+    callType: CallType;
+    title: string;
+    silentOnFailure?: boolean;
+  }): Promise<boolean> => {
+    const s = socketRef.current;
+    const myUserId = currentUserIdRef.current;
+    if (!s || !myUserId) {
+      if (!info.silentOnFailure) Alert.alert('Unavailable', 'Connection not ready yet.');
+      return false;
+    }
+    const ack: any = await new Promise(resolve => {
+      s.emit('call.knock', { conversationId: info.conversationId, callId: info.callId }, resolve);
+    });
+    if (!ack?.ok) {
+      if (!info.silentOnFailure) {
+        Alert.alert('Unable to request admission', ack?.error ?? 'This call is no longer available.');
+      }
+      return false;
+    }
+
+    const localParticipant = makeParticipant({
+      userId: myUserId,
+      displayName: 'You',
+      isLocal: true,
+      role: 'audience',
+    });
+
+    setCallMinimised(false);
+    setActiveCall({
+      callId: info.callId,
+      conversationId: info.conversationId,
+      callType: info.callType,
+      title: safeDisplayName(info.title, 'Call'),
+      state: 'knocking',
+      participants: [localParticipant],
+      localUserId: myUserId,
+      initiatedBy: null,
+      startedAt: new Date().toISOString(),
+      isMuted: false,
+      isVideoEnabled: hasVideo(info.callType),
+      isSpeakerOn: false,
+      isFrontCamera: true,
+      isScreenSharing: false,
+      layout: isGroupCall(info.callType) ? 'speaker' : 'gallery',
+      pinnedUserId: null,
+      activeSpeakerId: null,
+      isControlsVisible: true,
+      chatMessages: [],
+      raisedHands: [],
+      reactions: [],
+      networkQuality: 4,
+      unreadChatCount: 0,
+      viewerCount: 0,
+      isRecording: false,
+      knockingUsers: [],
+      isAudioOnly: false,
+      isNoiseCancellationOn: true,
+    });
+    DeviceEventEmitter.emit('calls.refresh');
+    return true;
+  }, []);
+
+  /** Withdraw a pending admission request — see call.knock.cancel (backend). */
+  const cancelAdmissionRequest = useCallback(() => {
+    const session = activeCallRef.current;
+    const s = socketRef.current;
+    if (!session || session.state !== 'knocking' || !s) return;
+    s.emit('call.knock.cancel', { conversationId: session.conversationId, callId: session.callId });
+    setActiveCall(prev => prev ? { ...prev, state: 'ended', reason: 'cancelled', endedAt: new Date().toISOString() } : prev);
+  }, []);
+
+  /**
    * startScheduledCall — the HOST starts a call that was previously
    * scheduled. Reuses the original callId/conversationId (the server
    * transitions the SAME CallSession from 'pending' to 'ringing' and rings
@@ -897,6 +1018,8 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     // See joinExistingCall's identical flag — CallJoinScreen.tsx shows its
     // own dedicated failure screen, so it opts out of this generic Alert.
     silentOnFailure?: boolean;
+    /** Broadcast only: does the host appear in their own panelist grid? Default true. */
+    hostIsPanelist?: boolean;
   }): Promise<boolean> => {
     const s = socketRef.current;
     const myUserId = currentUserIdRef.current;
@@ -936,6 +1059,13 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       isVideoOff: !needsVideo,
       stream: webRTCService.getLocalStream(),
       role: 'host',
+      // Prefers the server's own record of what this host actually chose
+      // at creation time (set via POST /calls/standalone's
+      // host_is_panelist) over the `info.hostIsPanelist` param — that
+      // param only reflects what THIS CALLER happened to pass in, which
+      // for a scheduled call started from the Upcoming list (CallsTab's
+      // handleJoinScheduled) is never populated at all.
+      isPanelist: ack?.data?.hostIsPanelist !== undefined ? !!ack.data.hostIsPanelist : info.hostIsPanelist !== false,
     });
 
     setCallMinimised(false);
@@ -1020,6 +1150,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       isVideoOff: !needsVideo,
       stream: webRTCService.getLocalStream(),
       role: 'host',
+      isPanelist: args.hostIsPanelist !== false,
     });
 
     const session: CallSession = {
@@ -1712,23 +1843,32 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const knockOnCall = useCallback(() => {
     const session = activeCallRef.current;
     if (!session || !socketRef.current) return;
-    const myUserId = currentUserIdRef.current;
+    // displayName is resolved authoritatively server-side from the caller's
+    // own token now (never trusts a client-supplied string) - see the
+    // matching fix in calls.ts's call.knock handler.
     socketRef.current.emit('call.knock', {
       callId: session.callId,
       conversationId: session.conversationId,
-      displayName: myUserId ?? 'Guest',
     });
     setActiveCall(prev => prev ? { ...prev, state: 'knocking' } : prev);
   }, []);
 
-  const admitKnocker = useCallback((userId: string) => {
+  // Ack-aware (unlike most fire-and-forget call actions here) so the
+  // admission-request sheet can show a per-row loading state and — on
+  // failure — leave the request visible with an error instead of silently
+  // vanishing it, per the admit/decline UX this is built for.
+  const admitKnocker = useCallback(async (userId: string): Promise<boolean> => {
     const session = activeCallRef.current;
-    if (!session || !socketRef.current) return;
-    socketRef.current.emit('call.knock.admit', {
-      callId: session.callId,
-      conversationId: session.conversationId,
-      targetUserId: userId,
+    const s = socketRef.current;
+    if (!session || !s) return false;
+    const ack: any = await new Promise(resolve => {
+      s.emit('call.knock.admit', {
+        callId: session.callId,
+        conversationId: session.conversationId,
+        targetUserId: userId,
+      }, resolve);
     });
+    if (!ack?.ok) return false;
     setActiveCall(prev => {
       if (!prev) return prev;
       return {
@@ -1736,16 +1876,21 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         knockingUsers: (prev.knockingUsers ?? []).filter(u => u.userId !== userId),
       };
     });
+    return true;
   }, []);
 
-  const denyKnocker = useCallback((userId: string) => {
+  const denyKnocker = useCallback(async (userId: string): Promise<boolean> => {
     const session = activeCallRef.current;
-    if (!session || !socketRef.current) return;
-    socketRef.current.emit('call.knock.deny', {
-      callId: session.callId,
-      conversationId: session.conversationId,
-      targetUserId: userId,
+    const s = socketRef.current;
+    if (!session || !s) return false;
+    const ack: any = await new Promise(resolve => {
+      s.emit('call.knock.deny', {
+        callId: session.callId,
+        conversationId: session.conversationId,
+        targetUserId: userId,
+      }, resolve);
     });
+    if (!ack?.ok) return false;
     setActiveCall(prev => {
       if (!prev) return prev;
       return {
@@ -1753,6 +1898,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         knockingUsers: (prev.knockingUsers ?? []).filter(u => u.userId !== userId),
       };
     });
+    return true;
   }, []);
 
   const promoteParticipant = useCallback((userId: string, role: string) => {
@@ -1763,6 +1909,20 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       conversationId: session.conversationId,
       targetUserId: userId,
       role,
+    });
+  }, []);
+
+  // Broadcast-only: move a participant between the panelist grid and the
+  // participant strip — independent of promoteParticipant's role change
+  // above. See CallParticipant.isPanelist's own doc comment.
+  const setParticipantPanelist = useCallback((userId: string, isPanelist: boolean) => {
+    const session = activeCallRef.current;
+    if (!session || !socketRef.current) return;
+    socketRef.current.emit('call.panelist.set', {
+      callId: session.callId,
+      conversationId: session.conversationId,
+      targetUserId: userId,
+      isPanelist,
     });
   }, []);
 
@@ -2371,14 +2531,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           s.emit('call.end', { conversationId, callId, reason: 'busy' });
           return;
         }
-        // Duplicate/resent call.offer for the SAME callId we're already on
-        // (e.g. a queued emit flushed after a socket reconnect) must be
-        // idempotent — it must NOT reset an already-answered call back to a
-        // ring screen, and must NOT re-trigger the native incoming-call UI
-        // a second time. Only a call we haven't acted on yet ('incoming'/
-        // 'lobby'/'waiting-for-host') is safe to re-render from a fresh copy.
-        if (existing && existing.callId === callId &&
-            !['incoming', 'lobby', 'waiting-for-host'].includes(existing.state)) {
+        if (shouldIgnoreDuplicateCallOffer(existing, callId)) {
           return;
         }
 
@@ -2818,6 +2971,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
               userId,
               displayName: safeDisplayName(payload?.displayName, 'Participant'),
               role: payload?.role ?? 'audience',
+              isPanelist: !!payload?.isPanelist,
             })],
           };
         });
@@ -3046,7 +3200,13 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       s.on('call.knock.request', (payload: any) => {
         const callId = String(payload?.callId ?? '');
         const userId = String(payload?.userId ?? '');
-        const displayName = safeDisplayName(payload?.displayName, 'Guest');
+        // Backend now resolves displayName authoritatively from the
+        // requester's own token (never trusts a client-supplied string —
+        // see the matching fix in calls.ts) and includes their phone as a
+        // fallback identity when they have no display name set.
+        const rawDisplayName = typeof payload?.displayName === 'string' ? payload.displayName.trim() : '';
+        const phone = typeof payload?.phone === 'string' ? payload.phone : undefined;
+        const displayName = rawDisplayName || phone || 'Guest';
         const knockedAt = payload?.knockedAt ?? new Date().toISOString();
         if (!callId || !userId) return;
         setActiveCall(prev => {
@@ -3056,6 +3216,22 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           return {
             ...prev,
             knockingUsers: [...(prev.knockingUsers ?? []), { userId, displayName, knockedAt }],
+          };
+        });
+      });
+
+      // Requester withdrew their own pending knock — remove it from
+      // everyone's pending-requests list (not just the host's), same
+      // conv-room scope call.knock.request itself was delivered on.
+      s.on('call.knock.cancelled', (payload: any) => {
+        const callId = String(payload?.callId ?? '');
+        const userId = String(payload?.userId ?? '');
+        if (!callId || !userId) return;
+        setActiveCall(prev => {
+          if (!prev || prev.callId !== callId) return prev;
+          return {
+            ...prev,
+            knockingUsers: (prev.knockingUsers ?? []).filter(u => u.userId !== userId),
           };
         });
       });
@@ -3141,6 +3317,23 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             ...prev,
             participants: prev.participants.map(p =>
               p.userId === userId ? { ...p, role: role as any } : p,
+            ),
+          };
+        });
+      });
+
+      // Broadcast-only: moved between the panelist grid and the
+      // participant strip — independent of call.role.changed above.
+      s.on('call.panelist.changed', (payload: any) => {
+        const callId = String(payload?.callId ?? '');
+        const userId = String(payload?.userId ?? '');
+        if (!callId || !userId || typeof payload?.isPanelist !== 'boolean') return;
+        setActiveCall(prev => {
+          if (!prev || prev.callId !== callId) return prev;
+          return {
+            ...prev,
+            participants: prev.participants.map(p =>
+              p.userId === userId ? { ...p, isPanelist: payload.isPanelist } : p,
             ),
           };
         });
@@ -3543,6 +3736,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     admitKnocker,
     denyKnocker,
     promoteParticipant,
+    setParticipantPanelist,
     toggleNoiseCancellation,
     toggleCaptions,
     sendCaption,
@@ -3567,18 +3761,26 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     joinWaitingRoom,
     startScheduledCall,
     inviteToCall,
-  }), [socket, isConnected, isNetworkOnline, currentUserId, typingByConversation, typingDisplayNames, presenceByUser, activeCall, startCall, startVoiceChannel, answerCall, rejectCall, leaveCall, endCallForAll, endCall, dismissCallUi, knockOnCall, admitKnocker, denyKnocker, promoteParticipant, toggleNoiseCancellation, toggleCaptions, sendCaption, selectVirtualBg, toggleRecording, createPoll, votePoll, closePoll, submitQuestion, dismissQuestion, markAnswered, createBreakoutRooms, returnToMainRoom, closeBreakoutRooms, startRtmp, stopRtmp, wbStroke, wbUndo, wbClear, joinExistingCall, getCallInviteLink, joinWaitingRoom, startScheduledCall, inviteToCall]);
+    requestCallAdmission,
+    cancelAdmissionRequest,
+  }), [socket, isConnected, isNetworkOnline, currentUserId, typingByConversation, typingDisplayNames, presenceByUser, activeCall, startCall, startVoiceChannel, answerCall, rejectCall, leaveCall, endCallForAll, endCall, dismissCallUi, knockOnCall, admitKnocker, denyKnocker, promoteParticipant, setParticipantPanelist, toggleNoiseCancellation, toggleCaptions, sendCaption, selectVirtualBg, toggleRecording, createPoll, votePoll, closePoll, submitQuestion, dismissQuestion, markAnswered, createBreakoutRooms, returnToMainRoom, closeBreakoutRooms, startRtmp, stopRtmp, wbStroke, wbUndo, wbClear, joinExistingCall, getCallInviteLink, joinWaitingRoom, startScheduledCall, inviteToCall, requestCallAdmission, cancelAdmissionRequest]);
 
   /* ─── Render call screens ───────────────────────────────────────────────── */
 
   const isIncoming = activeCall?.state === 'incoming';
   const isLobby = activeCall?.state === 'lobby';
   const isWaitingForHost = activeCall?.state === 'waiting-for-host';
+  // Pending admission request (link-based join requiring host approval) -
+  // this state previously had no render branch at all and fell straight
+  // into isActiveOrConnecting below, which rendered the full ActiveCallScreen
+  // for a user with no media access and no WebRTC connection yet.
+  const isKnocking = activeCall?.state === 'knocking';
   const isActiveOrConnecting =
     activeCall &&
     activeCall.state !== 'incoming' &&
     activeCall.state !== 'lobby' &&
     activeCall.state !== 'waiting-for-host' &&
+    activeCall.state !== 'knocking' &&
     activeCall.state !== null;
   const isEnded = activeCall?.state === 'ended' || activeCall?.state === 'missed';
 
@@ -3605,6 +3807,20 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           visible
           callTitle={activeCall.title}
           onLeave={() => void leaveCall()}
+        />
+      )}
+
+      {/* Pending admission request — link-based join awaiting host approval.
+          No media access, no WebRTC connection until call.knock.admitted
+          (see that listener) — this screen is purely a waiting state. */}
+      {isKnocking && activeCall && (
+        <WaitingForHostScreen
+          visible
+          callTitle={activeCall.title}
+          heading="Request sent"
+          note="Waiting for the host to let you in."
+          leaveLabel="Cancel request"
+          onLeave={() => cancelAdmissionRequest()}
         />
       )}
 
@@ -3725,6 +3941,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             onAdmitKnocker: (uid: string) => admitKnocker(uid),
             onDenyKnocker: (uid: string) => denyKnocker(uid),
             onPromoteParticipant: (uid: string, role: string) => promoteParticipant(uid, role),
+            onSetParticipantPanelist: (uid: string, isPanelist: boolean) => setParticipantPanelist(uid, isPanelist),
             onToggleCaptions: toggleCaptions,
             onSendCaption: sendCaption,
             onSelectVirtualBg: selectVirtualBg,

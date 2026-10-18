@@ -40,6 +40,15 @@ export type CallParticipant = {
   joinedAt: string;
   /** DTLS-SRTP fingerprint extracted from remote SDP once the peer reaches connected state. */
   dtlsFingerprint?: string;
+  /**
+   * Broadcast-only UI placement: shown in the panelist grid vs the
+   * participant strip. Deliberately orthogonal to `role` — role still
+   * governs mic/camera + moderation rights everywhere else; this exists
+   * only so a host can run a broadcast without appearing on the panel
+   * themselves, and so the host can move anyone between the two groups
+   * independent of their speaking role. Meaningless outside 'broadcast'.
+   */
+  isPanelist?: boolean;
 };
 
 export type InCallMessage = {

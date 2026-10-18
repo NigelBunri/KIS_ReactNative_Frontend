@@ -42,7 +42,7 @@ import CallTimer from './components/CallTimer';
 import NetworkQualityBars from './components/NetworkQualityBars';
 import CallStatsPanel from './CallStatsPanel';
 import NetworkQualityBanner from './components/NetworkQualityBanner';
-import WaitingRoomPanel from './components/WaitingRoomPanel';
+import AdmissionRequestSheet from './components/AdmissionRequestSheet';
 import InviteLinkCard from './components/InviteLinkCard';
 import CaptionOverlay from './components/CaptionOverlay';
 import InCallPollSheet from './components/InCallPollSheet';
@@ -83,9 +83,11 @@ type CallActions = {
   onInviteToCall?: (userIds: string[]) => Promise<{ ok: boolean; error?: string }>;
   onToggleNoiseCancellation?: () => void;
   onChatOpenChange?: (open: boolean) => void;
-  onAdmitKnocker?: (userId: string) => void;
-  onDenyKnocker?: (userId: string) => void;
+  onAdmitKnocker?: (userId: string) => Promise<boolean>;
+  onDenyKnocker?: (userId: string) => Promise<boolean>;
   onPromoteParticipant?: (userId: string, role: string) => void;
+  /** Broadcast only: move a participant between the panelist grid and participant strip. */
+  onSetParticipantPanelist?: (userId: string, isPanelist: boolean) => void;
   onToggleCaptions?: () => void;
   onSendCaption?: (text: string) => void;
   onSelectVirtualBg?: (opt: VirtualBgOption) => void;
@@ -138,6 +140,7 @@ export default function ActiveCallScreen({ session, actions }: Props) {
   const [resolvedInviteLink, setResolvedInviteLink] = useState<string | null>(null);
   const [showPolls, setShowPolls] = useState(false);
   const [showQA, setShowQA] = useState(false);
+  const [showAdmissionRequests, setShowAdmissionRequests] = useState(false);
   const [showBreakout, setShowBreakout] = useState(false);
   const [showVirtualBg, setShowVirtualBg] = useState(false);
   const [showRtmp, setShowRtmp] = useState(false);
@@ -386,6 +389,9 @@ export default function ActiveCallScreen({ session, actions }: Props) {
         break;
       case 'qa':
         setShowQA(v => !v);
+        break;
+      case 'admission-requests':
+        setShowAdmissionRequests(v => !v);
         break;
       case 'breakout':
         setShowBreakout(v => !v);
@@ -750,6 +756,11 @@ export default function ActiveCallScreen({ session, actions }: Props) {
                 liveStartedAt={session.liveStartedAt}
                 onPressParticipant={uid => actions.onPinParticipant(uid)}
                 callActive={session.state === 'active'}
+                isOwner={isHostOrCoHost}
+                onMuteParticipant={isHostOrCoHost ? actions.onMuteParticipant : undefined}
+                onRemoveParticipant={isHostOrCoHost ? actions.onRemoveParticipant : undefined}
+                onSetParticipantPanelist={isHostOrCoHost ? actions.onSetParticipantPanelist : undefined}
+                onPromoteParticipant={isHostOrCoHost ? actions.onPromoteParticipant : undefined}
               />
             )}
 
@@ -823,15 +834,6 @@ export default function ActiveCallScreen({ session, actions }: Props) {
             <Text style={styles.callTypeChip}>{callTypeLabel(session.callType)}</Text>
           </View>
         </Animated.View>
-
-        {/* ── Waiting room (host sees knocking users) ── */}
-        {isHostOrCoHost && (session.knockingUsers?.length ?? 0) > 0 && (
-          <WaitingRoomPanel
-            knockingUsers={session.knockingUsers ?? []}
-            onAdmit={uid => actions.onAdmitKnocker?.(uid)}
-            onDeny={uid => actions.onDenyKnocker?.(uid)}
-          />
-        )}
 
         {/* ── BOTTOM: Controls ── */}
         <Animated.View style={{ opacity: controlsOpacity }}>
@@ -915,6 +917,19 @@ export default function ActiveCallScreen({ session, actions }: Props) {
         onDismiss={id => actions.onDismissQuestion?.(id)}
         onMarkAnswered={id => actions.onMarkAnswered?.(id)}
       />
+
+      {/* Admission requests sheet (host/co-host only — link-based joiners
+          waiting for approval). Opened via the "Requests" control; see
+          CallControls' badge = knockingUsers.length. */}
+      {isHostOrCoHost && (
+        <AdmissionRequestSheet
+          visible={showAdmissionRequests}
+          onClose={() => setShowAdmissionRequests(false)}
+          knockingUsers={session.knockingUsers ?? []}
+          onAdmit={uid => actions.onAdmitKnocker?.(uid) ?? Promise.resolve(false)}
+          onDeny={uid => actions.onDenyKnocker?.(uid) ?? Promise.resolve(false)}
+        />
+      )}
 
       {/* Breakout rooms sheet */}
       <BreakoutRoomsSheet

@@ -90,27 +90,6 @@ export function resolveMainStageParticipants<T extends MainStageCandidate>(
   return pinned ? [pinned] : [];
 }
 
-// Resolves BroadcastLayout's main-stage list: the primary host plus any
-// on-stage (co-host/speaker) participant currently screen-sharing are
-// GUARANTEED a main-stage slot, regardless of `cap` — a presentation must
-// never be bumped by a cap meant only to limit how many ordinary camera
-// feeds crowd the main area. Remaining slots (cap minus however many
-// guaranteed participants there are) go to on-stage participants with
-// their camera on, in their existing order. A sharer who IS the primary
-// host, or who otherwise appears twice, is never double-counted (`onStage`
-// is assumed to already exclude the primary host, matching how
-// BroadcastLayout constructs it, but this still guards defensively).
-export function resolveBroadcastMainStage<
-  T extends MainStageCandidate & { isVideoOff?: boolean },
->(primaryHost: T | null, onStage: T[], cap: number): T[] {
-  const sharers = onStage.filter(p => p.isScreenSharing && p !== primaryHost);
-  const guaranteed: T[] = primaryHost ? [primaryHost, ...sharers] : [...sharers];
-  const guaranteedIds = new Set(guaranteed.map(p => p.userId));
-  const camOnStage = onStage.filter(p => !p.isVideoOff && !guaranteedIds.has(p.userId));
-  const effectiveCap = Math.max(cap, guaranteed.length);
-  return [...guaranteed, ...camOnStage].slice(0, effectiveCap);
-}
-
 export type TileCell = {
   width: number;
   height: number;

@@ -19,9 +19,20 @@ type Props = {
   visible: boolean;
   callTitle: string;
   onLeave: () => void;
+  /** Override copy for non-"waiting for host" uses (e.g. a link-based admission request). */
+  heading?: string;
+  note?: string;
+  leaveLabel?: string;
 };
 
-export default function WaitingForHostScreen({ visible, callTitle, onLeave }: Props) {
+export default function WaitingForHostScreen({
+  visible,
+  callTitle,
+  onLeave,
+  heading = 'Waiting for the host',
+  note = "You'll be connected automatically when the host starts the call.",
+  leaveLabel = 'Leave',
+}: Props) {
   const { palette } = useKISTheme();
   const spin = useRef(new Animated.Value(0)).current;
   const pulse = useRef(new Animated.Value(0.9)).current;
@@ -62,23 +73,23 @@ export default function WaitingForHostScreen({ visible, callTitle, onLeave }: Pr
               </Animated.View>
             </Animated.View>
 
-            <Text style={[styles.title, { color: palette.text }]}>Waiting for the host</Text>
+            <Text style={[styles.title, { color: palette.text }]}>{heading}</Text>
             <Text style={[styles.subtitle, { color: palette.subtext }]} numberOfLines={2}>
               {callTitle}
             </Text>
             <Text style={[styles.note, { color: palette.subtext }]}>
-              You'll be connected automatically when the host starts the call.
+              {note}
             </Text>
           </View>
 
           <Pressable
             onPress={onLeave}
             accessibilityRole="button"
-            accessibilityLabel="Leave waiting room"
+            accessibilityLabel={leaveLabel}
             style={[styles.leaveBtn, { borderColor: palette.danger }]}
           >
             <KISIcon name="phone-off" size={18} color={palette.danger} />
-            <Text style={[styles.leaveText, { color: palette.danger }]}>Leave</Text>
+            <Text style={[styles.leaveText, { color: palette.danger }]}>{leaveLabel}</Text>
           </Pressable>
 
         </SafeAreaView>

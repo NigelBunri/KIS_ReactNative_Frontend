@@ -34,6 +34,7 @@ type ControlAction =
   | 'chat'
   | 'participants'
   | 'add-participant'
+  | 'admission-requests'
   | 'raise-hand'
   | 'reactions'
   | 'layout'
@@ -103,6 +104,7 @@ export default function CallControls({
   const localParticipant = session.participants.find(p => p.isLocal);
   const isAudienceOnly = isBroadcast && localParticipant?.role === 'audience';
   const isHostOrCoHost = localParticipant?.role === 'host' || localParticipant?.role === 'co-host';
+  const knockingCount = (session.knockingUsers ?? []).length;
   const handRaised = !!session.raisedHands.includes(session.localUserId);
   const accent = ACCENT[session.callType] ?? palette.primary;
 
@@ -175,6 +177,18 @@ export default function CallControls({
       id: 'add-participant',
       icon: 'user-plus',
       label: 'Add',
+      overrideAccent: palette.gold,
+    },
+    {
+      // Only the host/co-host can admit/decline — see AdmissionRequestSheet's
+      // own gate. Always visible to them, badge-only when 0 (same convention as
+      // 'chat'/'participants' above), so the control's presence/position
+      // doesn't shift as requests come and go.
+      id: 'admission-requests',
+      icon: 'shield',
+      label: 'Requests',
+      badge: knockingCount,
+      hidden: !isHostOrCoHost,
       overrideAccent: palette.gold,
     },
     {
@@ -480,7 +494,13 @@ function CallButton({
   return (
     <Pressable
       onPress={onPress}
-      accessibilityLabel={btn.comingSoon ? `${btn.label} — coming soon` : btn.label}
+      accessibilityLabel={
+        btn.comingSoon
+          ? `${btn.label} — coming soon`
+          : (btn.badge ?? 0) > 0
+          ? `${btn.label}, ${btn.badge} pending`
+          : btn.label
+      }
       accessibilityRole="button"
       hitSlop={10}
       style={({ pressed }) => [

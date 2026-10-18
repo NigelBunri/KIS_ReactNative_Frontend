@@ -371,6 +371,7 @@ const CallsTab = forwardRef<ScrollableHandle, CallsTabProps>(function CallsTab({
     scheduledFor?: Date | null;
     durationMinutes?: number | null;
     inviteeUserIds?: string[];
+    hostIsPanelist?: boolean;
   }): Promise<StandaloneCallResult> => {
     // ROOT CAUSE of "Cannot POST /api/v1/calls/standalone — Not Found": this
     // hardcoded URL never matched the real route. CallsController is
@@ -384,6 +385,7 @@ const CallsTab = forwardRef<ScrollableHandle, CallsTabProps>(function CallsTab({
       scheduled_for: params.scheduledFor?.toISOString() ?? undefined,
       duration_minutes: params.durationMinutes ?? undefined,
       invitee_user_ids: params.inviteeUserIds,
+      host_is_panelist: params.hostIsPanelist,
     });
     // ApiResult's failure field is `message`, not `error` — `res.error` was
     // always undefined, silently discarding the server's actual reason and
@@ -415,6 +417,7 @@ const CallsTab = forwardRef<ScrollableHandle, CallsTabProps>(function CallsTab({
           inviteeUserIds: [],
           inviteToken: result.inviteToken,
           callId: result.callId,
+          hostIsPanelist: result.hostIsPanelist,
         });
         if (started && inviteToCall && result.inviteeUserIds?.length) {
           const inviteResult = await inviteToCall(result.inviteeUserIds);

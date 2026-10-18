@@ -39,6 +39,7 @@ type CallInfo = {
   participantCount: number;
   createdBy?: string;
   isHost?: boolean;
+  requiresApproval?: boolean;
 };
 
 export default function CallJoinScreen({ route, navigation }: Props) {
@@ -46,7 +47,7 @@ export default function CallJoinScreen({ route, navigation }: Props) {
   const { palette } = useKISTheme();
   const responsive = useResponsiveLayout();
   const topInset = useSafeTopInset();
-  const { joinExistingCall, startScheduledCall, joinWaitingRoom, currentUserId } = useSocket();
+  const { joinExistingCall, startScheduledCall, joinWaitingRoom, requestCallAdmission, currentUserId } = useSocket();
 
   const [phase, setPhase] = useState<'loading' | 'preview' | 'joining' | 'error'>('loading');
   const [callInfo, setCallInfo] = useState<CallInfo | null>(null);
@@ -88,7 +89,20 @@ export default function CallJoinScreen({ route, navigation }: Props) {
       const isActive = callInfo.status === 'active' || callInfo.status === 'ongoing' || callInfo.status === 'ringing';
       let joined = false;
 
-      if (isActive && joinExistingCall) {
+      if (isActive && callInfo.requiresApproval && !callInfo.isHost && requestCallAdmission) {
+        // This link-holder has no prior relationship to the call (not the
+        // host, not a conversation member, not personally invited) - enter
+        // the admission-request flow instead of joining media directly.
+        // See requestCallAdmission's own doc comment: no WebRTC/media setup
+        // happens until the host actually admits them.
+        joined = await requestCallAdmission({
+          callId: callInfo.callId,
+          conversationId: callInfo.conversationId,
+          callType: callInfo.callType,
+          title: callInfo.title ?? callTypeLabel(callInfo.callType),
+          silentOnFailure: true,
+        });
+      } else if (isActive && joinExistingCall) {
         joined = await joinExistingCall({
           callId: callInfo.callId,
           conversationId: callInfo.conversationId,
@@ -133,7 +147,7 @@ export default function CallJoinScreen({ route, navigation }: Props) {
       setErrorMsg('Something went wrong joining the call.');
       setPhase('error');
     }
-  }, [callInfo, joinExistingCall, startScheduledCall, joinWaitingRoom, currentUserId, navigation]);
+  }, [callInfo, joinExistingCall, startScheduledCall, joinWaitingRoom, requestCallAdmission, currentUserId, navigation]);
 
   const icon = callInfo ? callTypeIcon(callInfo.callType) : 'phone';
   const typeLabel = callInfo ? callTypeLabel(callInfo.callType) : '';

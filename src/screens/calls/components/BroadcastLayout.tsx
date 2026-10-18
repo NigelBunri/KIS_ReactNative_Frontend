@@ -1,4 +1,18 @@
 // src/screens/calls/components/BroadcastLayout.tsx
+//
+// Broadcast call layout: panelists (the people actually broadcasting —
+// camera/mic on stage) render in a responsive grid that scrolls
+// vertically; everyone else who joined the call (attendees who aren't
+// panelists) renders in a fixed horizontal strip that never moves, even
+// while the panelist grid scrolls underneath it. Same shape for both
+// video and audio-only broadcasts — an audio panelist still gets a tile
+// (avatar + speaking/mute state), it just never shows a camera feed.
+//
+// The call's CREATOR is just another participant here, not special-cased
+// into the grid — whether they appear at all is purely their own
+// isPanelist flag (set at call-creation time via the "I'll host off-panel"
+// toggle, or changed later by any panelist-move action below), same as
+// everyone else.
 import React, { useMemo, useState, useCallback } from 'react';
 import {
   View,
@@ -6,12 +20,15 @@ import {
   ScrollView,
   StyleSheet,
   LayoutChangeEvent,
+  Pressable,
+  Modal,
 } from 'react-native';
 import type { CallParticipant } from '@/services/calls/callTypes';
 import ParticipantTile from './ParticipantTile';
 import CallTimer from './CallTimer';
+import { KISIcon } from '@/constants/kisIcons';
 import { useKISTheme } from '@/theme/useTheme';
-import { computeGridColumns, computeTileCell, resolveBroadcastMainStage } from '../callGridMath';
+import { computeGridColumns, computeTileCell } from '../callGridMath';
 import { useIOSCallPiP } from '../hooks/useIOSCallPiP';
 
 type Props = {
@@ -26,17 +43,26 @@ type Props = {
   // See VideoGrid's identical prop - gates iOS PiP to an actually-live
   // broadcast, defaults true for callers that haven't been updated.
   callActive?: boolean;
+  // Host/co-host only — when present, tapping any tile opens the owner
+  // action sheet (mute, move panel/participant, promote, remove) instead
+  // of just onPressParticipant. All four are optional independently so a
+  // caller can offer a subset (matches ParticipantsSheet's own pattern).
+  isOwner?: boolean;
+  onMuteParticipant?: (userId: string) => void;
+  onRemoveParticipant?: (userId: string) => void;
+  onSetParticipantPanelist?: (userId: string, isPanelist: boolean) => void;
+  onPromoteParticipant?: (userId: string, role: string) => void;
 };
 
-const TOP_BAR_H   = 44;   // LIVE indicator bar
-const CO_HOST_H   = 96;   // on-stage horizontal strip
-const HANDS_H     = 56;   // raised-hands strip
-const AUDIENCE_H  = 36;   // audience count bar
-const MAIN_STAGE_GAP = 4;
-// Cap on simultaneous large tiles in the main stage — beyond this a
-// broadcast with many cameras-on co-hosts/speakers would crowd the main
-// area past legibility; the overflow stays in the "On stage" strip below.
-const MAIN_STAGE_CAP = 4;
+const TOP_BAR_H     = 44;  // LIVE indicator bar
+const ATTENDEE_H    = 92;  // fixed attendee strip (chips + label)
+const AUDIENCE_H    = 36;  // passive-viewer count bar
+const GRID_GAP       = 10;
+const GRID_PADDING   = 12;
+// A panelist tile's target aspect ratio (w:h) — wide enough to read as a
+// "camera feed" shape even for an audio-only panelist's avatar tile, same
+// ratio VideoGrid's gallery tiles already use elsewhere in this call UI.
+const TILE_ASPECT = 3 / 4;
 
 export default function BroadcastLayout({
   participants,
@@ -46,12 +72,18 @@ export default function BroadcastLayout({
   liveStartedAt,
   onPressParticipant,
   callActive = true,
+  isOwner = false,
+  onMuteParticipant,
+  onRemoveParticipant,
+  onSetParticipantPanelist,
+  onPromoteParticipant,
 }: Props) {
   const { palette } = useKISTheme();
   const styles = useBroadcastStyles(palette);
 
   const [containerW, setContainerW] = useState(0);
   const [containerH, setContainerH] = useState(0);
+  const [actionTarget, setActionTarget] = useState<CallParticipant | null>(null);
 
   const onLayout = useCallback((e: LayoutChangeEvent) => {
     const { width, height } = e.nativeEvent.layout;
@@ -59,53 +91,36 @@ export default function BroadcastLayout({
     if (height > 0) setContainerH(Math.floor(height));
   }, []);
 
-  const hosts    = participants.filter(p => p.role === 'host' || p.role === 'co-host');
-  const speakers = participants.filter(p => p.role === 'speaker');
-  const audience = participants.filter(p => p.role === 'audience');
-  const raisedHands = audience.filter(a => a.handRaised);
+  const panelists = participants.filter(p => p.isPanelist);
+  const attendees  = participants.filter(p => !p.isPanelist);
 
-  const primaryHost = hosts.find(h => h.role === 'host') ?? hosts[0] ?? null;
-  const coHosts     = hosts.filter(h => h !== primaryHost);
-  const onStage     = [...coHosts, ...speakers];
-
-  // Main stage: the primary host always gets prominent space, plus any
-  // on-stage co-host/speaker who currently has their camera on — they're
-  // an actual "broadcasting location" with a video feed worth showing
-  // large, not just a voice in the mix. Gated on camera state (a
-  // deliberate action) rather than activeSpeakerId so the main stage
-  // doesn't jitter on every speaking blip. Capped so a large panel still
-  // reads cleanly; anyone past the cap, or on-stage without video, stays
-  // in the horizontal strip below. A screen-sharing host/co-host/speaker
-  // is always guaranteed a slot regardless of the cap — see
-  // resolveBroadcastMainStage.
-  const mainStage = resolveBroadcastMainStage(primaryHost, onStage, MAIN_STAGE_CAP);
-  const mainStageIds = new Set(mainStage.map(p => p.userId));
-  const stageStrip = onStage.filter(p => !mainStageIds.has(p.userId));
-
-  // iOS PiP target: the primary host's camera if it's on, else whichever
-  // main-stage tile has video - mirrors "what's prominent on screen right
-  // now" the same way VideoGrid does for group calls.
-  const hasVideo = (p: CallParticipant | null) => !!p && !!p.stream && !p.isVideoOff;
-  const pipParticipant = hasVideo(primaryHost) ? primaryHost : mainStage.find(hasVideo) ?? null;
+  // iOS PiP target: the first panelist with their camera on — "what's
+  // prominent on screen right now" for a broadcast, same reasoning
+  // VideoGrid/the old main-stage concept used.
+  const pipParticipant = panelists.find(p => !!p.stream && !p.isVideoOff) ?? null;
   const pipRef = useIOSCallPiP(callActive && !!pipParticipant);
 
-  // Main stage height = total container minus every section below it.
-  const mainH = Math.max(
-    80,
-    containerH
-      - TOP_BAR_H
-      - (stageStrip.length > 0 ? CO_HOST_H : 0)
-      - (raisedHands.length > 0 ? HANDS_H : 0)
-      - AUDIENCE_H,
+  const gridAreaH = Math.max(
+    120,
+    containerH - TOP_BAR_H - (attendees.length > 0 ? ATTENDEE_H : 0) - AUDIENCE_H,
   );
-
-  const mainCols = computeGridColumns(mainStage.length, containerW, mainH);
-  const mainRows = Math.ceil(mainStage.length / Math.max(mainCols, 1));
-  const mainCell = computeTileCell(containerW, mainH, mainCols, mainRows, MAIN_STAGE_GAP);
-  const mainRowChunks: CallParticipant[][] = [];
-  for (let i = 0; i < mainStage.length; i += mainCols) {
-    mainRowChunks.push(mainStage.slice(i, i + mainCols));
+  const gridCols = Math.max(1, computeGridColumns(Math.max(panelists.length, 1), containerW, gridAreaH));
+  const tileW = gridCols > 0
+    ? Math.floor((containerW - GRID_PADDING * 2 - GRID_GAP * (gridCols - 1)) / gridCols)
+    : containerW;
+  const tileH = Math.round(tileW / TILE_ASPECT);
+  const panelistRows: CallParticipant[][] = [];
+  for (let i = 0; i < panelists.length; i += gridCols) {
+    panelistRows.push(panelists.slice(i, i + gridCols));
   }
+
+  const handleTilePress = useCallback((participant: CallParticipant) => {
+    if (isOwner && (onMuteParticipant || onRemoveParticipant || onSetParticipantPanelist || onPromoteParticipant)) {
+      setActionTarget(participant);
+    } else {
+      onPressParticipant?.(participant.userId);
+    }
+  }, [isOwner, onMuteParticipant, onRemoveParticipant, onSetParticipantPanelist, onPromoteParticipant, onPressParticipant]);
 
   return (
     <View
@@ -136,90 +151,187 @@ export default function BroadcastLayout({
         )}
       </View>
 
-      {/* Main stage — primary host plus any on-stage participant with their
-          camera on, arranged in a small responsive grid (1 = full size). */}
-      {mainStage.length > 0 && containerW > 0 && (
-        <View style={{ width: containerW, height: mainH, justifyContent: 'center' }}>
-          {mainRowChunks.map((row, ri) => (
-            <View
-              key={ri}
-              style={{
-                flexDirection: 'row',
-                justifyContent: 'center',
-                gap: MAIN_STAGE_GAP,
-                marginBottom: ri < mainRowChunks.length - 1 ? MAIN_STAGE_GAP : 0,
-              }}
-            >
-              {row.map(p => (
-                <ParticipantTile
-                  key={p.userId}
-                  participant={p}
-                  width={mainStage.length === 1 ? containerW : mainCell.width}
-                  height={mainStage.length === 1 ? mainH : mainCell.height}
-                  isSpeaker={p.userId === activeSpeakerId}
-                  cornerRadius={mainStage.length === 1 ? 0 : 12}
-                  showName
-                  onPress={p === primaryHost ? undefined : () => onPressParticipant?.(p.userId)}
-                  isPipSource={p.userId === pipParticipant?.userId}
-                  pipRef={pipRef}
-                />
-              ))}
+      <View style={{ flex: 1, paddingTop: TOP_BAR_H }}>
+
+        {/* Panelist grid — the actual broadcast panel, scrolls vertically.
+            Rendered FIRST (behind, z-order-wise, nothing special needed —
+            flex column order) so the attendee strip below visually sits
+            "on top of"/after it, per spec: panelists scroll underneath a
+            fixed attendee row. */}
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={{ padding: GRID_PADDING, gap: GRID_GAP }}
+          showsVerticalScrollIndicator={false}
+        >
+          {panelists.length === 0 ? (
+            <View style={styles.emptyPanel}>
+              <KISIcon name="radio" size={28} color={palette.subtext} />
+              <Text style={[styles.emptyPanelText, { color: palette.subtext }]}>
+                No panelists on stage yet
+              </Text>
             </View>
-          ))}
-        </View>
-      )}
-
-      {/* On-stage co-hosts + speakers not currently in the main stage
-          (camera off, or past the main-stage cap) */}
-      {stageStrip.length > 0 && (
-        <View style={[styles.stageSection, { backgroundColor: palette.royalInk, height: CO_HOST_H }]}>
-          <Text style={styles.sectionLabel}>On stage</Text>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.stageRow}
-          >
-            {stageStrip.map(p => (
-              <ParticipantTile
-                key={p.userId}
-                participant={p}
-                width={Math.round(CO_HOST_H * 0.72)}
-                height={CO_HOST_H - 16}
-                isSpeaker={p.userId === activeSpeakerId}
-                cornerRadius={12}
-                showName
-                onPress={() => onPressParticipant?.(p.userId)}
-              />
-            ))}
-          </ScrollView>
-        </View>
-      )}
-
-      {/* Raised-hand strip */}
-      {raisedHands.length > 0 && (
-        <View style={[styles.handsSection, { height: HANDS_H }]}>
-          <Text style={styles.sectionLabel}>✋ Raised hands</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.stageRow}>
-            {raisedHands.map(p => (
-              <View key={p.userId} style={[styles.handChip, { borderColor: `${palette.gold}66`, backgroundColor: `${palette.gold}33` }]}>
-                <Text style={[styles.handChipText, { color: palette.gold }]} numberOfLines={1}>
-                  {p.displayName}
-                </Text>
+          ) : (
+            panelistRows.map((row, ri) => (
+              <View key={ri} style={{ flexDirection: 'row', gap: GRID_GAP }}>
+                {row.map(p => (
+                  <ParticipantTile
+                    key={p.userId}
+                    participant={p}
+                    width={tileW}
+                    height={tileH}
+                    isSpeaker={p.userId === activeSpeakerId}
+                    cornerRadius={14}
+                    showName
+                    onPress={() => handleTilePress(p)}
+                    isPipSource={p.userId === pipParticipant?.userId}
+                    pipRef={pipRef}
+                  />
+                ))}
+                {/* Pad the last row so tiles don't stretch to fill a
+                    partial row — keeps every tile the same size regardless
+                    of position. */}
+                {row.length < gridCols &&
+                  Array.from({ length: gridCols - row.length }).map((_, i) => (
+                    <View key={`pad-${i}`} style={{ width: tileW, height: tileH }} />
+                  ))}
               </View>
-            ))}
-          </ScrollView>
-        </View>
-      )}
+            ))
+          )}
+        </ScrollView>
 
-      {/* Audience count */}
+        {/* Attendee strip — fixed, horizontal scroll. Everyone on the call
+            who isn't a panelist (both video and audio broadcasts get the
+            same chip shape; there's no camera feed to show here either
+            way, just presence + mute/hand state). */}
+        {attendees.length > 0 && (
+          <View style={[styles.attendeeSection, { height: ATTENDEE_H, backgroundColor: `${palette.royalInk}F2`, borderTopColor: `${palette.gold}26` }]}>
+            <Text style={styles.sectionLabel}>
+              {attendees.length.toLocaleString()} in the call
+            </Text>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.attendeeRow}
+            >
+              {attendees.map(p => (
+                <Pressable key={p.userId} onPress={() => handleTilePress(p)} style={[styles.attendeeChip, { backgroundColor: palette.surface, borderColor: palette.inputBorder }]}>
+                  <View style={[styles.attendeeAvatar, { backgroundColor: palette.goldDeep }]}>
+                    <Text style={[styles.attendeeInitial, { color: palette.ivory }]}>
+                      {(p.displayName || '?').charAt(0).toUpperCase()}
+                    </Text>
+                  </View>
+                  <Text style={[styles.attendeeName, { color: palette.text }]} numberOfLines={1}>
+                    {p.displayName}
+                  </Text>
+                  {p.handRaised && <Text style={styles.attendeeHand}>✋</Text>}
+                  {p.isMuted && <KISIcon name="mic-off" size={12} color={palette.danger} />}
+                </Pressable>
+              ))}
+            </ScrollView>
+          </View>
+        )}
+      </View>
+
+      {/* Passive-viewer count (never joined as a real call participant —
+          see CallSession.viewerCount's own doc comment) */}
       <View style={[styles.audienceBar, { height: AUDIENCE_H }]}>
         <Text style={[styles.audienceText, { color: palette.subtext }]}>
-          {audience.length > 0
-            ? `${audience.length.toLocaleString()} audience member${audience.length !== 1 ? 's' : ''}`
-            : 'No audience yet'}
+          {viewerCount > 0
+            ? `${viewerCount.toLocaleString()} watching`
+            : 'No viewers yet'}
         </Text>
       </View>
+
+      {/* Owner action sheet — mute, move between panel/participants,
+          promote, remove. Only reachable when isOwner and at least one
+          action callback was actually provided (handleTilePress already
+          gates on this), so a non-host tap always falls through to
+          onPressParticipant/pin instead. */}
+      <Modal
+        visible={!!actionTarget}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setActionTarget(null)}
+      >
+        <Pressable style={styles.actionBackdrop} onPress={() => setActionTarget(null)}>
+          <Pressable style={[styles.actionSheet, { backgroundColor: palette.card }]} onPress={() => {}}>
+            <Text style={[styles.actionTitle, { color: palette.text }]} numberOfLines={1}>
+              {actionTarget?.displayName}
+            </Text>
+            {onMuteParticipant && actionTarget && (
+              <ActionRow
+                icon={actionTarget.isMuted ? 'mic' : 'mic-off'}
+                label={actionTarget.isMuted ? 'Unmute' : 'Mute'}
+                palette={palette}
+                onPress={() => { onMuteParticipant(actionTarget.userId); setActionTarget(null); }}
+              />
+            )}
+            {onSetParticipantPanelist && actionTarget && (
+              <ActionRow
+                icon={actionTarget.isPanelist ? 'arrow-down-left' : 'arrow-up-right'}
+                label={actionTarget.isPanelist ? 'Move to participants' : 'Move to panel'}
+                palette={palette}
+                onPress={() => { onSetParticipantPanelist(actionTarget.userId, !actionTarget.isPanelist); setActionTarget(null); }}
+              />
+            )}
+            {onPromoteParticipant && actionTarget && actionTarget.role !== 'co-host' && (
+              <ActionRow
+                icon="star"
+                label="Make co-host"
+                palette={palette}
+                onPress={() => { onPromoteParticipant(actionTarget.userId, 'co-host'); setActionTarget(null); }}
+              />
+            )}
+            {onRemoveParticipant && actionTarget && (
+              <ActionRow
+                icon="user-minus"
+                label="Remove from call"
+                palette={palette}
+                danger
+                onPress={() => { onRemoveParticipant(actionTarget.userId); setActionTarget(null); }}
+              />
+            )}
+            <ActionRow
+              icon="close"
+              label="Cancel"
+              palette={palette}
+              onPress={() => setActionTarget(null)}
+            />
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
+  );
+}
+
+function ActionRow({ icon, label, palette, onPress, danger }: {
+  icon: string;
+  label: string;
+  palette: any;
+  onPress: () => void;
+  danger?: boolean;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [
+        {
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 12,
+          paddingVertical: 13,
+          paddingHorizontal: 4,
+          opacity: pressed ? 0.6 : 1,
+        },
+      ]}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+    >
+      <KISIcon name={icon} size={18} color={danger ? palette.danger : palette.text} />
+      <Text style={{ color: danger ? palette.danger : palette.text, fontSize: 15, fontWeight: '600' }}>
+        {label}
+      </Text>
+    </Pressable>
   );
 }
 
@@ -262,7 +374,19 @@ function useBroadcastStyles(palette: any) {
     dot: { width: 7, height: 7, borderRadius: 4 },
     chipText: { fontWeight: '800', fontSize: 11, letterSpacing: 0.5 },
     viewerCount: { fontSize: 13, fontWeight: '600', color: palette.ivory },
-    stageSection: { paddingHorizontal: 10, paddingVertical: 6 },
+    emptyPanel: {
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 8,
+      paddingVertical: 60,
+    },
+    emptyPanelText: { fontSize: 13, fontWeight: '600' },
+    attendeeSection: {
+      paddingHorizontal: 10,
+      paddingTop: 8,
+      paddingBottom: 6,
+      borderTopWidth: 1,
+    },
     sectionLabel: {
       fontSize: 11,
       fontWeight: '700',
@@ -270,24 +394,45 @@ function useBroadcastStyles(palette: any) {
       color: palette.subtext,
       marginBottom: 4,
     },
-    stageRow: { gap: 8, paddingBottom: 2, alignItems: 'center' },
-    handsSection: {
-      backgroundColor: `${palette.gold}1A`,
+    attendeeRow: { gap: 8, paddingBottom: 2, alignItems: 'center' },
+    attendeeChip: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      borderRadius: 20,
+      borderWidth: 1,
       paddingHorizontal: 10,
       paddingVertical: 6,
+      maxWidth: 160,
     },
-    handChip: {
-      borderRadius: 16,
-      paddingHorizontal: 12,
-      paddingVertical: 5,
-      borderWidth: 1,
+    attendeeAvatar: {
+      width: 22,
+      height: 22,
+      borderRadius: 11,
+      alignItems: 'center',
+      justifyContent: 'center',
     },
-    handChipText: { fontSize: 12, fontWeight: '600' },
+    attendeeInitial: { fontSize: 11, fontWeight: '800' },
+    attendeeName: { fontSize: 12, fontWeight: '600', maxWidth: 90 },
+    attendeeHand: { fontSize: 12 },
     audienceBar: {
       paddingHorizontal: 14,
       justifyContent: 'center',
       backgroundColor: `${palette.royalInk}80`,
     },
     audienceText: { fontSize: 12 },
+    actionBackdrop: {
+      flex: 1,
+      backgroundColor: 'rgba(0,0,0,0.5)',
+      justifyContent: 'flex-end',
+    },
+    actionSheet: {
+      borderTopLeftRadius: 20,
+      borderTopRightRadius: 20,
+      paddingHorizontal: 20,
+      paddingTop: 16,
+      paddingBottom: 32,
+    },
+    actionTitle: { fontSize: 15, fontWeight: '800', marginBottom: 8 },
   }), [palette]);
 }

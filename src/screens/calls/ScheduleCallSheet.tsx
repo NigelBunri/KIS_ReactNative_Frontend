@@ -47,6 +47,8 @@ export type StandaloneCallResult = {
   /** Echoed back from the create params so the caller (CallsTab) knows
    * who to actually ring without re-deriving the list. */
   inviteeUserIds?: string[];
+  /** Echoed back so the caller knows whether to show the host as a panelist on start. */
+  hostIsPanelist?: boolean;
 };
 
 type Props = {
@@ -60,6 +62,7 @@ type Props = {
     scheduledFor?: Date | null;
     durationMinutes?: number | null;
     inviteeUserIds?: string[];
+    hostIsPanelist?: boolean;
   }) => Promise<StandaloneCallResult>;
 };
 
@@ -114,6 +117,11 @@ export default function ScheduleCallSheet({ visible, onClose, onStart, onCreate 
 
   // Panelists (broadcast only)
   const [panelistIds, setPanelistIds] = useState<string[]>([]);
+  // "the creator should be included as one of the options to be a
+  // panelist. one can create the call but is not a panelist" — default
+  // true (host appears on their own panel, matching every other call
+  // type's existing behavior), explicit opt-out via this toggle.
+  const [hostIsPanelist, setHostIsPanelist] = useState(true);
   const [showPanelistPicker, setShowPanelistPicker] = useState(false);
   const [panelistChats, setPanelistChats] = useState<Chat[]>([]);
   const [panelistChatsLoading, setPanelistChatsLoading] = useState(false);
@@ -167,6 +175,7 @@ export default function ScheduleCallSheet({ visible, onClose, onStart, onCreate 
     setScheduledTime(addMinutes(new Date(), 30));
     setDurationMinutes(DEFAULT_DURATION_MINUTES);
     setPanelistIds([]);
+    setHostIsPanelist(true);
   }, []);
 
   const handleCreate = useCallback(async (startNow: boolean) => {
@@ -193,16 +202,17 @@ export default function ScheduleCallSheet({ visible, onClose, onStart, onCreate 
         scheduledFor: when,
         durationMinutes: when ? durationMinutes : null,
         inviteeUserIds: panelistIds,
+        hostIsPanelist: isBroadcast ? hostIsPanelist : undefined,
       });
 
-      onStart({ ...result, inviteeUserIds: panelistIds });
+      onStart({ ...result, inviteeUserIds: panelistIds, hostIsPanelist: isBroadcast ? hostIsPanelist : undefined });
       resetForm();
     } catch (e: any) {
       setError(e?.message ?? 'Failed to create call');
     } finally {
       setLoading(false);
     }
-  }, [title, selectedType, scheduledFor, durationMinutes, panelistIds, needsPanelists, scheduleInPast, onCreate, onStart, resetForm]);
+  }, [title, selectedType, scheduledFor, durationMinutes, panelistIds, hostIsPanelist, isBroadcast, needsPanelists, scheduleInPast, onCreate, onStart, resetForm]);
 
   return (
     <Modal
@@ -297,6 +307,22 @@ export default function ScheduleCallSheet({ visible, onClose, onStart, onCreate 
                   {panelistIds.length > 0 ? `${panelistIds.length} panelist${panelistIds.length === 1 ? '' : 's'} selected` : 'Add panelists'}
                 </Text>
                 <KISIcon name="chevron-right" size={16} color={palette.subtext} />
+              </Pressable>
+
+              {/* "the creator should be included as one of the options to
+                  be a panelist. one can create the call but is not a
+                  panelist" */}
+              <Pressable
+                onPress={() => setHostIsPanelist(v => !v)}
+                style={[styles.scheduleToggle, { borderColor: palette.inputBorder, backgroundColor: palette.surface }]}
+              >
+                <KISIcon name="radio" size={18} color={hostIsPanelist ? palette.gold : palette.subtext} />
+                <Text style={[styles.scheduleToggleText, { color: hostIsPanelist ? palette.gold : palette.text }]}>
+                  {hostIsPanelist ? "You'll appear as a panelist" : "You'll host off-panel"}
+                </Text>
+                <View style={[styles.hostToggleTrack, { backgroundColor: hostIsPanelist ? palette.gold : palette.inputBorder }]}>
+                  <View style={[styles.hostToggleThumb, { backgroundColor: palette.ivory, alignSelf: hostIsPanelist ? 'flex-end' : 'flex-start' }]} />
+                </View>
               </Pressable>
             </View>
           )}
@@ -504,6 +530,18 @@ const styles = StyleSheet.create({
     padding: 14,
   },
   scheduleToggleText: { flex: 1, fontSize: 15, fontWeight: '700' },
+  hostToggleTrack: {
+    width: 40,
+    height: 22,
+    borderRadius: 11,
+    padding: 2,
+    justifyContent: 'center',
+  },
+  hostToggleThumb: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+  },
   presetRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
   durationStepperRow: {
     flexDirection: 'row',
