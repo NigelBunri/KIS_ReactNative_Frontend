@@ -224,6 +224,14 @@ export default function CommunityRoomPage({
           <Text style={[styles.headerTitle, { color: palette.text }]} numberOfLines={1}>
             {community.name}
           </Text>
+          {/* The community name/avatar was the only way to reach
+              CommunityInfoPage (invite link, member management, join
+              requests) - nothing signaled it was tappable, so owners
+              reported no way to find the invite-link feature at all even
+              though it already existed there. A plain chevron matches the
+              same discoverability affordance chat conversation headers use
+              elsewhere in the app. */}
+          <KISIcon name="chevron-right" size={16} color={palette.subtext} />
         </Pressable>
       </View>
 
