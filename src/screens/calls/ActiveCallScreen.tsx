@@ -10,18 +10,15 @@ import {
   Alert,
   Animated,
   AppState,
-  DeviceEventEmitter,
   Easing,
   Modal,
   Pressable,
   StyleSheet,
   Text,
-  TextInput,
   TouchableWithoutFeedback,
   View,
   useWindowDimensions,
   StatusBar,
-  Platform,
   PanResponder,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -56,9 +53,13 @@ import { useVirtualBg, virtualBackgroundNativeAvailable } from '@/services/calls
 import RtmpSheet from './components/RtmpSheet';
 import InCallWhiteboardSheet from './components/InCallWhiteboardSheet';
 import IOSScreenSharePicker from './components/IOSScreenSharePicker';
+import AddParticipantSheet from './components/AddParticipantSheet';
 import { KISIcon } from '@/constants/kisIcons';
 import { useKISTheme } from '@/theme/useTheme';
 import { useSafeTopInset } from '@/hooks/useSafeTopInset';
+import { fetchConversationsForCurrentUser } from '@/Module/ChatRoom/normalizeConversation';
+import { otherDirectParticipantUserId } from '@/Module/ChatRoom/messagesUtils';
+import { getCurrentAuthUserId } from '@/storage/userScopedProfileCache';
 
 const CONTROLS_HIDE_AFTER = 4000;
 
@@ -78,7 +79,8 @@ type CallActions = {
   onMuteParticipant?: (userId: string) => void;
   onRemoveParticipant?: (userId: string) => void;
   onToggleScreenShare?: () => void;
-  onAddParticipant?: () => void;
+  /** Invites users (by id) directly into the already-active call — pushes CALL_OFFER + a real incoming-call push notification to each. */
+  onInviteToCall?: (userIds: string[]) => Promise<{ ok: boolean; error?: string }>;
   onToggleNoiseCancellation?: () => void;
   onChatOpenChange?: (open: boolean) => void;
   onAdmitKnocker?: (userId: string) => void;
@@ -150,9 +152,11 @@ export default function ActiveCallScreen({ session, actions }: Props) {
   // Self-preview ref for virtual background capture
   const selfPreviewRef = useRef<any>(null);
   const { frameUri, setConfig: setVbConfig } = useVirtualBg(selfPreviewRef);
-  const [addParticipantInput, setAddParticipantInput] = useState('');
-  const [showAddParticipant, setShowAddParticipant] = useState(false);
-  const addParticipantCb = useRef<((userIds: string[]) => Promise<{ ok: boolean; error?: string }>) | null>(null);
+  const [showAddParticipantSheet, setShowAddParticipantSheet] = useState(false);
+  const [addParticipantChats, setAddParticipantChats] = useState<import('@/Module/ChatRoom/messagesUtils').Chat[]>([]);
+  const [addParticipantLoading, setAddParticipantLoading] = useState(false);
+  const [addParticipantCurrentUserId, setAddParticipantCurrentUserId] = useState<string | null>(null);
+  const [invitingParticipants, setInvitingParticipants] = useState(false);
   const controlsOpacity = useRef(new Animated.Value(1)).current;
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -172,16 +176,20 @@ export default function ActiveCallScreen({ session, actions }: Props) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // only on mount
 
-  // Android: listen for add-participant request emitted from SocketProvider
-  useEffect(() => {
-    if (Platform.OS === 'ios') return;
-    const sub = DeviceEventEmitter.addListener('call.add_participant.request', ({ inviteToCall }: { inviteToCall: (ids: string[]) => Promise<{ ok: boolean; error?: string }> }) => {
-      addParticipantCb.current = inviteToCall;
-      setAddParticipantInput('');
-      setShowAddParticipant(true);
-    });
-    return () => sub.remove();
+  const openAddParticipantSheet = useCallback(() => {
+    setShowAddParticipantSheet(true);
+    setAddParticipantLoading(true);
+    Promise.all([fetchConversationsForCurrentUser(), getCurrentAuthUserId()])
+      .then(([chats, uid]) => {
+        setAddParticipantChats(chats);
+        setAddParticipantCurrentUserId(uid);
+      })
+      .catch(() => {
+        setAddParticipantChats([]);
+      })
+      .finally(() => setAddParticipantLoading(false));
   }, []);
+
   const selfPan = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
@@ -277,6 +285,19 @@ export default function ActiveCallScreen({ session, actions }: Props) {
     () => session?.participants.filter(p => !p.isLocal) ?? [],
     [session?.participants],
   );
+  const invitableAddParticipantChats = useMemo(() => {
+    const onCallIds = new Set((session?.participants ?? []).map(p => p.userId));
+    const seen = new Set<string>();
+    const out: { chat: typeof addParticipantChats[number]; userId: string }[] = [];
+    for (const chat of addParticipantChats) {
+      if (chat.isGroup || chat.isGroupChat || chat.isCommunityChat || chat.kind === 'group' || chat.kind === 'community') continue;
+      const uid = otherDirectParticipantUserId(chat.participants, addParticipantCurrentUserId ?? undefined);
+      if (!uid || onCallIds.has(uid) || seen.has(uid)) continue;
+      seen.add(uid);
+      out.push({ chat, userId: uid });
+    }
+    return out;
+  }, [addParticipantChats, addParticipantCurrentUserId, session?.participants]);
   const isHostOrCoHost = localParticipant?.role === 'host' || localParticipant?.role === 'co-host';
   const withVideo = session ? hasVideo(session.callType) : false;
   const isGroup = session ? isGroupCall(session.callType) : false;
@@ -303,6 +324,9 @@ export default function ActiveCallScreen({ session, actions }: Props) {
       case 'participants':
         setShowParticipants(v => !v);
         setShowChat(false);
+        break;
+      case 'add-participant':
+        openAddParticipantSheet();
         break;
       case 'layout':
         actions.onSetLayout(
@@ -367,7 +391,7 @@ export default function ActiveCallScreen({ session, actions }: Props) {
         setShowWhiteboard(true);
         break;
     }
-  }, [actions, session?.layout, revealControls]);
+  }, [actions, session?.layout, revealControls, openAddParticipantSheet]);
 
   const styles = useMemo(() => StyleSheet.create({
     root: {
@@ -824,7 +848,7 @@ export default function ActiveCallScreen({ session, actions }: Props) {
           isHost={isHostOrCoHost}
           onMute={isHostOrCoHost ? actions.onMuteParticipant : undefined}
           onRemove={isHostOrCoHost ? actions.onRemoveParticipant : undefined}
-          onAddParticipant={isHostOrCoHost ? actions.onAddParticipant : undefined}
+          onAddParticipant={isHostOrCoHost ? openAddParticipantSheet : undefined}
           onPromote={isHostOrCoHost ? actions.onPromoteParticipant : undefined}
         />
 
@@ -927,51 +951,28 @@ export default function ActiveCallScreen({ session, actions }: Props) {
         onCursor={(x, y) => actions.onWbCursor?.(x, y)}
       />
 
-      {/* Android: Add-participant input modal */}
-      <Modal visible={showAddParticipant} transparent animationType="fade" onRequestClose={() => setShowAddParticipant(false)}>
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: palette.overlay, padding: 24 }}>
-          <View style={{ backgroundColor: palette.royalInk, borderRadius: 16, padding: 20, width: '100%' }}>
-            <Text style={{ color: palette.goldHighlight, fontSize: 16, fontWeight: '700', marginBottom: 12 }}>Add to Call</Text>
-            <TextInput
-              style={{ borderWidth: 1, borderColor: palette.inputBorder, borderRadius: 10, padding: 12, color: palette.ivory, fontSize: 15, marginBottom: 16 }}
-              placeholder="Enter username or user ID"
-              placeholderTextColor={palette.subtext}
-              value={addParticipantInput}
-              onChangeText={setAddParticipantInput}
-              accessibilityLabel="Username or user ID to invite"
-              autoFocus
-            />
-            <View style={{ flexDirection: 'row', gap: 10 }}>
-              <Pressable
-                onPress={() => setShowAddParticipant(false)}
-                accessibilityRole="button"
-                accessibilityLabel="Cancel"
-                style={{ flex: 1, alignItems: 'center', paddingVertical: 12, borderRadius: 10, borderWidth: 1, borderColor: palette.gold }}
-              >
-                <Text style={{ color: palette.gold, fontWeight: '700' }}>Cancel</Text>
-              </Pressable>
-              <Pressable
-                onPress={() => {
-                  const uid = addParticipantInput.trim();
-                  if (uid && addParticipantCb.current) {
-                    void Promise.resolve(addParticipantCb.current([uid])).then((result: any) => {
-                      if (result && result.ok === false) {
-                        Alert.alert('Could not add participant', result.error ?? 'Please try again.');
-                      }
-                    });
-                  }
-                  setShowAddParticipant(false);
-                }}
-                accessibilityRole="button"
-                accessibilityLabel="Invite"
-                style={{ flex: 1, alignItems: 'center', paddingVertical: 12, borderRadius: 10, backgroundColor: palette.goldDeep }}
-              >
-                <Text style={{ color: palette.ivory, fontWeight: '700' }}>Invite</Text>
-              </Pressable>
-            </View>
-          </View>
-        </View>
-      </Modal>
+      {/* Add participant — bottom sheet listing the user's direct chats */}
+      <AddParticipantSheet
+        visible={showAddParticipantSheet}
+        palette={palette}
+        loading={addParticipantLoading}
+        inviting={invitingParticipants}
+        invitable={invitableAddParticipantChats}
+        onClose={() => setShowAddParticipantSheet(false)}
+        onInvite={(userIds) => {
+          if (userIds.length === 0 || !actions.onInviteToCall) return;
+          setInvitingParticipants(true);
+          actions.onInviteToCall(userIds)
+            .then(result => {
+              if (!result.ok) {
+                Alert.alert('Could not add participant', result.error ?? 'Please try again.');
+              } else {
+                setShowAddParticipantSheet(false);
+              }
+            })
+            .finally(() => setInvitingParticipants(false));
+        }}
+      />
 
     </Modal>
   );

@@ -33,6 +33,7 @@ type ControlAction =
   | 'end'
   | 'chat'
   | 'participants'
+  | 'add-participant'
   | 'raise-hand'
   | 'reactions'
   | 'layout'
@@ -152,6 +153,13 @@ export default function CallControls({
       label: 'People',
       badge: session.participants.length > 1 ? session.participants.length : 0,
       hidden: !isGroup,
+    },
+    {
+      id: 'add-participant',
+      icon: 'user-plus',
+      label: 'Add',
+      overrideAccent: palette.gold,
+      hidden: !isGroup || !isHostOrCoHost,
     },
     {
       // AND-097: this button DID correctly flip session.layout and

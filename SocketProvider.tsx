@@ -3690,30 +3690,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             onMuteParticipant: muteParticipant,
             onRemoveParticipant: removeParticipant,
             onToggleScreenShare: () => void toggleScreenShare(),
-            onAddParticipant: () => {
-              if (Platform.OS === 'ios') {
-                Alert.prompt(
-                  'Add to Call',
-                  'Enter the username or user ID to invite:',
-                  [
-                    { text: 'Cancel', style: 'cancel' },
-                    {
-                      text: 'Invite',
-                      onPress: (value?: string) => {
-                        const uid = (value ?? '').trim();
-                        if (!uid) return;
-                        void inviteToCall([uid]).then(result => {
-                          if (!result.ok) Alert.alert('Could not add participant', result.error ?? 'Please try again.');
-                        });
-                      },
-                    },
-                  ],
-                  'plain-text',
-                );
-              } else {
-                DeviceEventEmitter.emit('call.add_participant.request', { inviteToCall });
-              }
-            },
+            onInviteToCall: inviteToCall,
             onMinimize: () => setCallMinimised(true),
             onChatOpenChange: (open: boolean) => {
               callChatOpenRef.current = open;

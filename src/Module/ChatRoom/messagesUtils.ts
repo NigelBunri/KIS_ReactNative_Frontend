@@ -167,6 +167,30 @@ function participantUserId(p: ParticipantWire): string | null {
   return null;
 }
 
+/** The other participant's actual user id (not display name) for a direct chat — see participantUserId's own doc comment for why `.id` (the participant/membership ROW's id) must never be used for this. */
+export function otherDirectParticipantUserId(
+  participants: string[] | ParticipantWire[] | undefined,
+  currentUserId: string | undefined,
+): string | null {
+  if (!participants) return null;
+  const hasCurrentUser = !!currentUserId;
+
+  if (Array.isArray(participants) && participants.length > 0 && typeof participants[0] === 'string') {
+    const list = (participants as string[]).map((s) => String(s));
+    return (hasCurrentUser ? list.find((s) => s && s !== currentUserId) : list.find((s) => s)) ?? null;
+  }
+
+  if (Array.isArray(participants)) {
+    for (const p of participants as ParticipantWire[]) {
+      if (!p) continue;
+      const uid = participantUserId(p);
+      if (uid && (!hasCurrentUser || uid !== String(currentUserId))) return uid;
+    }
+  }
+
+  return null;
+}
+
 export function directConversationName(
   participants: string[] | ParticipantWire[] | undefined,
   currentUserId: string | undefined,
