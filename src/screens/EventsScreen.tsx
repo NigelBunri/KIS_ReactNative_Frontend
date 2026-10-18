@@ -31,6 +31,7 @@ import { patchRequest } from '@/network/patch';
 import ROUTES from '@/network';
 import { KISIcon } from '@/constants/kisIcons';
 import KISButton from '@/constants/KISButton';
+import QrCodeShareModal from '@/components/common/QrCodeShareModal';
 import { useAuth } from '../../App';
 import { isTierAtLeast } from '@/services/tierAccess';
 import { useSafeTopInset } from '@/hooks/useSafeTopInset';
@@ -42,11 +43,18 @@ import { useSafeTopInset } from '@/hooks/useSafeTopInset';
 type Event = {
   id: string;
   title: string;
+  // EventSerializer returns fields = "__all__" (Django's Event.slug is
+  // always set, unique) - already present on the wire, just never typed
+  // here before. The matching public page (apps.core.link_resolver's
+  // _resolve_event + website's /join/event/[slug]) resolves by this
+  // slug, not the id.
+  slug?: string;
   description?: string;
   start_dt?: string;
   end_dt?: string;
   location?: string;
   status?: string;
+  visibility?: string;
   attendance_count?: number;
   created_by?: string;
   ticket_count?: number;
@@ -670,16 +678,35 @@ export default function EventsScreen() {
   // Share event
   // ---------------------------------------------------------------------------
 
+  // Only a visibility: "public" event actually resolves on the matching
+  // web page (apps.core.link_resolver._resolve_event gates on exactly
+  // this) - an unlisted/private event's link would just 404 for anyone
+  // without the app, so there's nothing real to share/QR-code for those.
+  const eventShareUrl = useCallback((event: Event) => (
+    event.visibility === 'public' && event.slug
+      ? `https://kingdomimpactventures.org/join/event/${event.slug}`
+      : ''
+  ), []);
+
   const shareEvent = useCallback(async (event: Event) => {
+    const url = eventShareUrl(event);
     try {
       await Share.share({
         title: event.title,
-        message: `${event.title}\n${event.description || ''}\n📅 ${formatDate(event.start_dt)}\n📍 ${event.location || ''}\n\nJoin on KIS app`,
+        message: `${event.title}\n${event.description || ''}\n📅 ${formatDate(event.start_dt)}\n📍 ${event.location || ''}\n\nJoin on KIS app${url ? `: ${url}` : ''}`,
+        url: url || undefined,
       });
     } catch {
       // User cancelled share or platform error — ignore silently
     }
-  }, []);
+  }, [eventShareUrl]);
+
+  const [qrEventUrl, setQrEventUrl] = useState<string | null>(null);
+  const [showEventQr, setShowEventQr] = useState(false);
+  const showEventQrCode = useCallback((event: Event) => {
+    setQrEventUrl(eventShareUrl(event));
+    setShowEventQr(true);
+  }, [eventShareUrl]);
 
   // ---------------------------------------------------------------------------
   // Add to Calendar
@@ -1284,6 +1311,15 @@ export default function EventsScreen() {
                     left={<KISIcon name="calendar" size={14} color={palette.text} />}
                     onPress={() => addToCalendar(detailEvent)}
                   />
+                  {detailEvent.visibility === 'public' && detailEvent.slug ? (
+                    <KISButton
+                      variant="outline"
+                      size="sm"
+                      title="QR Code"
+                      left={<KISIcon name="qr-code" size={14} color={palette.text} />}
+                      onPress={() => showEventQrCode(detailEvent)}
+                    />
+                  ) : null}
                 </View>
               )}
 
@@ -1483,6 +1519,14 @@ export default function EventsScreen() {
           </View>
         </View>
       </Modal>
+
+      <QrCodeShareModal
+        visible={showEventQr}
+        onClose={() => setShowEventQr(false)}
+        link={qrEventUrl ?? ''}
+        title="Event QR code"
+        subtitle={`Anyone who scans this can view "${detailEvent?.title || 'this event'}".`}
+      />
     </View>
   );
 }

@@ -923,7 +923,7 @@ export default function ClinicalCommandCenterScreen({ route, navigation }: Props
           />
         }
         ListEmptyComponent={
-          <EmptyState palette={palette} accentColor={palette.accentPrimary} icon="share-outline" message="No referrals found." />
+          <EmptyState palette={palette} accentColor={palette.accentPrimary} icon="share" message="No referrals found." />
         }
       />
     );

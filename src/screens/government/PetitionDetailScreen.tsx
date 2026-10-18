@@ -21,6 +21,7 @@ import { postRequest } from '@/network/post';
 import ROUTES from '@/network';
 import { KISIcon } from '@/constants/kisIcons';
 import KISButton from '@/constants/KISButton';
+import QrCodeShareModal from '@/components/common/QrCodeShareModal';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'PetitionDetail'>;
 
@@ -102,13 +103,22 @@ export default function PetitionDetailScreen({ route }: Props) {
     }
   }
 
+  // Real public page added alongside apps.core.link_resolver's
+  // _resolve_petition - previously this only shared plain text with no
+  // link at all, so there was nothing a recipient without the app
+  // installed could actually open.
+  const petitionShareUrl = petition ? `https://kingdomimpactventures.org/join/petition/${petition.id}` : '';
+
   async function handleShare() {
     if (!petition) return;
     await Share.share({
       title: petition.title,
-      message: `Sign this petition: ${petition.title}\n\nTarget: ${petition.target}\n\n${petition.description?.slice(0, 200)}`,
+      message: `Sign this petition: ${petition.title}\n\nTarget: ${petition.target}\n\n${petition.description?.slice(0, 200)}\n\n${petitionShareUrl}`,
+      url: petitionShareUrl,
     });
   }
+
+  const [showQr, setShowQr] = useState(false);
 
   if (loading) {
     return (
@@ -261,9 +271,24 @@ export default function PetitionDetailScreen({ route }: Props) {
           ]}
           onPress={handleShare}
         >
-          <KISIcon name="share-outline" size={18} color={palette.primary} />
+          <KISIcon name="share" size={18} color={palette.primary} />
           <Text style={[styles.shareBtnText, { color: palette.primary }]}>
             Share Petition
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          activeOpacity={0.75}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          style={[
+            styles.shareBtn,
+            { borderColor: palette.divider, marginTop: 10 },
+          ]}
+          onPress={() => setShowQr(true)}
+        >
+          <KISIcon name="qr-code" size={18} color={palette.primary} />
+          <Text style={[styles.shareBtnText, { color: palette.primary }]}>
+            QR Code
           </Text>
         </TouchableOpacity>
 
@@ -308,6 +333,14 @@ export default function PetitionDetailScreen({ route }: Props) {
           </View>
         )}
       </ScrollView>
+
+      <QrCodeShareModal
+        visible={showQr}
+        onClose={() => setShowQr(false)}
+        link={petitionShareUrl}
+        title="Petition QR code"
+        subtitle={`Anyone who scans this can view and sign "${petition?.title || 'this petition'}".`}
+      />
     </SafeAreaView>
   );
 }

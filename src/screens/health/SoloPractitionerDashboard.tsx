@@ -723,7 +723,7 @@ export default function SoloPractitionerDashboard({ onClose }: Props) {
           { icon: 'videocam-outline', label: 'Secure Video Calls', desc: 'HIPAA-compliant video sessions', color: kisPalette.info },
           { icon: 'document-text-outline', label: 'E-Prescriptions', desc: 'Write and send digital prescriptions', color: kisPalette.success },
           { icon: 'flask-outline', label: 'Lab Order Requests', desc: 'Order diagnostic tests remotely', color: kisPalette.gold },
-          { icon: 'share-outline', label: 'Referral Network', desc: 'Refer patients to specialists', color: kisPalette.primaryStrong },
+          { icon: 'share', label: 'Referral Network', desc: 'Refer patients to specialists', color: kisPalette.primaryStrong },
           { icon: 'shield-checkmark-outline', label: 'HIPAA Compliant', desc: 'All sessions are encrypted and audited', color: kisPalette.error },
         ].map((feat) => (
           <View key={feat.label} style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
