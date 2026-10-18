@@ -582,12 +582,22 @@ export default function DeviceManagementScreen() {
                     ) : qrData ? (
                       <>
                         <View style={[styles.qrWrap, { backgroundColor: palette.ivory }]}>
-                          {/* QR code content is never displayed as text — only as a visual QR */}
+                          {/* QR code content is never displayed as text — only as a visual QR.
+                              ecl="H" (highest error correction) is required alongside the
+                              logo overlay — same as every other QR code in the app
+                              (QrCodeShareModal.tsx) — so the center logo patch doesn't
+                              reduce scannability. */}
                           <QRCode
                             value={qrData.qr_payload}
                             size={200}
                             backgroundColor={palette.ivory}
                             color={palette.royalInk}
+                            ecl="H"
+                            logo={require('@/assets/qr-logo.png')}
+                            logoSize={46}
+                            logoBackgroundColor={palette.ivory}
+                            logoBorderRadius={10}
+                            logoMargin={4}
                           />
                         </View>
                         <View style={styles.countdownRow}>
@@ -671,6 +681,12 @@ export default function DeviceManagementScreen() {
                             size={200}
                             backgroundColor={palette.ivory}
                             color={palette.royalInk}
+                            ecl="H"
+                            logo={require('@/assets/qr-logo.png')}
+                            logoSize={46}
+                            logoBackgroundColor={palette.ivory}
+                            logoBorderRadius={10}
+                            logoMargin={4}
                           />
                         </View>
                         <Text style={[styles.webCodeText, { color: palette.text }]}>{webPairing.code}</Text>
