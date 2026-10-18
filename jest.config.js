@@ -31,8 +31,12 @@ module.exports = {
   // '@jest/globals'` — same pnpm unbuilt-source story again, needed wherever
   // a test mocks this package to avoid the real native module hanging under
   // Jest (e.g. ChatRoomPage mounted unmocked via a comment overlay).
+  // react-native-qrcode-svg's package.json "main" points at its own ESM
+  // `export { default } from './src/index.js'` entry (no separate CJS
+  // build) — reached via QrCodeShareModal.tsx, pulled in transitively by
+  // anything that imports ActiveCallScreen/SocketProvider.
   transformIgnorePatterns: [
-    'node_modules/(?!\\.pnpm/[^/]*/node_modules/((jest-)?react-native|@react-native(-community)?|@react-navigation|react-native-reanimated|react-native-worklets|react-native-inappbrowser-reborn|react-native-contacts|react-native-safe-area-context)/|((jest-)?react-native|@react-native(-community)?|@react-navigation|react-native-reanimated|react-native-worklets|react-native-inappbrowser-reborn|react-native-contacts|react-native-safe-area-context)/)',
+    'node_modules/(?!\\.pnpm/[^/]*/node_modules/((jest-)?react-native|@react-native(-community)?|@react-navigation|react-native-reanimated|react-native-worklets|react-native-inappbrowser-reborn|react-native-contacts|react-native-safe-area-context|react-native-qrcode-svg)/|((jest-)?react-native|@react-native(-community)?|@react-navigation|react-native-reanimated|react-native-worklets|react-native-inappbrowser-reborn|react-native-contacts|react-native-safe-area-context|react-native-qrcode-svg)/)',
   ],
   // 20+ files import `useAuth` straight from App.tsx (App.tsx being the
   // app's root component, that pulls the entire navigation stack and every

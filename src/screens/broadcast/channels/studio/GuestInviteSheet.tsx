@@ -25,6 +25,7 @@ import ROUTES from '@/network';
 import { getRequest } from '@/network/get';
 import { postRequest } from '@/network/post';
 import { patchRequest } from '@/network/patch';
+import QrCodeShareModal from '@/components/common/QrCodeShareModal';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -74,6 +75,7 @@ export default function GuestInviteSheet({
   const [inviting, setInviting]     = useState(false);
   const [actioning, setActioning]   = useState<string | null>(null);
   const [pendingShareLink, setPendingShareLink] = useState<string | null>(null);
+  const [showInviteQr, setShowInviteQr] = useState(false);
 
   // ── Fetch guests ─────────────────────────────────────────────────────────────
 
@@ -391,6 +393,12 @@ export default function GuestInviteSheet({
                         <Text style={[styles.shareLinkActionText, { color: palette.onPrimary }]}>Share</Text>
                       </Pressable>
                       <Pressable
+                        onPress={() => setShowInviteQr(true)}
+                        style={[styles.shareLinkActionBtn, { backgroundColor: palette.surface, borderColor: palette.border }]}
+                      >
+                        <Text style={[styles.shareLinkActionText, { color: palette.text }]}>QR</Text>
+                      </Pressable>
+                      <Pressable
                         onPress={() => setPendingShareLink(null)}
                         style={styles.shareLinkDismissBtn}
                       >
@@ -404,6 +412,14 @@ export default function GuestInviteSheet({
           </ScrollView>
         </View>
       </KeyboardAvoidingView>
+
+      <QrCodeShareModal
+        visible={showInviteQr}
+        onClose={() => setShowInviteQr(false)}
+        link={pendingShareLink ?? ''}
+        title="Guest invite QR code"
+        subtitle="Anyone who scans this can join this stream as a guest."
+      />
     </Modal>
   );
 }

@@ -14,6 +14,7 @@ import {
 import { SafeAreaView } from '@/components/common/SafeAreaViewWithTopPadding';
 import { KISIcon } from '@/constants/kisIcons';
 import { useKISTheme } from '@/theme/useTheme';
+import QrCodeShareModal from '@/components/common/QrCodeShareModal';
 
 // Deep-link base — callers pass the full link so this component stays pure
 export type InviteLinkCardProps = {
@@ -31,6 +32,7 @@ export default function InviteLinkCard({
 }: InviteLinkCardProps) {
   const { palette } = useKISTheme();
   const [copied, setCopied] = useState(false);
+  const [showQr, setShowQr] = useState(false);
 
   const handleCopy = () => {
     Clipboard.setString(inviteLink);
@@ -125,6 +127,18 @@ export default function InviteLinkCard({
               <KISIcon name="share" size={18} color={palette.primary} />
               <Text style={[styles.actionText, { color: palette.primary }]}>Share</Text>
             </Pressable>
+
+            <Pressable
+              onPress={() => setShowQr(true)}
+              style={({ pressed }) => [
+                styles.actionBtn,
+                { backgroundColor: `${palette.gold}1A`, borderColor: `${palette.gold}60` },
+                pressed && { opacity: 0.75 },
+              ]}
+            >
+              <KISIcon name="qr-code" size={18} color={palette.gold} />
+              <Text style={[styles.actionText, { color: palette.gold }]}>QR</Text>
+            </Pressable>
           </View>
 
           {/* Note */}
@@ -134,6 +148,14 @@ export default function InviteLinkCard({
 
         </SafeAreaView>
       </View>
+
+      <QrCodeShareModal
+        visible={showQr}
+        onClose={() => setShowQr(false)}
+        link={inviteLink}
+        title="Call QR code"
+        subtitle={`Anyone who scans this can join "${callTitle}".`}
+      />
     </Modal>
   );
 }

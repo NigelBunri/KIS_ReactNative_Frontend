@@ -108,6 +108,7 @@ export type KISIconName =
   | 'document'
   | 'shield'
   | 'download'
+  | 'qr-code'
   | 'archive'
   | 'group'
   | 'channel'
@@ -337,6 +338,7 @@ const ion: IonMap = {
   document: { filled: 'document', outline: 'document-outline' },
   shield: { filled: 'shield-checkmark', outline: 'shield-checkmark-outline' },
   download: { filled: 'archive', outline: 'archive-outline' },
+  'qr-code': { filled: 'qr-code', outline: 'qr-code-outline' },
   archive: { filled: 'archive', outline: 'archive-outline' },
   group: { filled: 'people', outline: 'people-outline' },
   channel: { filled: 'radio', outline: 'radio-outline' },

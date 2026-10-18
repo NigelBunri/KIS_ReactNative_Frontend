@@ -35,6 +35,7 @@ import { getAccessToken } from '@/security/authStorage';
 import { getFeedPlainText } from '@/components/feeds/richTextValue';
 import { useSocket } from '@/SocketProvider';
 import { refreshFromDeviceAndBackend, type KISContact } from '@/Module/AddContacts/contactsService';
+import QrCodeShareModal from '@/components/common/QrCodeShareModal';
 
 type MemberUser = {
   id?: string;
@@ -111,6 +112,7 @@ export const CommunityInfoPage: React.FC<CommunityInfoPageProps> = ({
   const [saving, setSaving] = useState(false);
   const [inviteLink, setInviteLink] = useState<string | null>(null);
   const [inviteLinkLoading, setInviteLinkLoading] = useState(false);
+  const [showInviteQr, setShowInviteQr] = useState(false);
   // Authoritative, pagination-independent role signal from the community
   // detail response itself (CommunityDetailSerializer.is_owner/
   // current_user_role — a direct per-request DB lookup, not derived from
@@ -930,6 +932,12 @@ export const CommunityInfoPage: React.FC<CommunityInfoPageProps> = ({
                     <Text style={[styles.inviteLinkBtnText, { color: palette.text }]}>Share</Text>
                   </Pressable>
                   <Pressable
+                    onPress={() => setShowInviteQr(true)}
+                    style={({ pressed }) => [styles.inviteLinkBtn, { borderWidth: 1, borderColor: palette.border, opacity: pressed ? 0.7 : 1 }]}
+                  >
+                    <Text style={[styles.inviteLinkBtnText, { color: palette.text }]}>QR</Text>
+                  </Pressable>
+                  <Pressable
                     onPress={() => { setInviteLink(null); handleFetchInviteLink(); }}
                     style={({ pressed }) => [styles.inviteLinkBtn, { borderWidth: 1, borderColor: palette.border, opacity: pressed ? 0.7 : 1 }]}
                   >
@@ -983,6 +991,14 @@ export const CommunityInfoPage: React.FC<CommunityInfoPageProps> = ({
           </View>
         )}
       </ScrollView>
+
+      <QrCodeShareModal
+        visible={showInviteQr}
+        onClose={() => setShowInviteQr(false)}
+        link={inviteLink ?? ''}
+        title="Community QR code"
+        subtitle="Anyone who scans this can join the community."
+      />
 
       <Modal
         visible={addMembersModalVisible}

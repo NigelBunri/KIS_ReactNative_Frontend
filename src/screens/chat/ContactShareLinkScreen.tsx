@@ -7,6 +7,7 @@ import { getRequest } from '@/network/get';
 import { postRequest } from '@/network/post';
 import { deleteRequest } from '@/network/delete';
 import { SafeAreaView } from '@/components/common/SafeAreaViewWithTopPadding';
+import QrCodeShareModal from '@/components/common/QrCodeShareModal';
 
 // PART 7 of the deep-links spec: a private, shareable "message me" link
 // that never exposes the owner's phone number to whoever clicks it -
@@ -24,6 +25,7 @@ export default function ContactShareLinkScreen() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showQr, setShowQr] = useState(false);
 
   const fetchLink = useCallback(async () => {
     setLoading(true);
@@ -150,13 +152,22 @@ export default function ContactShareLinkScreen() {
             <Text style={[s.codeValue, { color: palette.onPrimary }]} numberOfLines={2}>
               {link?.invite_link ?? '—'}
             </Text>
-            <Pressable
-              disabled={!link?.is_active || busy}
-              onPress={handleShare}
-              style={[s.shareBtn, { backgroundColor: palette.onPrimary, opacity: !link?.is_active || busy ? 0.5 : 1 }]}
-            >
-              <Text style={[s.shareBtnText, { color: palette.primaryStrong }]}>Share link</Text>
-            </Pressable>
+            <View style={s.codeCardActions}>
+              <Pressable
+                disabled={!link?.is_active || busy}
+                onPress={handleShare}
+                style={[s.shareBtn, { backgroundColor: palette.onPrimary, opacity: !link?.is_active || busy ? 0.5 : 1 }]}
+              >
+                <Text style={[s.shareBtnText, { color: palette.primaryStrong }]}>Share link</Text>
+              </Pressable>
+              <Pressable
+                disabled={!link?.is_active || busy}
+                onPress={() => setShowQr(true)}
+                style={[s.shareBtn, { backgroundColor: palette.onPrimary, opacity: !link?.is_active || busy ? 0.5 : 1 }]}
+              >
+                <Text style={[s.shareBtnText, { color: palette.primaryStrong }]}>QR code</Text>
+              </Pressable>
+            </View>
           </View>
 
           <Pressable disabled={busy} onPress={handleTogglePause} style={[s.actionRow, { borderColor: palette.divider }]}>
@@ -169,6 +180,14 @@ export default function ContactShareLinkScreen() {
           </Pressable>
         </View>
       )}
+
+      <QrCodeShareModal
+        visible={showQr}
+        onClose={() => setShowQr(false)}
+        link={link?.invite_link ?? ''}
+        title="Contact QR code"
+        subtitle="Anyone who scans this can message you on KIS."
+      />
     </SafeAreaView>
   );
 }
@@ -195,7 +214,8 @@ const s = StyleSheet.create({
   codeCard: { borderRadius: 20, padding: 24, alignItems: 'center', gap: 8 },
   codeLabel: { fontSize: 13, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 1 },
   codeValue: { fontSize: 15, fontWeight: '700', textAlign: 'center' },
-  shareBtn: { borderRadius: 12, paddingHorizontal: 20, paddingVertical: 12, marginTop: 10 },
+  codeCardActions: { flexDirection: 'row', gap: 10, marginTop: 10 },
+  shareBtn: { borderRadius: 12, paddingHorizontal: 20, paddingVertical: 12 },
   shareBtnText: { fontSize: 14, fontWeight: '800' },
   actionRow: { borderWidth: 1, borderRadius: 12, padding: 14, alignItems: 'center' },
   actionText: { fontSize: 14, fontWeight: '700' },

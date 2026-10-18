@@ -42,6 +42,7 @@ import { refreshFromDeviceAndBackend, type KISContact } from '@/Module/AddContac
 import { useSocket } from '../../../SocketProvider';
 import { useSafeTopInset } from '@/hooks/useSafeTopInset';
 import KISButton from '@/constants/KISButton';
+import QrCodeShareModal from '@/components/common/QrCodeShareModal';
 
 type ChatInfoPageProps = {
   chat: Chat;
@@ -105,6 +106,7 @@ export const ChatInfoPage: React.FC<ChatInfoPageProps> = ({
   const avatarAnim = useMemo(() => new Animated.Value(0), []);
   const [inviteLink, setInviteLink] = useState<string | null>(null);
   const [inviteLinkLoading, setInviteLinkLoading] = useState(false);
+  const [showInviteQr, setShowInviteQr] = useState(false);
   const [groupIdFetchDone, setGroupIdFetchDone] = useState(
     !!(chat.groupId ?? (chat as any).group_id),
   );
@@ -1548,6 +1550,18 @@ export const ChatInfoPage: React.FC<ChatInfoPageProps> = ({
                         Share
                       </Text>
                     </Pressable>
+                    <Pressable
+                      onPress={() => setShowInviteQr(true)}
+                      style={({ pressed }) => [
+                        styles.inviteLinkBtn,
+                        { backgroundColor: palette.surface, borderWidth: 1, borderColor: palette.divider, opacity: pressed ? 0.7 : 1 },
+                      ]}
+                    >
+                      <KISIcon name="qr-code" size={14} color={palette.text} />
+                      <Text style={[styles.inviteLinkBtnText, { color: palette.text }]}>
+                        QR
+                      </Text>
+                    </Pressable>
                     {isAdmin && (
                       <Pressable
                         onPress={() =>
@@ -1924,6 +1938,14 @@ export const ChatInfoPage: React.FC<ChatInfoPageProps> = ({
           </View>
         )}
       </ScrollView>
+
+      <QrCodeShareModal
+        visible={showInviteQr}
+        onClose={() => setShowInviteQr(false)}
+        link={inviteLink ?? ''}
+        title="Group QR code"
+        subtitle="Anyone who scans this can join the group."
+      />
 
       <Modal
         visible={!!avatarPreview}
