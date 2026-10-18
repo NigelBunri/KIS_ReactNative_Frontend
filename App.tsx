@@ -461,6 +461,7 @@ function DetachedChatOverlayOutlet() {
           onBack={p.closeChat}
           onOpenInfo={p.openInfo}
           onOpenChat={p.openChat}
+          allChats={p.forwardTargets}
           initialTargetMessageId={(p.activeChat as any)?.initialTargetMessageId ?? null}
         />
       </TabletDialogOverlay>
@@ -473,6 +474,7 @@ function DetachedChatOverlayOutlet() {
             onBack={p.closeChat}
             onOpenInfo={p.openInfo}
             onOpenChat={p.openChat}
+            allChats={p.forwardTargets}
             initialTargetMessageId={(p.activeSubRoom as any)?.initialTargetMessageId ?? null}
           />
         )}

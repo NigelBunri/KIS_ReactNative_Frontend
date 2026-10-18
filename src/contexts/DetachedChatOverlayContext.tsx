@@ -38,6 +38,8 @@ export type ChatOverlayBridgeProps = {
   chatVisible: boolean;
   chatSlide: RNAnimatedNamespace.Value;
   activeChat: Chat | null;
+  /** Conversation list for ChatRoomPage's "Forward to..." picker (ForwardChatSheet) — see AppNavigator.tsx's own doc comment on its forwardTargets state. */
+  forwardTargets: Chat[];
   subRoomVisible: boolean;
   subRoomSlide: RNAnimatedNamespace.Value;
   activeSubRoom: Chat | null;

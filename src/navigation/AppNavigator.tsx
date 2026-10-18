@@ -39,6 +39,7 @@ import BibleScreen from '../screens/tabs/BibleScreen';
 import BroadcastScreen from '../screens/tabs/BroadcastScreen';
 import ProfileScreen from '../screens/tabs/ProfileScreen';
 import { Chat } from '@/Module/ChatRoom/messagesUtils';
+import { fetchConversationsForCurrentUser } from '@/Module/ChatRoom/normalizeConversation';
 import { resolveChatOpenPayload } from './resolveChatOpenPayload';
 import { hasUsableConversationKey } from './chatOverlayGuard';
 import { useSocket } from '../../SocketProvider';
@@ -434,6 +435,14 @@ export function MainTabs() {
   >({});
   // 🔥 Chat room overlay — stack so sub-rooms push on top of the parent room
   const [chatHistory, setChatHistory] = useState<Chat[]>([]);
+  // ChatRoomPage's "Forward to..." picker (ForwardChatSheet) only ever shows
+  // whatever this overlay hands it as `allChats` — this is the app-wide
+  // overlay opened via the 'chat.open' DeviceEventEmitter (used from
+  // notifications, deep links, MessagesScreen, etc, see openChat below), and
+  // it previously never fetched or passed a conversation list at all, so
+  // forwarding from here always showed an empty picker regardless of what
+  // was fixed at the other, screen-local chat-overlay entry points.
+  const [forwardTargets, setForwardTargets] = useState<Chat[]>([]);
   const chatSlide = useRef(new RNAnimated.Value(0)).current;    // main layer (first chat)
   const subRoomSlide = useRef(new RNAnimated.Value(0)).current; // sub-room layer (depth ≥ 2)
 
@@ -658,6 +667,8 @@ export function MainTabs() {
       });
       return;
     }
+
+    fetchConversationsForCurrentUser().then(setForwardTargets).catch(() => {});
 
     setChatHistory(prev => {
       if (prev.length === 0) {
@@ -998,6 +1009,7 @@ export function MainTabs() {
         chatVisible={chatVisible}
         chatSlide={chatSlide}
         activeChat={activeChat}
+        forwardTargets={forwardTargets}
         subRoomVisible={subRoomVisible}
         subRoomSlide={subRoomSlide}
         activeSubRoom={activeSubRoom}
