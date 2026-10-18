@@ -17,6 +17,7 @@ import ROUTES from '@/network';
 import { getRequest } from '@/network/get';
 import { postRequest } from '@/network/post';
 import { patchRequest } from '@/network/patch';
+import QrCodeShareModal from '@/components/common/QrCodeShareModal';
 
 type Props = {
   isOpen: boolean;
@@ -73,6 +74,7 @@ export default function PartnerGovernancePanel({
   const [newInviteExpiry, setNewInviteExpiry] = useState('');
   const [inviteCreating, setInviteCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [qrLink, setQrLink] = useState<string | null>(null);
 
   const backdropOpacity = panelTranslateX.interpolate({
     inputRange: [0, panelWidth],
@@ -628,6 +630,21 @@ export default function PartnerGovernancePanel({
                     >
                       <Text style={{ color: palette.text, fontSize: 12 }}>Share</Text>
                     </Pressable>
+                    <Pressable
+                      onPress={() => setQrLink(fullLink)}
+                      style={({ pressed }) => [
+                        {
+                          paddingVertical: 5,
+                          paddingHorizontal: 10,
+                          borderRadius: 8,
+                          borderWidth: 1,
+                          borderColor: palette.borderMuted,
+                          opacity: pressed ? 0.7 : 1,
+                        },
+                      ]}
+                    >
+                      <Text style={{ color: palette.text, fontSize: 12 }}>QR</Text>
+                    </Pressable>
                     {invite.is_active !== false && (
                       <Pressable
                         onPress={() =>
@@ -662,6 +679,14 @@ export default function PartnerGovernancePanel({
           )}
         </ScrollView>
       </Animated.View>
+
+      <QrCodeShareModal
+        visible={!!qrLink}
+        onClose={() => setQrLink(null)}
+        link={qrLink ?? ''}
+        title="Partner invite QR code"
+        subtitle="Anyone who scans this can join the partner organization."
+      />
     </View>
   );
 }

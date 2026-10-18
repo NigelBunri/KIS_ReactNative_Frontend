@@ -14,6 +14,7 @@ import { useNavigation } from '@react-navigation/native';
 import ROUTES from '@/network';
 import { getRequest } from '@/network/get';
 import { SafeAreaView } from '@/components/common/SafeAreaViewWithTopPadding';
+import QrCodeShareModal from '@/components/common/QrCodeShareModal';
 
 // New screen for Phase 8 of the billing/rewards project — no prior mobile
 // screen read apps.referrals' API before this. Shows the user's own
@@ -80,6 +81,7 @@ export default function ReferralScreen() {
 
   const [summary, setSummary] = useState<ReferralSummary | null>(null);
   const [loading, setLoading] = useState(true);
+  const [showQr, setShowQr] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -181,12 +183,22 @@ export default function ReferralScreen() {
                 {summary?.current_referral_rate_tier ? ` (${summary.current_referral_rate_tier})` : ''}.
               </Text>
             )}
-            <Pressable
-              onPress={handleShare}
-              style={[s.shareBtn, { backgroundColor: palette.onPrimary }]}
-            >
-              <Text style={[s.shareBtnText, { color: palette.primaryStrong }]}>Share your code</Text>
-            </Pressable>
+            <View style={{ flexDirection: 'row', gap: 10, marginTop: 10 }}>
+              <Pressable
+                onPress={handleShare}
+                style={[s.shareBtn, { backgroundColor: palette.onPrimary, marginTop: 0, flex: 1 }]}
+              >
+                <Text style={[s.shareBtnText, { color: palette.primaryStrong }]}>Share your code</Text>
+              </Pressable>
+              {summary?.referral_link ? (
+                <Pressable
+                  onPress={() => setShowQr(true)}
+                  style={[s.shareBtn, { backgroundColor: palette.onPrimary, marginTop: 0, flex: 1 }]}
+                >
+                  <Text style={[s.shareBtnText, { color: palette.primaryStrong }]}>QR code</Text>
+                </Pressable>
+              ) : null}
+            </View>
           </View>
 
           {/* Summary stats */}
@@ -270,6 +282,14 @@ export default function ReferralScreen() {
           </View>
         </ScrollView>
       )}
+
+      <QrCodeShareModal
+        visible={showQr}
+        onClose={() => setShowQr(false)}
+        link={summary?.referral_link ?? ''}
+        title="Referral QR code"
+        subtitle="Anyone who scans this signs up with your referral code."
+      />
     </SafeAreaView>
   );
 }

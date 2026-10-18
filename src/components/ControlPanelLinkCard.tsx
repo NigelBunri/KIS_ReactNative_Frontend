@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Alert, Text, View } from 'react-native';
 import Clipboard from '@react-native-clipboard/clipboard';
 import { useKISTheme } from '@/theme/useTheme';
 import KISButton from '@/constants/KISButton';
+import QrCodeShareModal from '@/components/common/QrCodeShareModal';
 
 // Shown to Business Pro/Partner/Partner Pro tier holders (and separately,
 // with isGo=true, to GO) as the "line in the app" they can copy to open
@@ -13,9 +14,11 @@ import KISButton from '@/constants/KISButton';
 export default function ControlPanelLinkCard({ isGo = false }: { isGo?: boolean }) {
   const { palette } = useKISTheme();
   const url = isGo ? 'kingdomimpactventures.org/control/admin' : 'kingdomimpactventures.org/control';
+  const fullUrl = `https://${url}`;
+  const [showQr, setShowQr] = useState(false);
 
   const handleCopy = () => {
-    Clipboard.setString(`https://${url}`);
+    Clipboard.setString(fullUrl);
     Alert.alert('Copied', 'Paste this link into a browser on your computer to open it there.');
   };
 
@@ -39,7 +42,18 @@ export default function ControlPanelLinkCard({ isGo = false }: { isGo?: boolean 
           : 'Manage your shops, institutions, and partner organization from any browser instead of the app.'}
       </Text>
       <Text style={{ color: palette.primaryStrong, fontWeight: '700', fontSize: 13 }}>{url}</Text>
-      <KISButton title="Copy link" size="xs" variant="outline" onPress={handleCopy} />
+      <View style={{ flexDirection: 'row', gap: 8 }}>
+        <KISButton title="Copy link" size="xs" variant="outline" onPress={handleCopy} />
+        <KISButton title="QR code" size="xs" variant="outline" onPress={() => setShowQr(true)} />
+      </View>
+
+      <QrCodeShareModal
+        visible={showQr}
+        onClose={() => setShowQr(false)}
+        link={fullUrl}
+        title="Control panel QR code"
+        subtitle="Scan this with a computer's camera-linked device, or open it on a browser."
+      />
     </View>
   );
 }

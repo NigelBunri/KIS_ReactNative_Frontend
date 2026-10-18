@@ -22,6 +22,7 @@ import { useKISTheme } from '@/theme/useTheme';
 import { KISIcon } from '@/constants/kisIcons';
 import ROUTES from '@/network';
 import { postRequest } from '@/network/post';
+import QrCodeShareModal from '@/components/common/QrCodeShareModal';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -55,6 +56,7 @@ export default function GiftMembershipSheet({ channelId, tiers, visible, onClose
   const [success, setSuccess] = useState(false);
   const [paymentModal, setPaymentModal] = useState(false);
   const [shareLink, setShareLink] = useState<string | null>(null);
+  const [showQr, setShowQr] = useState(false);
 
   const selectedTier = tiers.find(t => t.id === selectedTierId);
 
@@ -204,6 +206,12 @@ export default function GiftMembershipSheet({ channelId, tiers, visible, onClose
                       style={[styles.linkActionBtn, { backgroundColor: palette.primaryStrong }]}
                     >
                       <Text style={[styles.linkActionText, { color: palette.onPrimary }]}>Share</Text>
+                    </Pressable>
+                    <Pressable
+                      onPress={() => setShowQr(true)}
+                      style={[styles.linkActionBtn, { backgroundColor: palette.surface, borderColor: palette.border }]}
+                    >
+                      <Text style={[styles.linkActionText, { color: palette.text }]}>QR</Text>
                     </Pressable>
                   </View>
                 </>
@@ -388,6 +396,14 @@ export default function GiftMembershipSheet({ channelId, tiers, visible, onClose
           </Pressable>
         </Pressable>
       </Modal>
+
+      <QrCodeShareModal
+        visible={showQr}
+        onClose={() => setShowQr(false)}
+        link={shareLink ?? ''}
+        title="Gift membership QR code"
+        subtitle={`Anyone who scans this can redeem the gift for ${recipient || 'this membership'}.`}
+      />
     </>
   );
 }

@@ -60,6 +60,7 @@ import SubscribeBellButton from '@/screens/broadcast/channels/components/Subscri
 import AgeGateScreen from '@/screens/broadcast/channels/components/AgeGateScreen';
 import GeoBlockedScreen from '@/screens/broadcast/channels/components/GeoBlockedScreen';
 import { fetchPublicContentLanding } from '@/services/publicGrowthService';
+import QrCodeShareModal from '@/components/common/QrCodeShareModal';
 import { useSafeTopInset } from '@/hooks/useSafeTopInset';
 
 const compactNumber = (value?: number) => {
@@ -1015,22 +1016,34 @@ export default function ChannelContentDetailPage() {
     }
   }, [applyCounts, content?.id, saved]);
 
+  const resolveContentShareUrl = useCallback(async () => {
+    if (!content?.id) return '';
+    try {
+      const publicMeta = await fetchPublicContentLanding(content.id);
+      return publicMeta?.share_card?.url || publicMeta?.url || '';
+    } catch {
+      return '';
+    }
+  }, [content?.id]);
+
   const handleShare = useCallback(async () => {
     if (!content?.id) return;
     const title = content?.title || 'KIS channel content';
-    let url = '';
-    try {
-      const publicMeta = await fetchPublicContentLanding(content.id);
-      url = publicMeta?.share_card?.url || publicMeta?.url || '';
-    } catch {
-      url = '';
-    }
+    const url = await resolveContentShareUrl();
     const byline = channel?.display_name ? `By ${channel.display_name}` : '';
     const message = [title, byline, url].filter(Boolean).join('\n');
     const result = await Share.share({ message, url: url || undefined, title });
     const completed = result.action === Share.sharedAction;
     if (completed) applyCounts(await shareChannelContent(content.id, true));
-  }, [applyCounts, channel?.display_name, content?.id, content?.title]);
+  }, [applyCounts, channel?.display_name, content?.id, content?.title, resolveContentShareUrl]);
+
+  const [qrUrl, setQrUrl] = useState<string | null>(null);
+  const [showQr, setShowQr] = useState(false);
+  const handleShowQr = useCallback(async () => {
+    const url = await resolveContentShareUrl();
+    setQrUrl(url);
+    setShowQr(true);
+  }, [resolveContentShareUrl]);
 
   const handleVideoEnd = useCallback(() => {
     if (relatedContent.length > 0) {
@@ -1331,6 +1344,7 @@ export default function ChannelContentDetailPage() {
             <ActionButton icon="warning" label="Dislike" value={compactNumber(counts.dislikes)} onPress={handleDislike} />
             <ActionButton icon="comment" label="Comment" value={compactNumber(counts.comments)} onPress={() => setCommentsModalVisible(true)} />
             <ActionButton icon="share" label="Share" value={compactNumber(counts.shares)} onPress={handleShare} />
+            <ActionButton icon="qr-code" label="QR code" value="Share" onPress={handleShowQr} />
             <ActionButton icon="call-history" label="Share at time" value="Timestamp" onPress={handleShareAtTimestamp} />
             <ActionButton icon="bookmark" label="Save" value={saved ? 'Saved' : compactNumber(counts.saves)} onPress={handleSave} />
             <ActionButton icon="call-history" label="Watch Later" value="Queue" onPress={handleWatchLater} />
@@ -1548,6 +1562,14 @@ export default function ChannelContentDetailPage() {
           </View>
         </View>
       </Modal>
+
+      <QrCodeShareModal
+        visible={showQr}
+        onClose={() => setShowQr(false)}
+        link={qrUrl ?? ''}
+        title="Content QR code"
+        subtitle={`Anyone who scans this can open "${content?.title || 'this content'}".`}
+      />
     </SafeAreaView>
   );
 }

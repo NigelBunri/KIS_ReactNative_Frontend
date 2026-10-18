@@ -109,13 +109,20 @@ export default function QrCodeShareModal({
   }, []);
 
   useEffect(() => {
-    if (visible) {
+    // Some callers open this modal before their link has finished
+    // resolving (e.g. a channel's share URL needs a network fetch) —
+    // `link` is in this effect's own deps so that arriving late still
+    // triggers a real capture instead of the capture running once, immediately,
+    // against an empty string. While visible && !link, the "not ready"
+    // spinner overlay just keeps showing (fileUri stays null) rather than
+    // generating a QR code for a blank value.
+    if (visible && link) {
       void generate();
-    } else {
+    } else if (!visible) {
       setFileUri(null);
       setError(false);
     }
-  }, [visible, generate]);
+  }, [visible, link, generate]);
 
   const ready = !!fileUri && !error;
 

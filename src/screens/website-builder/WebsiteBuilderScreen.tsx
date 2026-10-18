@@ -9,6 +9,7 @@ import { deleteRequest } from '@/network/delete';
 import ROUTES, { NEST_API_BASE_URL } from '@/network';
 import { uploadFileToBackend } from '@/Module/ChatRoom/uploadFileToBackend';
 import KISButton from '@/constants/KISButton';
+import QrCodeShareModal from '@/components/common/QrCodeShareModal';
 import KISTextInput from '@/constants/KISTextInput';
 import { KISIcon } from '@/constants/kisIcons';
 import {
@@ -514,17 +515,22 @@ export default function WebsiteBuilderScreen({ navigation, route }: Props) {
     navigation.navigate('WebsiteCustomDomain', { websiteId: website.id });
   }, [website, navigation]);
 
+  const publicPageUrl = website
+    ? (activePage && !activePage.is_home
+        ? `${WEBSITE_PUBLIC_BASE_URL}/page/${website.slug}/${activePage.slug}`
+        : `${WEBSITE_PUBLIC_BASE_URL}/page/${website.slug}`)
+    : '';
+
   const handleShare = useCallback(async () => {
-    if (!website) return;
-    const url = activePage && !activePage.is_home
-      ? `${WEBSITE_PUBLIC_BASE_URL}/page/${website.slug}/${activePage.slug}`
-      : `${WEBSITE_PUBLIC_BASE_URL}/page/${website.slug}`;
+    if (!website || !publicPageUrl) return;
     try {
-      await Share.share({ message: `${website.name} — ${url}`, url });
+      await Share.share({ message: `${website.name} — ${publicPageUrl}`, url: publicPageUrl });
     } catch {
       // user dismissed share sheet
     }
-  }, [website, activePage]);
+  }, [website, publicPageUrl]);
+
+  const [showQr, setShowQr] = useState(false);
 
   const selectedSectionTypeLabel = useMemo(() => {
     if (!selectedType) return 'Select section type';
@@ -599,6 +605,7 @@ export default function WebsiteBuilderScreen({ navigation, route }: Props) {
           {website.status === 'published' ? (
             <>
               <KISButton title="Share" variant="outline" onPress={handleShare} />
+              <KISButton title="QR Code" variant="outline" onPress={() => setShowQr(true)} />
               <KISButton title="Unpublish Website" variant="outline" onPress={handleUnpublishWebsite} />
             </>
           ) : (
@@ -775,6 +782,14 @@ export default function WebsiteBuilderScreen({ navigation, route }: Props) {
           onClose={() => setIsDesignPickerOpen(false)}
         />
       ) : null}
+
+      <QrCodeShareModal
+        visible={showQr}
+        onClose={() => setShowQr(false)}
+        link={publicPageUrl}
+        title="Page QR code"
+        subtitle={`Anyone who scans this can open "${website?.name || 'this page'}".`}
+      />
     </View>
   );
 }

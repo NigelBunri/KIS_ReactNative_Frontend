@@ -35,6 +35,7 @@ import PermanentRemoteImage from '@/components/media/PermanentRemoteImage';
 import ChannelAvatar from '@/components/broadcast/ChannelAvatar';
 import OfflineDataBadge from '@/components/offline/OfflineDataBadge';
 import { useSafeTopInset } from '@/hooks/useSafeTopInset';
+import QrCodeShareModal from '@/components/common/QrCodeShareModal';
 import {
   freshOfflineMeta,
   offlineStructuredCacheKey,
@@ -220,7 +221,7 @@ export default function ChannelHomePage() {
     }
   }, [channel, navigation]);
 
-  const handleShare = useCallback(async () => {
+  const resolveShareUrl = useCallback(async () => {
     const handleOrId = channel?.handle || channel?.id || '';
     let url = handleOrId ? `https://kis.app/channels/${handleOrId}` : 'https://kis.app/channels';
     try {
@@ -228,13 +229,27 @@ export default function ChannelHomePage() {
         const publicMeta = await fetchPublicChannelLanding(channel.handle);
         url = publicMeta?.share_card?.url || publicMeta?.url || url;
       }
+    } catch { /* fall back to the plain handle/id URL above */ }
+    return url;
+  }, [channel]);
+
+  const handleShare = useCallback(async () => {
+    const url = await resolveShareUrl();
+    try {
       await Share.share({ message: `${channel?.display_name || 'KIS Channel'} - ${url}`, url, title: channel?.display_name });
     } catch {
       try {
         await Share.share({ message: `${channel?.display_name || 'KIS Channel'} - ${url}`, url, title: channel?.display_name });
       } catch { /* ignore */ }
     }
-  }, [channel]);
+  }, [channel, resolveShareUrl]);
+
+  const [qrUrl, setQrUrl] = useState<string | null>(null);
+  const [showQr, setShowQr] = useState(false);
+  const handleShowQr = useCallback(async () => {
+    setShowQr(true);
+    setQrUrl(await resolveShareUrl());
+  }, [resolveShareUrl]);
 
   const bannerUrl = channel?.banner_url ? resolveBackendAssetUrl(channel.banner_url) : '';
   const featured = contents[0];
@@ -322,6 +337,10 @@ export default function ChannelHomePage() {
             <Pressable onPress={handleShare} style={[styles.actionChip, { backgroundColor: palette.surface, borderColor: palette.border }]}>
               <KISIcon name="share" size={14} color={palette.text} />
               <Text style={[styles.actionChipText, { color: palette.text }]}>Share</Text>
+            </Pressable>
+            <Pressable onPress={handleShowQr} style={[styles.actionChip, { backgroundColor: palette.surface, borderColor: palette.border }]}>
+              <KISIcon name="qr-code" size={14} color={palette.text} />
+              <Text style={[styles.actionChipText, { color: palette.text }]}>QR</Text>
             </Pressable>
             <Pressable
               onPress={() => {
@@ -535,6 +554,14 @@ export default function ChannelHomePage() {
           </>
         )}
       </ScrollView>
+
+      <QrCodeShareModal
+        visible={showQr}
+        onClose={() => setShowQr(false)}
+        link={qrUrl ?? ''}
+        title="Channel QR code"
+        subtitle={`Anyone who scans this can open "${channel?.display_name || 'this channel'}".`}
+      />
     </SafeAreaView>
   );
 }
