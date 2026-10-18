@@ -23,7 +23,7 @@ import { KISIcon } from '@/constants/kisIcons';
 import Skeleton from '@/components/common/Skeleton';
 import { getRequest } from '@/network/get';
 import { postRequest } from '@/network/post';
-import ROUTES, { NEST_API_BASE_URL } from '@/network';
+import ROUTES from '@/network';
 import { useSocket } from '../../../../SocketProvider';
 import { fetchConversationsForCurrentUser } from '@/Module/ChatRoom/normalizeConversation';
 import type {
@@ -372,7 +372,12 @@ const CallsTab = forwardRef<ScrollableHandle, CallsTabProps>(function CallsTab({
     durationMinutes?: number | null;
     inviteeUserIds?: string[];
   }): Promise<StandaloneCallResult> => {
-    const res = await postRequest(`${NEST_API_BASE_URL}/api/v1/calls/standalone`, {
+    // ROOT CAUSE of "Cannot POST /api/v1/calls/standalone — Not Found": this
+    // hardcoded URL never matched the real route. CallsController is
+    // registered at the bare '/calls' prefix (@Controller('calls')), not
+    // '/api/v1/calls' — see ROUTES.calls.standalone, the already-correct
+    // constant every other call-related request in this file goes through.
+    const res = await postRequest(ROUTES.calls.standalone, {
       call_id: params.callId,
       call_type: params.callType,
       title: params.title,
