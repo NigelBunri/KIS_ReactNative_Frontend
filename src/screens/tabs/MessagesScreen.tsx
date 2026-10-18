@@ -71,6 +71,13 @@ import { translateString } from '@/languages';
 import { normalizeChatDisplayText, resolveChatPreviewText } from '@/Module/ChatRoom/safeChatText';
 import { getCurrentAuthUserId } from '@/storage/userScopedProfileCache';
 
+// The main gold-header app bar's logo badge — replaces the plain "K"
+// letter fallback it used to show. Always the white mark, not theme-
+// switched: the badge itself sits on a fixed translucent royalInk
+// background regardless of the app's light/dark setting (see palette
+// .onGold, the equally fixed-white color the letter it replaces used).
+const KIS_ICON_WHITE = require('@/assets/kis-icon-white.png');
+
 const Tab = createMaterialTopTabNavigator();
 
 // In-memory (not AsyncStorage-level - just a JS module variable, cleared on
@@ -2323,9 +2330,23 @@ const handleOpenChatFromAddContacts = useCallback((chat: Chat) => {
                   borderColor: 'rgba(255,244,184,0.30)',
                 }}
               >
-                <Text style={{ color: palette.onGold, fontSize: responsive.isWatch ? 15 : 18, fontWeight: '900' }}>
-                  {appName ? appName[0].toUpperCase() : 'K'}
-                </Text>
+                {appName ? (
+                  <Text style={{ color: palette.onGold, fontSize: responsive.isWatch ? 15 : 18, fontWeight: '900' }}>
+                    {appName[0].toUpperCase()}
+                  </Text>
+                ) : (
+                  // The badge's own background (rgba(23,17,31,0.28), a
+                  // translucent royalInk) stays dark regardless of the
+                  // app's light/dark theme setting — same reason the
+                  // letter it replaces always used the fixed-white
+                  // palette.onGold rather than a theme-switched color.
+                  // The white icon mark is correct here unconditionally.
+                  <Image
+                    source={KIS_ICON_WHITE}
+                    resizeMode="contain"
+                    style={{ width: '60%', height: '60%' }}
+                  />
+                )}
               </View>
               <View style={{ flex: 1, minWidth: 0 }}>
                 <Text
