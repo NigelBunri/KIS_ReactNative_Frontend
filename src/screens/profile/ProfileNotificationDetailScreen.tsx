@@ -9,6 +9,10 @@ import { KISIcon } from '@/constants/kisIcons';
 import type { RootStackParamList } from '@/navigation/types';
 import { markInAppNotificationAsRead, type InAppNotification } from '@/services/inAppNotificationService';
 import { routeNotification } from '@/push/notificationRouter';
+import { recordWatchHistory } from '@/screens/broadcast/channels/hooks/useChannelsData';
+import { postRequest } from '@/network/post';
+import ROUTES from '@/network';
+import { emitMainTabBadgeRefresh } from '@/services/mainTabNotificationBadges';
 
 // Comms migration (Sep 2026): notifications like GIFT_READY_TO_SHARE and
 // GUEST_INVITATION_READY_TO_SHARE embed a share link directly in their body
@@ -72,7 +76,35 @@ export default function ProfileNotificationDetailScreen() {
     if (route.params?.notificationId) {
       markInAppNotificationAsRead(route.params.notificationId).catch(() => undefined);
     }
-  }, [route.params?.notificationId]);
+    // CONFIRMED ROOT CAUSE of "I opened and closed the notification but
+    // the Broadcast tab's badge number is still there": the Broadcast
+    // badge count (apps.notifications.badge_counts._broadcast_unread_
+    // count/_comment_room_broadcast_unread_count) isn't driven by the
+    // Notification record's own read-state alone - it ALSO counts
+    // channel content the user hasn't watched (ChannelWatchHistory) and
+    // comment-room messages they haven't opened (ConversationMember.
+    // last_read_seq). Marking the notification read above only touches
+    // the notification-record portion of that count; reading ABOUT new
+    // content/a new comment here was never the same as marking the
+    // content/comment itself seen, which previously only happened if the
+    // user went on to tap "Go to source" - most people just read the
+    // notification and went back, so the badge stayed up even though
+    // they'd clearly already seen what it was about. Mark the real
+    // underlying target seen here too, not just the notification.
+    const targetType = String(notification?.targetType || '').toLowerCase();
+    const targetId = notification?.targetId;
+    if (targetId) {
+      if (targetType === 'channel_content') {
+        recordWatchHistory(String(targetId), { completed: true })
+          .then(() => emitMainTabBadgeRefresh('notification_opened'))
+          .catch(() => undefined);
+      } else if (targetType === 'conversation' || targetType === 'chat' || targetType === 'message') {
+        postRequest(ROUTES.chat.markRead(String(targetId)), {})
+          .then(() => emitMainTabBadgeRefresh('notification_opened'))
+          .catch(() => undefined);
+      }
+    }
+  }, [route.params?.notificationId, notification?.targetType, notification?.targetId]);
 
   const goToSource = useMemo(() => {
     if (!notification) return null;
