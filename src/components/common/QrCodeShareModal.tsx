@@ -19,10 +19,25 @@ import {
 } from 'react-native';
 import ViewShot from 'react-native-view-shot';
 import QRCode from 'react-native-qrcode-svg';
-import { CameraRoll } from '@react-native-camera-roll/camera-roll';
 import { SafeAreaView } from '@/components/common/SafeAreaViewWithTopPadding';
 import { KISIcon } from '@/constants/kisIcons';
 import { useKISTheme } from '@/theme/useTheme';
+
+// @react-native-camera-roll/camera-roll is a native module — this file is
+// reached from InviteLinkCard.tsx -> ActiveCallScreen.tsx ->
+// SocketProvider.tsx, which is mounted near the app root and imported by
+// nearly every screen. A plain top-level `import` throws synchronously
+// the moment the native binary hasn't been rebuilt with this (newly added)
+// dependency's native code yet — turning "Download hasn't been rebuilt
+// into this binary" into "the whole app won't boot" for anyone on a build
+// that's one native rebuild behind the JS bundle. Guarded require, same
+// pattern already used for other optional native modules in this codebase
+// (see CaptionOverlay.tsx's Voice import), keeps every other part of this
+// screen (viewing/sharing the QR) working even when this one is missing.
+let CameraRoll: typeof import('@react-native-camera-roll/camera-roll').CameraRoll | null = null;
+try {
+  CameraRoll = require('@react-native-camera-roll/camera-roll').CameraRoll;
+} catch {}
 
 export type QrCodeShareModalProps = {
   visible: boolean;
@@ -106,6 +121,13 @@ export default function QrCodeShareModal({
 
   const handleDownload = async () => {
     if (!fileUri || saving) return;
+    if (!CameraRoll) {
+      // Native module not linked into this binary yet (see the guarded
+      // require above) — Share still works, so point there instead of
+      // failing silently.
+      Alert.alert('Download unavailable', 'Please use Share and save the image from there for now.');
+      return;
+    }
     setSaving(true);
     try {
       const allowed = await ensureAndroidSavePermission();
