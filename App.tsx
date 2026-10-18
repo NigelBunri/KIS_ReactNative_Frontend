@@ -50,7 +50,6 @@ import { startMediaTransferQueue, stopMediaTransferQueue } from '@/services/medi
 import { flushPendingMutations } from '@/services/pendingMutationsQueue';
 import { loadConsentPreferences } from '@/services/consentService';
 
-import SplashScreen from './src/screens/SplashScreen';
 import WelcomeScreen from './src/screens/WelcomeScreen';
 import LoginScreen from './src/screens/LoginScreen';
 import RegisterScreen from './src/screens/RegisterScreen';
@@ -1174,7 +1173,17 @@ function AppContent() {
   );
 
   if (booting) {
-    return <SplashScreen />;
+    // The native launch screen (iOS LaunchScreen.storyboard / Android's
+    // AppTheme windowBackground) is already visible and already carries
+    // the KIS branding — it stays on screen until the very first JS frame
+    // paints. Rendering the old animated SplashScreen here replaced that
+    // native screen with a SECOND, differently-styled loading screen
+    // (its own 8s timer, orbit animation, logo) for the boot window
+    // below, producing exactly the jarring double-splash users reported.
+    // A same-colored, contentless bridge means the native screen reads
+    // as continuing uninterrupted until the real app is ready, instead of
+    // being replaced by another loading screen.
+    return <View style={{ flex: 1, backgroundColor: scheme === 'dark' ? '#0A090F' : '#F8F6F3' }} />;
   }
 
   // No app-wide location gate here anymore — country/calling-code is a

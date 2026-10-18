@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Native boot-time background, shown by the OS between tapping the app
+     icon and the first JS frame painting — the Android equivalent of the
+     redesigned LaunchScreen.storyboard on iOS. A static windowBackground
+     drawable can't lay out styled multi-line text (no TextView here), so
+     this carries over the removed JS SplashScreen's branded-background +
+     centered-logo treatment; the matching title/subtitle/footer text only
+     exists on the iOS storyboard. Wired in as AppTheme's windowBackground
+     in styles.xml. -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:drawable="@color/launch_background"/>
+    <item
+        android:width="120dp"
+        android:height="120dp"
+        android:gravity="center">
+        <bitmap
+            android:src="@mipmap/ic_launcher"
+            android:gravity="center"/>
+    </item>
+</layer-list>

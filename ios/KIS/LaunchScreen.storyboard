@@ -16,27 +16,57 @@
                         <rect key="frame" x="0.0" y="0.0" width="375" height="667"/>
                         <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
                         <subviews>
-                            <label opaque="NO" clipsSubviews="YES" userInteractionEnabled="NO" contentMode="left" horizontalHuggingPriority="251" verticalHuggingPriority="251" text="KIS" textAlignment="center" lineBreakMode="middleTruncation" baselineAdjustment="alignBaselines" minimumFontSize="18" translatesAutoresizingMaskIntoConstraints="NO" id="GJd-Yh-RWb">
-                                <rect key="frame" x="0.0" y="202" width="375" height="43"/>
-                                <fontDescription key="fontDescription" type="boldSystem" pointSize="36"/>
+                            <!-- Logo mark — same artwork as the app icon, carried over from the
+                                 removed JS SplashScreen's centered logo treatment. -->
+                            <imageView clipsSubviews="YES" userInteractionEnabled="NO" contentMode="scaleAspectFit" horizontalHuggingPriority="251" verticalHuggingPriority="251" image="LaunchLogo" translatesAutoresizingMaskIntoConstraints="NO" id="LG0-go-img">
+                                <rect key="frame" x="127.5" y="243" width="120" height="120"/>
+                            </imageView>
+                            <!-- "kingdom impact social" — same two-line title treatment as the
+                                 removed SplashScreen. -->
+                            <label opaque="NO" userInteractionEnabled="NO" contentMode="left" horizontalHuggingPriority="251" verticalHuggingPriority="251" text="kingdom&#10;impact social" textAlignment="center" lineBreakMode="tailTruncation" numberOfLines="2" baselineAdjustment="alignBaselines" adjustsFontSizeToFit="NO" translatesAutoresizingMaskIntoConstraints="NO" id="TTL-ti-tle">
+                                <rect key="frame" x="20" y="371" width="335" height="40"/>
+                                <fontDescription key="fontDescription" type="boldSystem" pointSize="26"/>
+                                <color key="textColor" systemColor="labelColor"/>
                                 <nil key="highlightedColor"/>
                             </label>
-                            <label opaque="NO" clipsSubviews="YES" userInteractionEnabled="NO" contentMode="left" horizontalHuggingPriority="251" verticalHuggingPriority="251" text="Powered by KIV (Kingdom Impact Ventures)" textAlignment="center" lineBreakMode="tailTruncation" baselineAdjustment="alignBaselines" minimumFontSize="9" translatesAutoresizingMaskIntoConstraints="NO" id="MN2-I3-ftu">
-                                <rect key="frame" x="0.0" y="626" width="375" height="21"/>
-                                <fontDescription key="fontDescription" type="system" pointSize="17"/>
+                            <!-- "Connecting Communities in Faith" — same subtitle as the removed
+                                 SplashScreen. -->
+                            <label opaque="NO" userInteractionEnabled="NO" contentMode="left" horizontalHuggingPriority="251" verticalHuggingPriority="251" text="Connecting Communities in Faith" textAlignment="center" lineBreakMode="tailTruncation" numberOfLines="1" baselineAdjustment="alignBaselines" adjustsFontSizeToFit="NO" minimumFontSize="9" translatesAutoresizingMaskIntoConstraints="NO" id="SUB-su-btl">
+                                <rect key="frame" x="20" y="419" width="335" height="20"/>
+                                <fontDescription key="fontDescription" type="system" pointSize="15"/>
+                                <color key="textColor" systemColor="secondaryLabelColor"/>
+                                <nil key="highlightedColor"/>
+                            </label>
+                            <!-- Attribution footer — this is the page the user keeps as the
+                                 app's one and only loading screen; kept at the bottom as a
+                                 small footer rather than the page's main content. -->
+                            <label opaque="NO" clipsSubviews="YES" userInteractionEnabled="NO" contentMode="left" horizontalHuggingPriority="251" verticalHuggingPriority="251" text="Powered by KIV (Kingdom Impact Ventures)" textAlignment="center" lineBreakMode="tailTruncation" numberOfLines="1" baselineAdjustment="alignBaselines" minimumFontSize="9" translatesAutoresizingMaskIntoConstraints="NO" id="MN2-I3-ftu">
+                                <rect key="frame" x="20" y="626" width="335" height="21"/>
+                                <fontDescription key="fontDescription" type="system" pointSize="13"/>
+                                <color key="textColor" systemColor="secondaryLabelColor"/>
                                 <nil key="highlightedColor"/>
                             </label>
                         </subviews>
-                        <color key="backgroundColor" systemColor="systemBackgroundColor" cocoaTouchSystemColor="whiteColor"/>
-                        <constraints>
-                            <constraint firstItem="Bcu-3y-fUS" firstAttribute="bottom" secondItem="MN2-I3-ftu" secondAttribute="bottom" constant="20" id="OZV-Vh-mqD"/>
-                            <constraint firstItem="Bcu-3y-fUS" firstAttribute="centerX" secondItem="GJd-Yh-RWb" secondAttribute="centerX" id="Q3B-4B-g5h"/>
-                            <constraint firstItem="MN2-I3-ftu" firstAttribute="centerX" secondItem="Bcu-3y-fUS" secondAttribute="centerX" id="akx-eg-2ui"/>
-                            <constraint firstItem="MN2-I3-ftu" firstAttribute="leading" secondItem="Bcu-3y-fUS" secondAttribute="leading" id="i1E-0Y-4RG"/>
-                            <constraint firstItem="GJd-Yh-RWb" firstAttribute="centerY" secondItem="Ze5-6b-2t3" secondAttribute="bottom" multiplier="1/3" constant="1" id="moa-c2-u7t"/>
-                            <constraint firstItem="GJd-Yh-RWb" firstAttribute="leading" secondItem="Bcu-3y-fUS" secondAttribute="leading" symbolic="YES" id="x7j-FC-K8j"/>
-                        </constraints>
                         <viewLayoutGuide key="safeArea" id="Bcu-3y-fUS"/>
+                        <color key="backgroundColor" name="LaunchBackground"/>
+                        <constraints>
+                            <constraint firstItem="LG0-go-img" firstAttribute="centerX" secondItem="Bcu-3y-fUS" secondAttribute="centerX" id="lg0-cx-001"/>
+                            <constraint firstItem="LG0-go-img" firstAttribute="centerY" secondItem="Bcu-3y-fUS" secondAttribute="centerY" constant="-60" id="lg0-cy-001"/>
+                            <constraint firstItem="LG0-go-img" firstAttribute="width" constant="120" id="lg0-w-001"/>
+                            <constraint firstItem="LG0-go-img" firstAttribute="height" constant="120" id="lg0-h-001"/>
+                            <constraint firstItem="TTL-ti-tle" firstAttribute="top" secondItem="LG0-go-img" secondAttribute="bottom" constant="8" id="ttl-top-001"/>
+                            <constraint firstItem="TTL-ti-tle" firstAttribute="centerX" secondItem="Bcu-3y-fUS" secondAttribute="centerX" id="ttl-cx-001"/>
+                            <constraint firstItem="TTL-ti-tle" firstAttribute="leading" secondItem="Bcu-3y-fUS" secondAttribute="leading" constant="20" id="ttl-lead-001"/>
+                            <constraint firstItem="Bcu-3y-fUS" firstAttribute="trailing" secondItem="TTL-ti-tle" secondAttribute="trailing" constant="20" id="ttl-trail-001"/>
+                            <constraint firstItem="SUB-su-btl" firstAttribute="top" secondItem="TTL-ti-tle" secondAttribute="bottom" constant="8" id="sub-top-001"/>
+                            <constraint firstItem="SUB-su-btl" firstAttribute="centerX" secondItem="Bcu-3y-fUS" secondAttribute="centerX" id="sub-cx-001"/>
+                            <constraint firstItem="SUB-su-btl" firstAttribute="leading" secondItem="Bcu-3y-fUS" secondAttribute="leading" constant="20" id="sub-lead-001"/>
+                            <constraint firstItem="Bcu-3y-fUS" firstAttribute="trailing" secondItem="SUB-su-btl" secondAttribute="trailing" constant="20" id="sub-trail-001"/>
+                            <constraint firstItem="Bcu-3y-fUS" firstAttribute="bottom" secondItem="MN2-I3-ftu" secondAttribute="bottom" constant="20" id="OZV-Vh-mqD"/>
+                            <constraint firstItem="MN2-I3-ftu" firstAttribute="centerX" secondItem="Bcu-3y-fUS" secondAttribute="centerX" id="akx-eg-2ui"/>
+                            <constraint firstItem="MN2-I3-ftu" firstAttribute="leading" secondItem="Bcu-3y-fUS" secondAttribute="leading" constant="20" id="i1E-0Y-4RG"/>
+                            <constraint firstItem="Bcu-3y-fUS" firstAttribute="trailing" secondItem="MN2-I3-ftu" secondAttribute="trailing" constant="20" id="pwr-trail-001"/>
+                        </constraints>
                     </view>
                 </viewController>
                 <placeholder placeholderIdentifier="IBFirstResponder" id="iYj-Kq-Ea1" userLabel="First Responder" sceneMemberID="firstResponder"/>
@@ -44,4 +74,8 @@
             <point key="canvasLocation" x="52.173913043478265" y="375"/>
         </scene>
     </scenes>
+    <resources>
+        <image name="LaunchLogo" width="1024" height="1024"/>
+        <namedColor name="LaunchBackground"/>
+    </resources>
 </document>

@@ -1,0 +1,8 @@
+<resources>
+    <!-- Matches KIS_COLORS/theme/constants.ts's light palette.bg exactly, and
+         App.tsx's own educationModalContentStyle fallback — kept in sync by
+         hand since this is a native resource with no access to the JS
+         theme constants file. Used for the native launch-screen background
+         (styles.xml's windowBackground) shown before any JS has loaded. -->
+    <color name="launch_background">#F8F6F3</color>
+</resources>

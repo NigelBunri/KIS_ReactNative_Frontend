@@ -9,6 +9,13 @@
         <item name="android:navigationBarColor">@android:color/transparent</item>
         <item name="android:windowLightStatusBar">false</item>
         <item name="android:windowLightNavigationBar">false</item>
+        <!-- Shown by the OS from icon-tap until RN's root view paints its
+             first frame over it — the native boot background this app
+             previously had none of, so the window was blank/default
+             (tracking only the device's own DayNight resource selection,
+             not this app's in-app theme choice) during that gap. See
+             drawable/launch_screen.xml. -->
+        <item name="android:windowBackground">@drawable/launch_screen</item>
     </style>
 
 </resources>

@@ -1,0 +1,5 @@
+<resources>
+    <!-- Dark-mode override of values/colors.xml's launch_background — matches
+         KIS_COLORS/theme/constants.ts's dark palette.bg exactly. -->
+    <color name="launch_background">#0A090F</color>
+</resources>
