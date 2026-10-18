@@ -31,7 +31,6 @@ import { saveStickerToLibrary } from './main/FroSticker/stickerLibrary';
 import { ViewOnceViewerModal, type ViewOnceContentSnapshot } from './ViewOnceViewerModal';
 import { useMessageTranslation } from '../hooks/useMessageTranslation';
 import { MessageTranslationBlock } from './MessageTranslationBlock';
-import { useDetachedChatOverlayProps } from '@/contexts/DetachedChatOverlayContext';
 import {
   BIBLE_REFERENCE_RE,
   BIBLE_QUOTE_BLOCK_RE,
@@ -288,10 +287,10 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   // top-level sibling painted OUTSIDE NavigationContainer, above every
   // RootStack screen - so navigating to 'InviteJoin' from inside an open
   // chat pushes it onto the stack underneath the still-visible overlay,
-  // where the user can never actually see or tap it. Closing the chat
-  // first (see the two "Tap to join" handlers below) makes the invite/
-  // welcome screen visible the way any other navigation would be.
-  const closeChatOverlay = useDetachedChatOverlayProps()?.closeChat;
+  // where the user can never actually see or tap it. The two "Tap to
+  // join" handlers below dismiss it via DeviceEventEmitter('chat.close_all')
+  // instead of closeChat (this context's one-level animated pop) — see
+  // their own comments for why closeChat alone isn't reliable here.
   // Fullscreen viewers below (video/image/PDF) position their close button
   // with `position: absolute` inside a SafeAreaView - absolutely-positioned
   // children ignore their parent's own safe-area padding in RN's layout
@@ -2163,7 +2162,21 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
                 <Pressable
                   key={i}
                   onPress={() => {
-                    closeChatOverlay?.();
+                    // closeChat (closeChatOverlay) only pops one level with
+                    // a 260ms animation and is meant for staying inside the
+                    // chat UI (the back button) — it does not reliably
+                    // finish before this synchronous navigate() away to a
+                    // totally different flow (InviteJoin -> CallJoin ->
+                    // MainTabs), the same "overlay is a full-screen layer
+                    // above the tab navigator, not a stack screen" gap
+                    // openBibleReference's own chat.close_all already
+                    // works around above. Left as closeChat, a stale empty
+                    // chat overlay (ChatRoomBody's isEmpty={!chat} "Select
+                    // a chat to start messaging") could still be mounted
+                    // on top of the call screen once it dismissed/
+                    // minimised, with nothing left pointing back at a real
+                    // chat to clear it.
+                    DeviceEventEmitter.emit('chat.close_all');
                     navigation.navigate('InviteJoin', {
                       type: inviteMatch[1] as 'group' | 'community' | 'call' | 'broadcast-call',
                       token: inviteMatch[2],
@@ -4594,7 +4607,10 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
           return (
             <Pressable
               onPress={() => {
-                closeChatOverlay?.();
+                // See the matching comment on the inline invite-link
+                // Pressable above — closeChat alone can leave a stale
+                // empty chat overlay mounted behind the call screen.
+                DeviceEventEmitter.emit('chat.close_all');
                 navigation.navigate('InviteJoin', inviteInfo);
               }}
               style={{
