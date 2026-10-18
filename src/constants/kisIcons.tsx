@@ -57,6 +57,8 @@ export type KISIconName =
   | 'info'
   // NEW — for country picker
   | 'chevron-down'
+  | 'chevron-up'
+  | 'minus'
   | 'fullscreen'
   // NEW — camera / media
   | 'flash-on'
@@ -290,6 +292,11 @@ const ion: IonMap = {
     filled: 'chevron-down',
     outline: 'chevron-down',
   },
+  'chevron-up': {
+    filled: 'chevron-up',
+    outline: 'chevron-up',
+  },
+  minus: { filled: 'remove', outline: 'remove-outline' },
 
   // NEW — Camera / media icons
   'flash-on': { filled: 'flash', outline: 'flash-outline' },

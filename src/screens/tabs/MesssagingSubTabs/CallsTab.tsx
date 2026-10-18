@@ -33,6 +33,7 @@ import type {
 } from '@/services/calls/callTypes';
 import { callTypeLabel, callTypeIcon, formatDuration } from '@/services/calls/callTypes';
 import ScheduleCallSheet, { type StandaloneCallResult } from '@/screens/calls/ScheduleCallSheet';
+import { formatDuration as formatScheduledDuration } from '@/screens/calls/scheduleCallSheetHelpers';
 import { loadCallHistory, saveCallHistory } from '@/services/calls/callHistoryStorage';
 import { useSafeTopInset } from '@/hooks/useSafeTopInset';
 import { resolveCallbackInvitees, isScheduledCallHost } from './callsTabHelpers';
@@ -98,7 +99,7 @@ const CallsTab = forwardRef<ScrollableHandle, CallsTabProps>(function CallsTab({
   useImperativeHandle(ref, () => ({
     scrollTo: ({ y, animated }) => listRef.current?.getScrollResponder()?.scrollTo({ y, animated }),
   }), []);
-  const { currentUserId, startCall, joinExistingCall, joinWaitingRoom, startScheduledCall, socket } = useSocket();
+  const { currentUserId, startCall, joinExistingCall, joinWaitingRoom, startScheduledCall, inviteToCall, socket } = useSocket();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [calls, setCalls] = useState<CallHistoryItem[]>([]);
@@ -368,12 +369,16 @@ const CallsTab = forwardRef<ScrollableHandle, CallsTabProps>(function CallsTab({
     callType: CallType;
     title: string;
     scheduledFor?: Date | null;
+    durationMinutes?: number | null;
+    inviteeUserIds?: string[];
   }): Promise<StandaloneCallResult> => {
     const res = await postRequest(`${NEST_API_BASE_URL}/api/v1/calls/standalone`, {
       call_id: params.callId,
       call_type: params.callType,
       title: params.title,
       scheduled_for: params.scheduledFor?.toISOString() ?? undefined,
+      duration_minutes: params.durationMinutes ?? undefined,
+      invitee_user_ids: params.inviteeUserIds,
     });
     // ApiResult's failure field is `message`, not `error` — `res.error` was
     // always undefined, silently discarding the server's actual reason and
@@ -385,19 +390,37 @@ const CallsTab = forwardRef<ScrollableHandle, CallsTabProps>(function CallsTab({
   const handleStandaloneStart = useCallback(async (result: StandaloneCallResult) => {
     setShowNewCallSheet(false);
     if (!result.scheduledFor) {
-      // Start the call immediately if not scheduled
+      // Start the call immediately if not scheduled. Reuses the EXACT
+      // callId the REST call above already created (ROOT CAUSE of "New
+      // call" never actually working: startCall used to always mint its
+      // own fresh callId, which createCallOrThrowIfActiveInConversation's
+      // existingActive check rejected outright — this standalone
+      // conversationId already had an isActiveInConversation:true call
+      // under the ORIGINAL callId from the instant it was REST-created).
+      // inviteeUserIds is deliberately NOT passed here — ringing panelists
+      // through this same call.offer would hit the idempotent/"reused"
+      // branch (same callId, already exists) and silently skip their push
+      // notification. inviteToCall below is the one proven-correct path
+      // for ringing people into a call that already exists.
       if (startCall) {
-        await startCall({
+        const started = await startCall({
           conversationId: result.conversationId,
           title: result.title ?? 'My call',
           callType: result.callType,
           inviteeUserIds: [],
           inviteToken: result.inviteToken,
+          callId: result.callId,
         });
+        if (started && inviteToCall && result.inviteeUserIds?.length) {
+          const inviteResult = await inviteToCall(result.inviteeUserIds);
+          if (!inviteResult.ok) {
+            Alert.alert('Some panelists could not be invited', inviteResult.error ?? 'Please try again from the call screen.');
+          }
+        }
       }
     }
     loadCalls();
-  }, [startCall, loadCalls]);
+  }, [startCall, inviteToCall, loadCalls]);
 
   const handleJoinScheduled = useCallback(async (item: ScheduledCallItem) => {
     // The host starts the SAME scheduled call (reusing its callId so every
@@ -566,6 +589,12 @@ const CallsTab = forwardRef<ScrollableHandle, CallsTabProps>(function CallsTab({
               <>
                 <Text style={{ color: palette.subtext }}>·</Text>
                 <Text style={{ color: palette.gold, fontWeight: '700', fontSize: 12 }}>{timeStr}</Text>
+              </>
+            ) : null}
+            {item.scheduledDurationMinutes ? (
+              <>
+                <Text style={{ color: palette.subtext }}>·</Text>
+                <Text style={{ color: palette.subtext, fontSize: 12 }}>{formatScheduledDuration(item.scheduledDurationMinutes)}</Text>
               </>
             ) : null}
           </View>

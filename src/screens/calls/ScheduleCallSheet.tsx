@@ -1,7 +1,8 @@
 // src/screens/calls/ScheduleCallSheet.tsx
-// Bottom sheet for creating a standalone call (with optional scheduling and invite link).
+// Bottom sheet for creating a standalone call (with optional scheduling,
+// panelist selection for broadcasts, and invite link).
 
-import React, { useState, useCallback } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Modal,
@@ -15,9 +16,25 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { KISIcon } from '@/constants/kisIcons';
 import KISButton from '@/constants/KISButton';
+import KISDateTimeInput from '@/constants/KISDateTimeInput';
 import { useKISTheme } from '@/theme/useTheme';
 import type { CallType } from '@/services/calls/callTypes';
 import { useSafeTopInset } from '@/hooks/useSafeTopInset';
+import { fetchConversationsForCurrentUser } from '@/Module/ChatRoom/normalizeConversation';
+import { otherDirectParticipantUserId, type Chat } from '@/Module/ChatRoom/messagesUtils';
+import { getCurrentAuthUserId } from '@/storage/userScopedProfileCache';
+import PanelistPickerSheet, {
+  MAX_BROADCAST_PANELISTS,
+  MIN_BROADCAST_PANELISTS,
+} from './components/PanelistPickerSheet';
+import {
+  DEFAULT_DURATION_MINUTES,
+  MAX_DURATION_MINUTES,
+  MIN_DURATION_MINUTES,
+  evaluateNewCallSubmit,
+  formatDuration,
+  mergeDateAndTime,
+} from './scheduleCallSheetHelpers';
 
 export type StandaloneCallResult = {
   callId: string;
@@ -26,6 +43,10 @@ export type StandaloneCallResult = {
   callType: CallType;
   title: string;
   scheduledFor?: string | null;
+  scheduledDurationMinutes?: number | null;
+  /** Echoed back from the create params so the caller (CallsTab) knows
+   * who to actually ring without re-deriving the list. */
+  inviteeUserIds?: string[];
 };
 
 type Props = {
@@ -37,6 +58,8 @@ type Props = {
     callType: CallType;
     title: string;
     scheduledFor?: Date | null;
+    durationMinutes?: number | null;
+    inviteeUserIds?: string[];
   }) => Promise<StandaloneCallResult>;
 };
 
@@ -54,6 +77,9 @@ const CALL_TYPE_OPTIONS: CallTypeOption[] = [
   { type: 'broadcast', icon: 'radio', label: 'Broadcast', desc: 'Live to many viewers' },
 ];
 
+const DURATION_STEP = 5;
+const DURATION_PRESETS = [5, 15, 30, 60, 120, 240, 480, 720, 1440];
+
 function makeTempCallId() {
   return `call_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
 }
@@ -63,13 +89,13 @@ function addMinutes(date: Date, minutes: number): Date {
 }
 
 function formatScheduled(d: Date): string {
-  const now = new Date();
-  const diffMs = d.getTime() - now.getTime();
-  const diffMin = Math.round(diffMs / 60_000);
-  if (diffMin < 60) return `in ${diffMin} min`;
-  const h = Math.floor(diffMin / 60);
-  const m = diffMin % 60;
-  return `in ${h}h${m > 0 ? ` ${m}m` : ''}`;
+  return d.toLocaleString(undefined, {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
 }
 
 export default function ScheduleCallSheet({ visible, onClose, onStart, onCreate }: Props) {
@@ -80,20 +106,83 @@ export default function ScheduleCallSheet({ visible, onClose, onStart, onCreate 
   const [title, setTitle] = useState('');
   const [selectedType, setSelectedType] = useState<CallType>('voice');
   const [isScheduled, setIsScheduled] = useState(false);
-  const [scheduledFor, setScheduledFor] = useState<Date | null>(null);
+  const [scheduledDate, setScheduledDate] = useState<Date>(() => new Date());
+  const [scheduledTime, setScheduledTime] = useState<Date>(() => addMinutes(new Date(), 30));
+  const [durationMinutes, setDurationMinutes] = useState(DEFAULT_DURATION_MINUTES);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const SCHEDULE_PRESETS = [15, 30, 60, 120].map(m => ({
-    label: m < 60 ? `${m} min` : `${m / 60}h`,
-    date: addMinutes(new Date(), m),
-  }));
+  // Panelists (broadcast only)
+  const [panelistIds, setPanelistIds] = useState<string[]>([]);
+  const [showPanelistPicker, setShowPanelistPicker] = useState(false);
+  const [panelistChats, setPanelistChats] = useState<Chat[]>([]);
+  const [panelistChatsLoading, setPanelistChatsLoading] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+
+  const isBroadcast = selectedType === 'broadcast';
+
+  useEffect(() => {
+    if (!visible) return;
+    setPanelistChatsLoading(true);
+    Promise.all([fetchConversationsForCurrentUser(), getCurrentAuthUserId()])
+      .then(([chats, uid]) => {
+        setPanelistChats(chats);
+        setCurrentUserId(uid);
+      })
+      .catch(() => setPanelistChats([]))
+      .finally(() => setPanelistChatsLoading(false));
+  }, [visible]);
+
+  const invitablePanelists = useMemo(() => {
+    const seen = new Set<string>();
+    const out: { chat: Chat; userId: string }[] = [];
+    for (const chat of panelistChats) {
+      if (chat.isGroup || chat.isGroupChat || chat.isCommunityChat || chat.kind === 'group' || chat.kind === 'community') continue;
+      const uid = otherDirectParticipantUserId(chat.participants, currentUserId ?? undefined);
+      if (!uid || seen.has(uid)) continue;
+      seen.add(uid);
+      out.push({ chat, userId: uid });
+    }
+    return out;
+  }, [panelistChats, currentUserId]);
+
+  const scheduledFor = useMemo(
+    () => mergeDateAndTime(scheduledDate, scheduledTime),
+    [scheduledDate, scheduledTime],
+  );
+
+  const { canSubmit: formCanSubmit, needsPanelists, scheduleInPast } = evaluateNewCallSubmit({
+    callType: selectedType,
+    panelistCount: panelistIds.length,
+    isScheduled,
+    scheduledFor,
+  });
+  const canSubmit = formCanSubmit && !loading;
+
+  const resetForm = useCallback(() => {
+    setTitle('');
+    setSelectedType('voice');
+    setIsScheduled(false);
+    setScheduledDate(new Date());
+    setScheduledTime(addMinutes(new Date(), 30));
+    setDurationMinutes(DEFAULT_DURATION_MINUTES);
+    setPanelistIds([]);
+  }, []);
 
   const handleCreate = useCallback(async (startNow: boolean) => {
+    if (needsPanelists) {
+      setError(`Add at least ${MIN_BROADCAST_PANELISTS} panelist to start a broadcast.`);
+      setShowPanelistPicker(true);
+      return;
+    }
+    if (!startNow && scheduleInPast) {
+      setError('Pick a date and time in the future.');
+      return;
+    }
     setError(null);
     const callTitle = title.trim() || 'My call';
     const callId = makeTempCallId();
-    const when = startNow ? null : (scheduledFor ?? addMinutes(new Date(), 30));
+    const when = startNow ? null : scheduledFor;
 
     setLoading(true);
     try {
@@ -102,25 +191,18 @@ export default function ScheduleCallSheet({ visible, onClose, onStart, onCreate 
         callType: selectedType,
         title: callTitle,
         scheduledFor: when,
+        durationMinutes: when ? durationMinutes : null,
+        inviteeUserIds: panelistIds,
       });
 
-      if (startNow) {
-        onStart(result);
-      } else {
-        // Scheduled — show the invite link + confirm
-        onStart(result);
-      }
-      // Reset
-      setTitle('');
-      setSelectedType('voice');
-      setIsScheduled(false);
-      setScheduledFor(null);
+      onStart({ ...result, inviteeUserIds: panelistIds });
+      resetForm();
     } catch (e: any) {
       setError(e?.message ?? 'Failed to create call');
     } finally {
       setLoading(false);
     }
-  }, [title, selectedType, scheduledFor, onCreate, onStart]);
+  }, [title, selectedType, scheduledFor, durationMinutes, panelistIds, needsPanelists, scheduleInPast, onCreate, onStart, resetForm]);
 
   return (
     <Modal
@@ -197,6 +279,28 @@ export default function ScheduleCallSheet({ visible, onClose, onStart, onCreate 
             </View>
           </View>
 
+          {/* Panelists (broadcast only) */}
+          {isBroadcast && (
+            <View style={{ gap: 8 }}>
+              <Text style={[styles.label, { color: palette.subtext }]}>
+                Panelists ({MIN_BROADCAST_PANELISTS}-{MAX_BROADCAST_PANELISTS} required)
+              </Text>
+              <Pressable
+                onPress={() => setShowPanelistPicker(true)}
+                style={[
+                  styles.scheduleToggle,
+                  { borderColor: needsPanelists ? palette.danger : palette.inputBorder, backgroundColor: palette.surface },
+                ]}
+              >
+                <KISIcon name="people" size={18} color={panelistIds.length > 0 ? palette.gold : palette.subtext} />
+                <Text style={[styles.scheduleToggleText, { color: panelistIds.length > 0 ? palette.gold : palette.text }]}>
+                  {panelistIds.length > 0 ? `${panelistIds.length} panelist${panelistIds.length === 1 ? '' : 's'} selected` : 'Add panelists'}
+                </Text>
+                <KISIcon name="chevron-right" size={16} color={palette.subtext} />
+              </Pressable>
+            </View>
+          )}
+
           {/* Schedule toggle */}
           <View style={{ gap: 10 }}>
             <Pressable
@@ -211,27 +315,73 @@ export default function ScheduleCallSheet({ visible, onClose, onStart, onCreate 
             </Pressable>
 
             {isScheduled && (
-              <View style={{ gap: 8 }}>
-                <Text style={[styles.label, { color: palette.subtext }]}>Start in</Text>
-                <View style={styles.presetRow}>
-                  {SCHEDULE_PRESETS.map(preset => {
-                    const selected = scheduledFor?.getTime() === preset.date.getTime();
-                    return (
-                      <KISButton
-                        key={preset.label}
-                        title={preset.label}
-                        size="xs"
-                        variant={selected ? 'primary' : 'outline'}
-                        onPress={() => setScheduledFor(preset.date)}
-                      />
-                    );
-                  })}
+              <View style={{ gap: 14 }}>
+                <View style={{ flexDirection: 'row', gap: 10 }}>
+                  <View style={{ flex: 1 }}>
+                    <KISDateTimeInput
+                      label="Date"
+                      mode="date"
+                      value={scheduledDate.toISOString()}
+                      onChange={(iso) => setScheduledDate(new Date(iso))}
+                      minimumDate={new Date()}
+                      containerStyle={{ marginBottom: 0 }}
+                    />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <KISDateTimeInput
+                      label="Time"
+                      mode="time"
+                      value={scheduledTime.toISOString()}
+                      onChange={(iso) => setScheduledTime(new Date(iso))}
+                      containerStyle={{ marginBottom: 0 }}
+                    />
+                  </View>
                 </View>
-                {scheduledFor && (
-                  <Text style={[styles.scheduleConfirm, { color: palette.subtext }]}>
-                    Starts {formatScheduled(scheduledFor)}
-                  </Text>
-                )}
+
+                <View style={{ gap: 8 }}>
+                  <Text style={[styles.label, { color: palette.subtext }]}>Duration</Text>
+                  <View style={styles.presetRow}>
+                    {DURATION_PRESETS.map(mins => {
+                      const selected = durationMinutes === mins;
+                      return (
+                        <KISButton
+                          key={mins}
+                          title={formatDuration(mins)}
+                          size="xs"
+                          variant={selected ? 'primary' : 'outline'}
+                          onPress={() => setDurationMinutes(mins)}
+                        />
+                      );
+                    })}
+                  </View>
+                  <View style={styles.durationStepperRow}>
+                    <Pressable
+                      onPress={() => setDurationMinutes(d => Math.max(MIN_DURATION_MINUTES, d - DURATION_STEP))}
+                      disabled={durationMinutes <= MIN_DURATION_MINUTES}
+                      accessibilityRole="button"
+                      accessibilityLabel="Decrease duration by 5 minutes"
+                      style={[styles.stepperBtn, { borderColor: palette.inputBorder, opacity: durationMinutes <= MIN_DURATION_MINUTES ? 0.4 : 1 }]}
+                    >
+                      <KISIcon name="minus" size={16} color={palette.text} />
+                    </Pressable>
+                    <Text style={[styles.durationValue, { color: palette.text }]}>
+                      {formatDuration(durationMinutes)}
+                    </Text>
+                    <Pressable
+                      onPress={() => setDurationMinutes(d => Math.min(MAX_DURATION_MINUTES, d + DURATION_STEP))}
+                      disabled={durationMinutes >= MAX_DURATION_MINUTES}
+                      accessibilityRole="button"
+                      accessibilityLabel="Increase duration by 5 minutes"
+                      style={[styles.stepperBtn, { borderColor: palette.inputBorder, opacity: durationMinutes >= MAX_DURATION_MINUTES ? 0.4 : 1 }]}
+                    >
+                      <KISIcon name="plus" size={16} color={palette.text} />
+                    </Pressable>
+                  </View>
+                </View>
+
+                <Text style={[styles.scheduleConfirm, { color: scheduleInPast ? palette.danger : palette.subtext }]}>
+                  {scheduleInPast ? 'Pick a date and time in the future.' : `Starts ${formatScheduled(scheduledFor)} · ${formatDuration(durationMinutes)}`}
+                </Text>
               </View>
             )}
           </View>
@@ -248,8 +398,8 @@ export default function ScheduleCallSheet({ visible, onClose, onStart, onCreate 
           {isScheduled ? (
             <Pressable
               onPress={() => handleCreate(false)}
-              disabled={loading}
-              style={[styles.primaryBtn, { backgroundColor: palette.gold }, loading && styles.btnDisabled]}
+              disabled={!canSubmit}
+              style={[styles.primaryBtn, { backgroundColor: palette.gold }, !canSubmit && styles.btnDisabled]}
             >
               {loading ? (
                 <ActivityIndicator color={palette.royalInk} />
@@ -263,8 +413,8 @@ export default function ScheduleCallSheet({ visible, onClose, onStart, onCreate 
           ) : (
             <Pressable
               onPress={() => handleCreate(true)}
-              disabled={loading}
-              style={[styles.primaryBtn, { backgroundColor: palette.gold }, loading && styles.btnDisabled]}
+              disabled={!canSubmit}
+              style={[styles.primaryBtn, { backgroundColor: palette.gold }, !canSubmit && styles.btnDisabled]}
             >
               {loading ? (
                 <ActivityIndicator color={palette.royalInk} />
@@ -279,6 +429,17 @@ export default function ScheduleCallSheet({ visible, onClose, onStart, onCreate 
         </View>
 
       </View>
+
+      <PanelistPickerSheet
+        visible={showPanelistPicker}
+        palette={palette}
+        loading={panelistChatsLoading}
+        invitable={invitablePanelists}
+        selectedUserIds={panelistIds}
+        onChangeSelected={setPanelistIds}
+        onClose={() => setShowPanelistPicker(false)}
+        onDone={() => setShowPanelistPicker(false)}
+      />
     </Modal>
   );
 }
@@ -344,6 +505,22 @@ const styles = StyleSheet.create({
   },
   scheduleToggleText: { flex: 1, fontSize: 15, fontWeight: '700' },
   presetRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
+  durationStepperRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 20,
+    marginTop: 4,
+  },
+  stepperBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  durationValue: { fontSize: 16, fontWeight: '800', minWidth: 80, textAlign: 'center' },
   scheduleConfirm: { fontSize: 12, textAlign: 'center' },
   error: { fontSize: 13, textAlign: 'center' },
   actions: {

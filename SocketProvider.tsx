@@ -149,6 +149,8 @@ type SocketContextValue = {
   joinWaitingRoom?: (info: { callId: string; conversationId: string; callType: CallType; title: string; silentOnFailure?: boolean }) => Promise<boolean>;
   /** Host: start a previously-scheduled call (reuses its existing callId). */
   startScheduledCall?: (info: { callId: string; conversationId: string; callType: CallType; title: string; silentOnFailure?: boolean }) => Promise<boolean>;
+  /** Invite users directly into the currently-active call (requires activeCall to already be set — e.g. the host's own standalone call right after starting it). */
+  inviteToCall?: (userIds: string[]) => Promise<{ ok: boolean; error?: string; invitedCount?: number }>;
 };
 
 type StartCallArgs = {
@@ -158,6 +160,18 @@ type StartCallArgs = {
   media?: 'voice' | 'video';
   inviteeUserIds?: string[];
   inviteToken?: string;
+  /**
+   * Reuse a call that already exists server-side (e.g. one just created
+   * via POST /calls/standalone) instead of minting a brand-new callId.
+   * Without this, starting a standalone call "now" mints a second,
+   * different callId for the SAME standalone conversationId — which
+   * createCallOrThrowIfActiveInConversation's existingActive check
+   * rejects outright (CALL_ALREADY_ACTIVE), since the REST-created call
+   * is already isActiveInConversation:true under its own callId. Passing
+   * the original callId here instead hits that function's EARLIER
+   * existingById idempotent branch, which succeeds.
+   */
+  callId?: string;
 };
 
 /* ============================================================================
@@ -986,7 +1000,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const granted = await requestCallPermissions(callType);
     if (!granted) { _startingCallRef.current = false; return false; }
 
-    const callId = `call_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+    const callId = args.callId ?? `call_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
     const localUserId = currentUserIdRef.current;
     const invitees = (args.inviteeUserIds ?? []).filter(id => id !== localUserId);
 
@@ -3552,7 +3566,8 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     getCallInviteLink,
     joinWaitingRoom,
     startScheduledCall,
-  }), [socket, isConnected, isNetworkOnline, currentUserId, typingByConversation, typingDisplayNames, presenceByUser, activeCall, startCall, startVoiceChannel, answerCall, rejectCall, leaveCall, endCallForAll, endCall, dismissCallUi, knockOnCall, admitKnocker, denyKnocker, promoteParticipant, toggleNoiseCancellation, toggleCaptions, sendCaption, selectVirtualBg, toggleRecording, createPoll, votePoll, closePoll, submitQuestion, dismissQuestion, markAnswered, createBreakoutRooms, returnToMainRoom, closeBreakoutRooms, startRtmp, stopRtmp, wbStroke, wbUndo, wbClear, joinExistingCall, getCallInviteLink, joinWaitingRoom, startScheduledCall]);
+    inviteToCall,
+  }), [socket, isConnected, isNetworkOnline, currentUserId, typingByConversation, typingDisplayNames, presenceByUser, activeCall, startCall, startVoiceChannel, answerCall, rejectCall, leaveCall, endCallForAll, endCall, dismissCallUi, knockOnCall, admitKnocker, denyKnocker, promoteParticipant, toggleNoiseCancellation, toggleCaptions, sendCaption, selectVirtualBg, toggleRecording, createPoll, votePoll, closePoll, submitQuestion, dismissQuestion, markAnswered, createBreakoutRooms, returnToMainRoom, closeBreakoutRooms, startRtmp, stopRtmp, wbStroke, wbUndo, wbClear, joinExistingCall, getCallInviteLink, joinWaitingRoom, startScheduledCall, inviteToCall]);
 
   /* ─── Render call screens ───────────────────────────────────────────────── */
 

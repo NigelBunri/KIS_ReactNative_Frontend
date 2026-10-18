@@ -202,6 +202,8 @@ export type ScheduledCallItem = {
   callType: CallType;
   title: string | null;
   scheduledFor: string | null;
+  /** Planned length in minutes (5-1440), set at creation time. Informational only. */
+  scheduledDurationMinutes?: number | null;
   isStandalone: boolean;
   inviteToken: string | null;
   participantCount: number;
