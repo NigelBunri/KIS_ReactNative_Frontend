@@ -113,15 +113,9 @@ export default function ParticipantsSheet({ participants, visible, onClose, loca
       <View style={styles.header}>
         <Text style={[styles.title, { color: palette.ivory }]}>Participants ({participants.length})</Text>
         <View style={styles.headerActions}>
-          {isHost && (
+          {onAddParticipant && (
             <Pressable
-              onPress={() => {
-                if (onAddParticipant) {
-                  onAddParticipant();
-                } else {
-                  Alert.alert('Coming soon', 'Adding participants to an active call is not available yet.');
-                }
-              }}
+              onPress={onAddParticipant}
               style={styles.closeBtn}
               accessibilityLabel="Add participant"
               accessibilityRole="button"

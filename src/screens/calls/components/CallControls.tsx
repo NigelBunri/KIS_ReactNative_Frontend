@@ -155,11 +155,18 @@ export default function CallControls({
       hidden: !isGroup,
     },
     {
+      // No host/co-host gate here — the backend's call.invite handler has
+      // none either (any conversation member can invite another), so
+      // restricting this to hosts client-side would just hide a button
+      // that works fine for a plain participant who taps it. Still
+      // group/broadcast-only: 1:1 voice/video calls render through
+      // VoiceOneOnOneLayout/VideoOneOnOneLayout, which only ever show a
+      // single remote participant tile and have no layout for a 3rd.
       id: 'add-participant',
       icon: 'user-plus',
       label: 'Add',
       overrideAccent: palette.gold,
-      hidden: !isGroup || !isHostOrCoHost,
+      hidden: !isGroup,
     },
     {
       // AND-097: this button DID correctly flip session.layout and

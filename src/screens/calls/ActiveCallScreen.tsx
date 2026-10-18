@@ -848,7 +848,7 @@ export default function ActiveCallScreen({ session, actions }: Props) {
           isHost={isHostOrCoHost}
           onMute={isHostOrCoHost ? actions.onMuteParticipant : undefined}
           onRemove={isHostOrCoHost ? actions.onRemoveParticipant : undefined}
-          onAddParticipant={isHostOrCoHost ? openAddParticipantSheet : undefined}
+          onAddParticipant={isGroup ? openAddParticipantSheet : undefined}
           onPromote={isHostOrCoHost ? actions.onPromoteParticipant : undefined}
         />
 
