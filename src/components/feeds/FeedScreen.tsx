@@ -217,8 +217,22 @@ const uploadFeedAttachment = async (attachment: any, token: string): Promise<any
         uploadContext: 'feed',
         relatedEntityIds: { composer: 'feed' },
       });
+      // CONFIRMED ROOT CAUSE of "I posted an image but never saw it in the
+      // feed": this used to spread `...attachment` here, which still
+      // carries the picker's original local url/uri (set by
+      // composer/attachments.ts's makeAttachment). uploadFeedAttachmentsIfNeeded
+      // below only ever treated a null return as "upload failed" - a
+      // queued-fallback object with a local-only url looked like success,
+      // so the post was created immediately with an attachment whose url
+      // can never resolve for anyone, including the poster's own feed.
+      // Omitting url/uri entirely (not just leaving the stale local one)
+      // means this can never be mistaken for a real remote URL downstream,
+      // and the explicit uploadStatus: 'queued' is what lets the caller
+      // below refuse to submit the post until the real upload finishes.
       return {
         ...attachment,
+        url: undefined,
+        uri: undefined,
         localUri: job.localUri,
         localPath: job.localPath,
         offlineMediaJobId: job.id,
@@ -251,6 +265,20 @@ const uploadFeedAttachmentsIfNeeded = async (
   for (const attachment of attachments) {
     const uploaded = await uploadFeedAttachment(attachment, token);
     if (uploaded === null) return null;
+    if (uploaded.uploadStatus === 'queued') {
+      // The direct-to-S3 upload failed and the attachment only has a
+      // background-retry job queued, not a real remote URL yet - posting
+      // now would create a post referencing media nobody can ever load
+      // (see uploadFeedAttachment's queued-fallback comment above). Block
+      // the submission entirely rather than silently publishing a broken
+      // attachment; the queued job still retries in the background, so
+      // the user can just try posting again once it completes.
+      Alert.alert(
+        'Upload pending',
+        'Your photo/video couldn’t be uploaded right now and has been queued to retry in the background. Please try posting again once it finishes uploading.',
+      );
+      return null;
+    }
     nextAttachments.push(uploaded);
   }
 

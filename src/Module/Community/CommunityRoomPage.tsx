@@ -21,7 +21,6 @@ import ImagePlaceholder from '@/components/common/ImagePlaceholder';
 import Skeleton from '@/components/common/Skeleton';
 import AddContactsPage from '@/Module/AddContacts/AddContactsPage';
 import CommunityFeedScreen from '@/components/feeds/CommunityFeedScreen';
-import { getFeedPlainText } from '@/components/feeds/richTextValue';
 
 type Community = {
   id: string;
@@ -286,26 +285,19 @@ export default function CommunityRoomPage({
                   <Text style={[styles.sectionTitle, { color: palette.subtext }]}>Main feed</Text>
                   <KISIcon name="chevron-right" size={16} color={palette.subtext} />
                 </View>
+                {/* A plain affordance into the real feed, not a second
+                    render of its content - this previously peeked at the
+                    latest 1-2 posts' author/text here, a second,
+                    out-of-sync representation of items the actual feed
+                    (CommunityFeedScreen) already owns. */}
                 {loading ? (
                   <View style={styles.feedLoading}>
                     <Skeleton width="70%" height={11} radius={6} />
-                    <Skeleton width="48%" height={9} radius={5} style={styles.feedLoadingLine} />
                   </View>
-                ) : posts.length === 0 ? (
-                  <Text style={{ color: palette.subtext, fontSize: 12 }}>
-                    No posts yet. Tap to open the community feed.
-                  </Text>
                 ) : (
-                  posts.slice(0, 2).map((p) => (
-                    <View key={p.id} style={{ marginTop: 8 }}>
-                      <Text style={{ color: palette.text, fontWeight: '600' }}>
-                        {p.author?.display_name ?? 'Member'}
-                      </Text>
-                      <Text style={{ color: palette.text, marginTop: 4 }} numberOfLines={2}>
-                        {getFeedPlainText(p)}
-                      </Text>
-                    </View>
-                  ))
+                  <Text style={{ color: palette.subtext, fontSize: 12, marginTop: 4 }}>
+                    {posts.length > 0 ? 'Tap to view community posts.' : 'No posts yet. Tap to open the community feed.'}
+                  </Text>
                 )}
               </Pressable>
             </View>
