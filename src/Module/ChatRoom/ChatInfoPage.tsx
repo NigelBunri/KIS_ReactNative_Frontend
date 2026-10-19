@@ -713,6 +713,14 @@ export const ChatInfoPage: React.FC<ChatInfoPageProps> = ({
         (typeof res?.data === 'string' ? res.data : null);
       if (link) {
         setInviteLink(String(link));
+      } else if (res?.success === false) {
+        // Surfaces the real reason (e.g. "You are not a member of this
+        // channel." from a 403, or a 404 for a stale/bad id) - previously
+        // this branch also caught here showed the same generic "Could not
+        // retrieve an invite link." regardless of what actually failed,
+        // which made a real permission/lookup error indistinguishable
+        // from "the server responded 200 with no link field".
+        Alert.alert('Invite link', res?.message || 'Could not retrieve an invite link.');
       } else {
         Alert.alert('Invite link', 'Could not retrieve an invite link.');
       }
@@ -740,7 +748,11 @@ export const ChatInfoPage: React.FC<ChatInfoPageProps> = ({
         res?.data?.invite_link ??
         res?.data?.url ??
         (typeof res?.data === 'string' ? res.data : null);
-      if (link) setInviteLink(String(link));
+      if (link) {
+        setInviteLink(String(link));
+      } else if (res?.success === false) {
+        Alert.alert('Invite link', res?.message || 'Could not regenerate the invite link.');
+      }
     } catch {
       Alert.alert('Error', 'Failed to regenerate invite link.');
     } finally {

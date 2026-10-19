@@ -32,6 +32,7 @@ const socialRoutes = {
     approveRequest: (id: string) => `${API_BASE_URL}/api/v1/chat-communities/${id}/approve-request/`,
     rejectRequest: (id: string) => `${API_BASE_URL}/api/v1/chat-communities/${id}/reject-request/`,
     setMemberRole: (id: string) => `${API_BASE_URL}/api/v1/chat-communities/${id}/members/set-role/`,
+    promoteMemberToGroupAdmin: (id: string) => `${API_BASE_URL}/api/v1/chat-communities/${id}/members/promote-admin/`,
     removeMember: (id: string) => `${API_BASE_URL}/api/v1/chat-communities/${id}/members/remove/`,
     blockMember: (id: string) => `${API_BASE_URL}/api/v1/chat-communities/${id}/members/block/`,
     ban: (id: string) => `${API_BASE_URL}/api/v1/chat-communities/${id}/ban/`,

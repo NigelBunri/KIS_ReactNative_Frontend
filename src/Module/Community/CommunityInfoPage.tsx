@@ -107,6 +107,12 @@ export const CommunityInfoPage: React.FC<CommunityInfoPageProps> = ({
   const [description, setDescription] = useState<string>('');
   const [members, setMembers] = useState<CommunityMember[]>([]);
   const [memberCount, setMemberCount] = useState<number>(0);
+  // "Admin" is always admin OF ONE OF THE COMMUNITY'S OWN GROUPS, never a
+  // bare community-wide toggle (see promote_member_to_group_admin on the
+  // backend) — "Promote to admin" only appears in the member action sheet
+  // below when this is non-empty, and promoting asks the owner to pick
+  // one of these.
+  const [communityGroups, setCommunityGroups] = useState<{ id: string; name: string }[]>([]);
   const [posts, setPosts] = useState<CommunityPost[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -219,6 +225,23 @@ export const CommunityInfoPage: React.FC<CommunityInfoPageProps> = ({
       if (mountedRef.current) {
         setPosts(Array.isArray(postList) ? postList : []);
       }
+
+      const groupsRes = await getRequest(`${ROUTES.groups.list}?community=${communityId}`, {
+        errorMessage: '',
+      });
+      const groupsList =
+        groupsRes?.data?.results ??
+        groupsRes?.results ??
+        groupsRes?.data ??
+        groupsRes ??
+        [];
+      if (mountedRef.current) {
+        setCommunityGroups(
+          Array.isArray(groupsList)
+            ? groupsList.map((g: any) => ({ id: String(g.id), name: String(g.name ?? 'Group') }))
+            : [],
+        );
+      }
     } finally {
       if (mountedRef.current) setLoading(false);
     }
@@ -299,6 +322,65 @@ export const CommunityInfoPage: React.FC<CommunityInfoPageProps> = ({
   const role = String(viewerRole ?? me?.role ?? me?.base_role ?? '').toLowerCase();
   const isAdmin = role === 'owner' || role === 'admin' || role === 'mod' || role === 'moderator';
 
+  // "Admin" here always means admin of one of the community's own groups
+  // (promote_member_to_group_admin on the backend sets both the group's
+  // own GroupMembership/ConversationMember roles AND
+  // CommunityMembership.role=admin in one call) - this prompts the owner
+  // to pick which group when there's more than one, and promotes
+  // directly when there's exactly one.
+  const promoteToGroupAdmin = useCallback(async (userId: string, groupId: string) => {
+    const res = await postRequest(
+      ROUTES.community.promoteMemberToGroupAdmin(communityId),
+      { user_id: userId, group_id: groupId },
+      { errorMessage: 'Failed to promote member' },
+    );
+    if (res.success) {
+      setMembers((prev) =>
+        prev.map((m) =>
+          resolveUserId(m) === userId ? { ...m, role: 'admin', base_role: 'admin' } : m,
+        ),
+      );
+    } else {
+      Alert.alert('Error', res.message || 'Unable to promote member.');
+    }
+  }, [communityId]);
+
+  const promptPromoteToGroupAdmin = useCallback((userId: string, label: string) => {
+    if (communityGroups.length === 1) {
+      Alert.alert(
+        'Promote to admin',
+        `Make ${label} an admin of "${communityGroups[0].name}"?`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Promote', onPress: () => promoteToGroupAdmin(userId, communityGroups[0].id) },
+        ],
+      );
+      return;
+    }
+    const groupNames = communityGroups.map((g) => g.name);
+    if (Platform.OS === 'ios') {
+      ActionSheetIOS.showActionSheetWithOptions(
+        {
+          title: `Make ${label} admin of which group?`,
+          options: [...groupNames, 'Cancel'],
+          cancelButtonIndex: groupNames.length,
+        },
+        (index) => {
+          if (index < groupNames.length) {
+            void promoteToGroupAdmin(userId, communityGroups[index].id);
+          }
+        },
+      );
+    } else {
+      const buttons = communityGroups.map((g) => ({
+        text: g.name,
+        onPress: () => void promoteToGroupAdmin(userId, g.id),
+      }));
+      buttons.push({ text: 'Cancel', style: 'cancel' as any, onPress: () => {} } as any);
+      Alert.alert(`Make ${label} admin of which group?`, undefined, buttons as any);
+    }
+  }, [communityGroups, promoteToGroupAdmin]);
+
   const handleMemberAction = (member: CommunityMember) => {
     const userId = resolveUserId(member);
     if (!userId) return;
@@ -362,24 +444,12 @@ export const CommunityInfoPage: React.FC<CommunityInfoPageProps> = ({
             Alert.alert('Error', res.message || 'Unable to demote member.');
           }
         });
-      } else {
+      } else if (communityGroups.length > 0) {
+        // No "Promote to admin" at all when the community has no groups
+        // yet - there's nothing to scope an admin to (see
+        // promoteToGroupAdmin's docstring above).
         options.push('Promote to admin');
-        actions.push(async () => {
-          const res = await postRequest(
-            ROUTES.community.setMemberRole(communityId),
-            { user_id: userId, role: 'admin' },
-            { errorMessage: 'Failed to promote member' },
-          );
-          if (res.success) {
-            setMembers((prev) =>
-              prev.map((m) =>
-                resolveUserId(m) === userId ? { ...m, role: 'admin', base_role: 'admin' } : m,
-              ),
-            );
-          } else {
-            Alert.alert('Error', res.message || 'Unable to promote member.');
-          }
-        });
+        actions.push(() => promptPromoteToGroupAdmin(userId, label));
       }
     }
 
