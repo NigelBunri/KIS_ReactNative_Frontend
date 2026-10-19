@@ -62,6 +62,7 @@ type Props = {
   mentionParticipants?: { id: string; name: string }[];
   participantMap?: Record<string, string>;
   participantAvatarMap?: Record<string, string>;
+  participantPhoneMap?: Record<string, string>;
   senderName?: string;
   conversationIdForMentions?: string;
   onLoadOlder?: () => void;
@@ -145,6 +146,7 @@ export default function ChatRoomBody({
   mentionParticipants,
   participantMap,
   participantAvatarMap,
+  participantPhoneMap,
   senderName,
   conversationIdForMentions,
   onLoadOlder,
@@ -238,6 +240,7 @@ export default function ChatRoomBody({
         mentionMap={mentionMap}
         participantMap={participantMap}
         participantAvatarMap={participantAvatarMap}
+        participantPhoneMap={participantPhoneMap}
         callHistory={callHistory}
         onCallHistoryCallback={onCallHistoryCallback}
       />

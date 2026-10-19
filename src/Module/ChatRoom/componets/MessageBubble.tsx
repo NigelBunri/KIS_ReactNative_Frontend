@@ -28,6 +28,7 @@ import { AttachmentDownloadError, requestAttachmentDownloadUrl } from '../attach
 import { classifyVoicePlaybackReadiness, resolveEmbeddedVoicePlaybackUri } from '../voiceAttachment';
 import { cachedVoicePlaybackUrl, describeVoicePlaybackError, resolveFreshVoicePlaybackUrl } from '../voicePlaybackResolver';
 import { saveStickerToLibrary } from './main/FroSticker/stickerLibrary';
+import PollVotesSheet from './main/PollVotesSheet';
 import { ViewOnceViewerModal, type ViewOnceContentSnapshot } from './ViewOnceViewerModal';
 import { useMessageTranslation } from '../hooks/useMessageTranslation';
 import { MessageTranslationBlock } from './MessageTranslationBlock';
@@ -204,6 +205,7 @@ type MessageBubbleProps = {
   mentionMap?: Record<string, string>;
   participantMap?: Record<string, string>;
   participantAvatarMap?: Record<string, string>;
+  participantPhoneMap?: Record<string, string>;
   senderId?: string;
   onUpdateMessage?: (message: ChatMessage) => void;
 
@@ -278,6 +280,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   mentionMap,
   participantMap,
   participantAvatarMap,
+  participantPhoneMap,
   senderId,
   onUpdateMessage,
   translateRequestToken,
@@ -1190,6 +1193,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   const [selectedPollOptionKey, setSelectedPollOptionKey] = useState<
     string | null
   >(null);
+  const [pollVotesVisible, setPollVotesVisible] = useState(false);
 
   // Playback start/toggle/speed-cycle now go straight through voicePlayer
   // (VoiceMessagePlayerContext) from handleVoicePress, further down where
@@ -2805,6 +2809,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
     // (enforced again server-side in closePoll() - this only decides
     // whether to show the button at all).
     const canManuallyClose = isMe && !closed && typeof onClosePoll === 'function';
+    const badgeTint = palette.primary ?? '#6366F1';
 
     return (
       <View
@@ -2816,32 +2821,50 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
           style={{
             flexDirection: 'row',
             alignItems: 'center',
-            marginBottom: 6,
+            justifyContent: 'space-between',
+            marginBottom: 10,
           }}
         >
-          <KISIcon
-            name="poll"
-            size={14}
-            color={questionColor}
-          />
-          <Text
-            style={{
-              marginLeft: 4,
-              fontSize: 12,
-              fontWeight: '600',
-              color: questionColor,
-            }}
-          >
-            Poll
-          </Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <View
+              style={{
+                width: 22,
+                height: 22,
+                borderRadius: 11,
+                alignItems: 'center',
+                justifyContent: 'center',
+                backgroundColor: badgeTint + '26',
+                marginRight: 6,
+              }}
+            >
+              <KISIcon name="poll" size={12} color={badgeTint} />
+            </View>
+            <Text
+              style={{
+                fontSize: 12,
+                fontWeight: '700',
+                letterSpacing: 0.3,
+                color: metaTextColor,
+                textTransform: 'uppercase',
+              }}
+            >
+              Poll
+            </Text>
+          </View>
+          {totalVotes > 0 && (
+            <Text style={{ fontSize: 11, color: metaTextColor, fontWeight: '600' }}>
+              {totalVotes} vote{totalVotes === 1 ? '' : 's'}
+            </Text>
+          )}
         </View>
 
         <Text
           style={{
-            fontSize: 14,
-            fontWeight: '600',
+            fontSize: 15,
+            fontWeight: '700',
             color: questionColor,
-            marginBottom: 8,
+            marginBottom: 10,
+            lineHeight: 20,
           }}
         >
           {poll.question}
@@ -2872,18 +2895,18 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
               key={optionKey}
               disabled={closed}
               onPress={() => handlePollOptionPress(optionKey, rawOptionId)}
-              style={{ marginBottom: 6, opacity: closed && !isSelected ? 0.7 : 1 }}
+              style={{ marginBottom: 8, opacity: closed && !isSelected ? 0.7 : 1 }}
             >
               <View
                 style={{
-                  paddingHorizontal: 10,
-                  paddingVertical: 8,
-                  borderRadius: 10,
+                  paddingHorizontal: 12,
+                  paddingVertical: 10,
+                  borderRadius: 14,
                   backgroundColor: optionBg,
-                  borderWidth: isSelected ? 2 : 0,
+                  borderWidth: isSelected ? 2 : 1,
                   borderColor: isSelected
                     ? palette.pollOptionSelectedBorder ?? palette.primary
-                    : 'transparent',
+                    : (palette.divider ?? '#00000014'),
                   overflow: 'hidden',
                 }}
               >
@@ -2899,26 +2922,27 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
                       backgroundColor: isSelected
                         ? (palette.pollBarSelected ?? (palette.primary) + '44')
                         : (palette.pollBarBg ?? '#00000011'),
-                      borderRadius: 10,
+                      borderRadius: 14,
                     }}
                   />
                 )}
 
                 <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                   <View style={{ flex: 1 }}>
-                    <Text style={{ fontSize: 13, color: optionTextColor, fontWeight: isSelected ? '700' : '400' }}>
+                    <Text style={{ fontSize: 13, color: optionTextColor, fontWeight: isSelected ? '700' : '500' }}>
                       {opt.text}
                     </Text>
-                    <Text style={{ fontSize: 11, color: metaTextColor, marginTop: 2 }}>
-                      {votes} vote{votes === 1 ? '' : 's'}
-                      {totalVotes > 0 ? ` • ${percentage}%` : ''}
-                    </Text>
+                    {totalVotes > 0 && (
+                      <Text style={{ fontSize: 11, color: metaTextColor, marginTop: 2 }}>
+                        {votes} vote{votes === 1 ? '' : 's'} • {percentage}%
+                      </Text>
+                    )}
                   </View>
 
                   {isSelected && (
                     <Ionicons
                       name="checkmark-circle"
-                      size={16}
+                      size={18}
                       color={palette.primary}
                       style={{ marginLeft: 8 }}
                     />
@@ -2929,20 +2953,52 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
           );
         })}
 
-        <Text
+        <View
           style={{
-            fontSize: 11,
-            color: metaTextColor,
-            marginTop: 4,
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            marginTop: 2,
           }}
         >
-          {poll.allowMultiple ? 'Multiple choices allowed' : 'Single choice'}
-          {closed
-            ? ' • Poll closed'
-            : poll.expiresAt
-              ? ` • closes ${new Date(poll.expiresAt).toLocaleString()}`
-              : ''}
-        </Text>
+          <Text
+            style={{
+              fontSize: 11,
+              color: metaTextColor,
+              flex: 1,
+              marginRight: 8,
+            }}
+          >
+            {poll.allowMultiple ? 'Multiple choices allowed' : 'Single choice'}
+            {closed
+              ? ' • Poll closed'
+              : poll.expiresAt
+                ? ` • closes ${new Date(poll.expiresAt).toLocaleString()}`
+                : ''}
+          </Text>
+
+          {totalVotes > 0 && (
+            <Pressable
+              onPress={() => setPollVotesVisible(true)}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 4,
+                paddingHorizontal: 10,
+                paddingVertical: 5,
+                borderRadius: 12,
+                backgroundColor: badgeTint + '1F',
+              }}
+              accessibilityRole="button"
+              accessibilityLabel="View votes"
+            >
+              <KISIcon name="people" size={13} color={badgeTint} />
+              <Text style={{ fontSize: 11, fontWeight: '700', color: badgeTint }}>
+                View votes
+              </Text>
+            </Pressable>
+          )}
+        </View>
 
         {canManuallyClose && (
           <Pressable
@@ -2950,7 +3006,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
               const messageId = (message as any).serverId ?? (message as any).id;
               if (messageId) onClosePoll?.(messageId);
             }}
-            style={{ marginTop: 6, alignSelf: 'flex-start' }}
+            style={{ marginTop: 8, alignSelf: 'flex-start' }}
             accessibilityRole="button"
             accessibilityLabel="Close poll"
           >
@@ -2959,6 +3015,21 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
             </Text>
           </Pressable>
         )}
+
+        <PollVotesSheet
+          visible={pollVotesVisible}
+          onClose={() => setPollVotesVisible(false)}
+          palette={palette}
+          question={poll.question}
+          options={poll.options.map((opt, idx) => ({
+            id: typeof opt.id === 'string' && opt.id.length > 0 ? opt.id : String(idx),
+            text: opt.text,
+            voterIds: opt.voterIds,
+          }))}
+          participantMap={participantMap}
+          participantAvatarMap={participantAvatarMap}
+          participantPhoneMap={participantPhoneMap}
+        />
       </View>
     );
   };

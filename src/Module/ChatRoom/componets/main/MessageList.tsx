@@ -175,6 +175,7 @@ type MessageListProps = {
   mentionMap?: Record<string, string>;
   participantMap?: Record<string, string>;
   participantAvatarMap?: Record<string, string>;
+  participantPhoneMap?: Record<string, string>;
   isE2EE?: boolean;
   callHistory?: CallHistoryEntry[];
   onCallHistoryCallback?: (entry: CallHistoryEntry) => void;
@@ -217,6 +218,7 @@ export const MessageList: React.FC<MessageListProps> = ({
   mentionMap,
   participantMap,
   participantAvatarMap,
+  participantPhoneMap,
   isE2EE = false,
   callHistory = [],
   onCallHistoryCallback,
@@ -666,6 +668,7 @@ export const MessageList: React.FC<MessageListProps> = ({
             mentionMap={mentionMap}
             participantMap={participantMap}
             participantAvatarMap={participantAvatarMap}
+            participantPhoneMap={participantPhoneMap}
           />
         </View>
       );
@@ -700,6 +703,7 @@ export const MessageList: React.FC<MessageListProps> = ({
       mentionMap,
       participantMap,
       participantAvatarMap,
+      participantPhoneMap,
     ],
   );
 

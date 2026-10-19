@@ -1011,6 +1011,21 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
     return map;
   }, [chat?.participants]);
 
+  // Lets the poll "View votes" sheet show a phone number for any voter
+  // who has no display name, same fallback MessageBubble already uses
+  // elsewhere for a sender label.
+  const participantPhoneMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    const parts = chat?.participants ?? [];
+    if (!Array.isArray(parts)) return map;
+    (parts as any[]).forEach((p: any) => {
+      const id = String(p?.id ?? p?.user?.id ?? p ?? '');
+      const phone = p?.user?.phone ?? p?.phone ?? '';
+      if (id && phone) map[id] = String(phone);
+    });
+    return map;
+  }, [chat?.participants]);
+
   const createForwardClientId = useCallback(
     () => `client_${Date.now()}_${Math.random().toString(36).slice(2)}`,
     [],
@@ -2748,6 +2763,7 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
           mentionParticipants={mentionParticipants}
           participantMap={participantMap}
           participantAvatarMap={participantAvatarMap}
+          participantPhoneMap={participantPhoneMap}
           senderName={currentUserName ?? ''}
           conversationIdForMentions={String(conversationId ?? chat?.id ?? '')}
           onChangeDraft={handleChangeDraft}
