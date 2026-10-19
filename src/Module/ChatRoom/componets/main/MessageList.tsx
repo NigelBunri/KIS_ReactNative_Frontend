@@ -176,6 +176,8 @@ type MessageListProps = {
   participantMap?: Record<string, string>;
   participantAvatarMap?: Record<string, string>;
   participantPhoneMap?: Record<string, string>;
+  participantRoleMap?: Record<string, string>;
+  isDirectChat?: boolean;
   isE2EE?: boolean;
   callHistory?: CallHistoryEntry[];
   onCallHistoryCallback?: (entry: CallHistoryEntry) => void;
@@ -219,6 +221,8 @@ export const MessageList: React.FC<MessageListProps> = ({
   participantMap,
   participantAvatarMap,
   participantPhoneMap,
+  participantRoleMap,
+  isDirectChat,
   isE2EE = false,
   callHistory = [],
   onCallHistoryCallback,
@@ -669,6 +673,8 @@ export const MessageList: React.FC<MessageListProps> = ({
             participantMap={participantMap}
             participantAvatarMap={participantAvatarMap}
             participantPhoneMap={participantPhoneMap}
+            participantRoleMap={participantRoleMap}
+            isDirectChat={isDirectChat}
           />
         </View>
       );
@@ -704,6 +710,8 @@ export const MessageList: React.FC<MessageListProps> = ({
       participantMap,
       participantAvatarMap,
       participantPhoneMap,
+      participantRoleMap,
+      isDirectChat,
     ],
   );
 

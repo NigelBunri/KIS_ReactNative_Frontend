@@ -206,6 +206,8 @@ type MessageBubbleProps = {
   participantMap?: Record<string, string>;
   participantAvatarMap?: Record<string, string>;
   participantPhoneMap?: Record<string, string>;
+  participantRoleMap?: Record<string, string>;
+  isDirectChat?: boolean;
   senderId?: string;
   onUpdateMessage?: (message: ChatMessage) => void;
 
@@ -281,6 +283,8 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   participantMap,
   participantAvatarMap,
   participantPhoneMap,
+  participantRoleMap,
+  isDirectChat,
   senderId,
   onUpdateMessage,
   translateRequestToken,
@@ -3029,6 +3033,8 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
           participantMap={participantMap}
           participantAvatarMap={participantAvatarMap}
           participantPhoneMap={participantPhoneMap}
+          participantRoleMap={participantRoleMap}
+          isDirectChat={isDirectChat}
         />
       </View>
     );

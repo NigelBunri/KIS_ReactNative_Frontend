@@ -61,6 +61,8 @@ type Props = {
   participantMap?: Record<string, string>;
   participantAvatarMap?: Record<string, string>;
   participantPhoneMap?: Record<string, string>;
+  participantRoleMap?: Record<string, string>;
+  isDirectChat?: boolean;
 };
 
 const SWIPE_THRESHOLD = 40;
@@ -170,6 +172,8 @@ export const InteractiveMessageRow: React.FC<Props> = ({
   participantMap,
   participantAvatarMap,
   participantPhoneMap,
+  participantRoleMap,
+  isDirectChat,
 }) => {
   const { height: SCREEN_HEIGHT } = useWindowDimensions();
   const lastTapRef = useRef<number | null>(null);
@@ -462,6 +466,8 @@ export const InteractiveMessageRow: React.FC<Props> = ({
             participantMap={participantMap}
             participantAvatarMap={participantAvatarMap}
             participantPhoneMap={participantPhoneMap}
+            participantRoleMap={participantRoleMap}
+            isDirectChat={isDirectChat}
             senderId={(message as any).senderId}
             onUpdateMessage={onUpdateMessage}
             translateRequestToken={translateRequestToken}

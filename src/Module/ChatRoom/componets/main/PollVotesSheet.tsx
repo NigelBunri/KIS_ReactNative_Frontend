@@ -22,6 +22,7 @@ type Voter = {
   name?: string;
   phone?: string;
   avatarUrl?: string;
+  status: string;
 };
 
 type Props = {
@@ -33,6 +34,8 @@ type Props = {
   participantMap?: Record<string, string>;
   participantAvatarMap?: Record<string, string>;
   participantPhoneMap?: Record<string, string>;
+  participantRoleMap?: Record<string, string>;
+  isDirectChat?: boolean;
 };
 
 const initialsFor = (label: string): string =>
@@ -44,6 +47,19 @@ const initialsFor = (label: string): string =>
     .join('')
     .toUpperCase() || '?';
 
+// A 1-to-1 chat has no group/community role concept at all - the other
+// party is simply a contact, regardless of whatever base_role their
+// ConversationMember row happens to carry. Otherwise: owner/admin/mod all
+// read as "Admin" (matches the Owner/Admin badge split used elsewhere,
+// e.g. ChatInfoPage.tsx's own member list), anything else is "Member".
+const statusFor = (role: string | undefined, isDirectChat: boolean | undefined): string => {
+  if (isDirectChat) return 'Contact';
+  const normalized = (role ?? '').toLowerCase();
+  if (normalized === 'owner') return 'Owner';
+  if (normalized === 'admin' || normalized === 'mod' || normalized === 'moderator') return 'Admin';
+  return 'Member';
+};
+
 export default function PollVotesSheet({
   visible,
   onClose,
@@ -53,6 +69,8 @@ export default function PollVotesSheet({
   participantMap,
   participantAvatarMap,
   participantPhoneMap,
+  participantRoleMap,
+  isDirectChat,
 }: Props) {
   const slideAnim = useRef(new Animated.Value(0)).current;
 
@@ -69,8 +87,15 @@ export default function PollVotesSheet({
     name: participantMap?.[id],
     phone: participantPhoneMap?.[id],
     avatarUrl: participantAvatarMap?.[id],
+    status: statusFor(participantRoleMap?.[id], isDirectChat),
   });
 
+  // Recomputes on every render while the sheet is open (not just once on
+  // mount) - `options` is a fresh array built by MessageBubble's
+  // renderPollCard on every render, so a live 'chat.poll_updated' socket
+  // event (see useChatMessaging.ts) that updates the message's poll while
+  // this sheet is already open flows straight through to a new voter list
+  // here, with no need to close and reopen the sheet to see it.
   const sections = useMemo(
     () =>
       options.map((opt) => {
@@ -82,7 +107,7 @@ export default function PollVotesSheet({
         };
       }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [options, participantMap, participantAvatarMap, participantPhoneMap],
+    [options, participantMap, participantAvatarMap, participantPhoneMap, participantRoleMap, isDirectChat],
   );
 
   const totalVotes = sections.reduce((sum, s) => sum + s.count, 0);
@@ -174,6 +199,29 @@ export default function PollVotesSheet({
                     </Text>
                   ) : null}
                 </View>
+                {(() => {
+                  const statusColor =
+                    item.status === 'Owner'
+                      ? '#F59E0B'
+                      : item.status === 'Admin'
+                        ? palette.primary ?? '#6366F1'
+                        : palette.subtext;
+                  const tinted = item.status === 'Owner' || item.status === 'Admin';
+                  return (
+                    <View
+                      style={[
+                        styles.statusPill,
+                        tinted
+                          ? { backgroundColor: statusColor + '1F', borderColor: statusColor + '40', borderWidth: 1 }
+                          : { backgroundColor: palette.surfaceSoft ?? palette.surface },
+                      ]}
+                    >
+                      <Text style={{ color: statusColor, fontSize: 11, fontWeight: '700' }}>
+                        {item.status}
+                      </Text>
+                    </View>
+                  );
+                })()}
               </View>
             );
           }}
@@ -237,5 +285,6 @@ const styles = StyleSheet.create({
   avatarFallback: { alignItems: 'center', justifyContent: 'center' },
   voterName: { fontSize: 14, fontWeight: '600' },
   voterSecondary: { fontSize: 12, marginTop: 2 },
+  statusPill: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 10, marginLeft: 8 },
   emptySection: { paddingHorizontal: 18, paddingVertical: 10 },
 });

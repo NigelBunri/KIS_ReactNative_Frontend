@@ -1026,6 +1026,21 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
     return map;
   }, [chat?.participants]);
 
+  // Lets the poll "View votes" sheet label each voter's status
+  // (owner/admin/member) - same base_role field ChatInfoPage.tsx's own
+  // member list already reads for its role badge.
+  const participantRoleMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    const parts = chat?.participants ?? [];
+    if (!Array.isArray(parts)) return map;
+    (parts as any[]).forEach((p: any) => {
+      const id = String(p?.id ?? p?.user?.id ?? p ?? '');
+      const role = p?.base_role ?? p?.role ?? '';
+      if (id && role) map[id] = String(role).toLowerCase();
+    });
+    return map;
+  }, [chat?.participants]);
+
   const createForwardClientId = useCallback(
     () => `client_${Date.now()}_${Math.random().toString(36).slice(2)}`,
     [],
@@ -2764,6 +2779,8 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
           participantMap={participantMap}
           participantAvatarMap={participantAvatarMap}
           participantPhoneMap={participantPhoneMap}
+          participantRoleMap={participantRoleMap}
+          isDirectChat={!!(chat as any)?.isDirect}
           senderName={currentUserName ?? ''}
           conversationIdForMentions={String(conversationId ?? chat?.id ?? '')}
           onChangeDraft={handleChangeDraft}

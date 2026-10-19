@@ -63,6 +63,8 @@ type Props = {
   participantMap?: Record<string, string>;
   participantAvatarMap?: Record<string, string>;
   participantPhoneMap?: Record<string, string>;
+  participantRoleMap?: Record<string, string>;
+  isDirectChat?: boolean;
   senderName?: string;
   conversationIdForMentions?: string;
   onLoadOlder?: () => void;
@@ -147,6 +149,8 @@ export default function ChatRoomBody({
   participantMap,
   participantAvatarMap,
   participantPhoneMap,
+  participantRoleMap,
+  isDirectChat,
   senderName,
   conversationIdForMentions,
   onLoadOlder,
@@ -241,6 +245,8 @@ export default function ChatRoomBody({
         participantMap={participantMap}
         participantAvatarMap={participantAvatarMap}
         participantPhoneMap={participantPhoneMap}
+        participantRoleMap={participantRoleMap}
+        isDirectChat={isDirectChat}
         callHistory={callHistory}
         onCallHistoryCallback={onCallHistoryCallback}
       />
