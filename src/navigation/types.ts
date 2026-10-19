@@ -83,7 +83,7 @@ export type RootStackParamList = {
   NotificationsDashboard: undefined;
   OrganizationApp: { app: PartnerOrganizationApp; partnerId?: string; partnerName?: string; canManage?: boolean };
   OrgAppLaunch: { partnerId: string; appId: string };
-  InviteJoin: { type: 'group' | 'community' | 'contact' | 'referral' | 'call' | 'broadcast-call'; token: string };
+  InviteJoin: { type: 'group' | 'channel' | 'community' | 'contact' | 'referral' | 'call' | 'broadcast-call'; token: string };
   CallJoin: { token: string };
   PartnerRedeemInvite: { code?: string };
   GiftMembershipRedeem: { token?: string };

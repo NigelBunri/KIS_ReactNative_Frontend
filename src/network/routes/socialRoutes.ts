@@ -92,6 +92,8 @@ const socialRoutes = {
     overwrites: (id: string) => `${API_BASE_URL}/api/v1/partner-channels/channels/${id}/overwrites/`,
     overwriteDetail: (id: string, overwriteId: string) =>
       `${API_BASE_URL}/api/v1/partner-channels/channels/${id}/overwrites/${overwriteId}/`,
+    inviteLink: (id: string) => `${API_BASE_URL}/api/v1/partner-channels/channels/${id}/invite-link/`,
+    joinByInvite: `${API_BASE_URL}/api/v1/partner-channels/channels/join-by-invite/`,
   },
   subchannels: {
     getAllSubchannels: `${API_BASE_URL}/api/v1/subchannels/`,

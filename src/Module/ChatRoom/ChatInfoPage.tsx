@@ -213,9 +213,10 @@ export const ChatInfoPage: React.FC<ChatInfoPageProps> = ({
   // backed by the same Conversation/ConversationMember model as Groups -
   // members, base_role, set-role, add, and remove all already work
   // identically via the generic /chats/conversations/{id}/... endpoints
-  // below. Only group-specific features that need a resolved groupId
-  // (name/avatar edit, invite links, Ban - GroupBan has no Channel
-  // equivalent yet) stay gated on isGroup alone.
+  // below. Invite links now work the same way too (apps.channels.views
+  // .ChannelViewSet.invite_link/join_by_invite, added alongside this) -
+  // only name/avatar edit and Ban (GroupBan has no Channel equivalent
+  // yet) stay gated on isGroup alone.
   const isChannel = chat.kind === 'channel';
   const hasMembers = isGroup || isChannel;
 
@@ -234,15 +235,17 @@ export const ChatInfoPage: React.FC<ChatInfoPageProps> = ({
   const conversationId = String(chat.conversationId ?? chat.id ?? '');
 
   useEffect(() => {
-    if (!isGroup || resolvedGroupId || !conversationId) return;
+    if (!hasMembers || resolvedGroupId || !conversationId) return;
     getRequest(ROUTES.chat.conversationDetail(conversationId)).then((res) => {
       const raw = res?.data ?? res;
-      const gid = raw?.group_id ?? raw?.groupId;
+      const gid = isChannel
+        ? (raw?.channel_id ?? raw?.channelId)
+        : (raw?.group_id ?? raw?.groupId);
       if (gid) setResolvedGroupId(String(gid));
     }).finally(() => {
       setGroupIdFetchDone(true);
     });
-  }, [isGroup, resolvedGroupId, conversationId]);
+  }, [hasMembers, isChannel, resolvedGroupId, conversationId]);
 
   const directContact = useMemo(() => {
     if (hasMembers) return null;
@@ -280,14 +283,17 @@ export const ChatInfoPage: React.FC<ChatInfoPageProps> = ({
 
   // "Approval required to join" is a Group-level setting (join_policy),
   // not a ConversationSettings field - see GroupDetailSerializer, only
-  // reachable once groupId has resolved above.
+  // reachable once groupId has resolved above. Gated on isGroup
+  // specifically (not hasMembers) - groupId now also resolves to a
+  // channel's own id for channel chats, which has no join_policy/
+  // GroupDetailSerializer equivalent to fetch here.
   useEffect(() => {
-    if (!groupId) return;
+    if (!isGroup || !groupId) return;
     getRequest(ROUTES.groups.detail(groupId)).then((res) => {
       const data = res?.data ?? res;
       if (data?.join_policy) setApprovalRequired(data.join_policy === 'request');
     }).catch(() => {});
-  }, [groupId]);
+  }, [isGroup, groupId]);
 
   const handleStartCall = async (media: 'voice' | 'video') => {
     if (!startCall) {
@@ -683,20 +689,21 @@ export const ChatInfoPage: React.FC<ChatInfoPageProps> = ({
     }
   };
 
-  // GET, not POST: the backend action (apps/groups/views.py's invite_link)
-  // treats every POST as a hard regenerate, invalidating the link for
-  // everyone who already has it. GET returns the existing link (creating
-  // one on first call) without ever revoking it - the right semantics for
-  // "show/share the current link", and the one any active member is
-  // allowed to call (previously admin-only server-side for either verb,
-  // which is what made this unreachable for a plain member regardless of
-  // what the mobile UI gated on).
+  // GET, not POST: the backend action (apps/groups/views.py's invite_link,
+  // mirrored by apps/channels/views.py's for channels) treats every POST
+  // as a hard regenerate, invalidating the link for everyone who already
+  // has it. GET returns the existing link (creating one on first call)
+  // without ever revoking it - the right semantics for "show/share the
+  // current link", and the one any active member is allowed to call
+  // (previously admin-only server-side for either verb, which is what
+  // made this unreachable for a plain member regardless of what the
+  // mobile UI gated on).
   const handleFetchInviteLink = async () => {
     if (!groupId || inviteLinkLoading) return;
     setInviteLinkLoading(true);
     try {
       const res = await getRequest(
-        ROUTES.groups.inviteLink(groupId),
+        isChannel ? ROUTES.channels.inviteLink(groupId) : ROUTES.groups.inviteLink(groupId),
         { errorMessage: 'Failed to load invite link' },
       );
       const link =
@@ -724,7 +731,7 @@ export const ChatInfoPage: React.FC<ChatInfoPageProps> = ({
     setInviteLinkLoading(true);
     try {
       const res = await postRequest(
-        ROUTES.groups.inviteLink(groupId),
+        isChannel ? ROUTES.channels.inviteLink(groupId) : ROUTES.groups.inviteLink(groupId),
         {},
         { errorMessage: 'Failed to regenerate invite link' },
       );
@@ -1501,7 +1508,7 @@ export const ChatInfoPage: React.FC<ChatInfoPageProps> = ({
           </View>
         )}
 
-        {isGroup && (
+        {hasMembers && (
           <View style={[styles.section, { paddingHorizontal: responsive.pageGutter }]}>
             <Text style={[styles.sectionTitle, { color: palette.text }]}>
               Invite link
@@ -1598,7 +1605,7 @@ export const ChatInfoPage: React.FC<ChatInfoPageProps> = ({
                 >
                   <KISIcon name="link" size={14} color={palette.onPrimary} />
                   <Text style={[styles.inviteLinkBtnText, { color: palette.onPrimary }]}>
-                    {inviteLinkLoading ? 'Loading...' : !groupId ? (groupIdFetchDone ? 'Unavailable' : 'Loading group…') : 'Generate invite link'}
+                    {inviteLinkLoading ? 'Loading...' : !groupId ? (groupIdFetchDone ? 'Unavailable' : (isChannel ? 'Loading channel…' : 'Loading group…')) : 'Generate invite link'}
                   </Text>
                 </Pressable>
               )}

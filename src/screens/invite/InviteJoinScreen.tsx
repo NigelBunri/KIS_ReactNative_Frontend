@@ -95,6 +95,8 @@ export default function InviteJoinScreen({ route, navigation }: Props) {
       const url =
         type === 'group'
           ? ROUTES.groups.joinByInvite
+          : type === 'channel'
+          ? ROUTES.channels.joinByInvite
           : ROUTES.community.joinByInvite;
 
       const res = await postRequest(url, { invite_token: token });
@@ -128,14 +130,16 @@ export default function InviteJoinScreen({ route, navigation }: Props) {
       }
 
       if (joinedOrAlready) {
-        const entityId: string | null = data?.group_id ?? data?.community_id ?? null;
+        const entityId: string | null = data?.group_id ?? data?.community_id ?? data?.channel_id ?? null;
 
-        // Fetch group/community details to get the name and conversation_id
+        // Fetch group/channel/community details to get the name and conversation_id
         if (entityId) {
           try {
             const detailUrl =
               type === 'group'
                 ? ROUTES.groups.detail(entityId)
+                : type === 'channel'
+                ? ROUTES.channels.getChannelById(entityId)
                 : ROUTES.community.detail(entityId);
             const detail = await getRequest(detailUrl);
             const d = detail?.data ?? detail;
@@ -174,7 +178,7 @@ export default function InviteJoinScreen({ route, navigation }: Props) {
       DeviceEventEmitter.emit('chat.open', {
         conversationId,
         name: groupName || type,
-        kind: type === 'contact' ? 'direct' : type === 'community' ? 'community' : 'group',
+        kind: type === 'contact' ? 'direct' : type === 'community' ? 'community' : type === 'channel' ? 'channel' : 'group',
       });
     }
 
@@ -195,7 +199,7 @@ export default function InviteJoinScreen({ route, navigation }: Props) {
     navigation.navigate('MainTabs');
   };
 
-  const label = type === 'contact' ? 'this person' : type === 'group' ? 'group' : 'community';
+  const label = type === 'contact' ? 'this person' : type === 'group' ? 'group' : type === 'channel' ? 'channel' : 'community';
   const displayName = groupName ? `"${groupName}"` : label;
 
   return (
