@@ -22,6 +22,25 @@ import {
   type PermanentMediaDomain,
 } from '@/storage/permanentMediaStorage';
 import { getMediaTransferQueue, queueMediaDownload } from '@/services/mediaTransferQueue';
+import { useMediaHeaders } from '@/network';
+
+// CONFIRMED ROOT CAUSE of "posted an image, feed shows nothing but the
+// download button, just dark": when a backend isn't configured for public
+// object storage, Nest's upload-intent.service.ts (buildAttachment) returns
+// `url`/`displayUrl` as its OWN protected `/uploads/file?key=...` endpoint,
+// not a public/presigned S3 URL - fetching it requires the same
+// Authorization/X-Device-Id headers mediaTransferQueue.ts's download path
+// already attaches, and that react-native-video playback (FeedScreen.tsx's
+// video modal, via useMediaHeaders + buildMediaSource) already attaches
+// too. A bare `<Image source={{uri}}>` sent neither, so the fetch 401s/
+// 403s silently (RN's Image onError fires, but nothing here ever showed an
+// error state) - the Download overlay still renders fine since it's wired
+// to that same already-authenticated queue, making it look like only the
+// preview is "missing" rather than the whole fetch failing. Mirrors
+// useMediaHeaders' own established convention of always attaching these
+// (video playback elsewhere already does this unconditionally, including
+// against genuine public S3/CDN URLs, with no reported breakage) rather
+// than trying to guess which URLs need it.
 
 type Props = {
   uri?: string | null;
@@ -65,8 +84,10 @@ export default function PermanentRemoteImage({
   // <Image> network fetch/decode of a remote (non-cached) URL, which can
   // take a moment on a signed S3 URL and previously showed nothing at all.
   const [imageLoading, setImageLoading] = useState(false);
+  const imageHeaders = useMediaHeaders();
 
   const remoteUri = typeof uri === 'string' && uri.trim() ? uri.trim() : '';
+
   const cacheKey = useMemo(
     () => stableKey || (remoteUri ? keyFromUri(remoteUri) : ''),
     [remoteUri, stableKey],
@@ -148,7 +169,7 @@ export default function PermanentRemoteImage({
     <View style={[styles.container, containerStyle]}>
       {hasImage ? (
         <Image
-          source={{ uri: sourceUri }}
+          source={{ uri: sourceUri, headers: imageHeaders }}
           style={[StyleSheet.absoluteFillObject, style]}
           resizeMode={resizeMode}
           onLoadStart={() => setImageLoading(true)}
