@@ -29,6 +29,7 @@ type Community = {
   description?: string;
   main_conversation_id?: string;
   posts_conversation_id?: string;
+  is_owner?: boolean;
 };
 
 type Group = {
@@ -384,7 +385,9 @@ export default function CommunityRoomPage({
         </View>
       ) : null}
 
-      <KISFab icon="people" iconSize={22} onPress={() => setShowGroupCreate(true)} style={styles.fab} />
+      {community.is_owner ? (
+        <KISFab icon="people" iconSize={22} onPress={() => setShowGroupCreate(true)} style={styles.fab} />
+      ) : null}
     </View>
   );
 }

@@ -983,14 +983,16 @@ const CommunitiesTab = forwardRef<ScrollableHandle, CommunitiesTabProps>(functio
             </View>
           ) : (
             <View style={{ flex: 1 }}>
-              <KISButton
-                variant="primary"
-                size="sm"
-                onPress={openCreateGroup}
-                left={<KISIcon name="add" size={16} color={palette.onGold} />}
-                title="Create Group"
-                style={styles.primaryBtn}
-              />
+              {selected?.is_owner ? (
+                <KISButton
+                  variant="primary"
+                  size="sm"
+                  onPress={openCreateGroup}
+                  left={<KISIcon name="add" size={16} color={palette.onGold} />}
+                  title="Create Group"
+                  style={styles.primaryBtn}
+                />
+              ) : null}
               <FlatList
                 initialNumToRender={20}
                 maxToRenderPerBatch={10}

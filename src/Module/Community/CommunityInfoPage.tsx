@@ -22,6 +22,7 @@ import { launchImageLibrary } from 'react-native-image-picker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useKISTheme } from '@/theme/useTheme';
+import { KIS_TOKENS } from '@/theme/constants';
 import { KISIcon } from '@/constants/kisIcons';
 import ImagePlaceholder from '@/components/common/ImagePlaceholder';
 import ROUTES, { CHAT_BASE_URL } from '@/network';
@@ -850,25 +851,51 @@ export const CommunityInfoPage: React.FC<CommunityInfoPageProps> = ({
             members.map((m, index) => {
               const label = m.display_name || resolveUserName(m.user) || 'Member';
               const phone = resolveUserPhone(m.user);
-              const roleLabel = m.role || m.base_role ? String(m.role ?? m.base_role) : '';
               const memberId = resolveUserId(m);
               const memberRole = String(m.role ?? m.base_role ?? '').toLowerCase();
               const isOwnerMember = memberRole === 'owner';
+              // Django's CommunityRole only ever produces 'mod', never
+              // 'moderator' - matches isMemberAdmin's own mapping in
+              // handleMemberAction above.
+              const isAdminMember = memberRole === 'admin' || memberRole === 'mod';
               const isMe = memberId && memberId === String(currentUserId ?? '');
+              const initials = label.trim().split(/\s+/).map((w) => w[0]).slice(0, 2).join('').toUpperCase() || '?';
+              const badgeColor = isOwnerMember ? '#F59E0B' : palette.primary;
               return (
                 <View
                   key={`${typeof m.user === 'object' && m.user ? m.user.id : index}`}
-                  style={[styles.memberRow, { borderBottomColor: palette.divider }]}
+                  style={[
+                    styles.memberRow,
+                    { backgroundColor: palette.card, borderColor: palette.divider },
+                    KIS_TOKENS.elevation.card,
+                  ]}
                 >
-                  <View style={[styles.memberAvatar, { backgroundColor: palette.surfaceSoft ?? palette.surface }]} />
+                  <View style={[styles.memberAvatar, { backgroundColor: palette.surfaceSoft ?? palette.surface, alignItems: 'center', justifyContent: 'center' }]}>
+                    <Text style={{ color: palette.subtext, fontSize: 15, fontWeight: '700' }}>{initials}</Text>
+                  </View>
                   <View style={styles.memberInfo}>
-                    <Text style={[styles.memberName, { color: palette.text }]} numberOfLines={1}>
-                      {label}
-                    </Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      <Text style={[styles.memberName, { color: palette.text }]} numberOfLines={1}>
+                        {label}
+                      </Text>
+                      {isMe && (
+                        <View style={[styles.youPill, { backgroundColor: palette.surfaceSoft ?? palette.surface }]}>
+                          <Text style={{ color: palette.subtext, fontSize: 10, fontWeight: '700' }}>YOU</Text>
+                        </View>
+                      )}
+                    </View>
                     <Text style={[styles.memberRole, { color: palette.subtext }]} numberOfLines={1}>
-                      {phone || 'No phone'}{roleLabel ? ` • ${roleLabel}` : ''}
+                      {phone || 'No phone'}
                     </Text>
                   </View>
+                  {(isOwnerMember || isAdminMember) && (
+                    <View style={[styles.roleBadge, { backgroundColor: badgeColor + '1F', borderColor: badgeColor + '40' }]}>
+                      <KISIcon name={isOwnerMember ? 'crown' : 'shield'} size={12} color={badgeColor} />
+                      <Text style={{ color: badgeColor, fontSize: 11, fontWeight: '700' }}>
+                        {isOwnerMember ? 'Owner' : 'Admin'}
+                      </Text>
+                    </View>
+                  )}
                   {isAdmin && !isMe && !isOwnerMember && (
                     <Pressable
                       onPress={() => handleMemberAction(m)}
@@ -939,7 +966,7 @@ export const CommunityInfoPage: React.FC<CommunityInfoPageProps> = ({
                 return (
                   <View
                     key={String(req.id)}
-                    style={[styles.memberRow, { borderBottomColor: palette.divider }]}
+                    style={[styles.memberRow, { backgroundColor: palette.card, borderColor: palette.divider }, KIS_TOKENS.elevation.card]}
                   >
                     <View style={styles.memberInfo}>
                       <Text style={[styles.memberName, { color: palette.text }]} numberOfLines={1}>
@@ -1278,13 +1305,27 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 10,
-    borderBottomWidth: 1,
+    paddingHorizontal: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+    marginBottom: 8,
   },
-  memberAvatar: { width: 36, height: 36, borderRadius: 18 },
-  memberInfo: { marginLeft: 10, flex: 1 },
+  memberAvatar: { width: 44, height: 44, borderRadius: 22 },
+  memberInfo: { marginLeft: 12, flex: 1 },
   memberName: { fontSize: 14, fontWeight: '600' },
-  memberRole: { fontSize: 12 },
+  memberRole: { fontSize: 12, marginTop: 2 },
   memberActionBtn: { padding: 6, marginLeft: 4 },
+  youPill: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 },
+  roleBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 10,
+    borderWidth: 1,
+    marginLeft: 8,
+  },
   postRow: {
     alignItems: 'center',
     borderBottomWidth: 1,

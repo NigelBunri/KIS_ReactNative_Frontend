@@ -23,6 +23,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { launchImageLibrary } from 'react-native-image-picker';
 
 import { useKISTheme } from '../../theme/useTheme';
+import { KIS_TOKENS } from '../../theme/constants';
 import { useResponsiveLayout } from '../../theme/responsive';
 import { KISIcon } from '@/constants/kisIcons';
 import ImagePlaceholder from '@/components/common/ImagePlaceholder';
@@ -1669,25 +1670,30 @@ export const ChatInfoPage: React.FC<ChatInfoPageProps> = ({
                 const isTargetOwner = roleLabel === 'owner';
                 const isTargetAdmin = roleLabel === 'admin' || isTargetOwner;
                 const initials = label.trim().split(' ').map((w: string) => w[0]).slice(0, 2).join('').toUpperCase();
-                const roleBadgeColor = isTargetOwner ? '#F59E0B' : isTargetAdmin ? (palette.primary) : 'transparent';
+                const roleBadgeColor = isTargetOwner ? '#F59E0B' : palette.primary;
                 const roleBadgeText = isTargetOwner ? 'Owner' : isTargetAdmin ? 'Admin' : '';
                 return (
                   <Pressable
                     key={`${membUserId ?? index}`}
                     style={({ pressed }) => [
                       styles.memberRow,
-                      { borderBottomColor: palette.divider, backgroundColor: pressed && isAdmin && !isMe ? palette.surface : 'transparent' },
+                      { backgroundColor: pressed && isAdmin && !isMe ? palette.surface : palette.card, borderColor: palette.divider },
+                      KIS_TOKENS.elevation.card,
                     ]}
                     onPress={() => showMemberActions(p)}
                     disabled={!isAdmin || isMe}
                   >
                     <View style={[styles.memberAvatar, { backgroundColor: palette.surfaceSoft ?? palette.surface, alignItems: 'center', justifyContent: 'center' }]}>
-                      <Text style={{ color: palette.subtext, fontSize: 14, fontWeight: '700' }}>{initials}</Text>
+                      <Text style={{ color: palette.subtext, fontSize: 15, fontWeight: '700' }}>{initials}</Text>
                     </View>
                     <View style={[styles.memberInfo, { flex: 1 }]}>
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                         <Text style={[styles.memberName, { color: palette.text }]} numberOfLines={1}>{label}</Text>
-                        {isMe && <Text style={{ color: palette.subtext, fontSize: 11 }}>(You)</Text>}
+                        {isMe && (
+                          <View style={{ paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, backgroundColor: palette.surfaceSoft ?? palette.surface }}>
+                            <Text style={{ color: palette.subtext, fontSize: 10, fontWeight: '700' }}>YOU</Text>
+                          </View>
+                        )}
                       </View>
                       <Text style={[styles.memberRole, { color: palette.subtext }]} numberOfLines={1}>
                         {phone || 'No phone'}
@@ -1696,7 +1702,8 @@ export const ChatInfoPage: React.FC<ChatInfoPageProps> = ({
                     {isChanging ? (
                       <ActivityIndicator size="small" color={palette.primary} style={{ marginLeft: 8 }} />
                     ) : roleBadgeText ? (
-                      <View style={{ paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10, backgroundColor: roleBadgeColor + '22', marginLeft: 8 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 10, backgroundColor: roleBadgeColor + '1F', borderWidth: 1, borderColor: roleBadgeColor + '40', marginLeft: 8 }}>
+                        <KISIcon name={isTargetOwner ? 'crown' : 'shield'} size={12} color={roleBadgeColor} />
                         <Text style={{ color: roleBadgeColor, fontSize: 11, fontWeight: '700' }}>{roleBadgeText}</Text>
                       </View>
                     ) : isAdmin && !isMe ? (
@@ -1801,7 +1808,7 @@ export const ChatInfoPage: React.FC<ChatInfoPageProps> = ({
                   <KISButton
                     key={t}
                     variant={mediaTab === t ? 'primary' : 'outline'}
-                    size="sm"
+                    size="xs"
                     style={{ flex: 1 }}
                     onPress={() => setMediaTab(t)}
                     title={`${t}${!mediaLoading ? ` (${tabCount(t)})` : ''}`}
@@ -2221,12 +2228,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 10,
-    borderBottomWidth: 1,
+    paddingHorizontal: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+    marginBottom: 8,
   },
-  memberAvatar: { width: 36, height: 36, borderRadius: 18 },
-  memberInfo: { marginLeft: 10, flex: 1 },
+  memberAvatar: { width: 44, height: 44, borderRadius: 22 },
+  memberInfo: { marginLeft: 12, flex: 1 },
   memberName: { fontSize: 14, fontWeight: '600' },
-  memberRole: { fontSize: 12 },
+  memberRole: { fontSize: 12, marginTop: 2 },
   previewBackdrop: {
     position: 'absolute',
     top: 0,
