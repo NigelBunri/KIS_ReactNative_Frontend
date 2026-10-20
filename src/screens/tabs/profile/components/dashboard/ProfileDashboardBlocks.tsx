@@ -897,7 +897,7 @@ export const MarketplaceOrdersSummary = ({
   onViewOrders?: () => void;
   onViewReceivedOrders?: () => void;
 }) => {
-  const { palette, dashboardTheme, compact } = useDashboardTheme();
+  const { palette, dashboardTheme } = useDashboardTheme();
   return (
     <DashboardCard>
       <SectionHeader title="Marketplace orders" actionLabel="View all orders" onAction={onViewOrders} />
@@ -930,9 +930,22 @@ export const MarketplaceOrdersSummary = ({
           ))}
         </View>
       ) : null}
-      <View style={[dashboardStyles.dualActionRow, compact && dashboardStyles.wrapRow]}>
-        <KISButton title="View Orders" onPress={onViewOrders} />
-        <KISButton title="Received Orders" variant="outline" onPress={onViewReceivedOrders} />
+      <View style={dashboardStyles.dualActionRow}>
+        <KISButton
+          title="View Orders"
+          size="sm"
+          onPress={onViewOrders}
+          style={dashboardStyles.dualActionButton}
+          textStyle={dashboardStyles.dualActionButtonText}
+        />
+        <KISButton
+          title="Received Orders"
+          variant="outline"
+          size="sm"
+          onPress={onViewReceivedOrders}
+          style={dashboardStyles.dualActionButton}
+          textStyle={dashboardStyles.dualActionButtonText}
+        />
       </View>
     </DashboardCard>
   );
@@ -1519,9 +1532,17 @@ const dashboardStyles = StyleSheet.create({
   },
   dualActionRow: {
     flexDirection: 'row',
-    gap: 10,
-    flexWrap: 'wrap',
+    gap: 8,
+    flexWrap: 'nowrap',
     marginTop: 2,
+  },
+  dualActionButton: {
+    flex: 1,
+    minWidth: 0,
+    paddingHorizontal: 8,
+  },
+  dualActionButtonText: {
+    fontSize: 13,
   },
   workspaceList: {
     gap: 12,
