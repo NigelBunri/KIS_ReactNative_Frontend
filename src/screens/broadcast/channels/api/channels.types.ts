@@ -23,6 +23,9 @@ export type BroadcastChannelSummary = {
   subscriber_count?: number;
   content_count?: number;
   is_subscribed?: boolean;
+  // BroadcastChannelSubscription.NotificationLevel ('all' | 'personalized'
+  // | 'none') - null/absent when the viewer isn't subscribed at all.
+  notification_level?: 'all' | 'personalized' | 'none' | null;
   viewer_role?: string;
 };
 

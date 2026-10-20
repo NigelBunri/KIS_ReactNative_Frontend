@@ -312,7 +312,11 @@ export default function ChannelHomePage() {
               <Text style={[styles.handle, { color: palette.subtext }]}>@{channel?.handle || 'channel'}</Text>
               <Text style={[styles.metrics, { color: palette.text }]}>{compactNumber(channel?.subscriber_count)} subscribers · {compactNumber(channel?.content_count || contents.length)} posts</Text>
             </View>
-            <SubscribeBellButton channelId={channel?.id} initialSubscribed={Boolean(channel?.is_subscribed)} />
+            <SubscribeBellButton
+              channelId={channel?.id}
+              initialSubscribed={Boolean(channel?.is_subscribed)}
+              initialNotifLevel={channel?.notification_level ?? undefined}
+            />
             {channel?.id ? (
               <Pressable
                 onPress={() => navigation.navigate('Membership', { channelId: channel.id, channelName: channel.display_name })}

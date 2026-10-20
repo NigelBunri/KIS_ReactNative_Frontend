@@ -8,7 +8,7 @@ import { useKISTheme } from '@/theme/useTheme';
 import { useResponsiveLayout } from '@/theme/responsive';
 import type { RootStackParamList } from '@/navigation/types';
 import type { BroadcastChannelContent, BroadcastChannelPlaylist, BroadcastChannelSummary } from '@/screens/broadcast/channels/api/channels.types';
-import { createBroadcastChannel, fetchChannelContents, fetchChannelPlaylists, setChannelBroadcastState, setChannelContentBroadcastState, setChannelContentTags, useChannelsData } from '@/screens/broadcast/channels/hooks/useChannelsData';
+import { createBroadcastChannel, fetchChannelContents, fetchChannelPlaylists, publishChannelContent, setChannelBroadcastState, setChannelContentBroadcastState, setChannelContentTags, useChannelsData } from '@/screens/broadcast/channels/hooks/useChannelsData';
 import ROUTES from '@/network';
 import { getRequest } from '@/network/get';
 import { isTierAtLeast } from '@/services/tierAccess';
@@ -205,6 +205,7 @@ export default function ChannelStudioScreen({ legacyFeeds, liveCount, expiresAt,
   const [lastCreatedHandle, setLastCreatedHandle] = useState<string | null>(null);
   const [channelBroadcasting, setChannelBroadcasting] = useState(false);
   const [contentBroadcastingId, setContentBroadcastingId] = useState<string | null>(null);
+  const [contentPublishingId, setContentPublishingId] = useState<string | null>(null);
   const { channels, loading, refresh } = useChannelsData({ mine: true });
 
   useEffect(() => {
@@ -420,6 +421,21 @@ export default function ChannelStudioScreen({ legacyFeeds, liveCount, expiresAt,
     if (!contentId) return;
     await setChannelContentTags(contentId, tags);
   }, []);
+
+  const handlePublishContent = useCallback(async (content: BroadcastChannelContent) => {
+    if (!content?.id) return;
+    setContentPublishingId(content.id);
+    try {
+      const published = await publishChannelContent(content.id);
+      if (!published) {
+        Alert.alert('Unable to publish', 'Please try again.');
+        return;
+      }
+      await refreshContent();
+    } finally {
+      setContentPublishingId(null);
+    }
+  }, [refreshContent]);
 
   const renderCreatorPremiumPreview = (context: 'dashboard' | 'create' | 'analytics' | 'live' | 'settings' = 'dashboard') => {
     const features =
@@ -638,7 +654,7 @@ export default function ChannelStudioScreen({ legacyFeeds, liveCount, expiresAt,
         </>
       );
     }
-    if (activeTab === 'content') return <ChannelContentManager contents={contents} legacyFeeds={legacyFeeds} onCreate={() => onCreate(selectedChannel)} onToggleBroadcast={handleToggleContentBroadcast} broadcastingId={contentBroadcastingId} onUpdateTags={handleUpdateContentTags} />;
+    if (activeTab === 'content') return <ChannelContentManager contents={contents} legacyFeeds={legacyFeeds} onCreate={() => onCreate(selectedChannel)} onToggleBroadcast={handleToggleContentBroadcast} broadcastingId={contentBroadcastingId} onUpdateTags={handleUpdateContentTags} onPublish={handlePublishContent} publishingId={contentPublishingId} />;
     if (activeTab === 'moderation') return <ChannelModerationPanel channelId={selectedChannel.id} />;
     if (activeTab === 'create') {
       return (
@@ -747,7 +763,7 @@ export default function ChannelStudioScreen({ legacyFeeds, liveCount, expiresAt,
           subtitle="Creator, ministry, education, and institution media networks are packaged for future annual contracts only."
         />
         <ChannelAnalyticsPanel channelId={selectedChannel.id} queued={legacyFeeds.length} live={liveCount} subscribers={selectedChannel.subscriber_count} />
-        <ChannelContentManager contents={contents.slice(0, 4)} legacyFeeds={legacyFeeds.slice(0, 4)} onCreate={() => onCreate(selectedChannel)} onToggleBroadcast={handleToggleContentBroadcast} broadcastingId={contentBroadcastingId} onUpdateTags={handleUpdateContentTags} />
+        <ChannelContentManager contents={contents.slice(0, 4)} legacyFeeds={legacyFeeds.slice(0, 4)} onCreate={() => onCreate(selectedChannel)} onToggleBroadcast={handleToggleContentBroadcast} broadcastingId={contentBroadcastingId} onUpdateTags={handleUpdateContentTags} onPublish={handlePublishContent} publishingId={contentPublishingId} />
         {loadingContent ? <ActivityIndicator color={palette.primaryStrong} /> : null}
       </>
     );

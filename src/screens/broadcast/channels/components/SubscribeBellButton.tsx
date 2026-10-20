@@ -1,13 +1,17 @@
 // src/screens/broadcast/channels/components/SubscribeBellButton.tsx
 //
-// Subscribe button + notification bell for a channel.
+// Subscribe button + notification bell for a channel - matches YouTube's
+// own subscribe+bell exactly: three notification levels (All/Personalized/
+// None), Personalized is the default the moment you subscribe (same
+// default BroadcastChannelSubscription.notifications uses server-side),
+// and tapping the bell cycles through all three.
 //
 // State machine:
-//   unsubscribed          → tap Subscribe   → subscribed + bell=all
-//   subscribed + bell=all → tap bell        → subscribed + bell=mentions
-//   subscribed + bell=mentions → tap bell   → subscribed + bell=off
-//   subscribed + bell=off      → tap bell   → subscribed + bell=all
-//   subscribed                 → tap button → unsubscribed (bell hidden)
+//   unsubscribed                 → tap Subscribe → subscribed + bell=personalized
+//   subscribed + bell=all        → tap bell       → subscribed + bell=personalized
+//   subscribed + bell=personalized → tap bell     → subscribed + bell=none
+//   subscribed + bell=none        → tap bell      → subscribed + bell=all
+//   subscribed                    → tap button    → unsubscribed (bell hidden)
 //
 // Both actions persist to the backend with optimistic updates + rollback.
 
@@ -16,12 +20,15 @@ import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from 'rea
 import { KISIcon } from '@/constants/kisIcons';
 import { useKISTheme } from '@/theme/useTheme';
 import ROUTES from '@/network';
-import { postRequest } from '@/network/post';
+import { patchRequest } from '@/network/patch';
 import { toggleChannelSubscription } from '@/screens/broadcast/channels/hooks/useChannelsData';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-type NotifLevel = 'all' | 'mentions' | 'off';
+// Mirrors BroadcastChannelSubscription.NotificationLevel exactly
+// (apps/broadcasts/models.py) - these are also the literal values the
+// PATCH body below must send, not display labels.
+type NotifLevel = 'all' | 'personalized' | 'none';
 
 type Props = {
   channelId?:          string;
@@ -31,15 +38,15 @@ type Props = {
   onSubscribeChange?:  (subscribed: boolean) => void;
 };
 
-// ── Bell icon per notification level ─────────────────────────────────────────
+// ── Notification cycle ───────────────────────────────────────────────────────
 
-const BELL_ICON: Record<NotifLevel, string> = {
-  all:      'bell',
-  mentions: 'bell',
-  off:      'bell-off',
-};
-
-const NOTIF_CYCLE: NotifLevel[] = ['all', 'mentions', 'off'];
+// 'bell' is KISIcon's only registered bell glyph (maps to Ionicons
+// notifications/notifications-outline - see constants/kisIcons.tsx) - a
+// previous 'bell-off' name here didn't exist in that mapping at all and
+// silently rendered nothing for the "none" state. States are distinguished
+// by color/opacity instead (see bellColor below), the same way the rest
+// of this component already did for "mentions" vs "all".
+const NOTIF_CYCLE: NotifLevel[] = ['all', 'personalized', 'none'];
 
 function nextLevel(current: NotifLevel): NotifLevel {
   const i = NOTIF_CYCLE.indexOf(current);
@@ -47,9 +54,9 @@ function nextLevel(current: NotifLevel): NotifLevel {
 }
 
 const NOTIF_LABEL: Record<NotifLevel, string> = {
-  all:      'All notifications',
-  mentions: 'Mentions only',
-  off:      'Notifications off',
+  all:          'All notifications',
+  personalized: 'Personalized',
+  none:         'Notifications off',
 };
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -57,7 +64,7 @@ const NOTIF_LABEL: Record<NotifLevel, string> = {
 export default function SubscribeBellButton({
   channelId,
   initialSubscribed = false,
-  initialNotifLevel = 'all',
+  initialNotifLevel = 'personalized',
   compact = false,
   onSubscribeChange,
 }: Props) {
@@ -65,7 +72,7 @@ export default function SubscribeBellButton({
 
   const [subscribed,    setSubscribed]    = useState(initialSubscribed);
   const [notifLevel,    setNotifLevel]    = useState<NotifLevel>(
-    initialSubscribed ? initialNotifLevel : 'all',
+    initialSubscribed ? initialNotifLevel : 'personalized',
   );
   const [subPending,    setSubPending]    = useState(false);
   const [bellPending,   setBellPending]   = useState(false);
@@ -84,7 +91,12 @@ export default function SubscribeBellButton({
 
     // Optimistic
     setSubscribed(next);
-    if (!next) setNotifLevel('all'); // reset bell on unsub
+    // 'personalized' matches both BroadcastChannelSubscription's own
+    // model default and what a fresh subscribe gets server-side
+    // (BroadcastChannelSubscribeView.post's get_or_create defaults) -
+    // also the state shown immediately after subscribing, same as
+    // YouTube's own default bell state on a new subscription.
+    setNotifLevel('personalized');
     onSubscribeChange?.(next);
     setSubPending(true);
 
@@ -105,21 +117,34 @@ export default function SubscribeBellButton({
 
   const handleBell = useCallback(async () => {
     if (!channelId || !subscribedRef.current || bellPending) return;
-    const next = nextLevel(notifLevelRef.current);
+    // Captured before the optimistic update below - notifLevelRef.current
+    // tracks `notifLevel` via its own effect, which re-runs (and
+    // overwrites this ref to the NEW value) as soon as setNotifLevel(next)
+    // below commits, well before this request's response arrives. Rolling
+    // back to notifLevelRef.current at that point would just re-apply the
+    // same optimistic value instead of actually undoing it.
+    const previous = notifLevelRef.current;
+    const next = nextLevel(previous);
 
     // Optimistic
     setNotifLevel(next);
     setBellPending(true);
 
     try {
-      const res = await postRequest(
+      // PATCH, not POST: the backend (BroadcastChannelSubscriptionView,
+      // the same view both channelSubscription and
+      // channelNotificationPreference route to) only implements patch() -
+      // a POST here 405'd unconditionally, so every bell tap silently
+      // failed and rolled back regardless of which level was requested.
+      // Field name must be `notifications` (what the view actually
+      // reads), not `notification_level`.
+      const res = await patchRequest(
         ROUTES.broadcasts.channelNotificationPreference(channelId),
-        { notification_level: next },
+        { notifications: next },
         { errorMessage: '' },
       );
       if (!res?.success) {
-        // Rollback
-        setNotifLevel(notifLevelRef.current);
+        setNotifLevel(previous);
         Alert.alert('Could not update notifications', 'Please try again.');
       }
     } finally {
@@ -129,9 +154,9 @@ export default function SubscribeBellButton({
 
   // ── Render ──────────────────────────────────────────────────────────────────
 
-  const bellColor = notifLevel === 'off'
+  const bellColor = notifLevel === 'none'
     ? palette.subtext
-    : notifLevel === 'mentions'
+    : notifLevel === 'personalized'
       ? palette.gold
       : palette.primaryStrong;
 
@@ -181,19 +206,19 @@ export default function SubscribeBellButton({
             compact && styles.bellCompact,
             {
               borderColor:     palette.border,
-              backgroundColor: notifLevel !== 'off' ? palette.primarySoft ?? palette.primaryWeak : palette.surface,
+              backgroundColor: notifLevel !== 'none' ? palette.primarySoft ?? palette.primaryWeak : palette.surface,
               opacity:         bellPending ? 0.6 : 1,
             },
           ]}
           accessibilityRole="button"
           accessibilityLabel={NOTIF_LABEL[notifLevel]}
-          accessibilityHint="Cycles notification level: all, mentions only, or off"
+          accessibilityHint="Cycles notification level: all, personalized, or none"
         >
           {bellPending ? (
             <ActivityIndicator size="small" color={bellColor} />
           ) : (
             <KISIcon
-              name={BELL_ICON[notifLevel]}
+              name="bell"
               size={compact ? 15 : 18}
               color={bellColor}
             />

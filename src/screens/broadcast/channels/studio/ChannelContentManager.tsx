@@ -12,11 +12,19 @@ type Props = {
   onToggleBroadcast?: (content: BroadcastChannelContent, nextState: boolean) => void | Promise<void>;
   broadcastingId?: string | null;
   onUpdateTags?: (contentId: string, tags: string[]) => void;
+  // CONFIRMED ROOT CAUSE of "subscribers never get notified of new
+  // content": nothing in the app ever called the publish endpoint at
+  // all - content uploaded via Create stayed a draft forever. This is
+  // the one action that actually fans out CHANNEL_CONTENT_PUBLISHED
+  // notifications to subscribers (see apps.broadcasts.views
+  // .ChannelContentPublishView / _notify_channel_subscribers).
+  onPublish?: (content: BroadcastChannelContent) => void | Promise<void>;
+  publishingId?: string | null;
 };
 
 const statusLabel = (value?: string) => String(value || 'draft').replace(/_/g, ' ').toUpperCase();
 
-export default function ChannelContentManager({ contents, legacyFeeds, onCreate, onToggleBroadcast, broadcastingId, onUpdateTags }: Props) {
+export default function ChannelContentManager({ contents, legacyFeeds, onCreate, onToggleBroadcast, broadcastingId, onUpdateTags, onPublish, publishingId }: Props) {
   const { palette } = useKISTheme();
   const [tagsMap, setTagsMap] = useState<Record<string, string[]>>({});
   const [tagInput, setTagInput] = useState<Record<string, string>>({});
@@ -79,6 +87,9 @@ export default function ChannelContentManager({ contents, legacyFeeds, onCreate,
         const isBroadcast = Boolean(item.is_broadcast || item.broadcast_id);
         const isBusy = broadcastingId === item.id;
         const canToggle = Boolean(onToggleBroadcast && contents.length);
+        const isDraft = String(item.status || 'draft').toLowerCase() === 'draft';
+        const isPublishing = publishingId === item.id;
+        const canPublish = Boolean(onPublish && contents.length && isDraft);
         return (
           <View key={item.id} style={[styles.itemBlock, { borderColor: palette.border }]}>
             <View style={styles.row}>
@@ -92,6 +103,18 @@ export default function ChannelContentManager({ contents, legacyFeeds, onCreate,
                 </View>
                 <Text numberOfLines={1} style={[styles.rowMeta, { color: palette.subtext }]}>{String(item.content_type || 'post').replace(/_/g, ' ')} · {statusLabel(item.status)} · {item.visibility || 'private'}</Text>
               </View>
+              {canPublish ? (
+                <Pressable
+                  disabled={isPublishing}
+                  onPress={() => onPublish?.(item)}
+                  style={[styles.broadcastButton, { borderColor: palette.primary, opacity: isPublishing ? 0.7 : 1 }]}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Publish "${item.title || 'this content'}"`}
+                >
+                  {isPublishing ? <ActivityIndicator size="small" color={palette.primaryStrong} /> : null}
+                  <Text style={[styles.broadcastText, { color: palette.primaryStrong }]}>Publish</Text>
+                </Pressable>
+              ) : null}
               {canToggle ? (
                 <Pressable
                   disabled={isBusy}

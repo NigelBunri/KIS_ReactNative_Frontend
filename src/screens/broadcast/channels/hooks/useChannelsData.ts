@@ -31,6 +31,7 @@ import {
   channelContentPollEndpoint,
   channelBroadcastEndpoint,
   channelContentBroadcastEndpoint,
+  channelContentPublishEndpoint,
   channelModerationActionEndpoint,
   channelModerationEndpoint,
   channelReportEndpoint,
@@ -234,12 +235,21 @@ export const fetchChannelContentDetail = async (contentId: string): Promise<Broa
 };
 
 export const toggleChannelSubscription = async (channelId: string, subscribe: boolean) => {
+  // CONFIRMED ROOT CAUSE of "unsubscribe doesn't actually work": this
+  // always sent POST regardless of `subscribe`, but the backend
+  // (BroadcastChannelSubscribeView) only implements post() (subscribe,
+  // via get_or_create - idempotent, ignores any `subscribe` field in the
+  // body) and delete() (the only path that actually removes the
+  // subscription row and decrements subscriber_count). Unsubscribing via
+  // POST was a silent no-op server-side every time - the optimistic UI
+  // showed "unsubscribed" while the real subscription just sat there
+  // unchanged.
   const response = await queueableJsonRequest({
     domain: 'Broadcast',
     kind: 'channel.subscription',
-    method: 'POST',
+    method: subscribe ? 'POST' : 'DELETE',
     url: channelSubscribeEndpoint(channelId),
-    body: { subscribe },
+    body: subscribe ? {} : undefined,
     dedupeKey: `channel:subscribe:${channelId}`,
     replaceExisting: true,
     errorMessage: 'Unable to update subscription.',
@@ -458,6 +468,24 @@ export const setChannelContentBroadcastState = async (contentId: string, broadca
   const response = broadcast
     ? await postRequest(endpoint, {}, { errorMessage: 'Unable to broadcast content.' })
     : await deleteRequest(endpoint, { errorMessage: 'Unable to stop broadcasting content.' });
+  return response?.success ? normalizeChannelContent(response.data) : null;
+};
+
+// CONFIRMED ROOT CAUSE of "subscribers never get a new-content
+// notification": uploadChannelContentVideo.ts always creates a DRAFT
+// (by design - see that file's own header comment) and nothing in the
+// app ever called the one endpoint that actually publishes it
+// (POST .../channel-contents/{id}/publish/, apps.broadcasts.views
+// .ChannelContentPublishView) - that's the ONLY path that fans out
+// CHANNEL_CONTENT_PUBLISHED notifications to subscribers
+// (_notify_channel_subscribers). Content could sit as a draft forever
+// with no UI action to move it forward.
+export const publishChannelContent = async (contentId: string): Promise<BroadcastChannelContent | null> => {
+  const response = await postRequest(
+    channelContentPublishEndpoint(contentId),
+    {},
+    { errorMessage: 'Unable to publish content.' },
+  );
   return response?.success ? normalizeChannelContent(response.data) : null;
 };
 
