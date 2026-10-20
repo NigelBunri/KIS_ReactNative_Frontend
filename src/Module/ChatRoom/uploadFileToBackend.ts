@@ -465,7 +465,7 @@ export async function uploadFileToBackend(opts: {
     );
   }
   const originalFile = file;
-  const uploadFile = await prepareUploadFile(file);
+  let uploadFile = await prepareUploadFile(file);
 
   // Verify the local file is actually still there right before building the
   // request. Without this, a file that vanished after staging (copy silently
@@ -478,6 +478,23 @@ export async function uploadFileToBackend(opts: {
     if (!stillExists) {
       onStatus?.('failed');
       throw new Error('This file is no longer available on your device. Please pick it again and resend.');
+    }
+    // CONFIRMED ROOT CAUSE of "size_bytes must not be less than 1" on
+    // video posts: react-native-image-picker's `fileSize` is frequently
+    // undefined for VIDEO assets (especially cloud-backed gallery items
+    // that haven't fully downloaded locally yet) - a caller with no size
+    // of its own (uploadBroadcastVideo.ts didn't even try to pass one)
+    // left this falling through to `uploadFile.size || 0` below, which
+    // Nest's /uploads/initiate rejects outright via its @Min(1) validator.
+    // Stat the actual local file as a reliable fallback whenever the
+    // caller-supplied size is missing or non-positive - the file is
+    // already confirmed to exist above, so this read is cheap and safe.
+    if (!(typeof uploadFile.size === 'number' && uploadFile.size > 0)) {
+      const stat = await RNFS.stat(localPath).catch(() => null);
+      const statSize = stat ? Number((stat as any).size) : NaN;
+      if (Number.isFinite(statSize) && statSize > 0) {
+        uploadFile = { ...uploadFile, size: statSize };
+      }
     }
   }
 

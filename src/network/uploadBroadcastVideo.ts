@@ -56,6 +56,15 @@ export const uploadBroadcastVideoAttachment = async (
   }
   const name = attachment?.originalName ?? attachment?.name ?? `broadcast_${Date.now()}.mp4`;
   const type = attachment?.mimeType ?? attachment?.type ?? 'video/mp4';
+  // CONFIRMED ROOT CAUSE of "size must be less than 1" on a video post:
+  // this never passed `size` through at all, so uploadFileToBackend's
+  // `file.size` was always undefined - /uploads/initiate then sent
+  // size_bytes: 0 (see uploadFileToBackend.ts's `uploadFile.size || 0`),
+  // which fails Nest's InitiateUploadDto's @Min(1) validator with exactly
+  // that message. `attachment.size` is already captured from the picker
+  // (react-native-image-picker's fileSize) by composer/attachments.ts's
+  // makeAttachment - it just never made it into this call.
+  const size = typeof attachment?.size === 'number' && attachment.size > 0 ? attachment.size : undefined;
 
   try {
     let thumbnailAttachmentId: string | undefined;
@@ -79,7 +88,7 @@ export const uploadBroadcastVideoAttachment = async (
     }
 
     const videoAttachment = await uploadFileToBackend({
-      file: { uri, name, type },
+      file: { uri, name, type, size },
       baseUrl: NEST_API_BASE_URL,
       context: 'broadcast_video',
       confirmExtra: {
