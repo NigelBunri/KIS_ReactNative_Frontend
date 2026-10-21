@@ -1,10 +1,12 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, FlatList, Linking, Pressable, ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { KISPalette } from '@/theme/constants';
 import { walletModes } from '../profile/profile.constants';
 import { styles } from '../profile/profile.styles';
 import { getRequest } from '@/network/get';
+import { postRequest } from '@/network/post';
+import KISButton from '@/constants/KISButton';
 import ROUTES from '@/network';
 import { useSafeTopInset } from '@/hooks/useSafeTopInset';
 
@@ -209,6 +211,170 @@ function InvoicesPanel({ palette }: { palette: KISPalette }) {
   );
 }
 
+type LedgerRow = {
+  id: string;
+  amount_cents?: number;
+  currency?: string;
+  status?: string;
+  tx_ref?: string;
+  provider?: string;
+  method?: string;
+  created_at?: string;
+  receipt_url?: string;
+  receipt_pdf_url?: string;
+};
+
+const formatLedgerAmount = (row: LedgerRow) => {
+  const cents = Number(row.amount_cents || 0);
+  const sign = cents < 0 ? '-' : '+';
+  return `${sign}${row.currency || 'USD'} ${(Math.abs(cents) / 100).toFixed(2)}`;
+};
+
+// Was a static "Read-only credit center" placeholder for every mode other
+// than Loyalty/Invoices, including 'history' - walletModes' only real
+// entry ("Credit history") rendered nothing but that placeholder, and the
+// one component that DID show real ledger rows with working
+// receipt-download and self-service-refund buttons (AccountCreditsCard.tsx)
+// was never imported anywhere in the app. Self-fetching, same pattern as
+// InvoicesPanel just above, rather than threading the ProfileScreen-side
+// ledger state through as new props.
+function HistoryPanel({ palette }: { palette: KISPalette }) {
+  const [rows, setRows] = useState<LedgerRow[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [refundingId, setRefundingId] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await getRequest(ROUTES.wallet.ledger, { errorMessage: 'Unable to load transactions.' });
+      if (!res?.success) {
+        setLoadError(res?.message || 'Could not load transaction history.');
+        setRows([]);
+        return;
+      }
+      setLoadError(null);
+      setRows(Array.isArray(res?.data?.results) ? res.data.results : []);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { void load(); }, [load]);
+
+  const handleRefund = useCallback((row: LedgerRow) => {
+    Alert.alert(
+      'Request refund',
+      'Are you sure you want to request a refund for this transaction?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Request refund',
+          style: 'destructive',
+          onPress: async () => {
+            setRefundingId(row.id);
+            try {
+              const res = await postRequest(
+                ROUTES.billing.walletRefund,
+                { tx_ref: row.tx_ref, reason: 'Customer requested refund' },
+                { errorMessage: 'Unable to process refund.' },
+              );
+              if (res?.success) {
+                Alert.alert('Refund initiated', 'Your refund request has been submitted and will be processed within 5-10 business days.');
+                await load();
+              } else {
+                Alert.alert('Refund failed', res?.message || 'Unable to process refund. Please contact support.');
+              }
+            } finally {
+              setRefundingId(null);
+            }
+          },
+        },
+      ],
+    );
+  }, [load]);
+
+  if (loading) {
+    return <ActivityIndicator color={palette.primary} style={{ marginVertical: 16 }} />;
+  }
+
+  if (loadError) {
+    return (
+      <View style={{ alignItems: 'center', gap: 8, marginVertical: 16 }}>
+        <Text style={{ color: palette.danger, fontSize: 13, textAlign: 'center' }}>{loadError}</Text>
+        <Pressable onPress={load} accessibilityRole="button" accessibilityLabel="Retry loading transactions">
+          <Text style={{ color: palette.primary, fontSize: 13, fontWeight: '700' }}>Retry</Text>
+        </Pressable>
+      </View>
+    );
+  }
+
+  if (rows.length === 0) {
+    return (
+      <Text style={{ color: palette.subtext, fontSize: 13, textAlign: 'center', marginVertical: 16 }}>
+        No recent promotional-credit or billing activity.
+      </Text>
+    );
+  }
+
+  return (
+    <View style={{ gap: 8 }}>
+      {rows.slice(0, 20).map(row => (
+        <View
+          key={row.id}
+          style={{
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            borderWidth: 1,
+            borderColor: palette.divider,
+            backgroundColor: palette.surface,
+            borderRadius: 10,
+            padding: 12,
+            gap: 8,
+          }}
+        >
+          <View style={{ flex: 1 }}>
+            <Text style={{ color: palette.text, fontSize: 14, fontWeight: '700' }}>
+              {formatLedgerAmount(row)}
+            </Text>
+            <Text style={{ color: palette.subtext, fontSize: 12, marginTop: 2 }}>
+              {String(row.method || row.provider || 'entry').replace(/_/g, ' ')}
+              {row.created_at ? ` • ${new Date(row.created_at).toLocaleDateString()}` : ''}
+            </Text>
+          </View>
+          <View style={{ alignItems: 'flex-end', gap: 6 }}>
+            {(row.receipt_pdf_url || row.receipt_url) && (
+              <KISButton
+                title="Receipt"
+                size="xs"
+                variant="outline"
+                onPress={() => {
+                  const url = row.receipt_pdf_url || row.receipt_url;
+                  if (!url) return;
+                  Linking.openURL(url).catch(() => {
+                    Alert.alert('Receipt', 'Unable to open receipt.');
+                  });
+                }}
+              />
+            )}
+            {row.tx_ref && row.status === 'success' && (
+              <KISButton
+                title="Refund"
+                size="xs"
+                variant="outline"
+                loading={refundingId === row.id}
+                disabled={refundingId === row.id}
+                onPress={() => handleRefund(row)}
+              />
+            )}
+          </View>
+        </View>
+      ))}
+    </View>
+  );
+}
+
 export function WalletModal(props: WalletModalProps) {
   const {
     palette,
@@ -248,8 +414,9 @@ export function WalletModal(props: WalletModalProps) {
         <LoyaltyRedirectCard palette={palette} navigation={navigation} closeSheet={closeSheet} />
       )}
       {mode === 'invoices' && <InvoicesPanel palette={palette} />}
+      {mode === 'history' && <HistoryPanel palette={palette} />}
 
-      {!['loyalty', 'invoices'].includes(mode) && (
+      {!['loyalty', 'invoices', 'history'].includes(mode) && (
         <View
           style={{
             borderWidth: 1,

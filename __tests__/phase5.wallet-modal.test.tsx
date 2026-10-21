@@ -53,7 +53,7 @@ describe('WalletModal promotional-credit safety copy', () => {
         <WalletModal
           palette={palette}
           walletForm={{
-            mode: 'history',
+            mode: 'transfer',
             amount: '',
             recipient: '',
             reference: '',
@@ -70,8 +70,11 @@ describe('WalletModal promotional-credit safety copy', () => {
     });
     // WalletModal no longer renders a wallet-specific safety disclaimer
     // itself (that copy now lives in AccountCreditsCard.tsx) — every mode
-    // other than 'loyalty'/'invoices' collapses into the same generic
-    // read-only card below, so this asserts on that current copy.
+    // other than 'loyalty'/'invoices'/'history' (the last of which now
+    // shows a real transaction ledger via HistoryPanel, not this
+    // placeholder - see WalletModal.tsx's own HistoryPanel docstring)
+    // collapses into the same generic read-only card below, so this
+    // asserts on that current copy using one such legacy mode.
     expect(texts.some(value => value.includes('Read-only credit center'))).toBe(true);
     expect(
       texts.some(value =>
