@@ -99,6 +99,19 @@
       android:supportsRtl="true">
 
       <!-- ─── Main activity ──────────────────────────────────────────────────── -->
+      <!-- `uiMode` in configChanges below means the OS does NOT recreate
+           MainActivity when the device's day/night setting changes - it only
+           fires onConfigurationChanged (which MainActivity does not
+           override), so values-night/ resources (incl. styles.xml's
+           windowBackground, see colors.xml) stay resolved to whatever the
+           device's scheme was AT ACTIVITY CREATION and never re-resolve
+           afterward. That's intentional (recreating would tear down the RN
+           instance/JS context on every device dark-mode toggle - far worse
+           than a stale native-layer color), but it does mean the in-app
+           theme (App.tsx's AppContent) can never retroactively repaint this
+           native layer either - only App.tsx's own root View (the one with
+           backgroundColor: palette.bg) can, once JS has painted a frame over
+           it. See that View's own comment in App.tsx for the full chain. -->
       <activity
         android:name=".MainActivity"
         android:label="@string/app_name"

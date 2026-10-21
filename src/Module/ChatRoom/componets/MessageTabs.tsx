@@ -22,6 +22,7 @@ import { KIS_TOKENS } from '@/theme/constants';
 import { KISIcon } from '@/constants/kisIcons';
 import ImagePlaceholder from '@/components/common/ImagePlaceholder';
 import UserBadgeRow from '@/components/common/UserBadgeRow';
+import WorkStatusRing from '@/components/common/WorkStatusRing';
 
 import {
   styles,
@@ -332,11 +333,16 @@ const ChatRow = memo(function ChatRow({
             borderRadius: 28,
           }}
         >
-          {avatarUrl ? (
-            <Image source={{ uri: avatarUrl }} style={styles.avatar} />
-          ) : (
-            <ImagePlaceholder size={44} radius={22} style={styles.avatar} />
-          )}
+          <WorkStatusRing
+            size={44}
+            workStatus={item.isDirect ? otherUserWire?.profile?.work_status : undefined}
+          >
+            {avatarUrl ? (
+              <Image source={{ uri: avatarUrl }} style={styles.avatar} />
+            ) : (
+              <ImagePlaceholder size={44} radius={22} style={styles.avatar} />
+            )}
+          </WorkStatusRing>
         </View>
 
         {isArchived && (
@@ -607,9 +613,49 @@ export const ChatsTab = forwardRef<ScrollableHandle, ChatsTabProps>(function Cha
 
   /* ------------------------------------------------------------
    * NORMALIZE RAW BACKEND CONVERSATIONS → SAFE Chat objects
+   *
+   * Per-item memoized (keyed by the RAW conversation object's own
+   * reference) across renders, not just the whole array wrapped in
+   * useMemo. MessagesScreen.tsx's own `conversations` updates (on every
+   * incoming message, presence tick, etc.) already preserve each
+   * UNAFFECTED conversation's object reference via a `.map((item) => ...
+   * === convId ? {...item, ...} : item)` pattern - but re-running
+   * normalizeConversation() unconditionally for every item on every
+   * `conversations` array reference change (which is to say, on every
+   * single incoming-message tick, for every conversation currently in the
+   * list, not just the one that changed) threw that stability away again,
+   * allocating a brand-new Chat object for every row every time. Since
+   * `item={...}` is ChatRow's own identity prop and ChatRow is wrapped in
+   * React.memo, that meant literally every row in the list re-rendered on
+   * every socket event, not just the one row whose data actually changed -
+   * the dominant cause of this screen's chat-list jank. Reusing the
+   * previous render's Chat object whenever the raw input reference is
+   * unchanged restores that stability end to end, so an incoming message
+   * only ever re-renders the one row it actually affects.
    * ------------------------------------------------------------ */
+  const normalizeCacheRef = useRef<{ map: Map<any, Chat>; signature: string }>({
+    map: new Map(),
+    signature: '',
+  });
+
   const normalizedChats: Chat[] = useMemo(() => {
-    return conversations.map((c) => {
+    // isBlocked (computed below) depends on currentUserId/blockedUserIds
+    // too, not just the raw conversation object - a cached Chat is only
+    // safe to reuse as-is while BOTH of those are unchanged from the pass
+    // that produced it. They change far less often than `conversations`
+    // itself (blockedUserIds only on a manual block/unblock), so this only
+    // invalidates the whole cache on that rarer path, not on every message.
+    const signature = `${currentUserId ?? ''}|${[...blockedUserIds].sort().join(',')}`;
+    const prevCache = normalizeCacheRef.current;
+    const prevMap = prevCache.signature === signature ? prevCache.map : null;
+    const nextMap = new Map<any, Chat>();
+
+    const result = conversations.map((c) => {
+      const cached = prevMap?.get(c);
+      if (cached) {
+        nextMap.set(c, cached);
+        return cached;
+      }
       const chat = normalizeConversation(c, currentUserId);
       // normalizeConversation's own isBlocked reflects ConversationMember.
       // is_blocked - a distinct, moderator-driven per-conversation flag
@@ -629,8 +675,12 @@ export const ChatsTab = forwardRef<ScrollableHandle, ChatsTabProps>(function Cha
       } else {
         chat.isBlocked = false;
       }
+      nextMap.set(c, chat);
       return chat;
     });
+
+    normalizeCacheRef.current = { map: nextMap, signature };
+    return result;
   }, [conversations, currentUserId, blockedUserIds]);
 
   /* ------------------------------------------------------------

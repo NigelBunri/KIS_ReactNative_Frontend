@@ -141,6 +141,7 @@ import EventsLiveScreen from './src/screens/education/provider/EventsLiveScreen'
 import InstitutionSettingsScreen from './src/screens/education/provider/InstitutionSettingsScreen';
 import BroadcastsScreen from './src/screens/education/provider/BroadcastsScreen';
 import ClinicalCommandCenterScreen from './src/screens/health/ClinicalCommandCenterScreen';
+import HealthInstitutionComplianceScreen from './src/screens/health/HealthInstitutionComplianceScreen';
 import WebsiteBuilderScreen from './src/screens/website-builder/WebsiteBuilderScreen';
 import WebsitePreviewScreen from './src/screens/website-builder/WebsitePreviewScreen';
 import WebsiteThemeScreen from './src/screens/website-builder/WebsiteThemeScreen';
@@ -563,12 +564,22 @@ function AppContent() {
   const { themeMode } = useThemeMode();
   const sysScheme = useColorScheme();
   const scheme = themeMode === 'system' ? sysScheme : themeMode;
-  // Matches theme/constants.ts dark.bg / light.bg exactly, so a modal
-  // sheet's own content and the native chrome behind it are seamless -
-  // see the comment above RootStack.Navigator for why this is needed at
-  // all (NavigationContainer's background is forced transparent).
+  const { palette } = useKISTheme();
+  // palette.bg (not a hardcoded hex) so a modal sheet's own content and the
+  // native chrome behind it are seamless - see the comment above
+  // RootStack.Navigator for why this is needed at all (NavigationContainer's
+  // background is forced transparent). Was two independently hand-maintained
+  // hex-literal copies of theme/constants.ts's dark.bg/light.bg (this one,
+  // plus the `booting` early-return below) - the single real root-background
+  // fix (the flex:1 View wrapping StatusBar/GoldenSection/NavigationContainer
+  // further down, which previously had NO background at all and left the
+  // OS window's own background - frozen to the DEVICE's scheme, see
+  // android/app/src/main/AndroidManifest.xml's uiMode configChanges comment -
+  // showing through transparent/translucent areas regardless of the in-app
+  // theme) needs the exact same value, so this is now the one place that
+  // value is computed, not three.
   const educationModalContentStyle = {
-    backgroundColor: scheme === 'dark' ? '#0A090F' : '#F8F6F3',
+    backgroundColor: palette.bg,
   };
   // Start null so the gold gradient never flashes before navigation is ready.
   // syncActiveRoute fires via onReady/onStateChange and sets the real value.
@@ -1183,7 +1194,7 @@ function AppContent() {
     // A same-colored, contentless bridge means the native screen reads
     // as continuing uninterrupted until the real app is ready, instead of
     // being replaced by another loading screen.
-    return <View style={{ flex: 1, backgroundColor: scheme === 'dark' ? '#0A090F' : '#F8F6F3' }} />;
+    return <View style={{ flex: 1, backgroundColor: palette.bg }} />;
   }
 
   // No app-wide location gate here anymore — country/calling-code is a
@@ -1227,7 +1238,33 @@ function AppContent() {
             not playing and the play button showing zero visual feedback on
             tap, since nothing the bubble read ever actually changed. */}
         <VoiceMessagePlayerProvider>
-        <View style={{ flex: 1 }}>
+        {/* The actual root application background. Previously unset (plain
+            `{ flex: 1 }`, transparent by default) - with NavigationContainer's
+            own theme.colors.background forced to 'transparent' just below
+            (so tab screens' own gradient/animated backgrounds show through),
+            this View's own background is the ONLY thing standing between the
+            app's content and whatever is painted behind the OS window itself:
+            on Android, `android:windowBackground` (resolved from values/
+            values-night using the DEVICE's scheme, frozen at Activity-create
+            time since AndroidManifest.xml's configChanges includes `uiMode` -
+            see that file's own comment), and on iOS the UIWindow's background.
+            Neither of those two native layers has any way to know about an
+            in-app theme choice, and in particular neither one updates when
+            the user picks an in-app theme that differs from the device's
+            current one. Translucent/transparent status+nav bars (edge-to-
+            edge, see MainActivity.kt's enableEdgeToEdge) mean that native
+            layer is directly visible through those strips at all times, not
+            just during the cold-launch gap before JS paints - this is
+            exactly the "light theme chosen, background stays dark" bug:
+            every component correctly read the resolved in-app tone, but nothing
+            painted an opaque, theme-correct color into this one shared
+            layer, so the frozen native background kept showing through
+            underneath/around everything else. palette.bg is the same
+            resolved-theme value every other themed background in the app
+            already uses - this makes it the actual source of truth for the
+            app's root background instead of leaving that role to the native
+            window by default. */}
+        <View style={{ flex: 1, backgroundColor: palette.bg }}>
           <StatusBar
             animated
             translucent
@@ -1768,6 +1805,10 @@ function AppContent() {
                     <RootStack.Screen
                       name="ClinicalCommandCenter"
                       getComponent={() => ClinicalCommandCenterScreen}
+                    />
+                    <RootStack.Screen
+                      name="HealthInstitutionCompliance"
+                      getComponent={() => HealthInstitutionComplianceScreen}
                     />
                     {/* Education UX v2 */}
                     {/* Education UX v2 — presentation: 'modal' on every screen in this

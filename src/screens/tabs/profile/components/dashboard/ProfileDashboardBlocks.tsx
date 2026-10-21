@@ -30,6 +30,7 @@ import {
   getProfileDashboardCardStyle,
 } from '../../profileDashboardTheme';
 import { resolveNaturalHeight } from '@/hooks/goldHeaderNaturalHeight';
+import WorkStatusRing from '@/components/common/WorkStatusRing';
 
 import creditIcon from '../../../../../assets/KIS-Coin.png';
 
@@ -234,6 +235,7 @@ const BIG_AVATAR_SIZE_REGULAR = 100;
 export const ProfileHeroCard = ({
   coverUrl,
   avatarUrl,
+  workStatus,
   displayName,
   handle,
   headline,
@@ -250,6 +252,7 @@ export const ProfileHeroCard = ({
 }: {
   coverUrl?: string | null;
   avatarUrl?: string | null;
+  workStatus?: string | null;
   displayName: string;
   handle: string;
   headline?: string;
@@ -368,12 +371,20 @@ export const ProfileHeroCard = ({
               collapseNaturalHeight.value = withTiming(resolved, { duration: 220 });
             }, 150);
           }}
-          style={{ paddingTop: topInset, position: 'relative', overflow: 'hidden' }}
+          style={{ position: 'relative', overflow: 'hidden' }}
         >
           {/* Background — real cover photo or the decorative gold gradient
-              fallback — spans the *entire* hero (not just a top strip), so
-              it reads as one cohesive backdrop behind the avatar+name row
-              and the headline/badges below it, same as a LinkedIn cover. */}
+              fallback — spans the *entire* hero, all the way to y=0 (behind
+              the status bar/notch too), not just a top strip starting below
+              topInset. This View used to carry `paddingTop: topInset`
+              itself, which (per RN/Yoga's absolute-positioning model, same
+              as CSS) pushed this absoluteFillObject background down by that
+              same inset along with everything else - leaving a gap of bare
+              GoldHeaderShell backdrop above the cover photo on every device
+              with a non-zero safe-area inset. The inset still needs to push
+              the avatar/name row down below the status bar - moved onto
+              that row's own paddingTop just below instead, which only
+              affects the CONTENT, not this backdrop. */}
           <View style={StyleSheet.absoluteFillObject}>
             {coverUrl ? (
               <>
@@ -395,8 +406,13 @@ export const ProfileHeroCard = ({
             )}
           </View>
 
-          {/* Avatar + name/handle + actions — one row, LinkedIn-style */}
-          <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingTop: 44, gap: 14 }}>
+          {/* Avatar + name/handle + actions — one row, LinkedIn-style.
+              paddingTop carries both the fixed 44 breathing room below the
+              cover's top edge AND the safe-area topInset that used to live
+              on the outer container (see that View's own comment) - this
+              row is CONTENT, so it's the right place for the inset to push
+              things down, while the cover backdrop itself stays full-bleed. */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingTop: topInset + 44, gap: 14 }}>
             {/* Outer wrapper has NO overflow:hidden — only the inner circle
                 clips the image, so the edit badge (positioned partly outside
                 the circle) doesn't get clipped along with it. */}
@@ -434,13 +450,15 @@ export const ProfileHeroCard = ({
                 }}
               />
               <View style={[dashboardStyles.bigAvatarWrap, { width: bigAvatarSize, height: bigAvatarSize, borderRadius: bigAvatarSize / 2 }]}>
-                {avatarUrl ? (
-                  <Image source={{ uri: avatarUrl }} style={StyleSheet.absoluteFillObject as any} resizeMode="cover" />
-                ) : (
-                  <View style={[StyleSheet.absoluteFillObject, dashboardStyles.bigAvatarFallback, { backgroundColor: palette.surfaceElevated }]}>
-                    <KISIcon name="person" size={compact ? 26 : 30} color={palette.subtext} />
-                  </View>
-                )}
+                <WorkStatusRing size={bigAvatarSize} workStatus={workStatus}>
+                  {avatarUrl ? (
+                    <Image source={{ uri: avatarUrl }} style={StyleSheet.absoluteFillObject as any} resizeMode="cover" />
+                  ) : (
+                    <View style={[StyleSheet.absoluteFillObject, dashboardStyles.bigAvatarFallback, { backgroundColor: palette.surfaceElevated }]}>
+                      <KISIcon name="person" size={compact ? 26 : 30} color={palette.subtext} />
+                    </View>
+                  )}
+                </WorkStatusRing>
               </View>
               <Pressable
                 onPress={onEdit}
@@ -543,13 +561,15 @@ export const ProfileHeroCard = ({
         ]}
       >
         <View style={dashboardStyles.stickyAvatarWrap}>
-          {avatarUrl ? (
-            <Image source={{ uri: avatarUrl }} style={StyleSheet.absoluteFillObject as any} resizeMode="cover" />
-          ) : (
-            <View style={[StyleSheet.absoluteFillObject, dashboardStyles.stickyAvatarFallback]}>
-              <KISIcon name="person" size={18} color="rgba(255,244,184,0.85)" />
-            </View>
-          )}
+          <WorkStatusRing size={36} strokeWidth={2.5} workStatus={workStatus}>
+            {avatarUrl ? (
+              <Image source={{ uri: avatarUrl }} style={StyleSheet.absoluteFillObject as any} resizeMode="cover" />
+            ) : (
+              <View style={[StyleSheet.absoluteFillObject, dashboardStyles.stickyAvatarFallback]}>
+                <KISIcon name="person" size={18} color="rgba(255,244,184,0.85)" />
+              </View>
+            )}
+          </WorkStatusRing>
         </View>
 
         <View style={{ flex: 1, minWidth: 0 }}>
