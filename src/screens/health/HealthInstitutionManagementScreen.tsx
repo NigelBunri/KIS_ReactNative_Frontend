@@ -631,6 +631,23 @@ export default function HealthInstitutionManagementScreen({ route, navigation }:
     });
   }, [form.name, navigation, resolvedInstitution?.name, resolvedInstitutionId]);
 
+  // FinancialPanel/CompliancePanel (audit logs, credential verification,
+  // regulatory reports, billing reconciliation, claims, disputes) were
+  // fully built against real apps/core/apps/billing endpoints but had no
+  // mount point anywhere in the app for either Health or Market - this
+  // closes the Health half of that gap (see ShopDashboardScreen's new
+  // "Compliance" tab for the Market half).
+  const handleOpenComplianceBilling = useCallback(() => {
+    if (!resolvedInstitutionId) {
+      Alert.alert('Compliance & Billing', 'Create the institution first.');
+      return;
+    }
+    navigation.navigate('HealthInstitutionCompliance', {
+      institutionId: resolvedInstitutionId,
+      institutionName: form.name || resolvedInstitution?.name,
+    });
+  }, [form.name, navigation, resolvedInstitution?.name, resolvedInstitutionId]);
+
   const handleOpenLandingPage = useCallback(() => {
     if (!resolvedInstitutionId) {
       Alert.alert('Landing page', 'Create the institution first.');
@@ -883,6 +900,13 @@ export default function HealthInstitutionManagementScreen({ route, navigation }:
                 title={resolvedInstitutionId ? 'Manage landing page' : 'Create institution first'}
                 variant="outline"
                 onPress={resolvedInstitutionId ? handleOpenLandingPage : undefined}
+                disabled={!resolvedInstitutionId}
+              />
+              <View style={{ height: HEALTH_THEME_SPACING.sm }} />
+              <KISButton
+                title={resolvedInstitutionId ? 'Compliance & Billing' : 'Create institution first'}
+                variant="outline"
+                onPress={resolvedInstitutionId ? handleOpenComplianceBilling : undefined}
                 disabled={!resolvedInstitutionId}
               />
             </View>

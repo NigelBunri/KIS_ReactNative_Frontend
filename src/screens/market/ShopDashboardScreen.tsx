@@ -46,6 +46,8 @@ import { collectProductImageUris } from '@/utils/productImages';
 import CommerceRevenuePreviewCard from '@/components/profitability/CommerceRevenuePreviewCard';
 import { uploadMarketplaceMedia } from '@/services/uploadMarketplaceMedia';
 import { SafeAreaView } from '@/components/common/SafeAreaViewWithTopPadding';
+import { CompliancePanel } from '@/screens/tabs/profile-screen/CompliancePanel';
+import { FinancialPanel } from '@/screens/tabs/profile-screen/FinancialPanel';
 
 type PickedImage = { uri: string; name: string; type: string };
 
@@ -198,6 +200,7 @@ const TAB_DEFINITIONS = [
   { key: 'members', label: 'Members' },
   { key: 'analytics', label: 'Analytics' },
   { key: 'landing', label: 'Landing' },
+  { key: 'compliance', label: 'Compliance' },
 ];
 
 const ROLE_POSITION_MAP: Record<string, number> = {
@@ -3055,6 +3058,29 @@ export default function ShopDashboardScreen({ route, navigation }: Props) {
     </View>
   );
 
+  // Both panels were fully built against real apps/core (compliance) and
+  // apps/billing (financial) endpoints but had zero mount point anywhere in
+  // the app - the Market management feature list promised "Compliance
+  // audit log," "Billing & insurance reconciliation," "Claims lifecycle
+  // tracking," and "Payment disputes" for exactly this shop-owner surface,
+  // but nothing ever rendered either component. organizationId scopes
+  // both panels to this specific shop, matching the pattern CompliancePanel/
+  // FinancialPanel already expect (see their own prop types).
+  const renderComplianceTab = () => (
+    <View style={{ gap: 16 }}>
+      <FinancialPanel
+        palette={palette}
+        profileId={currentUserId ? String(currentUserId) : undefined}
+        organizationId={shopId ? String(shopId) : undefined}
+      />
+      <CompliancePanel
+        palette={palette}
+        profileId={currentUserId ? String(currentUserId) : undefined}
+        organizationId={shopId ? String(shopId) : undefined}
+      />
+    </View>
+  );
+
   const renderTabContent = () => {
     switch (activeTab) {
       case 'products':
@@ -3067,6 +3093,8 @@ export default function ShopDashboardScreen({ route, navigation }: Props) {
         return renderAnalyticsTab();
       case 'landing':
         return renderLandingTab();
+      case 'compliance':
+        return renderComplianceTab();
       case 'overview':
       default:
         return renderOverviewTab();
