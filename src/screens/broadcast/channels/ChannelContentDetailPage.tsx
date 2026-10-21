@@ -39,6 +39,7 @@ import {
   fetchChannelContentDetail,
   fetchWatchHistory,
   reactToChannelContent,
+  removeChannelContentReaction,
   recordChannelContentView,
   removeSavedChannelContent,
   saveChannelContent,
@@ -920,6 +921,7 @@ export default function ChannelContentDetailPage() {
   const [content, setContent] = useState<BroadcastChannelContent | null>(route.params?.item || null);
   const [loading, setLoading] = useState(!route.params?.item);
   const [counts, setCounts] = useState<Record<string, number>>((route.params?.item?.engagement_counts || {}) as Record<string, number>);
+  const [myReaction, setMyReaction] = useState<'like' | 'dislike' | null>(route.params?.item?.my_reaction ?? null);
   const [saved, setSaved] = useState(false);
   const [resumeSeconds, setResumeSeconds] = useState<number | null>(null);
   const [relatedContent, setRelatedContent] = useState<BroadcastChannelContent[]>([]);
@@ -949,6 +951,7 @@ export default function ChannelContentDetailPage() {
         if (mounted && next) {
           setContent(next);
           setCounts((next.engagement_counts || {}) as Record<string, number>);
+          setMyReaction(next.my_reaction ?? null);
         }
       })
       .finally(() => mounted && setLoading(false));
@@ -980,27 +983,60 @@ export default function ChannelContentDetailPage() {
     if (payload?.engagement_counts) setCounts(payload.engagement_counts);
   }, []);
 
-  const handleReact = useCallback(async () => {
+  // Real toggle, matching ChannelContentReactView's actual semantics
+  // (apps/broadcasts/views.py): POST upserts a single reaction row per
+  // user via ChannelContentReaction.unique_together, DELETE removes it.
+  // The old handleReact/handleDislike never tracked myReaction at all, so
+  // every tap just blindly POSTed another "like"/"dislike" - no way to
+  // un-like, no "already liked" highlight, and switching like->dislike
+  // never decremented the stale "reactions" count client-side (the
+  // server's own engagement_counts response did correct it, but only
+  // after a visible flash of the wrong number).
+  const toggleReaction = useCallback(async (type: 'like' | 'dislike') => {
     if (!content?.id) return;
-    setCounts(prev => ({ ...prev, reactions: Number(prev.reactions || 0) + 1 }));
-    try {
-      applyCounts(await reactToChannelContent(content.id));
-    } catch {
-      // Roll back — previously an unawaited/unchecked failure here left the
-      // optimistic reaction count permanently off by one with no feedback.
-      setCounts(prev => ({ ...prev, reactions: Math.max(0, Number(prev.reactions || 0) - 1) }));
-    }
-  }, [applyCounts, content?.id]);
+    const previous = myReaction;
+    const countKey = type === 'like' ? 'reactions' : 'dislikes';
+    const otherKey = type === 'like' ? 'dislikes' : 'reactions';
+    const turningOff = previous === type;
 
-  const handleDislike = useCallback(async () => {
-    if (!content?.id) return;
-    setCounts(prev => ({ ...prev, dislikes: Number(prev.dislikes || 0) + 1 }));
+    setMyReaction(turningOff ? null : type);
+    setCounts(prev => {
+      const next = { ...prev };
+      if (turningOff) {
+        next[countKey] = Math.max(0, Number(next[countKey] || 0) - 1);
+      } else {
+        next[countKey] = Number(next[countKey] || 0) + 1;
+        if (previous) next[otherKey] = Math.max(0, Number(next[otherKey] || 0) - 1);
+      }
+      return next;
+    });
+
     try {
-      applyCounts(await reactToChannelContent(content.id, 'dislike'));
+      const response = turningOff
+        ? await removeChannelContentReaction(content.id)
+        : await reactToChannelContent(content.id, type);
+      if (response) {
+        applyCounts(response);
+      } else {
+        throw new Error('reaction request failed');
+      }
     } catch {
-      setCounts(prev => ({ ...prev, dislikes: Math.max(0, Number(prev.dislikes || 0) - 1) }));
+      setMyReaction(previous);
+      setCounts(prev => {
+        const next = { ...prev };
+        if (turningOff) {
+          next[countKey] = Number(next[countKey] || 0) + 1;
+        } else {
+          next[countKey] = Math.max(0, Number(next[countKey] || 0) - 1);
+          if (previous) next[otherKey] = Number(next[otherKey] || 0) + 1;
+        }
+        return next;
+      });
     }
-  }, [applyCounts, content?.id]);
+  }, [applyCounts, content?.id, myReaction]);
+
+  const handleReact = useCallback(() => toggleReaction('like'), [toggleReaction]);
+  const handleDislike = useCallback(() => toggleReaction('dislike'), [toggleReaction]);
 
   const handleSave = useCallback(async () => {
     if (!content?.id) return;
@@ -1340,8 +1376,8 @@ export default function ChannelContentDetailPage() {
           )}
 
           <View style={[styles.actionGrid, { gap: compact ? 8 : 10 }]}>
-            <ActionButton icon="heart" label="Like" value={compactNumber(counts.reactions)} onPress={handleReact} />
-            <ActionButton icon="warning" label="Dislike" value={compactNumber(counts.dislikes)} onPress={handleDislike} />
+            <ActionButton icon="heart" label="Like" value={compactNumber(counts.reactions)} onPress={handleReact} active={myReaction === 'like'} />
+            <ActionButton icon="warning" label="Dislike" value={compactNumber(counts.dislikes)} onPress={handleDislike} active={myReaction === 'dislike'} />
             <ActionButton icon="comment" label="Comment" value={compactNumber(counts.comments)} onPress={() => setCommentsModalVisible(true)} />
             <ActionButton icon="share" label="Share" value={compactNumber(counts.shares)} onPress={handleShare} />
             <ActionButton icon="qr-code" label="QR code" value="Share" onPress={handleShowQr} />
@@ -1574,14 +1610,25 @@ export default function ChannelContentDetailPage() {
   );
 }
 
-function ActionButton({ icon, label, value, onPress }: { icon: string; label: string; value: string; onPress: () => void }) {
+function ActionButton({ icon, label, value, onPress, active = false }: { icon: string; label: string; value: string; onPress: () => void; active?: boolean }) {
   const { palette } = useKISTheme();
   const responsive = useResponsiveLayout();
   const compact = responsive.isWatch || responsive.isCompactPhone;
   return (
-    <Pressable onPress={onPress} style={[styles.actionButton, { backgroundColor: palette.surfaceElevated, borderColor: palette.border, width: compact ? '47%' : '30.5%', minHeight: compact ? 68 : 76 }]}> 
-      <KISIcon name={icon} size={18} color={palette.primaryStrong} />
-      <Text style={[styles.actionLabel, { color: palette.text }]}>{label}</Text>
+    <Pressable
+      onPress={onPress}
+      style={[
+        styles.actionButton,
+        {
+          backgroundColor: active ? palette.primarySoft : palette.surfaceElevated,
+          borderColor: active ? palette.primary : palette.border,
+          width: compact ? '47%' : '30.5%',
+          minHeight: compact ? 68 : 76,
+        },
+      ]}
+    >
+      <KISIcon name={icon} size={18} focused={active} color={palette.primaryStrong} />
+      <Text style={[styles.actionLabel, { color: active ? palette.primaryStrong : palette.text }]}>{label}</Text>
       <Text style={[styles.actionValue, { color: palette.subtext }]}>{value}</Text>
     </Pressable>
   );

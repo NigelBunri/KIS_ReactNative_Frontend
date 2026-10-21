@@ -9,8 +9,10 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useKISTheme } from '@/theme/useTheme';
 import { useResponsiveLayout } from '@/theme/responsive';
 import { KISIcon } from '@/constants/kisIcons';
+import KISButton from '@/constants/KISButton';
 import { getRequest } from '@/network/get';
 import { postRequest } from '@/network/post';
+import { deleteRequest } from '@/network/delete';
 import ROUTES from '@/network';
 import type { RootStackParamList } from '@/navigation/types';
 import GiftMembershipSheet from './components/GiftMembershipSheet';
@@ -64,10 +66,16 @@ export default function MembershipScreen() {
           text: 'Cancel membership', style: 'destructive',
           onPress: async () => {
             setJoining(tier.id);
-            const res = await postRequest(
+            // A real DELETE, not a POST with a fake `_method` override field
+            // nothing on the backend ever read — that POST landed in
+            // ChannelMembershipView.post's join branch instead of .delete's
+            // cancel branch, so "cancel" actually re-joined the tier (free)
+            // or re-kicked off a brand-new payment link the user never
+            // asked for (paid), and a second tap on an already-pending
+            // paid tier hit a duplicate WalletTransaction.tx_ref and 500'd.
+            const res = await deleteRequest(
               ROUTES.broadcasts.channelMembership(channelId),
-              { tier_id: tier.id, _method: 'DELETE' },
-              { errorMessage: 'Could not cancel.' }
+              { body: { tier_id: tier.id }, errorMessage: 'Could not cancel.' }
             ).catch(() => null);
             // Previously the failure was swallowed entirely and the screen
             // just silently reloaded — if `is_joined` was still true after
@@ -215,25 +223,19 @@ export default function MembershipScreen() {
                   </Text>
                 </View>
               )}
-              <Pressable
-                onPress={() => handleJoin(item)}
+              {/* KISButton, same as every other primary action in the app
+                  (see src/constants/KISButton.tsx) - 'secondary' once
+                  joined matches the neutral/outlined "on" treatment the
+                  Updates channel Follow button already uses, instead of
+                  this screen's own hand-rolled palette.primary Pressable. */}
+              <KISButton
+                variant={item.is_joined ? 'secondary' : 'primary'}
+                title={item.is_joined ? 'Joined ✓' : 'Join'}
+                loading={joining === item.id}
                 disabled={joining === item.id}
-                style={[
-                  styles.joinBtn,
-                  {
-                    backgroundColor: item.is_joined ? palette.surface : palette.primary,
-                    borderColor: item.is_joined ? palette.border : palette.primary,
-                  },
-                ]}
-              >
-                {joining === item.id ? (
-                  <ActivityIndicator color={item.is_joined ? palette.text : palette.ivory} size="small" />
-                ) : (
-                  <Text style={{ color: item.is_joined ? palette.text : palette.ivory, fontWeight: '900' }}>
-                    {item.is_joined ? 'Joined ✓' : 'Join'}
-                  </Text>
-                )}
-              </Pressable>
+                onPress={() => handleJoin(item)}
+                style={{ marginTop: 10 }}
+              />
             </View>
           )}
         />
@@ -291,9 +293,7 @@ export default function MembershipScreen() {
               </View>
             </Pressable>
 
-            <Pressable onPress={() => setPaymentModal(false)} style={styles.cancelBtn}>
-              <Text style={[styles.cancelText, { color: palette.subtext }]}>Cancel</Text>
-            </Pressable>
+            <KISButton variant="ghost" title="Cancel" onPress={() => setPaymentModal(false)} />
           </Pressable>
         </Pressable>
       </Modal>
@@ -329,10 +329,6 @@ const styles = StyleSheet.create({
   tierTitle: { fontSize: 16, fontWeight: '900' },
   tierPrice: { fontSize: 14, fontWeight: '800' },
   tierDesc: { fontSize: 13, fontWeight: '600', lineHeight: 18 },
-  joinBtn: {
-    marginTop: 14, borderRadius: 24, paddingVertical: 12,
-    alignItems: 'center', borderWidth: 1,
-  },
   modalOverlay: {
     flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end',
   },
@@ -356,6 +352,4 @@ const styles = StyleSheet.create({
   providerIconText: { fontWeight: '900', fontSize: 13 },
   providerName: { fontSize: 15, fontWeight: '800' },
   providerDesc: { fontSize: 12, fontWeight: '600', marginTop: 2 },
-  cancelBtn: { alignItems: 'center', paddingVertical: 12 },
-  cancelText: { fontSize: 15, fontWeight: '700' },
 });

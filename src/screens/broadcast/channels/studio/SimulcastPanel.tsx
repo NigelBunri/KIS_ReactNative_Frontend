@@ -19,6 +19,7 @@ import { useKISTheme } from '@/theme/useTheme';
 import ROUTES from '@/network';
 import { getRequest } from '@/network/get';
 import { postRequest } from '@/network/post';
+import { deleteRequest } from '@/network/delete';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -156,14 +157,18 @@ export default function SimulcastPanel({ streamId }: Props) {
         onPress: async () => {
           setRemovingId(target.id);
           try {
-            // postRequest resolves (never throws) on failure too — the
+            // deleteRequest resolves (never throws) on failure too — the
             // trailing `.catch(() => {})` here used to swallow that, so a
             // failed removal still re-fetched and looked like nothing
             // happened (the target just silently stayed in the list with
-            // no explanation why).
-            const res = await postRequest(
-              `${ROUTES.broadcasts.liveStreamSimulcast(streamId)}${target.id}/remove/`,
-              {},
+            // no explanation why). This previously POSTed to a
+            // `/remove/` path that Django never registered at all (the
+            // real route is DELETE `.../simulcast/<target_id>/`, matching
+            // ChannelLiveStreamTargetDetailView and the same detail-delete
+            // pattern used elsewhere in this studio, e.g.
+            // ChannelHomepageShelfEditor.tsx) — every removal 404ed.
+            const res = await deleteRequest(
+              `${ROUTES.broadcasts.liveStreamSimulcast(streamId)}${target.id}/`,
               { errorMessage: '' },
             );
             if (!res?.success) {

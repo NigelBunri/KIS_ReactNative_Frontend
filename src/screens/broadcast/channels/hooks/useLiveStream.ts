@@ -133,9 +133,9 @@ export function useLiveStream(
     const messages: LiveChatMessage[] = rows.map((r: any) => ({
       id:           String(r.id ?? ''),
       userId:       String(r.user_id ?? r.userId ?? ''),
-      displayName:  String(r.user_display ?? r.displayName ?? 'Viewer'),
-      text:         String(r.text ?? r.body ?? ''),
-      sentAt:       String(r.sent_at ?? r.sentAt ?? r.created_at ?? ''),
+      displayName:  String(r.display_name ?? r.displayName ?? 'Viewer'),
+      text:         String(r.message ?? r.text ?? ''),
+      sentAt:       String(r.created_at ?? r.sent_at ?? r.sentAt ?? ''),
       isMine:       currentUserId
         ? String(r.user_id ?? r.userId) === String(currentUserId)
         : false,
@@ -169,14 +169,22 @@ export function useLiveStream(
 
       const ms = status === 'live' ? POLL_LIVE_MS : POLL_PENDING_MS;
       pollTimerRef.current = setTimeout(async () => {
-        await fetchStream();
+        // REST fallback for chat, same role as the viewer-count ping below —
+        // covers any viewer whose socket connection drops or missed an
+        // emit, so messages don't silently stop appearing. Only worth the
+        // request while actually live.
+        if (status === 'live') {
+          await Promise.all([fetchStream(), fetchChatHistory()]);
+        } else {
+          await fetchStream();
+        }
         schedule();
       }, ms);
     };
 
     schedule();
     return () => { if (pollTimerRef.current) clearTimeout(pollTimerRef.current); };
-  }, [streamId, stream?.status, fetchStream]);
+  }, [streamId, stream?.status, fetchStream, fetchChatHistory]);
 
   // ── Realtime socket events ──────────────────────────────────────────────────
 
@@ -201,7 +209,11 @@ export function useLiveStream(
           : false,
         is_pinned:    (msg as any).is_pinned ?? false,
         is_moderator: (msg as any).is_moderator ?? false,
-        is_member:    (msg as any).is_member ?? false,
+        // Socket payload is camelCase (matches userId/displayName/sentAt
+        // above - see notify_live_chat_message in apps/broadcasts/
+        // realtime.py), unlike the snake_case REST response fetchChatHistory
+        // reads above it.
+        is_member:    msg.isMember ?? false,
       };
       setChatMessages(prev => {
         if (prev.some(m => m.id === message.id)) return prev;
@@ -266,7 +278,7 @@ export function useLiveStream(
 
     const res = await postRequest(
       ROUTES.broadcasts.liveStreamChat(streamId),
-      { text: text.trim() },
+      { message: text.trim() },
       { errorMessage: 'Unable to send message.' },
     );
 
@@ -274,10 +286,11 @@ export function useLiveStream(
       const saved: LiveChatMessage = {
         id:          String(res.data.id ?? optimisticId),
         userId:      String(res.data.user_id ?? currentUserId ?? ''),
-        displayName: String(res.data.user_display ?? 'You'),
-        text:        String(res.data.text ?? text),
-        sentAt:      String(res.data.sent_at ?? new Date().toISOString()),
+        displayName: String(res.data.display_name ?? 'You'),
+        text:        String(res.data.message ?? text),
+        sentAt:      String(res.data.created_at ?? new Date().toISOString()),
         isMine:      true,
+        is_member:   Boolean(res.data.is_member),
       };
       setChatMessages(prev =>
         prev.map(m => m.id === optimisticId ? saved : m),

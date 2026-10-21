@@ -8,7 +8,7 @@ import { useKISTheme } from '@/theme/useTheme';
 import { useResponsiveLayout } from '@/theme/responsive';
 import type { RootStackParamList } from '@/navigation/types';
 import type { BroadcastChannelContent, BroadcastChannelPlaylist, BroadcastChannelSummary } from '@/screens/broadcast/channels/api/channels.types';
-import { createBroadcastChannel, fetchChannelContents, fetchChannelPlaylists, publishChannelContent, setChannelBroadcastState, setChannelContentBroadcastState, setChannelContentTags, useChannelsData } from '@/screens/broadcast/channels/hooks/useChannelsData';
+import { createBroadcastChannel, fetchChannelContents, fetchChannelPlaylists, publishChannelContent, setChannelBroadcastState, setChannelContentBroadcastState, setChannelContentTags, setChannelContentVisibility, useChannelsData } from '@/screens/broadcast/channels/hooks/useChannelsData';
 import ROUTES from '@/network';
 import { getRequest } from '@/network/get';
 import { isTierAtLeast } from '@/services/tierAccess';
@@ -30,6 +30,8 @@ import ProductTagStudio from '@/screens/broadcast/channels/studio/ProductTagStud
 import EndScreenEditor from '@/screens/broadcast/channels/studio/EndScreenEditor';
 import ContentCardsEditor from '@/screens/broadcast/channels/studio/ContentCardsEditor';
 import ChannelHomepageShelfEditor from '@/screens/broadcast/channels/studio/ChannelHomepageShelfEditor';
+import MonetizationPanel from '@/screens/broadcast/channels/studio/MonetizationPanel';
+import MembershipTiersPanel from '@/screens/broadcast/channels/studio/MembershipTiersPanel';
 import {
   KIS_PROMOTIONAL_CREDIT_SAFETY_COPY,
   getLockedPremiumStateCopy,
@@ -39,7 +41,7 @@ import TrustPromotionRevenuePreviewCard from '@/components/profitability/TrustPr
 import NotificationRetentionPreviewCard from '@/components/profitability/NotificationRetentionPreviewCard';
 import EnterpriseKcanRevenuePreviewCard from '@/components/profitability/EnterpriseKcanRevenuePreviewCard';
 
-type StudioTab = 'dashboard' | 'content' | 'create' | 'branding' | 'playlists' | 'live' | 'analytics' | 'moderation' | 'revenue' | 'audience' | 'copyright' | 'ads' | 'impressions' | 'traffic' | 'subtitles' | 'chapters' | 'endscreens' | 'cards' | 'shelves' | 'products' | 'settings';
+type StudioTab = 'dashboard' | 'content' | 'create' | 'branding' | 'playlists' | 'live' | 'analytics' | 'moderation' | 'revenue' | 'audience' | 'copyright' | 'ads' | 'impressions' | 'traffic' | 'subtitles' | 'chapters' | 'endscreens' | 'cards' | 'shelves' | 'products' | 'monetization' | 'membership' | 'settings';
 
 type Props = {
   legacyFeeds: any[];
@@ -88,6 +90,8 @@ const TABS: Array<{ id: StudioTab; label: string }> = [
   { id: 'cards', label: 'Cards' },
   { id: 'shelves', label: 'Shelves' },
   { id: 'products', label: 'Products' },
+  { id: 'monetization', label: 'Monetization' },
+  { id: 'membership', label: 'Membership' },
   { id: 'settings', label: 'Settings' },
 ];
 
@@ -100,7 +104,7 @@ type StudioTabCategory = 'content' | 'live' | 'growth' | 'brand' | 'protect';
 const TAB_CATEGORIES: Array<{ id: StudioTabCategory; label: string; tabs: StudioTab[] }> = [
   { id: 'content', label: 'Content', tabs: ['dashboard', 'content', 'create', 'playlists'] },
   { id: 'live', label: 'Live', tabs: ['live', 'analytics', 'traffic', 'impressions'] },
-  { id: 'growth', label: 'Growth', tabs: ['audience', 'revenue', 'ads', 'shelves', 'cards', 'products'] },
+  { id: 'growth', label: 'Growth', tabs: ['audience', 'revenue', 'ads', 'shelves', 'cards', 'products', 'monetization', 'membership'] },
   { id: 'brand', label: 'Brand', tabs: ['branding', 'subtitles', 'chapters', 'endscreens'] },
   { id: 'protect', label: 'Protect', tabs: ['moderation', 'copyright', 'settings'] },
 ];
@@ -206,6 +210,7 @@ export default function ChannelStudioScreen({ legacyFeeds, liveCount, expiresAt,
   const [channelBroadcasting, setChannelBroadcasting] = useState(false);
   const [contentBroadcastingId, setContentBroadcastingId] = useState<string | null>(null);
   const [contentPublishingId, setContentPublishingId] = useState<string | null>(null);
+  const [contentMembersOnlyTogglingId, setContentMembersOnlyTogglingId] = useState<string | null>(null);
   const { channels, loading, refresh } = useChannelsData({ mine: true });
 
   useEffect(() => {
@@ -437,6 +442,21 @@ export default function ChannelStudioScreen({ legacyFeeds, liveCount, expiresAt,
     }
   }, [refreshContent]);
 
+  const handleToggleContentMembersOnly = useCallback(async (content: BroadcastChannelContent, nextMembersOnly: boolean) => {
+    if (!content?.id) return;
+    setContentMembersOnlyTogglingId(content.id);
+    try {
+      const updated = await setChannelContentVisibility(content.id, nextMembersOnly ? 'members_only' : 'public');
+      if (!updated) {
+        Alert.alert('Unable to update visibility', 'Please try again.');
+        return;
+      }
+      await refreshContent();
+    } finally {
+      setContentMembersOnlyTogglingId(null);
+    }
+  }, [refreshContent]);
+
   const renderCreatorPremiumPreview = (context: 'dashboard' | 'create' | 'analytics' | 'live' | 'settings' = 'dashboard') => {
     const features =
       context === 'create'
@@ -654,7 +674,7 @@ export default function ChannelStudioScreen({ legacyFeeds, liveCount, expiresAt,
         </>
       );
     }
-    if (activeTab === 'content') return <ChannelContentManager contents={contents} legacyFeeds={legacyFeeds} onCreate={() => onCreate(selectedChannel)} onToggleBroadcast={handleToggleContentBroadcast} broadcastingId={contentBroadcastingId} onUpdateTags={handleUpdateContentTags} onPublish={handlePublishContent} publishingId={contentPublishingId} />;
+    if (activeTab === 'content') return <ChannelContentManager contents={contents} legacyFeeds={legacyFeeds} onCreate={() => onCreate(selectedChannel)} onToggleBroadcast={handleToggleContentBroadcast} broadcastingId={contentBroadcastingId} onUpdateTags={handleUpdateContentTags} onPublish={handlePublishContent} publishingId={contentPublishingId} onToggleMembersOnly={handleToggleContentMembersOnly} togglingMembersOnlyId={contentMembersOnlyTogglingId} />;
     if (activeTab === 'moderation') return <ChannelModerationPanel channelId={selectedChannel.id} />;
     if (activeTab === 'create') {
       return (
@@ -727,6 +747,8 @@ export default function ChannelStudioScreen({ legacyFeeds, liveCount, expiresAt,
     // endscreens/subtitles all key off selectedContent?.id the same way).
     if (activeTab === 'products') return <ProductTagStudio contentId={selectedContent?.id ?? ''} />;
     if (activeTab === 'shelves') return <ChannelHomepageShelfEditor channelId={selectedChannel.id} />;
+    if (activeTab === 'monetization') return <MonetizationPanel channelId={selectedChannel.id} />;
+    if (activeTab === 'membership') return <MembershipTiersPanel channelId={selectedChannel.id} />;
     if (activeTab === 'settings') {
       return (
         <>
@@ -763,7 +785,7 @@ export default function ChannelStudioScreen({ legacyFeeds, liveCount, expiresAt,
           subtitle="Creator, ministry, education, and institution media networks are packaged for future annual contracts only."
         />
         <ChannelAnalyticsPanel channelId={selectedChannel.id} queued={legacyFeeds.length} live={liveCount} subscribers={selectedChannel.subscriber_count} />
-        <ChannelContentManager contents={contents.slice(0, 4)} legacyFeeds={legacyFeeds.slice(0, 4)} onCreate={() => onCreate(selectedChannel)} onToggleBroadcast={handleToggleContentBroadcast} broadcastingId={contentBroadcastingId} onUpdateTags={handleUpdateContentTags} onPublish={handlePublishContent} publishingId={contentPublishingId} />
+        <ChannelContentManager contents={contents.slice(0, 4)} legacyFeeds={legacyFeeds.slice(0, 4)} onCreate={() => onCreate(selectedChannel)} onToggleBroadcast={handleToggleContentBroadcast} broadcastingId={contentBroadcastingId} onUpdateTags={handleUpdateContentTags} onPublish={handlePublishContent} publishingId={contentPublishingId} onToggleMembersOnly={handleToggleContentMembersOnly} togglingMembersOnlyId={contentMembersOnlyTogglingId} />
         {loadingContent ? <ActivityIndicator color={palette.primaryStrong} /> : null}
       </>
     );

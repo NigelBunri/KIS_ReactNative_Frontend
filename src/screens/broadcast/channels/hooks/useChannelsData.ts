@@ -171,6 +171,7 @@ export const normalizeChannelContent = (item: any): BroadcastChannelContent | nu
     metadata: item.metadata && typeof item.metadata === 'object' ? item.metadata : {},
     tags: Array.isArray(item.tags) ? item.tags.map((t: any) => String(t)) : [],
     scheduled_at: item.scheduled_at || item.scheduledAt || null,
+    my_reaction: item.my_reaction ?? item.myReaction ?? null,
     created_at: item.created_at || item.createdAt || '',
     updated_at: item.updated_at || item.updatedAt || '',
   };
@@ -485,6 +486,15 @@ export const publishChannelContent = async (contentId: string): Promise<Broadcas
     channelContentPublishEndpoint(contentId),
     {},
     { errorMessage: 'Unable to publish content.' },
+  );
+  return response?.success ? normalizeChannelContent(response.data) : null;
+};
+
+export const setChannelContentVisibility = async (contentId: string, visibility: 'public' | 'members_only'): Promise<BroadcastChannelContent | null> => {
+  const response = await patchRequest(
+    channelContentDetailEndpoint(contentId),
+    { visibility },
+    { errorMessage: 'Unable to update visibility.' },
   );
   return response?.success ? normalizeChannelContent(response.data) : null;
 };

@@ -70,6 +70,7 @@ export type BroadcastChannelContent = {
   scheduled_at?: string | null;
   age_restriction?: 'none' | '13+' | '18+';
   geo_restricted?: boolean;
+  my_reaction?: 'like' | 'dislike' | null;
   created_at?: string;
   updated_at?: string;
 };
@@ -153,6 +154,7 @@ export type ChannelContentComment = {
   like_count?: number;
   is_liked?: boolean;
   is_pinned?: boolean;
+  is_member?: boolean;
   has_creator_heart?: boolean;
   reply_count?: number;
   created_at?: string;

@@ -19,6 +19,7 @@ import {
   View,
 } from 'react-native';
 import { useKISTheme } from '@/theme/useTheme';
+import KISButton from '@/constants/KISButton';
 import ROUTES from '@/network';
 import { getRequest } from '@/network/get';
 import { postRequest } from '@/network/post';
@@ -37,13 +38,18 @@ type PayoutRequest = {
   created_at: string;
 };
 
+// Mirrors ChannelMonetizationSettingsSerializer's actual field names
+// (apps/broadcasts/serializers.py) - this used to read/write
+// memberships_enabled/creator_share/platform_share/payout_threshold,
+// none of which exist on that serializer, so DRF silently dropped them
+// on every PATCH (a no-op save with no error shown) and every GET
+// rendered the hardcoded JS defaults below instead of the real settings.
 type MonetizationData = {
   tips_enabled: boolean;
-  memberships_enabled: boolean;
+  membership_enabled: boolean;
   ad_revenue_enabled: boolean;
-  creator_share: number;
-  platform_share: number;
-  payout_threshold: string;
+  revenue_share_pct: number;
+  payout_threshold_cents: number;
   payout_schedule: PayoutSchedule;
   payout_requests?: PayoutRequest[];
 };
@@ -103,11 +109,14 @@ export default function MonetizationPanel({ channelId }: Props) {
       }
       const d: MonetizationData = res.data;
       setTipsEnabled(d.tips_enabled ?? false);
-      setMembershipsEnabled(d.memberships_enabled ?? false);
+      setMembershipsEnabled(d.membership_enabled ?? false);
       setAdRevenueEnabled(d.ad_revenue_enabled ?? false);
-      setCreatorShare(d.creator_share ?? 70);
-      setPlatformShare(d.platform_share ?? 30);
-      setPayoutThreshold(d.payout_threshold ?? '');
+      const share = Number(d.revenue_share_pct ?? 70);
+      setCreatorShare(share);
+      setPlatformShare(100 - share);
+      setPayoutThreshold(
+        d.payout_threshold_cents != null ? (d.payout_threshold_cents / 100).toFixed(2) : '',
+      );
       setPayoutSchedule(d.payout_schedule ?? 'monthly');
       setPayoutRequests(d.payout_requests ?? []);
       // Also fetch payout requests separately if not bundled
@@ -134,14 +143,15 @@ export default function MonetizationPanel({ channelId }: Props) {
     if (saving) return;
     setSaving(true);
     try {
+      const thresholdCents = Math.max(0, Math.round((parseFloat(payoutThreshold) || 0) * 100));
       const res = await patchRequest(
         ROUTES.broadcasts.channelMonetization(channelId),
         {
-          tips_enabled:        tipsEnabled,
-          memberships_enabled: membershipsEnabled,
-          ad_revenue_enabled:  adRevenueEnabled,
-          payout_threshold:    payoutThreshold,
-          payout_schedule:     payoutSchedule,
+          tips_enabled:           tipsEnabled,
+          membership_enabled:     membershipsEnabled,
+          ad_revenue_enabled:     adRevenueEnabled,
+          payout_threshold_cents: thresholdCents,
+          payout_schedule:        payoutSchedule,
         },
         { errorMessage: 'Failed to save settings' },
       );
@@ -289,17 +299,13 @@ export default function MonetizationPanel({ channelId }: Props) {
       )}
 
       {/* Save button */}
-      <Pressable
-        onPress={handleSave}
+      <KISButton
+        variant="primary"
+        title="Save Settings"
+        loading={saving}
         disabled={saving || loadFailed}
-        style={[styles.saveBtn, { backgroundColor: palette.gold, opacity: loadFailed ? 0.5 : 1 }]}
-      >
-        {saving ? (
-          <ActivityIndicator size="small" color={palette.onPrimary} />
-        ) : (
-          <Text style={[styles.saveBtnText, { color: palette.onPrimary }]}>Save Settings</Text>
-        )}
-      </Pressable>
+        onPress={handleSave}
+      />
 
       {/* Separator */}
       <View style={[styles.separator, { backgroundColor: palette.border }]} />
@@ -317,25 +323,14 @@ export default function MonetizationPanel({ channelId }: Props) {
           keyboardType="decimal-pad"
           style={[styles.input, { color: palette.text, borderColor: palette.border }]}
         />
-        <Pressable
-          onPress={handlePayoutRequest}
+        <KISButton
+          variant="secondary"
+          title="Submit Payout Request"
+          loading={requesting}
           disabled={!payoutAmount.trim() || requesting}
-          style={[
-            styles.payoutBtn,
-            {
-              backgroundColor:
-                payoutAmount.trim() && !requesting
-                  ? palette.primaryStrong
-                  : palette.surfaceElevated,
-            },
-          ]}
-        >
-          {requesting ? (
-            <ActivityIndicator size="small" color={palette.onPrimary} />
-          ) : (
-            <Text style={[styles.payoutBtnText, { color: palette.onPrimary }]}>Submit Payout Request</Text>
-          )}
-        </Pressable>
+          onPress={handlePayoutRequest}
+          style={{ marginTop: 10 }}
+        />
       </View>
 
       {/* Recent requests */}
@@ -444,30 +439,9 @@ const styles = StyleSheet.create({
     lineHeight: 17,
     textAlign: 'center',
   },
-  saveBtn: {
-    borderRadius: 12,
-    height: 48,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  saveBtnText: {
-    fontWeight: '800',
-    fontSize: 15,
-  },
   separator: {
     height: 1,
     marginVertical: 8,
-  },
-  payoutBtn: {
-    borderRadius: 10,
-    height: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 4,
-  },
-  payoutBtnText: {
-    fontWeight: '700',
-    fontSize: 14,
   },
   requestRow: {
     flexDirection: 'row',

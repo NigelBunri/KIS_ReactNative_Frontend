@@ -178,6 +178,11 @@ function CommentItem({ comment, palette, contentId, isAdmin, currentUserId = '',
       )}
       <View style={styles.authorRow}>
         <Text style={[styles.author, { color: palette.text }]}>{comment.user_display || 'KIS user'}</Text>
+        {comment.is_member && (
+          <View style={[styles.memberBadge, { backgroundColor: palette.gold }]}>
+            <Text style={[styles.memberBadgeText, { color: palette.royalInk }]}>MEMBER</Text>
+          </View>
+        )}
         {comment.has_creator_heart && (
           <View style={styles.heartCrownBadge}>
             <KISIcon name="heart" size={11} color={palette.danger} />
@@ -362,7 +367,6 @@ export default function ChannelCommentsPanel({ contentId, onCountChange, isAdmin
     try {
       const rows = await fetchChannelComments(contentId, sort);
       setFlatComments(rows);
-      onCountChange?.(rows.length);
     } catch {
       // fetchChannelComments already returns [] on a handled API failure;
       // this only catches a hard throw (e.g. network drop) so the list
@@ -371,9 +375,22 @@ export default function ChannelCommentsPanel({ contentId, onCountChange, isAdmin
     } finally {
       setLoading(false);
     }
-  }, [contentId, onCountChange, sort]);
+  }, [contentId, sort]);
 
   useEffect(() => { void load(); }, [load]);
+
+  // Single source of truth for telling the parent how many comments there
+  // are - every call site below used to invoke onCountChange(...) (a
+  // setState on ChannelContentDetailPage) from *inside* a setFlatComments
+  // functional updater, which is a parent-component setState call made
+  // while this component's own state update is still being processed.
+  // React flags that as "Cannot update a component while rendering a
+  // different component." Deriving it here from the committed
+  // flatComments state instead means the parent only ever hears about a
+  // count change after this component has actually finished rendering it.
+  useEffect(() => {
+    onCountChange?.(flatComments.length);
+  }, [flatComments.length, onCountChange]);
 
   const submit = useCallback(async () => {
     const text = body.trim();
@@ -382,11 +399,7 @@ export default function ChannelCommentsPanel({ contentId, onCountChange, isAdmin
     try {
       const result = await postChannelComment(contentId, text);
       if (result?.comment) {
-        setFlatComments(prev => {
-          const updated = [result.comment!, ...prev];
-          onCountChange?.(updated.length);
-          return updated;
-        });
+        setFlatComments(prev => [result.comment!, ...prev]);
         setBody('');
       } else {
         Alert.alert('Error', 'Could not post your comment. Please try again.');
@@ -396,7 +409,7 @@ export default function ChannelCommentsPanel({ contentId, onCountChange, isAdmin
     } finally {
       setPosting(false);
     }
-  }, [body, contentId, onCountChange, posting]);
+  }, [body, contentId, posting]);
 
   const handleOptimisticLike = useCallback((id: string, liked: boolean) => {
     setFlatComments(prev => prev.map(c =>
@@ -413,12 +426,8 @@ export default function ChannelCommentsPanel({ contentId, onCountChange, isAdmin
   }, []);
 
   const handleReplyPosted = useCallback((reply: ChannelContentComment) => {
-    setFlatComments(prev => {
-      const updated = [...prev, reply];
-      onCountChange?.(updated.length);
-      return updated;
-    });
-  }, [onCountChange]);
+    setFlatComments(prev => [...prev, reply]);
+  }, []);
 
   const handleOptimisticEdit = useCallback((id: string, body: string) => {
     setFlatComments(prev => prev.map(c =>
@@ -427,12 +436,8 @@ export default function ChannelCommentsPanel({ contentId, onCountChange, isAdmin
   }, []);
 
   const handleDeleteComment = useCallback((id: string) => {
-    setFlatComments(prev => {
-      const updated = prev.filter(c => c.id !== id);
-      onCountChange?.(updated.length);
-      return updated;
-    });
-  }, [onCountChange]);
+    setFlatComments(prev => prev.filter(c => c.id !== id));
+  }, []);
 
   const handleOptimisticHeart = useCallback((id: string, hearted: boolean) => {
     setFlatComments(prev => prev.map(c =>
@@ -526,5 +531,7 @@ const styles = StyleSheet.create({
   sortPillLabel: { fontSize: 11, fontWeight: '800' },
   authorRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   heartCrownBadge: { flexDirection: 'row', alignItems: 'center', gap: 2 },
+  memberBadge: { borderRadius: 4, paddingHorizontal: 4, paddingVertical: 1 },
+  memberBadgeText: { fontSize: 8, fontWeight: '900' },
   editInputRow: { marginTop: 6, borderWidth: 1, borderRadius: 8, padding: 8, flexDirection: 'row', alignItems: 'flex-end', gap: 6 },
 });

@@ -97,7 +97,7 @@ export default function KISButton({
       {shouldUseGoldGradient ? <View pointerEvents="none" style={styles.goldSheen} /> : null}
       {left ? <View style={{ marginRight: 6 }}>{left}</View> : null}
 
-      {title ? <Text style={titleStyles}>{title}</Text> : children}
+      {title ? <Text style={titleStyles} numberOfLines={1}>{title}</Text> : children}
 
       {loading ? (
         <ActivityIndicator

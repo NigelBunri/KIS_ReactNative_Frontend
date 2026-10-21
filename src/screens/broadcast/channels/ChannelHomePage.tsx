@@ -318,22 +318,15 @@ export default function ChannelHomePage() {
               initialNotifLevel={channel?.notification_level ?? undefined}
             />
             {channel?.id ? (
-              <Pressable
+              <KISButton
+                variant="outline"
+                size="xs"
+                style={styles.joinButtonOverride}
+                textStyle={styles.joinButtonText}
+                left={<KISIcon name="people" size={14} color={palette.primaryStrong} />}
+                title="Join"
                 onPress={() => navigation.navigate('Membership', { channelId: channel.id, channelName: channel.display_name })}
-                style={{
-                  borderWidth: 1.5,
-                  borderColor: palette.primaryStrong,
-                  borderRadius: 20,
-                  paddingHorizontal: 14,
-                  paddingVertical: 8,
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  gap: 6,
-                }}
-              >
-                <KISIcon name="people" size={14} color={palette.primaryStrong} />
-                <Text style={{ color: palette.primaryStrong, fontWeight: '800', fontSize: 13 }}>Join</Text>
-              </Pressable>
+              />
             ) : null}
           </View>
           <Text numberOfLines={3} style={[styles.channelDescription, { color: palette.subtext }]}>{channel?.description || 'Original broadcasts, live sessions, posts, files, and updates from this KIS channel.'}</Text>
@@ -579,7 +572,16 @@ const styles = StyleSheet.create({
   backButton: { position: 'absolute', left: 16, width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.34)' },
   avatarOverlap: { marginTop: -50, marginBottom: 12 },
   avatarFallback: { borderWidth: 3, alignItems: 'center', justifyContent: 'center' },
-  headerTopRow: { flexDirection: 'row', alignItems: 'flex-start' },
+  // 'flex-start' used to top-align this row's children, which meant the
+  // name/handle block, SubscribeBellButton, and Join button never landed
+  // on the same line whenever any of them had a slightly different
+  // height - 'center' is what actually keeps them level. gap was also
+  // only ever applied in the (rare) `compact && flexWrap` case right
+  // below where this style is used, so Subscribe/Bell/Join sat flush
+  // against each other with zero breathing room the rest of the time.
+  headerTopRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  joinButtonOverride: { minHeight: 28, paddingHorizontal: 12 },
+  joinButtonText: { fontSize: 12 },
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   channelTitle: { flex: 1, fontSize: 26, fontWeight: '900', letterSpacing: 0 },
   handle: { marginTop: 3, fontSize: 13, fontWeight: '700' },

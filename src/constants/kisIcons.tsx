@@ -19,6 +19,7 @@ export type KISIconName =
   | 'search'
   | 'cart'
   | 'bell'
+  | 'bell-off'
   | 'settings'
   | 'back'
   | 'close'
@@ -184,6 +185,10 @@ const ion: IonMap = {
   bell: {
     filled: 'notifications',
     outline: 'notifications-outline',
+  },
+  'bell-off': {
+    filled: 'notifications-off',
+    outline: 'notifications-off-outline',
   },
   settings: {
     filled: 'settings',

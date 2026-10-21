@@ -16,8 +16,9 @@
 // Both actions persist to the backend with optimistic updates + rollback.
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, StyleSheet, View } from 'react-native';
 import { KISIcon } from '@/constants/kisIcons';
+import KISButton from '@/constants/KISButton';
 import { useKISTheme } from '@/theme/useTheme';
 import ROUTES from '@/network';
 import { patchRequest } from '@/network/patch';
@@ -154,6 +155,13 @@ export default function SubscribeBellButton({
 
   // ── Render ──────────────────────────────────────────────────────────────────
 
+  // Matches YouTube's own bell glyph per level: a solid/filled bell once
+  // it's been "rung" (All), the default hollow outline for Personalized,
+  // and a slashed bell once "unrung" (None) - distinguishing level by
+  // glyph shape, not just tint, so it reads correctly for colorblind users
+  // and at a glance without needing to compare against another channel.
+  const bellIconName = notifLevel === 'none' ? 'bell-off' : 'bell';
+  const bellFocused = notifLevel === 'all';
   const bellColor = notifLevel === 'none'
     ? palette.subtext
     : notifLevel === 'personalized'
@@ -162,39 +170,26 @@ export default function SubscribeBellButton({
 
   return (
     <View style={styles.row}>
-      {/* Subscribe button */}
-      <Pressable
-        onPress={handleSubscribe}
+      {/* Subscribe button - KISButton, same pill-shaped component every
+          other primary action in the app uses (see src/constants/
+          KISButton.tsx). 'danger' while unsubscribed matches YouTube's own
+          red Subscribe CTA exactly; once subscribed it switches to
+          'secondary' (neutral/outlined), the same treatment the Updates
+          channel Follow button already uses for its "on" state. This used
+          to be a hand-rolled Pressable styled with palette.text, which
+          wasn't red in either light or dark mode and didn't match this or
+          any other button's pill shape/sizing. */}
+      <KISButton
+        variant={subscribed ? 'secondary' : 'danger'}
+        size="xs"
+        title={subscribed ? 'Subscribed' : 'Subscribe'}
+        loading={subPending}
         disabled={subPending}
-        accessibilityRole="button"
+        onPress={handleSubscribe}
         accessibilityLabel={subscribed ? 'Unsubscribe from channel' : 'Subscribe to channel'}
-        accessibilityState={{ selected: subscribed, busy: subPending }}
-        style={[
-          styles.subscribe,
-          compact && styles.subscribeCompact,
-          {
-            backgroundColor: subscribed ? palette.surfaceElevated : palette.text,
-            opacity: subPending ? 0.7 : 1,
-          },
-        ]}
-      >
-        {subPending ? (
-          <ActivityIndicator
-            size="small"
-            color={subscribed ? palette.text : palette.surface}
-          />
-        ) : (
-          <Text
-            style={{
-              color:      subscribed ? palette.text : palette.surface,
-              fontWeight: '900',
-              fontSize:   compact ? 11 : 13,
-            }}
-          >
-            {subscribed ? 'Subscribed' : 'Subscribe'}
-          </Text>
-        )}
-      </Pressable>
+        style={compact ? styles.subscribeCompactOverride : styles.subscribeOverride}
+        textStyle={compact ? styles.subscribeCompactText : styles.subscribeText}
+      />
 
       {/* Bell button (only when subscribed) */}
       {subscribed && (
@@ -202,8 +197,7 @@ export default function SubscribeBellButton({
           onPress={handleBell}
           disabled={bellPending}
           style={[
-            styles.bell,
-            compact && styles.bellCompact,
+            compact ? styles.bellCompact : styles.bell,
             {
               borderColor:     palette.border,
               backgroundColor: notifLevel !== 'none' ? palette.primarySoft ?? palette.primaryWeak : palette.surface,
@@ -218,8 +212,9 @@ export default function SubscribeBellButton({
             <ActivityIndicator size="small" color={bellColor} />
           ) : (
             <KISIcon
-              name="bell"
-              size={compact ? 15 : 18}
+              name={bellIconName}
+              focused={bellFocused}
+              size={compact ? 13 : 14}
               color={bellColor}
             />
           )}
@@ -237,28 +232,38 @@ const styles = StyleSheet.create({
     alignItems:    'center',
     gap:           8,
   },
-  subscribe: {
-    minHeight:       44,
-    borderRadius:    8,
-    paddingHorizontal: 18,
-    alignItems:      'center',
-    justifyContent:  'center',
+  // Overrides on top of KISButton's own 'xs' size - still a real
+  // KISButton (pill shape, variant colors, loading/disabled states), just
+  // trimmed well below 'xs' so it doesn't dominate a header row shared
+  // with other buttons (ChannelHomePage's Join button, etc).
+  subscribeOverride: {
+    minHeight:         28,
+    paddingHorizontal: 12,
   },
-  subscribeCompact: {
-    minHeight:       44,
-    paddingHorizontal: 13,
+  subscribeCompactOverride: {
+    minHeight:         24,
+    paddingHorizontal: 10,
+  },
+  subscribeText: {
+    fontSize: 12,
+  },
+  subscribeCompactText: {
+    fontSize: 11,
   },
   bell: {
-    width:          44,
-    height:         44,
-    borderRadius:   22,
+    width:          28,
+    height:         28,
+    borderRadius:   14,
     borderWidth:    1,
     alignItems:     'center',
     justifyContent: 'center',
   },
   bellCompact: {
-    width:    44,
-    height:   44,
-    borderRadius: 22,
+    width:          24,
+    height:         24,
+    borderRadius:   12,
+    borderWidth:    1,
+    alignItems:     'center',
+    justifyContent: 'center',
   },
 });

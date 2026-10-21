@@ -85,9 +85,16 @@ export default function LiveChatPanel({
           : [styles.bubbleOther, { backgroundColor: palette.royalInk }],
       ]}>
         {!item.isMine && (
-          <Text style={[styles.msgName, { color: palette.primaryStrong }]}>
-            {item.displayName}
-          </Text>
+          <View style={styles.msgNameRow}>
+            <Text style={[styles.msgName, { color: palette.primaryStrong }]}>
+              {item.displayName}
+            </Text>
+            {item.is_member && (
+              <View style={[styles.memberBadge, { backgroundColor: palette.gold }]}>
+                <Text style={[styles.memberBadgeText, { color: palette.royalInk }]}>MEMBER</Text>
+              </View>
+            )}
+          </View>
         )}
         <Text style={[styles.msgText, { color: palette.ivory }]}>{item.text}</Text>
       </View>
@@ -227,7 +234,10 @@ const styles = StyleSheet.create({
   },
   bubbleOther: { borderBottomLeftRadius: 4 },
   bubbleMine:  { borderBottomRightRadius: 4 },
-  msgName: { fontSize: 10, fontWeight: '700', marginBottom: 2 },
+  msgNameRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 2 },
+  msgName: { fontSize: 10, fontWeight: '700' },
+  memberBadge: { borderRadius: 4, paddingHorizontal: 4, paddingVertical: 1 },
+  memberBadgeText: { fontSize: 7, fontWeight: '900' },
   msgText: { fontSize: 12, fontWeight: '500', lineHeight: 17 },
   inputRow: {
     flexDirection: 'row',

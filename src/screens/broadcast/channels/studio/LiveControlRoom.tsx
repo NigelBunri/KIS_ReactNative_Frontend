@@ -472,7 +472,7 @@ function BroadcasterPanel({
     try {
       const res = await getRequest(
         ROUTES.broadcasts.liveStreamStreamKey(stream.id),
-        { errorMessage: '' },
+        { errorMessage: 'Unable to load stream key.' },
       );
       if (res?.success) {
         setStreamKey(String(res.data?.stream_key ?? res.data?.key ?? ''));

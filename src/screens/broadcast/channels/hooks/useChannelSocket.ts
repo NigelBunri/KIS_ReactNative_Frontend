@@ -38,6 +38,7 @@ type ChatMessagePayload = {
   displayName: string;
   text: string;
   sentAt: string;
+  isMember?: boolean;
 };
 
 type ContentPublishedPayload = {
