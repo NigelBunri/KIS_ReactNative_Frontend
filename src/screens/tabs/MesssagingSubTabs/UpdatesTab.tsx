@@ -35,6 +35,7 @@ import NewChannelForm from '@/Module/AddContacts/components/NewChannelForm';
 import { Chat } from '@/Module/ChatRoom/messagesUtils';
 import Skeleton from '@/components/common/Skeleton';
 import KISText from '@/components/common/KISText';
+import WorkStatusRing from '@/components/common/WorkStatusRing';
 import KISButton from '@/constants/KISButton';
 import KISFab from '@/components/KISFab';
 import { launchImageLibrary } from 'react-native-image-picker';
@@ -87,6 +88,7 @@ type StatusUser = {
   id: string;
   name: string;
   avatar?: string;
+  workStatus?: string | null;
   items: StatusItem[];
   userId?: string;
   hasUnseen?: boolean;
@@ -534,7 +536,7 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
   const [interactionExpanded, setInteractionExpanded] = useState(false);
   const interactionSheetDragY = useRef(new Animated.Value(0)).current;
   const [reactionGroups, setReactionGroups] = useState<
-    { emoji: string; count: number; users: { id: string; display_name: string; avatar_url?: string | null }[] }[]
+    { emoji: string; count: number; users: { id: string; display_name: string; avatar_url?: string | null; work_status?: string | null }[] }[]
   >([]);
   const [myReaction, setMyReaction] = useState<string | null>(null);
   const [reactionsLoading, setReactionsLoading] = useState(false);
@@ -912,6 +914,7 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
             userId: String(entry?.user?.id ?? ''),
             name: entry?.user?.display_name ?? 'User',
             avatar: entry?.user?.avatar_url ?? undefined,
+            workStatus: entry?.user?.work_status ?? undefined,
             badges: entry?.user?.badges ?? undefined,
             tier: entry?.user?.tier ?? undefined,
             hasUnseen: Boolean(entry?.has_unseen),
@@ -3628,15 +3631,17 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
               or how recent it was, without backing out to the list. */}
           {activeUser ? (
             <View style={styles.viewerHeaderRow} pointerEvents="none">
-              <View style={[styles.viewerHeaderAvatar, { backgroundColor: palette.surfaceElevated }]}>
-                {activeUser.avatar ? (
-                  <Image source={{ uri: activeUser.avatar }} style={styles.viewerHeaderAvatarImg} />
-                ) : (
-                  <Text style={{ color: palette.text, fontWeight: '800', fontSize: 14 }}>
-                    {(activeUser.name || '?').trim().charAt(0).toUpperCase()}
-                  </Text>
-                )}
-              </View>
+              <WorkStatusRing size={32} workStatus={activeUser.workStatus}>
+                <View style={[styles.viewerHeaderAvatar, { backgroundColor: palette.surfaceElevated }]}>
+                  {activeUser.avatar ? (
+                    <Image source={{ uri: activeUser.avatar }} style={styles.viewerHeaderAvatarImg} />
+                  ) : (
+                    <Text style={{ color: palette.text, fontWeight: '800', fontSize: 14 }}>
+                      {(activeUser.name || '?').trim().charAt(0).toUpperCase()}
+                    </Text>
+                  )}
+                </View>
+              </WorkStatusRing>
               <View style={{ marginLeft: 10, flexShrink: 1 }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                   <Text style={styles.viewerHeaderName} numberOfLines={1}>
@@ -4169,15 +4174,17 @@ const UpdatesTab = forwardRef<ScrollableHandle, UpdatesTabProps>(function Update
               keyExtractor={u => u.id}
               renderItem={({ item: user }) => (
                 <View style={styles.interactionUserRow}>
-                  {user.avatar_url ? (
-                    <Image source={{ uri: user.avatar_url }} style={styles.interactionAvatar} />
-                  ) : (
-                    <View style={[styles.interactionAvatar, { backgroundColor: palette.card, alignItems: 'center', justifyContent: 'center' }]}>
-                      <Text style={{ color: palette.text, fontWeight: '700' }}>
-                        {(user.display_name || '?').trim().charAt(0).toUpperCase()}
-                      </Text>
-                    </View>
-                  )}
+                  <WorkStatusRing size={36} workStatus={user.work_status}>
+                    {user.avatar_url ? (
+                      <Image source={{ uri: user.avatar_url }} style={styles.interactionAvatar} />
+                    ) : (
+                      <View style={[styles.interactionAvatar, { backgroundColor: palette.card, alignItems: 'center', justifyContent: 'center' }]}>
+                        <Text style={{ color: palette.text, fontWeight: '700' }}>
+                          {(user.display_name || '?').trim().charAt(0).toUpperCase()}
+                        </Text>
+                      </View>
+                    )}
+                  </WorkStatusRing>
                   <Text style={{ color: palette.text, fontSize: 14, flex: 1 }} numberOfLines={1}>
                     {user.display_name}
                   </Text>

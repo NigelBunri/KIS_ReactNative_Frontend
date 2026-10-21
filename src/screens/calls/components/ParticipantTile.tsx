@@ -13,6 +13,7 @@ import NetworkQualityBars from './NetworkQualityBars';
 import { KISIcon } from '@/constants/kisIcons';
 import { RTCView, RTCPIPView } from '@/services/calls/webRTCService';
 import { useKISTheme } from '@/theme/useTheme';
+import WorkStatusRing from '@/components/common/WorkStatusRing';
 
 type Props = {
   participant: CallParticipant;
@@ -238,6 +239,27 @@ export default React.memo(function ParticipantTile({
             />
           );
         })()
+      ) : shape === 'circle' ? (
+        // Only the voice-call circular avatar tile gets the work-status
+        // ring — a rounded/video tile's fallback avatar fills a
+        // RECTANGULAR frame via absoluteFill, so forcing it through
+        // WorkStatusRing's circular clip would corrupt that shape.
+        <WorkStatusRing size={width} workStatus={participant.workStatus}>
+          {showAvatarPhoto ? (
+            <Image
+              source={{ uri: participant.avatarUrl! }}
+              style={StyleSheet.absoluteFill}
+              resizeMode="cover"
+              onError={() => setAvatarLoadFailed(true)}
+            />
+          ) : (
+            <View style={[styles.avatar, { backgroundColor: avatarColor }]}>
+              <Text style={[styles.initials, { fontSize: Math.max(16, width * 0.2) }]}>
+                {initials(participant.displayName)}
+              </Text>
+            </View>
+          )}
+        </WorkStatusRing>
       ) : showAvatarPhoto ? (
         <Image
           source={{ uri: participant.avatarUrl! }}

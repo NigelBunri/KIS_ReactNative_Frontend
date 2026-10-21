@@ -30,6 +30,7 @@ type FallbackProfile = {
     bio: string | null;
     avatar_url: string | null;
     cover_url: string | null;
+    work_status?: string | null;
   };
 };
 
@@ -148,6 +149,10 @@ export default function useAuthorProfilePreview() {
               bio:
                 userPayload?.profile?.bio ??
                 fallback?.profile?.bio ??
+                null,
+              work_status:
+                userPayload?.profile?.work_status ??
+                fallback?.profile?.work_status ??
                 null,
             },
           });

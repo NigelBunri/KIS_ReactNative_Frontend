@@ -20,6 +20,15 @@ export type ProfilePayload = {
     completion_score?: number;
     branding_prefs?: Record<string, any>;
     open_to_work?: boolean;
+    work_status?: 'none' | 'open_for_work' | 'hiring' | null;
+    work_preferences?: {
+      roles?: string[];
+      employment_types?: string[];
+      workplace?: 'on_site' | 'hybrid' | 'remote' | '';
+      location?: string;
+      availability?: string;
+    } | null;
+    hiring_job_listing_id?: string | null;
     connection_count?: number;
     connection_degree?: number | null;
   };

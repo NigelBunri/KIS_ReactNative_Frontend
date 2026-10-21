@@ -48,6 +48,8 @@ function buildRouteNotificationData(item: InAppNotification): Record<string, str
       return { conversationId: targetId, title: item.title };
     case 'channel_content':
       return { channel_content_id: targetId };
+    case 'channel_live_stream':
+      return { live_id: targetId };
     case 'channel':
       return { channel_id: targetId };
     case 'partner_community':

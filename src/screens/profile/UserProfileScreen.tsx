@@ -21,6 +21,7 @@ import { KISIcon } from '@/constants/kisIcons';
 import type { RootStackParamList } from '@/navigation/types';
 import PermanentRemoteImage from '@/components/media/PermanentRemoteImage';
 import OfflineDataBadge from '@/components/offline/OfflineDataBadge';
+import WorkStatusRing from '@/components/common/WorkStatusRing';
 import {
   freshOfflineMeta,
   offlineStructuredCacheKey,
@@ -230,9 +231,22 @@ export default function UserProfileScreen() {
     );
   };
 
-  const skills: any[] = profile?.skills ?? [];
-  const experiences: any[] = profile?.experiences ?? profile?.experience ?? [];
-  const educations: any[] = profile?.educations ?? profile?.education ?? [];
+  // apps.accounts.views._build_profile_payload (the backend of
+  // ROUTES.profiles.view, the only loader for this screen's `profile`
+  // state) nests these under `sections.*` and `profile.*`/`user.*`, not
+  // flat on the response root the way every field below used to assume -
+  // every field here (skills/experiences/educations, and the whole
+  // identity block further down: avatar, name, headline, industry, bio,
+  // open_to_work) was silently reading `undefined` off the real payload.
+  // useAuthorProfilePreview.ts's mergeProfilePayload already reads the
+  // correct nested shape for this exact endpoint - this screen just never
+  // did. Keeping the old flat keys as a fallback is harmless (they're
+  // simply never present on the real response) and costs nothing.
+  const skills: any[] = profile?.sections?.skills ?? profile?.skills ?? [];
+  const experiences: any[] = profile?.sections?.experiences ?? profile?.experiences ?? profile?.experience ?? [];
+  const educations: any[] = profile?.sections?.educations ?? profile?.educations ?? profile?.education ?? [];
+  const profileUser: any = profile?.user ?? {};
+  const profileDetail: any = profile?.profile ?? {};
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: palette.bg, }} edges={['top']}>
@@ -272,24 +286,34 @@ export default function UserProfileScreen() {
 
           {/* Avatar + name block */}
           <View style={styles.identityBlock}>
-            {profile?.avatar_url ? (
-              <PermanentRemoteImage
-                uri={profile.avatar_url}
-                domain="Profile"
-                stableKey={`profile_avatar_${userId}_${profile.avatar_url}`}
-                containerStyle={[styles.avatarCircle, { borderColor: palette.bg }]}
-              />
-            ) : (
-              <View style={[styles.avatarCircle, { backgroundColor: palette.primary, borderColor: palette.bg }]}>
-                <Text style={[styles.avatarInitials, { color: palette.bg }]}>
-                  {getInitials(profile?.display_name ?? displayName)}
-                </Text>
-              </View>
-            )}
+            <WorkStatusRing
+              size={80}
+              workStatus={profileDetail?.work_status}
+              onHiringPress={
+                profileDetail?.hiring_job_listing_id
+                  ? () => navigation.navigate('JobDetail', { jobId: profileDetail.hiring_job_listing_id })
+                  : undefined
+              }
+            >
+              {profileDetail?.avatar_url ?? profile?.avatar_url ? (
+                <PermanentRemoteImage
+                  uri={profileDetail?.avatar_url ?? profile.avatar_url}
+                  domain="Profile"
+                  stableKey={`profile_avatar_${userId}_${profileDetail?.avatar_url ?? profile.avatar_url}`}
+                  containerStyle={[styles.avatarCircle, { borderColor: palette.bg }]}
+                />
+              ) : (
+                <View style={[styles.avatarCircle, { backgroundColor: palette.primary, borderColor: palette.bg }]}>
+                  <Text style={[styles.avatarInitials, { color: palette.bg }]}>
+                    {getInitials(profileUser?.display_name ?? profile?.display_name ?? displayName)}
+                  </Text>
+                </View>
+              )}
+            </WorkStatusRing>
 
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap', justifyContent: 'center' }}>
               <Text style={[styles.displayName, { color: palette.text }]}>
-                {profile?.display_name ?? displayName ?? 'Member'}
+                {profileUser?.display_name ?? profile?.display_name ?? displayName ?? 'Member'}
               </Text>
               {degreeLabel(profile?.connection_degree) !== null && (
                 <View style={[degreeStyles.chip, {
@@ -306,19 +330,19 @@ export default function UserProfileScreen() {
               </Text>
             )}
 
-            {!!profile?.headline && (
+            {!!(profileDetail?.headline ?? profile?.headline) && (
               <Text style={[styles.headline, { color: palette.subtext }]} numberOfLines={2}>
-                {profile.headline}
+                {profileDetail?.headline ?? profile.headline}
               </Text>
             )}
 
-            {!!profile?.industry && (
+            {!!(profileDetail?.industry ?? profile?.industry) && (
               <View style={[styles.industryBadge, { backgroundColor: palette.surface, borderColor: palette.border }]}>
-                <Text style={[styles.industryText, { color: palette.primary }]}>{profile.industry}</Text>
+                <Text style={[styles.industryText, { color: palette.primary }]}>{profileDetail?.industry ?? profile.industry}</Text>
               </View>
             )}
 
-            {profile?.open_to_work === true && (
+            {(profileDetail?.open_to_work ?? profile?.open_to_work) === true && (
               <View style={[styles.openToWorkBanner, { backgroundColor: palette.surface, borderColor: palette.border }]}>
                 <Text style={[styles.openToWorkText, { color: palette.text }]}>🟢 Open to Work</Text>
               </View>
@@ -333,7 +357,7 @@ export default function UserProfileScreen() {
               onPress={() => {
                 DeviceEventEmitter.emit('chat.open', {
                   userId: userId,
-                  name: profile?.display_name ?? displayName ?? '',
+                  name: profileUser?.display_name ?? profile?.display_name ?? displayName ?? '',
                   kind: 'dm',
                 });
               }}
@@ -343,12 +367,12 @@ export default function UserProfileScreen() {
           </View>
 
           {/* Bio */}
-          {!!profile?.bio && (
+          {!!(profileDetail?.bio ?? profile?.bio) && (
             <>
               <View style={[styles.divider, { backgroundColor: palette.divider }]} />
               <View style={styles.section}>
                 <Text style={[styles.sectionTitle, { color: palette.text }]}>About</Text>
-                <Text style={[styles.bioText, { color: palette.subtext }]}>{profile.bio}</Text>
+                <Text style={[styles.bioText, { color: palette.subtext }]}>{profileDetail?.bio ?? profile.bio}</Text>
               </View>
             </>
           )}

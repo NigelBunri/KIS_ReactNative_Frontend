@@ -25,6 +25,7 @@ import { useKISTheme } from '@/theme/useTheme';
 import { KIS_TOKENS } from '@/theme/constants';
 import { KISIcon } from '@/constants/kisIcons';
 import ImagePlaceholder from '@/components/common/ImagePlaceholder';
+import WorkStatusRing from '@/components/common/WorkStatusRing';
 import ROUTES, { CHAT_BASE_URL } from '@/network';
 import { getRequest } from '@/network/get';
 import { postRequest } from '@/network/post';
@@ -870,9 +871,11 @@ export const CommunityInfoPage: React.FC<CommunityInfoPageProps> = ({
                     KIS_TOKENS.elevation.card,
                   ]}
                 >
-                  <View style={[styles.memberAvatar, { backgroundColor: palette.surfaceSoft ?? palette.surface, alignItems: 'center', justifyContent: 'center' }]}>
-                    <Text style={{ color: palette.subtext, fontSize: 15, fontWeight: '700' }}>{initials}</Text>
-                  </View>
+                  <WorkStatusRing size={44} workStatus={(typeof m.user === 'object' ? (m.user as any)?.profile?.work_status : undefined)}>
+                    <View style={[styles.memberAvatar, { backgroundColor: palette.surfaceSoft ?? palette.surface, alignItems: 'center', justifyContent: 'center' }]}>
+                      <Text style={{ color: palette.subtext, fontSize: 15, fontWeight: '700' }}>{initials}</Text>
+                    </View>
+                  </WorkStatusRing>
                   <View style={styles.memberInfo}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                       <Text style={[styles.memberName, { color: palette.text }]} numberOfLines={1}>

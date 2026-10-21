@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Image,
   Pressable,
   StyleSheet,
   Text,
@@ -11,6 +12,7 @@ import {
 import { useKISTheme } from '@/theme/useTheme';
 import { getRequest } from '@/network/get';
 import { postRequest } from '@/network/post';
+import WorkStatusRing from '@/components/common/WorkStatusRing';
 
 type CommunityComment = {
   id: string | number;
@@ -20,6 +22,12 @@ type CommunityComment = {
     id?: string;
     display_name?: string | null;
     phone?: string | null;
+    // Already backend-gated (CommunityUserSerializer /
+    // PartnerPostCommentSerializer.get_author both route through
+    // apps.accounts.visibility) - safe to render directly, same as every
+    // other WorkStatusRing call site.
+    avatar_url?: string | null;
+    work_status?: string | null;
   };
 };
 
@@ -125,14 +133,27 @@ export default function CommunityCommentThreadPanel({
         comments.map((comment) => (
           <View
             key={String(comment.id)}
-            style={[styles.comment, { backgroundColor: palette.surface }]}
+            style={[styles.comment, styles.commentRow, { backgroundColor: palette.surface }]}
           >
-            <Text style={[styles.author, { color: palette.text }]}>
-              {comment.author?.display_name || comment.author?.phone || 'Member'}
-            </Text>
-            <Text style={[styles.body, { color: palette.text }]}>
-              {String(comment.text ?? '')}
-            </Text>
+            <WorkStatusRing size={28} workStatus={comment.author?.work_status} style={styles.commentAvatar}>
+              {comment.author?.avatar_url ? (
+                <Image source={{ uri: comment.author.avatar_url }} style={styles.commentAvatarImage} />
+              ) : (
+                <View style={[styles.commentAvatarImage, styles.commentAvatarFallback, { backgroundColor: palette.primarySoft }]}>
+                  <Text style={[styles.commentAvatarInitial, { color: palette.text }]}>
+                    {(comment.author?.display_name || comment.author?.phone || 'M').charAt(0).toUpperCase()}
+                  </Text>
+                </View>
+              )}
+            </WorkStatusRing>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.author, { color: palette.text }]}>
+                {comment.author?.display_name || comment.author?.phone || 'Member'}
+              </Text>
+              <Text style={[styles.body, { color: palette.text }]}>
+                {String(comment.text ?? '')}
+              </Text>
+            </View>
           </View>
         ))
       )}
@@ -179,6 +200,11 @@ const styles = StyleSheet.create({
   loader: { marginVertical: 12 },
   empty: { fontSize: 13, marginBottom: 10 },
   comment: { borderRadius: 8, marginBottom: 7, padding: 10 },
+  commentRow: { flexDirection: 'row', gap: 8, alignItems: 'flex-start' },
+  commentAvatar: { marginTop: 1 },
+  commentAvatarImage: { width: 28, height: 28, borderRadius: 14 },
+  commentAvatarFallback: { alignItems: 'center', justifyContent: 'center' },
+  commentAvatarInitial: { fontSize: 12, fontWeight: '700' },
   author: { fontSize: 12, fontWeight: '700', marginBottom: 3 },
   body: { fontSize: 14, lineHeight: 19 },
   errorRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 8 },

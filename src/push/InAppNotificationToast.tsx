@@ -9,6 +9,7 @@ import React, {
 } from 'react';
 import {
   Animated,
+  Image,
   PanResponder,
   Pressable,
   StyleSheet,
@@ -19,6 +20,7 @@ import {
 import { useKISTheme } from '@/theme/useTheme';
 import { routeNotification } from './notificationRouter';
 import { useSafeTopInset } from '@/hooks/useSafeTopInset';
+import WorkStatusRing from '@/components/common/WorkStatusRing';
 
 export interface InAppNotificationPayload {
   title: string;
@@ -143,6 +145,19 @@ const InAppNotificationToast = forwardRef<InAppNotificationToastHandle>(
           onPress={handlePress}
           style={[styles.card, { backgroundColor: palette.royalInk }]}
         >
+          {displayPayload.data?.actor_id ? (
+            <WorkStatusRing size={36} workStatus={displayPayload.data.actor_work_status} style={styles.actorAvatarWrap}>
+              {displayPayload.data.actor_avatar_url ? (
+                <Image source={{ uri: displayPayload.data.actor_avatar_url }} style={styles.actorAvatarImage} />
+              ) : (
+                <View style={[styles.actorAvatarImage, styles.actorAvatarFallback]}>
+                  <Text style={styles.actorAvatarInitial}>
+                    {(displayPayload.data.actor_display_name || '?').charAt(0).toUpperCase()}
+                  </Text>
+                </View>
+              )}
+            </WorkStatusRing>
+          ) : null}
           <View style={styles.textContainer}>
             {!!displayPayload.title && (
               <Text
@@ -178,6 +193,9 @@ const styles = StyleSheet.create({
     elevation: 20,
   },
   card: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
     borderRadius: 14,
     paddingHorizontal: 16,
     paddingVertical: 12,
@@ -188,7 +206,27 @@ const styles = StyleSheet.create({
     minHeight: BANNER_HEIGHT,
     justifyContent: 'center',
   },
+  actorAvatarWrap: {
+    flexShrink: 0,
+  },
+  actorAvatarImage: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+  },
+  actorAvatarFallback: {
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  actorAvatarInitial: {
+    color: '#fff',
+    fontWeight: '700',
+    fontSize: 14,
+  },
   textContainer: {
+    flex: 1,
+    minWidth: 0,
     gap: 2,
   },
   title: {

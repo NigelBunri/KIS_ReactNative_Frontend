@@ -28,6 +28,16 @@ export type CallParticipant = {
   userId: string;
   displayName: string;
   avatarUrl?: string | null;
+  // Mirrors avatarUrl above: both are populated on a best-effort basis by
+  // SocketProvider's makeParticipant() from participantProfileHints.ts - a
+  // small cache fed by screens (today: ChatRoomPage) that already hold
+  // gated profile data for the same users, since the call-signaling layer
+  // itself (a separate NestJS service - see NEST_API_BASE_URL) carries
+  // neither field. See ParticipantTile.tsx/ParticipantsSheet.tsx for the
+  // render side, which still degrades gracefully to "no ring"/initials
+  // when a cache miss leaves this undefined (e.g. a call started before
+  // the conversation's members ever loaded).
+  workStatus?: string | null;
   stream?: any | null; // RTCMediaStream - typed as any to avoid hard dep
   isLocal: boolean;
   isMuted: boolean;

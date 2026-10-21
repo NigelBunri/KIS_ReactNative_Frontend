@@ -192,6 +192,8 @@ import type {
   ShopStatus,
 } from './profile-screen';
 import { HealthManagementModal } from './profile-screen/HealthManagementModal';
+import WorkPreferencesSheet, { type WorkPreferences } from './profile-screen/WorkPreferencesSheet';
+import HiringLinkSheet from './profile-screen/HiringLinkSheet';
 import ShopEditorDrawer from '@/screens/market/ShopEditorDrawer';
 import { resolveShopImageUri } from '@/utils/shopAssets';
 import { backendOrderTotalToFrontendKisc } from '@/utils/currency';
@@ -1147,6 +1149,66 @@ export default function ProfileScreen() {
 
   const [openToWork, setOpenToWork] = useState(false);
   const [openToWorkLoading, setOpenToWorkLoading] = useState(false);
+
+  // work_status — the LinkedIn-style avatar ring (green "Open for work" /
+  // purple "Hiring"). Deliberately a separate, tri-state field from the
+  // openToWork boolean above: that one feeds the unrelated partners/
+  // recruitment talent-search filter (TalentDiscoverScreen), this one only
+  // drives the visual ring shown around this user's avatar everywhere it
+  // renders in the app. Saved through the same ProfileViewSet PATCH
+  // endpoint EditProfileModal's headline/bio/industry fields already use -
+  // no new endpoint needed.
+  const [workStatus, setWorkStatus] = useState<'none' | 'open_for_work' | 'hiring'>('none');
+  const [workStatusLoading, setWorkStatusLoading] = useState(false);
+
+  useEffect(() => {
+    const incoming = c.profile?.profile?.work_status;
+    if (incoming === 'none' || incoming === 'open_for_work' || incoming === 'hiring') {
+      setWorkStatus(incoming);
+    }
+  }, [c.profile?.profile?.work_status]);
+
+  // `extra` carries work_preferences (Open for work) or hiring_job_listing
+  // (Hiring) alongside the status change itself - same single PATCH, same
+  // offline-queue retry path, just a richer payload than the bare
+  // {work_status} this previously only ever sent.
+  const handleWorkStatusChange = useCallback(async (
+    value: 'none' | 'open_for_work' | 'hiring',
+    extra?: { work_preferences?: WorkPreferences; hiring_job_listing?: string | null },
+  ) => {
+    const profileId = c.profile?.profile?.id;
+    if (!profileId) return;
+    setWorkStatus(value);
+    setWorkStatusLoading(true);
+    const endpoint = ROUTES.profiles.update(String(profileId));
+    const payload = { work_status: value, ...extra };
+    try {
+      const res = await patchRequest(endpoint, payload);
+      if (!res?.success) throw new Error(res?.message || 'Failed');
+    } catch {
+      // Queue for retry; keep optimistic state (don't revert) — same
+      // pattern handleOpenToWorkToggle above already uses.
+      await enqueueMutation({ method: 'PATCH', url: endpoint, payload }).catch(() => {});
+    } finally {
+      setWorkStatusLoading(false);
+    }
+  }, [c.profile?.profile?.id]);
+
+  // Section A/3 of the Open-to-Work spec: picking "Open for work" or
+  // "Hiring" opens a secondary sheet instead of applying immediately -
+  // both sheets stay re-openable afterwards (the "Edit" row below the
+  // picker) so this isn't a first-activation-only flow.
+  const [workPrefsSheetOpen, setWorkPrefsSheetOpen] = useState(false);
+  const [hiringSheetOpen, setHiringSheetOpen] = useState(false);
+
+  const handleWorkStatusOptionPress = useCallback((value: 'none' | 'open_for_work' | 'hiring') => {
+    if (value === 'open_for_work') { setWorkPrefsSheetOpen(true); return; }
+    if (value === 'hiring') { setHiringSheetOpen(true); return; }
+    handleWorkStatusChange(value);
+  }, [handleWorkStatusChange]);
+
+  const workPreferences: WorkPreferences | null = c.profile?.profile?.work_preferences ?? null;
+  const hiringJobListingId: string | null = c.profile?.profile?.hiring_job_listing_id ?? null;
 
   useEffect(() => {
     if (c.profile?.profile?.open_to_work !== undefined) {
@@ -2599,6 +2661,7 @@ export default function ProfileScreen() {
       <ProfileHeroCard
         coverUrl={c.profile?.profile?.cover_url}
         avatarUrl={appendCacheBust(c.profile?.profile?.avatar_url, c.avatarVersion)}
+        workStatus={workStatus}
         displayName={profileDisplayName}
         handle={profileHandle}
         headline={c.profile?.profile?.headline || 'Add a headline that sells you'}
@@ -2668,14 +2731,23 @@ export default function ProfileScreen() {
           />
         ) : (
           <>
-            <View
-              style={{
+            {/* Tabs — a plain, separate section in this screen's own regular
+                scroll content, directly below the golden header (which ends
+                where this ScrollView begins; they're two independent
+                normal-flow siblings, not nested inside one another). Words,
+                not icons, in a horizontally-scrollable single-row KISButton
+                group so a long label ("Wallet & Orders") never wraps - it
+                sizes to its own content and the row scrolls instead of
+                wrapping to a second line if they don't all fit on screen. */}
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{
                 flexDirection: 'row',
-                flexWrap: 'wrap',
                 gap: 8,
                 paddingHorizontal: compactProfile ? 12 : 18,
-                marginTop: 4,
               }}
+              style={{ marginTop: 4 }}
             >
               {(
                 [
@@ -2692,10 +2764,9 @@ export default function ProfileScreen() {
                   size="xs"
                   variant={activeProfileTab === tab.key ? 'primary' : 'outline'}
                   onPress={() => setActiveProfileTab(tab.key)}
-                  style={{ flexGrow: 1, minWidth: 90 }}
                 />
               ))}
-            </View>
+            </ScrollView>
 
             <View
               style={{
@@ -2779,7 +2850,116 @@ export default function ProfileScreen() {
                     />
                   )}
                 </View>
+
+                {/* Avatar status ring — Off / Open for work / Hiring. A
+                    separate tri-state field from the "Open to Work" toggle
+                    above: this one only drives the green/blue ring shown
+                    around this user's avatar everywhere it renders. */}
+                <View
+                  style={{
+                    paddingVertical: 10,
+                    borderTopWidth: StyleSheet.hairlineWidth,
+                    borderTopColor: palette.divider,
+                    marginTop: 4,
+                    gap: 8,
+                  }}
+                >
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <Text style={{ fontSize: responsive.bodyFontSize, fontWeight: '600', color: palette.text }}>
+                      Avatar status
+                    </Text>
+                    {workStatusLoading ? <ActivityIndicator size="small" color={palette.primary} /> : null}
+                  </View>
+                  <View style={{ flexDirection: 'row', gap: 8 }}>
+                    {(
+                      [
+                        { value: 'none' as const, label: 'Off', color: palette.subtext },
+                        { value: 'open_for_work' as const, label: 'Open for work', color: palette.success },
+                        { value: 'hiring' as const, label: 'Hiring', color: palette.purple },
+                      ]
+                    ).map((opt) => {
+                      const selected = workStatus === opt.value;
+                      return (
+                        <Pressable
+                          key={opt.value}
+                          onPress={() => handleWorkStatusOptionPress(opt.value)}
+                          disabled={workStatusLoading}
+                          accessibilityRole="button"
+                          accessibilityLabel={`Avatar status: ${opt.label}`}
+                          accessibilityState={{ selected }}
+                          style={{
+                            flex: 1,
+                            paddingVertical: 8,
+                            borderRadius: 10,
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            borderWidth: 1.5,
+                            borderColor: selected ? opt.color : palette.divider,
+                            backgroundColor: selected ? `${opt.color}1F` : 'transparent',
+                          }}
+                        >
+                          <Text
+                            style={{
+                              fontSize: responsive.labelFontSize,
+                              fontWeight: '700',
+                              color: selected ? opt.color : palette.subtext,
+                            }}
+                            numberOfLines={1}
+                          >
+                            {opt.label}
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                  {/* Re-opens the same secondary sheet used on first
+                      activation - "Must be editable later, not just on
+                      first activation" (spec, item 2/3). */}
+                  {workStatus === 'open_for_work' ? (
+                    <Pressable onPress={() => setWorkPrefsSheetOpen(true)} accessibilityRole="button">
+                      <Text style={{ color: palette.success, fontSize: responsive.labelFontSize, fontWeight: '700' }}>
+                        Edit job preferences
+                      </Text>
+                    </Pressable>
+                  ) : null}
+                  {workStatus === 'hiring' ? (
+                    <Pressable onPress={() => setHiringSheetOpen(true)} accessibilityRole="button">
+                      <Text style={{ color: palette.purple, fontSize: responsive.labelFontSize, fontWeight: '700' }}>
+                        {hiringJobListingId ? 'Edit linked job listing' : 'Link a job listing'}
+                      </Text>
+                    </Pressable>
+                  ) : null}
+                </View>
               </View>
+
+              <WorkPreferencesSheet
+                visible={workPrefsSheetOpen}
+                palette={palette}
+                initial={workPreferences}
+                saving={workStatusLoading}
+                onClose={() => setWorkPrefsSheetOpen(false)}
+                onSkip={() => {
+                  setWorkPrefsSheetOpen(false);
+                  handleWorkStatusChange('open_for_work');
+                }}
+                onSave={(prefs) => {
+                  setWorkPrefsSheetOpen(false);
+                  handleWorkStatusChange('open_for_work', { work_preferences: prefs });
+                }}
+              />
+
+              <HiringLinkSheet
+                visible={hiringSheetOpen}
+                palette={palette}
+                currentUserId={currentUserId}
+                initialListingId={hiringJobListingId}
+                saving={workStatusLoading}
+                onClose={() => setHiringSheetOpen(false)}
+                onSave={(listingId) => {
+                  setHiringSheetOpen(false);
+                  handleWorkStatusChange('hiring', { hiring_job_listing: listingId });
+                }}
+              />
 
               <QuickActionGrid
                 title="Quick actions"

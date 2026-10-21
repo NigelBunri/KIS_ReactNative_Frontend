@@ -142,6 +142,10 @@ export type RootStackParamList = {
     institutionId: string;
     institutionName?: string;
   };
+  HealthInstitutionCompliance: {
+    institutionId: string;
+    institutionName?: string;
+  };
   InstitutionLandingPreview: {
     institutionId?: string;
     institutionType?: HealthInstitutionType;

@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   FlatList,
+  Image,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -18,6 +19,7 @@ import { useResponsiveLayout } from '@/theme/responsive';
 import { getRequest } from '@/network/get';
 import ROUTES from '@/network';
 import ImagePlaceholder from '@/components/common/ImagePlaceholder';
+import WorkStatusRing from '@/components/common/WorkStatusRing';
 import { KISIcon } from '@/constants/kisIcons';
 import { useSafeTopInset } from '@/hooks/useSafeTopInset';
 
@@ -428,7 +430,13 @@ export default function SearchScreen({ onClose, onSelectResult }: Props) {
                       pressed && { backgroundColor: palette.surfaceElevated },
                     ]}
                   >
-                    <ImagePlaceholder size={40} radius={13} style={styles.avatar} />
+                    <WorkStatusRing size={40} workStatus={result.metadata?.work_status} style={styles.avatar}>
+                      {result.metadata?.avatar_url ? (
+                        <Image source={{ uri: result.metadata.avatar_url }} style={styles.avatarImage} />
+                      ) : (
+                        <ImagePlaceholder size={40} radius={13} />
+                      )}
+                    </WorkStatusRing>
                     <View style={{ flex: 1, minWidth: 0 }}>
                       <Text style={[styles.title, { color: palette.text }]} numberOfLines={1}>
                         {result.title}
@@ -560,6 +568,7 @@ const makeStyles = (responsive: ReturnType<typeof useResponsiveLayout>) =>
       gap: 12,
     },
     avatar: { borderRadius: 13 },
+    avatarImage: { width: 40, height: 40, borderRadius: 20 },
     title: { fontSize: 14, fontWeight: '700' },
     kindBadge: {
       width: 26,

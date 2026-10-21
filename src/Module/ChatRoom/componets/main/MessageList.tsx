@@ -175,6 +175,7 @@ type MessageListProps = {
   mentionMap?: Record<string, string>;
   participantMap?: Record<string, string>;
   participantAvatarMap?: Record<string, string>;
+  participantWorkStatusMap?: Record<string, string>;
   participantPhoneMap?: Record<string, string>;
   participantRoleMap?: Record<string, string>;
   isDirectChat?: boolean;
@@ -220,6 +221,7 @@ export const MessageList: React.FC<MessageListProps> = ({
   mentionMap,
   participantMap,
   participantAvatarMap,
+  participantWorkStatusMap,
   participantPhoneMap,
   participantRoleMap,
   isDirectChat,
@@ -672,6 +674,7 @@ export const MessageList: React.FC<MessageListProps> = ({
             mentionMap={mentionMap}
             participantMap={participantMap}
             participantAvatarMap={participantAvatarMap}
+            participantWorkStatusMap={participantWorkStatusMap}
             participantPhoneMap={participantPhoneMap}
             participantRoleMap={participantRoleMap}
             isDirectChat={isDirectChat}
@@ -709,6 +712,7 @@ export const MessageList: React.FC<MessageListProps> = ({
       mentionMap,
       participantMap,
       participantAvatarMap,
+      participantWorkStatusMap,
       participantPhoneMap,
       participantRoleMap,
       isDirectChat,

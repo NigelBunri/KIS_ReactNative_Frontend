@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   FlatList,
+  Image,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -12,6 +13,7 @@ import {
 import { useKISTheme } from '@/theme/useTheme';
 import { useSocket } from '@/SocketProvider';
 import { KISIcon } from '@/constants/kisIcons';
+import WorkStatusRing from '@/components/common/WorkStatusRing';
 import {
   ChatEvents,
   CommentMessage,
@@ -508,11 +510,17 @@ export default function CommentThreadPanel({
               pressed ? { opacity: 0.85 } : null,
             ]}
           >
-            <View style={[commentStyles.avatar, { backgroundColor: palette.primarySoft }]}>
-              <Text style={[commentStyles.avatarLabel, { color: palette.text }]}>
-                {item.senderName.slice(0, 2).toUpperCase()}
-              </Text>
-            </View>
+            <WorkStatusRing size={34} workStatus={item.workStatus} style={commentStyles.avatarRing}>
+              {item.avatarUrl ? (
+                <Image source={{ uri: item.avatarUrl }} style={commentStyles.avatarImage} />
+              ) : (
+                <View style={[commentStyles.avatar, { backgroundColor: palette.primarySoft }]}>
+                  <Text style={[commentStyles.avatarLabel, { color: palette.text }]}>
+                    {item.senderName.slice(0, 2).toUpperCase()}
+                  </Text>
+                </View>
+              )}
+            </WorkStatusRing>
 
             <View style={commentStyles.commentBody}>
               <View style={commentStyles.commentHeader}>
@@ -907,6 +915,14 @@ const commentStyles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.12)',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  avatarRing: {
+    marginTop: 1,
+  },
+  avatarImage: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
   },
   avatarLabel: {
     fontSize: 12,

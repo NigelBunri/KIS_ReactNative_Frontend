@@ -27,6 +27,7 @@ import { KIS_TOKENS } from '../../theme/constants';
 import { useResponsiveLayout } from '../../theme/responsive';
 import { KISIcon } from '@/constants/kisIcons';
 import ImagePlaceholder from '@/components/common/ImagePlaceholder';
+import WorkStatusRing from '@/components/common/WorkStatusRing';
 import type { Chat, ParticipantWire, UserWire } from './messagesUtils';
 import { directConversationAvatar, participantsToIds } from './messagesUtils';
 import ROUTES, { CHAT_BASE_URL } from '@/network';
@@ -1683,9 +1684,11 @@ export const ChatInfoPage: React.FC<ChatInfoPageProps> = ({
                     onPress={() => showMemberActions(p)}
                     disabled={!isAdmin || isMe}
                   >
-                    <View style={[styles.memberAvatar, { backgroundColor: palette.surfaceSoft ?? palette.surface, alignItems: 'center', justifyContent: 'center' }]}>
-                      <Text style={{ color: palette.subtext, fontSize: 15, fontWeight: '700' }}>{initials}</Text>
-                    </View>
+                    <WorkStatusRing size={44} workStatus={(p.user as any)?.profile?.work_status}>
+                      <View style={[styles.memberAvatar, { backgroundColor: palette.surfaceSoft ?? palette.surface, alignItems: 'center', justifyContent: 'center' }]}>
+                        <Text style={{ color: palette.subtext, fontSize: 15, fontWeight: '700' }}>{initials}</Text>
+                      </View>
+                    </WorkStatusRing>
                     <View style={[styles.memberInfo, { flex: 1 }]}>
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                         <Text style={[styles.memberName, { color: palette.text }]} numberOfLines={1}>{label}</Text>

@@ -17,6 +17,7 @@ import { postRequest } from '@/network/post';
 import ROUTES from '@/network';
 
 import AudioRecorderPlayer from 'react-native-audio-recorder-player';
+import WorkStatusRing from '@/components/common/WorkStatusRing';
 
 /* -------------------------------------------------------------------------- */
 /*                         MENTION NOTIFICATION HELPER                         */
@@ -436,7 +437,7 @@ type MessageComposerProps = {
   onCreateEvent?: (event: EventDraft) => void;
 
   // @mention autocomplete
-  mentionParticipants?: { id: string; name: string }[];
+  mentionParticipants?: { id: string; name: string; avatarUrl?: string | null; workStatus?: string | null }[];
 
   // mention notification context
   senderName?: string;
@@ -1169,21 +1170,26 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
                 borderBottomColor: palette.divider,
               })}
             >
-              <View
-                style={{
-                  width: 32,
-                  height: 32,
-                  borderRadius: 16,
-                  backgroundColor: palette.primary,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  marginRight: 10,
-                }}
-              >
-                <Text style={{ color: palette.onPrimary, fontWeight: '700', fontSize: 13 }}>
-                  {p.name.charAt(0).toUpperCase()}
-                </Text>
-              </View>
+              <WorkStatusRing size={32} workStatus={p.workStatus} style={{ marginRight: 10 }}>
+                {p.avatarUrl ? (
+                  <Image source={{ uri: p.avatarUrl }} style={{ width: 32, height: 32, borderRadius: 16 }} />
+                ) : (
+                  <View
+                    style={{
+                      width: 32,
+                      height: 32,
+                      borderRadius: 16,
+                      backgroundColor: palette.primary,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <Text style={{ color: palette.onPrimary, fontWeight: '700', fontSize: 13 }}>
+                      {p.name.charAt(0).toUpperCase()}
+                    </Text>
+                  </View>
+                )}
+              </WorkStatusRing>
               <Text style={{ fontSize: 14, color: palette.text, fontWeight: '600' }}>
                 @{p.name}
               </Text>

@@ -14,6 +14,7 @@ import { chatRoomStyles as styles } from '../chatRoomStyles';
 import Pdf from 'react-native-pdf';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { KISIcon } from '@/constants/kisIcons';
+import WorkStatusRing from '@/components/common/WorkStatusRing';
 import UserBadgeRow from '@/components/common/UserBadgeRow';
 import KISButton from '@/constants/KISButton';
 import { ChatMessage } from '../chatTypes';
@@ -205,6 +206,7 @@ type MessageBubbleProps = {
   mentionMap?: Record<string, string>;
   participantMap?: Record<string, string>;
   participantAvatarMap?: Record<string, string>;
+  participantWorkStatusMap?: Record<string, string>;
   participantPhoneMap?: Record<string, string>;
   participantRoleMap?: Record<string, string>;
   isDirectChat?: boolean;
@@ -282,6 +284,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   mentionMap,
   participantMap,
   participantAvatarMap,
+  participantWorkStatusMap,
   participantPhoneMap,
   participantRoleMap,
   isDirectChat,
@@ -2230,13 +2233,15 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
 
     return (
       <Pressable onPress={handleTap} hitSlop={6} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-        <View style={{ width: 26, height: 26, borderRadius: 13, overflow: 'hidden', backgroundColor: accentColor + '33', alignItems: 'center', justifyContent: 'center' }}>
-          {effectiveAvatar ? (
-            <Image source={{ uri: effectiveAvatar }} style={{ width: 26, height: 26 }} resizeMode="cover" />
-          ) : (
-            <Text style={{ fontSize: 10, fontWeight: '700', color: accentColor }}>{initials}</Text>
-          )}
-        </View>
+        <WorkStatusRing size={26} workStatus={resolvedSenderId ? participantWorkStatusMap?.[resolvedSenderId] : undefined}>
+          <View style={{ width: 26, height: 26, borderRadius: 13, overflow: 'hidden', backgroundColor: accentColor + '33', alignItems: 'center', justifyContent: 'center' }}>
+            {effectiveAvatar ? (
+              <Image source={{ uri: effectiveAvatar }} style={{ width: 26, height: 26 }} resizeMode="cover" />
+            ) : (
+              <Text style={{ fontSize: 10, fontWeight: '700', color: accentColor }}>{initials}</Text>
+            )}
+          </View>
+        </WorkStatusRing>
         <Text style={{ fontSize: 11, fontWeight: '800', color: accentColor }} numberOfLines={1}>
           {effectiveName}
         </Text>
@@ -3032,6 +3037,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
           }))}
           participantMap={participantMap}
           participantAvatarMap={participantAvatarMap}
+          participantWorkStatusMap={participantWorkStatusMap}
           participantPhoneMap={participantPhoneMap}
           participantRoleMap={participantRoleMap}
           isDirectChat={isDirectChat}

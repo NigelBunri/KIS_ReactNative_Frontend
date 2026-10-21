@@ -24,6 +24,7 @@ import { postRequest } from '@/network/post';
 import { patchRequest } from '@/network/patch';
 import { deleteRequest } from '@/network/delete';
 import type { RootStackParamList } from '@/navigation/types';
+import WorkStatusRing from '@/components/common/WorkStatusRing';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 type Route = RouteProp<RootStackParamList, 'Connections'>;
@@ -47,12 +48,16 @@ type Connection = {
     display_name?: string;
     avatar_url?: string | null;
     headline?: string | null;
+    work_status?: string | null;
+    hiring_job_listing_id?: string | null;
   };
   to_user?: {
     id: string;
     display_name?: string;
     avatar_url?: string | null;
     headline?: string | null;
+    work_status?: string | null;
+    hiring_job_listing_id?: string | null;
   };
 };
 
@@ -63,6 +68,8 @@ type SuggestedUser = {
   headline?: string | null;
   industry?: string | null;
   connection_status?: 'none' | 'pending_sent' | 'pending_received' | 'accepted';
+  work_status?: string | null;
+  hiring_job_listing_id?: string | null;
 };
 
 const getInitials = (name?: string | null) => {
@@ -267,13 +274,23 @@ export default function ConnectionsScreen() {
     const isLoading = actionLoadingId === item.id;
     return (
       <View style={[styles.userCard, { backgroundColor: palette.card, borderColor: palette.border }]}>
-        {user?.avatar_url ? (
-          <Image source={{ uri: user.avatar_url }} style={styles.avatar} />
-        ) : (
-          <View style={[styles.avatar, { backgroundColor: palette.primary }]}>
-            <Text style={[styles.avatarText, { color: palette.onPrimary }]}>{initials}</Text>
-          </View>
-        )}
+        <WorkStatusRing
+          size={46}
+          workStatus={user?.work_status}
+          onHiringPress={
+            user?.hiring_job_listing_id
+              ? () => navigation.navigate('JobDetail', { jobId: user.hiring_job_listing_id as string })
+              : undefined
+          }
+        >
+          {user?.avatar_url ? (
+            <Image source={{ uri: user.avatar_url }} style={styles.avatar} />
+          ) : (
+            <View style={[styles.avatar, { backgroundColor: palette.primary }]}>
+              <Text style={[styles.avatarText, { color: palette.onPrimary }]}>{initials}</Text>
+            </View>
+          )}
+        </WorkStatusRing>
         <View style={{ flex: 1 }}>
           <Text style={[styles.userName, { color: palette.text }]}>{name}</Text>
           {user?.headline ? (
@@ -323,13 +340,23 @@ export default function ConnectionsScreen() {
     const isLoading = actionLoadingId === item.id;
     return (
       <View style={[styles.userCard, { backgroundColor: palette.card, borderColor: palette.border }]}>
-        {user?.avatar_url ? (
-          <Image source={{ uri: user.avatar_url }} style={styles.avatar} />
-        ) : (
-          <View style={[styles.avatar, { backgroundColor: palette.primary }]}>
-            <Text style={[styles.avatarText, { color: palette.onPrimary }]}>{initials}</Text>
-          </View>
-        )}
+        <WorkStatusRing
+          size={46}
+          workStatus={user?.work_status}
+          onHiringPress={
+            user?.hiring_job_listing_id
+              ? () => navigation.navigate('JobDetail', { jobId: user.hiring_job_listing_id as string })
+              : undefined
+          }
+        >
+          {user?.avatar_url ? (
+            <Image source={{ uri: user.avatar_url }} style={styles.avatar} />
+          ) : (
+            <View style={[styles.avatar, { backgroundColor: palette.primary }]}>
+              <Text style={[styles.avatarText, { color: palette.onPrimary }]}>{initials}</Text>
+            </View>
+          )}
+        </WorkStatusRing>
         <View style={{ flex: 1 }}>
           <Text style={[styles.userName, { color: palette.text }]}>{name}</Text>
           {user?.headline ? (
@@ -373,13 +400,23 @@ export default function ConnectionsScreen() {
     const label = isConnected ? 'Connected' : isPending ? 'Pending' : 'Connect';
     return (
       <View style={[styles.userCard, { backgroundColor: palette.card, borderColor: palette.border }]}>
-        {item.avatar_url ? (
-          <Image source={{ uri: item.avatar_url }} style={styles.avatar} />
-        ) : (
-          <View style={[styles.avatar, { backgroundColor: palette.primary }]}>
-            <Text style={[styles.avatarText, { color: palette.onPrimary }]}>{initials}</Text>
-          </View>
-        )}
+        <WorkStatusRing
+          size={46}
+          workStatus={item.work_status}
+          onHiringPress={
+            item.hiring_job_listing_id
+              ? () => navigation.navigate('JobDetail', { jobId: item.hiring_job_listing_id as string })
+              : undefined
+          }
+        >
+          {item.avatar_url ? (
+            <Image source={{ uri: item.avatar_url }} style={styles.avatar} />
+          ) : (
+            <View style={[styles.avatar, { backgroundColor: palette.primary }]}>
+              <Text style={[styles.avatarText, { color: palette.onPrimary }]}>{initials}</Text>
+            </View>
+          )}
+        </WorkStatusRing>
         <View style={{ flex: 1 }}>
           <Text style={[styles.userName, { color: palette.text }]}>{name}</Text>
           {item.headline ? (

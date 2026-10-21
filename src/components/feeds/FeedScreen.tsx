@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Image,
   KeyboardAvoidingView,
   Linking,
   View,
@@ -38,6 +39,8 @@ import FeedPostActionsSheet from './FeedPostActionsSheet';
 import ShareRenderer, { type SharePayload } from './ShareRenderer';
 import QrCodeShareModal from '@/components/common/QrCodeShareModal';
 import ImagePlaceholder from '@/components/common/ImagePlaceholder';
+import WorkStatusRing from '@/components/common/WorkStatusRing';
+import { registerCommentAuthorHints, getCommentAuthorHint } from './commentAuthorHints';
 import Skeleton from '@/components/common/Skeleton';
 import { uploadFileToBackend } from '@/Module/ChatRoom/uploadFileToBackend';
 import { DEV_BACKEND_HOST } from '@/network/config';
@@ -106,6 +109,10 @@ export type FeedPost = {
     id?: string;
     connection_degree?: number | null;
     avatar_url?: string | null;
+    // Only populated for community posts today (CommunityUserSerializer) -
+    // partner posts' hand-built author dict doesn't include it yet, so this
+    // degrades to "no ring" there, same as any other missing/unknown value.
+    work_status?: string | null;
   };
 };
 
@@ -367,6 +374,23 @@ export default function FeedScreen<T extends FeedPost>({
   const [loading, setLoading] = useState(true);
   const [feedCacheMeta, setFeedCacheMeta] = useState<OfflineCacheMeta | null>(null);
   const [posts, setPosts] = useState<T[]>([]);
+
+  // Seeds commentAuthorHints.ts with every post author we already have
+  // gated profile data for (initial load, pagination, refresh all land
+  // here via setPosts) so a post author's OWN replies in their post's
+  // comment thread get a real avatar+ring even though the comment socket
+  // itself never carries that data - see commentThreadUtils.ts.
+  useEffect(() => {
+    registerCommentAuthorHints(
+      posts
+        .filter((p) => p.author?.id)
+        .map((p) => ({
+          userId: p.author!.id,
+          avatarUrl: p.author!.avatar_url,
+          workStatus: p.author!.work_status,
+        })),
+    );
+  }, [posts]);
   const [composerVisible, setComposerVisible] = useState(false);
   const [userHasPersonalizedHistory, setUserHasPersonalizedHistory] = useState(false);
 
@@ -1301,16 +1325,18 @@ export default function FeedScreen<T extends FeedPost>({
               >
                 <View style={styles.postTopRow}>
                   <View style={styles.avatarStack}>
-                    {post.author?.avatar_url ? (
-                      <PermanentRemoteImage
-                        uri={post.author.avatar_url}
-                        domain="Feeds"
-                        stableKey={`feed_author_${post.author?.id ?? post.id}_${post.author.avatar_url}`}
-                        containerStyle={[styles.avatarNew, { borderRadius: 20 }]}
-                      />
-                    ) : (
-                      <ImagePlaceholder size={40} radius={20} style={styles.avatarNew} />
-                    )}
+                    <WorkStatusRing size={40} workStatus={post.author?.work_status} style={styles.avatarNew}>
+                      {post.author?.avatar_url ? (
+                        <PermanentRemoteImage
+                          uri={post.author.avatar_url}
+                          domain="Feeds"
+                          stableKey={`feed_author_${post.author?.id ?? post.id}_${post.author.avatar_url}`}
+                          containerStyle={{ width: 40, height: 40, borderRadius: 20 }}
+                        />
+                      ) : (
+                        <ImagePlaceholder size={40} radius={20} />
+                      )}
+                    </WorkStatusRing>
                     {/* tiny “heart badge” like mock */}
                     <View
                       style={[
@@ -2015,6 +2041,8 @@ type CommentMessage = {
   senderId?: string;
   createdAt: string;
   mine?: boolean;
+  avatarUrl?: string | null;
+  workStatus?: string | null;
 };
 
 type InlineCommentSheetProps = {
@@ -2134,6 +2162,13 @@ export const InlineCommentSheet: React.FC<InlineCommentSheetProps> = ({
         new Date().toISOString();
       const mine =
         senderId && currentUserId ? String(senderId) === String(currentUserId) : false;
+      // Same opportunistic hint-cache lookup as commentThreadUtils.ts's
+      // mapCommentPayload - this inline sheet keeps its own local mapper
+      // but the cache itself is shared (module-level), so hints seeded by
+      // FeedScreen's own post-author effect still apply here.
+      const hint = senderId ? getCommentAuthorHint(senderId) : undefined;
+      const avatarUrl = payload?.avatar_url ?? payload?.sender?.avatar_url ?? payload?.user?.profile?.avatar_url ?? hint?.avatarUrl ?? null;
+      const workStatus = payload?.work_status ?? payload?.sender?.work_status ?? payload?.user?.profile?.work_status ?? hint?.workStatus ?? null;
       return {
         id: String(id),
         clientId: payload?.clientId,
@@ -2142,6 +2177,8 @@ export const InlineCommentSheet: React.FC<InlineCommentSheetProps> = ({
         senderId: senderId ? String(senderId) : undefined,
         createdAt,
         mine,
+        avatarUrl,
+        workStatus,
       };
     },
     [conversationId, currentUserId],
@@ -2264,11 +2301,17 @@ export const InlineCommentSheet: React.FC<InlineCommentSheetProps> = ({
           item.mine ? commentStyles.commentMine : commentStyles.commentOther,
         ]}
       >
-        <View style={commentStyles.avatar}>
-          <Text style={commentStyles.avatarLabel}>
-            {item.senderName.slice(0, 2).toUpperCase()}
-          </Text>
-        </View>
+        <WorkStatusRing size={36} workStatus={item.workStatus}>
+          {item.avatarUrl ? (
+            <Image source={{ uri: item.avatarUrl }} style={commentStyles.avatarImage} />
+          ) : (
+            <View style={commentStyles.avatar}>
+              <Text style={commentStyles.avatarLabel}>
+                {item.senderName.slice(0, 2).toUpperCase()}
+              </Text>
+            </View>
+          )}
+        </WorkStatusRing>
         <View style={commentStyles.commentBody}>
           <View style={commentStyles.commentHeader}>
             <Text style={commentStyles.commentAuthor}>{item.senderName}</Text>
@@ -2449,6 +2492,11 @@ const commentStyles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.12)',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  avatarImage: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
   },
   avatarLabel: {
     fontSize: 14,

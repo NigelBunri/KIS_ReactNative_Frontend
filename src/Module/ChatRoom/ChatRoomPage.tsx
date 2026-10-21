@@ -79,6 +79,7 @@ import {
   saveConversationCallHistory,
 } from '@/services/calls/callHistoryStorage';
 import type { CallType } from '@/services/calls/callTypes';
+import { registerParticipantProfileHints } from '@/services/calls/participantProfileHints';
 import ROUTES, { NEST_API_BASE_URL } from '@/network';
 import { patchRequest } from '@/network/patch';
 import { loadMessages, filterLocallyDeletedMessages } from './Storage/chatStorage';
@@ -982,9 +983,15 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
           p?.user?.username ??
           (typeof p === 'string' ? p : null);
         if (!name || !id) return null;
-        return { id, name: String(name) };
+        // Same p.user.profile.{avatar_url,work_status} shape ChatInfoPage's
+        // member list already reads - same ConversationMember payload, just
+        // consumed here too so the mention dropdown's avatar carries the
+        // same ring everywhere else it's shown for this user.
+        const avatarUrl = p?.avatar_url ?? p?.user?.profile?.avatar_url ?? null;
+        const workStatus = p?.work_status ?? p?.user?.profile?.work_status ?? null;
+        return { id, name: String(name), avatarUrl, workStatus };
       })
-      .filter(Boolean) as { id: string; name: string }[];
+      .filter(Boolean) as { id: string; name: string; avatarUrl?: string | null; workStatus?: string | null }[];
   }, [chat?.participants]);
 
   const participantMap = useMemo(() => {
@@ -998,8 +1005,15 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
     const parts = chat?.participants ?? [];
     if (!Array.isArray(parts)) return map;
     (parts as any[]).forEach((p: any) => {
-      const id = String(p?.id ?? p?.user?.id ?? p ?? '');
+      // Prefer the USER id over the membership row's own `id` - a sender
+      // lookup (participantAvatarMap?.[senderId] in MessageBubble.tsx) is
+      // always keyed by user id, but ConversationMemberSerializer's `id`
+      // field is the membership row's id, which is a DIFFERENT uuid from
+      // p.user.id. Keying by that first meant this map was effectively
+      // always a miss for every real ParticipantWire payload.
+      const id = String(p?.user?.id ?? p?.id ?? p ?? '');
       const avatar =
+        p?.user?.profile?.avatar_url ??
         p?.user?.avatar_url ??
         p?.user?.profile_picture ??
         p?.user?.avatarUrl ??
@@ -1010,6 +1024,39 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
     });
     return map;
   }, [chat?.participants]);
+
+  // Mirrors participantAvatarMap above exactly, for the work-status ring -
+  // same ParticipantWire payload, same user-id keying.
+  const participantWorkStatusMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    const parts = chat?.participants ?? [];
+    if (!Array.isArray(parts)) return map;
+    (parts as any[]).forEach((p: any) => {
+      const id = String(p?.user?.id ?? p?.id ?? p ?? '');
+      const workStatus = p?.user?.profile?.work_status;
+      if (id && workStatus) map[id] = String(workStatus);
+    });
+    return map;
+  }, [chat?.participants]);
+
+  // Feeds this conversation's already-gated avatar_url/work_status (same
+  // ParticipantWire payload as participantAvatarMap/participantWorkStatusMap
+  // above) into the cross-screen hint cache SocketProvider's makeParticipant
+  // reads from, so a call started/joined from this conversation shows real
+  // avatars and work-status rings on its participant tiles instead of the
+  // bare initials/no-ring fallback (call signaling itself carries neither -
+  // see participantProfileHints.ts for why this indirection exists).
+  useEffect(() => {
+    const parts = chat?.participants ?? [];
+    if (!Array.isArray(parts) || parts.length === 0) return;
+    registerParticipantProfileHints(
+      (parts as any[]).map((p: any) => ({
+        userId: p?.user?.id ?? p?.id ?? p,
+        avatarUrl: participantAvatarMap[String(p?.user?.id ?? p?.id ?? p ?? '')] ?? null,
+        workStatus: participantWorkStatusMap[String(p?.user?.id ?? p?.id ?? p ?? '')] ?? null,
+      })),
+    );
+  }, [chat?.participants, participantAvatarMap, participantWorkStatusMap]);
 
   // Lets the poll "View votes" sheet show a phone number for any voter
   // who has no display name, same fallback MessageBubble already uses
@@ -2778,6 +2825,7 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
           mentionParticipants={mentionParticipants}
           participantMap={participantMap}
           participantAvatarMap={participantAvatarMap}
+          participantWorkStatusMap={participantWorkStatusMap}
           participantPhoneMap={participantPhoneMap}
           participantRoleMap={participantRoleMap}
           isDirectChat={!!(chat as any)?.isDirect}

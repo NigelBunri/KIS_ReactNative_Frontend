@@ -9,6 +9,7 @@ import { chatRoomStyles as styles } from '../../chatRoomStyles';
 import { KISIcon } from '@/constants/kisIcons';
 import ImagePlaceholder from '@/components/common/ImagePlaceholder';
 import UserBadgeRow from '@/components/common/UserBadgeRow';
+import WorkStatusRing from '@/components/common/WorkStatusRing';
 
 type ChatHeaderProps = {
   chat: Chat | null;
@@ -364,14 +365,19 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
             { opacity: pressed && onOpenInfo ? 0.75 : 1 },
           ]}
         >
-          {headerAvatar ? (
-            <Image
-              source={{ uri: headerAvatar }}
-              style={styles.headerAvatar}
-            />
-          ) : (
-            <ImagePlaceholder size={36} radius={18} style={styles.headerAvatar} />
-          )}
+          <WorkStatusRing
+            size={36}
+            workStatus={chat?.isDirect ? otherUserWire?.profile?.work_status : undefined}
+          >
+            {headerAvatar ? (
+              <Image
+                source={{ uri: headerAvatar }}
+                style={styles.headerAvatar}
+              />
+            ) : (
+              <ImagePlaceholder size={36} radius={18} style={styles.headerAvatar} />
+            )}
+          </WorkStatusRing>
 
           <View style={{ marginLeft: 10, flex: 1 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>

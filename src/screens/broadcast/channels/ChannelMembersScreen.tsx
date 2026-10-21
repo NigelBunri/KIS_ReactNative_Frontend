@@ -15,6 +15,7 @@ import { useResponsiveLayout } from '@/theme/responsive';
 import { KISIcon } from '@/constants/kisIcons';
 import type { RootStackParamList } from '@/navigation/types';
 import { fetchChannelSubscribers } from '@/screens/broadcast/channels/hooks/useChannelsData';
+import WorkStatusRing from '@/components/common/WorkStatusRing';
 
 type Subscriber = {
   id: string;
@@ -22,6 +23,7 @@ type Subscriber = {
   username?: string;
   avatar_url?: string;
   subscribed_at?: string;
+  work_status?: string | null;
 };
 
 function initialsFor(name?: string): string {
@@ -136,11 +138,13 @@ export default function ChannelMembersScreen() {
               style={[styles.row, { borderBottomColor: palette.border, backgroundColor: palette.surface, paddingHorizontal: pageGutter }]}
               onPress={() => navigation.navigate('ViewProfile', { userId: item.id, displayName: item.display_name || item.username })}
             >
-              <View style={[styles.avatar, { backgroundColor: palette.primarySoft }]}>
-                <Text style={[styles.avatarText, { color: palette.primaryStrong }]}>
-                  {initialsFor(item.display_name || item.username)}
-                </Text>
-              </View>
+              <WorkStatusRing size={44} workStatus={item.work_status}>
+                <View style={[styles.avatar, { backgroundColor: palette.primarySoft }]}>
+                  <Text style={[styles.avatarText, { color: palette.primaryStrong }]}>
+                    {initialsFor(item.display_name || item.username)}
+                  </Text>
+                </View>
+              </WorkStatusRing>
               <View style={styles.info}>
                 <Text style={[styles.name, { color: palette.text, fontSize: bodyFontSize }]} numberOfLines={1}>
                   {item.display_name || item.username || 'KIS user'}

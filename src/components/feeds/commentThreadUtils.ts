@@ -1,3 +1,5 @@
+import { getCommentAuthorHint } from './commentAuthorHints';
+
 export type CommentMessage = {
   id: string;
   clientId?: string;
@@ -7,6 +9,8 @@ export type CommentMessage = {
   createdAt: string;
   mine?: boolean;
   replyToId?: string | null;
+  avatarUrl?: string | null;
+  workStatus?: string | null;
 };
 
 export const ChatEvents = {
@@ -76,6 +80,14 @@ export const mapCommentPayload = (
     payload?.reply_to ??
     payload?.replyTo ??
     null;
+  // The comment socket payload itself never carries avatar/work-status
+  // data (see commentAuthorHints.ts) - fall back to whatever this sender
+  // was last seen with via a post-author or viewer-self hint. A payload
+  // that DOES carry them directly (not the case today, but future-proof,
+  // same spirit as makeParticipant's hint usage) still wins.
+  const hint = senderId ? getCommentAuthorHint(senderId) : undefined;
+  const avatarUrl = payload?.avatar_url ?? payload?.sender?.avatar_url ?? payload?.user?.profile?.avatar_url ?? hint?.avatarUrl ?? null;
+  const workStatus = payload?.work_status ?? payload?.sender?.work_status ?? payload?.user?.profile?.work_status ?? hint?.workStatus ?? null;
   return {
     id: String(id),
     clientId: payload?.clientId,
@@ -85,5 +97,7 @@ export const mapCommentPayload = (
     createdAt,
     mine,
     replyToId: replyToId ? String(replyToId) : null,
+    avatarUrl,
+    workStatus,
   };
 };

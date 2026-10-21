@@ -1,6 +1,7 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, Switch, Text, View } from 'react-native';
+import { ActivityIndicator, Image, Pressable, ScrollView, Switch, Text, View } from 'react-native';
 import { SafeAreaView } from '@/components/common/SafeAreaViewWithTopPadding';
+import WorkStatusRing from '@/components/common/WorkStatusRing';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useKISTheme } from '@/theme/useTheme';
@@ -341,6 +342,25 @@ export default function ProfileNotificationsScreen() {
             alignItems: 'flex-start',
           }}
         >
+          {item.actor ? (
+            <WorkStatusRing
+              size={40}
+              workStatus={item.actor.workStatus}
+              onHiringPress={
+                item.actor.hiringJobListingId
+                  ? () => navigation.navigate('JobDetail', { jobId: item.actor!.hiringJobListingId as string })
+                  : undefined
+              }
+            >
+              {item.actor.avatarUrl ? (
+                <Image source={{ uri: item.actor.avatarUrl }} style={{ width: 40, height: 40, borderRadius: 20 }} />
+              ) : (
+                <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: palette.surfaceElevated, alignItems: 'center', justifyContent: 'center' }}>
+                  <KISIcon name="person" size={18} color={palette.subtext} />
+                </View>
+              )}
+            </WorkStatusRing>
+          ) : null}
           <Pressable onPress={() => openNotification(item)} style={{ flex: 1, gap: 4 }}>
             <Text style={{ color: palette.text, fontSize: 16, fontWeight: '700' }}>{item.title}</Text>
             <Text style={{ color: palette.subtext }}>{item.body}</Text>

@@ -60,6 +60,7 @@ type Props = {
   mentionMap?: Record<string, string>;
   participantMap?: Record<string, string>;
   participantAvatarMap?: Record<string, string>;
+  participantWorkStatusMap?: Record<string, string>;
   participantPhoneMap?: Record<string, string>;
   participantRoleMap?: Record<string, string>;
   isDirectChat?: boolean;
@@ -171,6 +172,7 @@ export const InteractiveMessageRow: React.FC<Props> = ({
   mentionMap,
   participantMap,
   participantAvatarMap,
+  participantWorkStatusMap,
   participantPhoneMap,
   participantRoleMap,
   isDirectChat,
@@ -465,6 +467,7 @@ export const InteractiveMessageRow: React.FC<Props> = ({
             mentionMap={mentionMap}
             participantMap={participantMap}
             participantAvatarMap={participantAvatarMap}
+            participantWorkStatusMap={participantWorkStatusMap}
             participantPhoneMap={participantPhoneMap}
             participantRoleMap={participantRoleMap}
             isDirectChat={isDirectChat}

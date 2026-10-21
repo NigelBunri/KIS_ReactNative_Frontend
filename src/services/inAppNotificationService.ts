@@ -36,6 +36,17 @@ export type InAppNotification = {
   notificationType?: string;
   targetType?: string;
   targetId?: string;
+  // Gated, enriched view of Notification.actor_user_id - see
+  // apps.notifications.serializers.NotificationSerializer.get_actor.
+  // Undefined (not just null) for local reminder-type notifications,
+  // same as notificationType/targetType/targetId above.
+  actor?: {
+    id: string;
+    displayName?: string;
+    avatarUrl?: string | null;
+    workStatus?: string | null;
+    hiringJobListingId?: string | null;
+  } | null;
 };
 
 type AvailabilityReminder = {
@@ -126,6 +137,15 @@ const toBackendNotification = (raw: any): InAppNotification | null => {
     notificationType: raw?.type ? String(raw.type) : undefined,
     targetType: raw?.target_type ? String(raw.target_type) : undefined,
     targetId: targetId ? String(targetId) : undefined,
+    actor: raw?.actor
+      ? {
+          id: String(raw.actor.id),
+          displayName: raw.actor.display_name ?? undefined,
+          avatarUrl: raw.actor.avatar_url ?? null,
+          workStatus: raw.actor.work_status ?? null,
+          hiringJobListingId: raw.actor.hiring_job_listing_id ?? null,
+        }
+      : undefined,
   };
 };
 

@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { KISIcon } from '@/constants/kisIcons';
 import PermanentRemoteImage from '@/components/media/PermanentRemoteImage';
+import WorkStatusRing from '@/components/common/WorkStatusRing';
 
 export type PollVotesSheetOption = {
   id: string;
@@ -22,6 +23,7 @@ type Voter = {
   name?: string;
   phone?: string;
   avatarUrl?: string;
+  workStatus?: string;
   status: string;
 };
 
@@ -33,6 +35,7 @@ type Props = {
   options: PollVotesSheetOption[];
   participantMap?: Record<string, string>;
   participantAvatarMap?: Record<string, string>;
+  participantWorkStatusMap?: Record<string, string>;
   participantPhoneMap?: Record<string, string>;
   participantRoleMap?: Record<string, string>;
   isDirectChat?: boolean;
@@ -68,6 +71,7 @@ export default function PollVotesSheet({
   options,
   participantMap,
   participantAvatarMap,
+  participantWorkStatusMap,
   participantPhoneMap,
   participantRoleMap,
   isDirectChat,
@@ -87,6 +91,7 @@ export default function PollVotesSheet({
     name: participantMap?.[id],
     phone: participantPhoneMap?.[id],
     avatarUrl: participantAvatarMap?.[id],
+    workStatus: participantWorkStatusMap?.[id],
     status: statusFor(participantRoleMap?.[id], isDirectChat),
   });
 
@@ -107,7 +112,7 @@ export default function PollVotesSheet({
         };
       }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [options, participantMap, participantAvatarMap, participantPhoneMap, participantRoleMap, isDirectChat],
+    [options, participantMap, participantAvatarMap, participantWorkStatusMap, participantPhoneMap, participantRoleMap, isDirectChat],
   );
 
   const totalVotes = sections.reduce((sum, s) => sum + s.count, 0);
@@ -175,20 +180,22 @@ export default function PollVotesSheet({
                   !isLast && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: palette.divider },
                 ]}
               >
-                {item.avatarUrl ? (
-                  <PermanentRemoteImage
-                    uri={item.avatarUrl}
-                    domain="Chat"
-                    stableKey={`poll_voter_${item.id}`}
-                    containerStyle={styles.avatar}
-                  />
-                ) : (
-                  <View style={[styles.avatar, styles.avatarFallback, { backgroundColor: palette.surfaceSoft ?? palette.surface }]}>
-                    <Text style={{ color: palette.subtext, fontSize: 13, fontWeight: '700' }}>
-                      {initialsFor(label)}
-                    </Text>
-                  </View>
-                )}
+                <WorkStatusRing size={36} workStatus={item.workStatus}>
+                  {item.avatarUrl ? (
+                    <PermanentRemoteImage
+                      uri={item.avatarUrl}
+                      domain="Chat"
+                      stableKey={`poll_voter_${item.id}`}
+                      containerStyle={styles.avatar}
+                    />
+                  ) : (
+                    <View style={[styles.avatar, styles.avatarFallback, { backgroundColor: palette.surfaceSoft ?? palette.surface }]}>
+                      <Text style={{ color: palette.subtext, fontSize: 13, fontWeight: '700' }}>
+                        {initialsFor(label)}
+                      </Text>
+                    </View>
+                  )}
+                </WorkStatusRing>
                 <View style={{ flex: 1, marginLeft: 12 }}>
                   <Text style={[styles.voterName, { color: palette.text }]} numberOfLines={1}>
                     {label}

@@ -17,6 +17,7 @@ import { KISIcon } from '@/constants/kisIcons';
 import NetworkQualityBars from './NetworkQualityBars';
 import { useKISTheme } from '@/theme/useTheme';
 import { useSafeTopInset } from '@/hooks/useSafeTopInset';
+import WorkStatusRing from '@/components/common/WorkStatusRing';
 
 type Props = {
   participants: CallParticipant[];
@@ -54,29 +55,32 @@ function ParticipantAvatar({
   avatarUrl,
   backgroundColor,
   textColor,
+  workStatus,
 }: {
   displayName: string;
   avatarUrl?: string | null;
   backgroundColor: string;
   textColor: string;
+  workStatus?: string | null;
 }) {
   const [failed, setFailed] = useState(false);
   useEffect(() => setFailed(false), [avatarUrl]);
-  if (avatarUrl && !failed) {
-    return (
-      <Image
-        source={{ uri: avatarUrl }}
-        style={styles.avatar}
-        onError={() => setFailed(true)}
-      />
-    );
-  }
   return (
-    <View style={[styles.avatar, { backgroundColor }]}>
-      <Text style={[styles.avatarText, { color: textColor }]}>
-        {displayName.charAt(0).toUpperCase()}
-      </Text>
-    </View>
+    <WorkStatusRing size={38} workStatus={workStatus}>
+      {avatarUrl && !failed ? (
+        <Image
+          source={{ uri: avatarUrl }}
+          style={styles.avatar}
+          onError={() => setFailed(true)}
+        />
+      ) : (
+        <View style={[styles.avatar, { backgroundColor }]}>
+          <Text style={[styles.avatarText, { color: textColor }]}>
+            {displayName.charAt(0).toUpperCase()}
+          </Text>
+        </View>
+      )}
+    </WorkStatusRing>
   );
 }
 
@@ -159,6 +163,7 @@ export default function ParticipantsSheet({ participants, visible, onClose, loca
               <ParticipantAvatar
                 displayName={item.displayName}
                 avatarUrl={item.avatarUrl}
+                workStatus={item.workStatus}
                 backgroundColor={palette.gold}
                 textColor={palette.royalInk}
               />

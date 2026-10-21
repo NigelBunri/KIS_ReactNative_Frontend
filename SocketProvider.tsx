@@ -59,6 +59,7 @@ import { toggleScreenShare as callServiceToggleScreenShare } from '@/services/ca
 import { saveConversationCallHistory, loadConversationCallHistory } from '@/services/calls/callHistoryStorage';
 import { logCallDiagnostic } from '@/services/calls/callDiagnostics';
 import { getPendingCallPayload, clearPendingCallPayload } from '@/services/calls/pendingCallPayload';
+import { getParticipantProfileHint } from '@/services/calls/participantProfileHints';
 
 // Use SFU when a group call grows beyond this threshold.
 // Below it, P2P is used (lower latency, no server media).
@@ -373,6 +374,12 @@ function safeDisplayName(value: unknown, fallback: string): string {
 
 function makeParticipant(overrides: Partial<CallParticipant> & { userId: string }): CallParticipant {
   const displayName = safeDisplayName(overrides.displayName, overrides.isLocal ? 'You' : 'Participant');
+  // See participantProfileHints.ts - a best-effort, locally-sourced lookup
+  // for avatarUrl/workStatus since the call-signaling payload itself never
+  // carries either. Only used as a DEFAULT: any caller that already knows
+  // a participant's avatarUrl/workStatus (none do today, but this stays
+  // future-proof) still wins via the `...overrides` spread below.
+  const hint = getParticipantProfileHint(overrides.userId);
   return {
     isLocal: false,
     isMuted: false,
@@ -385,7 +392,8 @@ function makeParticipant(overrides: Partial<CallParticipant> & { userId: string 
     handRaised: false,
     joinedAt: new Date().toISOString(),
     stream: null,
-    avatarUrl: null,
+    avatarUrl: hint?.avatarUrl ?? null,
+    workStatus: hint?.workStatus ?? null,
     ...overrides,
     displayName,
   };

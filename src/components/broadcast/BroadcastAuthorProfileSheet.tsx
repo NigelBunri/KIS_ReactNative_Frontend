@@ -12,6 +12,7 @@ import {
 import { useKISTheme } from '@/theme/useTheme';
 import { KISIcon } from '@/constants/kisIcons';
 import { resolveBackendAssetUrl } from '@/network';
+import WorkStatusRing from '@/components/common/WorkStatusRing';
 import {
   formatKisHandle,
   formatPublicPhone,
@@ -272,7 +273,12 @@ export default function BroadcastAuthorProfileSheet({
                 </View>
 
                 <View style={styles.identityCard}>
-                  <Image source={avatarUri ? { uri: avatarUri } : fallbackAvatar} style={styles.avatar} />
+                  <WorkStatusRing size={76} workStatus={profileData?.work_status}>
+                    <Image
+                      source={avatarUri ? { uri: avatarUri } : fallbackAvatar}
+                      style={styles.avatar}
+                    />
+                  </WorkStatusRing>
                   <View style={{ flex: 1 }}>
                     <Text style={styles.handleText} numberOfLines={1}>
                       {formatKisHandle(displayName)}
