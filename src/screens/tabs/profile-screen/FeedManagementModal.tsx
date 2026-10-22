@@ -614,7 +614,7 @@ export function FeedManagementModal(props: FeedManagementModalProps) {
             Channel Studio
           </Text>
           <Text style={[modalStyles.toolRowSubtitle, { color: palette.subtext }]}>
-            Manage channels, content, and analytics.
+            Manage channels, content, analytics, and go live.
           </Text>
         </View>
         <KISIcon name="chevron-right" size={18} color={palette.subtext} />
