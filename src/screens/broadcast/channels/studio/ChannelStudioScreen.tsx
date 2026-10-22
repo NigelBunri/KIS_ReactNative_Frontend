@@ -8,16 +8,14 @@ import { useKISTheme } from '@/theme/useTheme';
 import { useResponsiveLayout } from '@/theme/responsive';
 import type { RootStackParamList } from '@/navigation/types';
 import type { BroadcastChannelContent, BroadcastChannelPlaylist, BroadcastChannelSummary } from '@/screens/broadcast/channels/api/channels.types';
-import { createBroadcastChannel, fetchChannelContents, fetchChannelPlaylists, publishChannelContent, setChannelBroadcastState, setChannelContentBroadcastState, setChannelContentTags, setChannelContentVisibility, useChannelsData } from '@/screens/broadcast/channels/hooks/useChannelsData';
+import { createBroadcastChannel, fetchChannelContents, fetchChannelPlaylists, publishChannelContent, setChannelContentBroadcastState, setChannelContentTags, setChannelContentVisibility, useChannelsData } from '@/screens/broadcast/channels/hooks/useChannelsData';
 import ROUTES from '@/network';
 import { getRequest } from '@/network/get';
-import { isTierAtLeast } from '@/services/tierAccess';
 import { useAuth } from '../../../../../App';
 import ChannelAnalyticsPanel from '@/screens/broadcast/channels/studio/ChannelAnalyticsPanel';
 import ChannelBrandingEditor from '@/screens/broadcast/channels/studio/ChannelBrandingEditor';
 import ChannelContentManager from '@/screens/broadcast/channels/studio/ChannelContentManager';
 import ChannelModerationPanel from '@/screens/broadcast/channels/studio/ChannelModerationPanel';
-import LiveControlRoom from '@/screens/broadcast/channels/studio/LiveControlRoom';
 import RevenueAnalyticsPanel from '@/screens/broadcast/channels/studio/RevenueAnalyticsPanel';
 import AudienceDemographicsPanel from '@/screens/broadcast/channels/studio/AudienceDemographicsPanel';
 import CopyrightClaimsPanel from '@/screens/broadcast/channels/studio/CopyrightClaimsPanel';
@@ -41,7 +39,7 @@ import TrustPromotionRevenuePreviewCard from '@/components/profitability/TrustPr
 import NotificationRetentionPreviewCard from '@/components/profitability/NotificationRetentionPreviewCard';
 import EnterpriseKcanRevenuePreviewCard from '@/components/profitability/EnterpriseKcanRevenuePreviewCard';
 
-type StudioTab = 'dashboard' | 'content' | 'create' | 'branding' | 'playlists' | 'live' | 'analytics' | 'moderation' | 'revenue' | 'audience' | 'copyright' | 'ads' | 'impressions' | 'traffic' | 'subtitles' | 'chapters' | 'endscreens' | 'cards' | 'shelves' | 'products' | 'monetization' | 'membership' | 'settings';
+type StudioTab = 'dashboard' | 'content' | 'create' | 'branding' | 'playlists' | 'analytics' | 'moderation' | 'revenue' | 'audience' | 'copyright' | 'ads' | 'impressions' | 'traffic' | 'subtitles' | 'chapters' | 'endscreens' | 'cards' | 'shelves' | 'products' | 'monetization' | 'membership' | 'settings';
 
 type Props = {
   legacyFeeds: any[];
@@ -75,7 +73,6 @@ const TABS: Array<{ id: StudioTab; label: string }> = [
   { id: 'create', label: 'Create' },
   { id: 'branding', label: 'Branding' },
   { id: 'playlists', label: 'Playlists' },
-  { id: 'live', label: 'Live' },
   { id: 'analytics', label: 'Analytics' },
   { id: 'moderation', label: 'Moderation' },
   { id: 'revenue', label: 'Revenue' },
@@ -99,11 +96,11 @@ const TABS: Array<{ id: StudioTab; label: string }> = [
 // shows ~4-5 items at a time instead of all 20 at once — the individual
 // tab panels themselves are unchanged, only how many are visible in the
 // strip simultaneously.
-type StudioTabCategory = 'content' | 'live' | 'growth' | 'brand' | 'protect';
+type StudioTabCategory = 'content' | 'analytics' | 'growth' | 'brand' | 'protect';
 
 const TAB_CATEGORIES: Array<{ id: StudioTabCategory; label: string; tabs: StudioTab[] }> = [
   { id: 'content', label: 'Content', tabs: ['dashboard', 'content', 'create', 'playlists'] },
-  { id: 'live', label: 'Live', tabs: ['live', 'analytics', 'traffic', 'impressions'] },
+  { id: 'analytics', label: 'Analytics', tabs: ['analytics', 'traffic', 'impressions'] },
   { id: 'growth', label: 'Growth', tabs: ['audience', 'revenue', 'ads', 'shelves', 'cards', 'products', 'monetization', 'membership'] },
   { id: 'brand', label: 'Brand', tabs: ['branding', 'subtitles', 'chapters', 'endscreens'] },
   { id: 'protect', label: 'Protect', tabs: ['moderation', 'copyright', 'settings'] },
@@ -157,14 +154,6 @@ const CREATOR_PREMIUM_FEATURES = [
     detail: 'Public/private embed controls and analytics after embed safety policy approval.',
   },
   {
-    key: 'live',
-    planId: 'creator_growth',
-    icon: 'channel',
-    title: 'Live and premieres',
-    value: 'Growth',
-    detail: 'Live provider controls, premieres, replays, moderation, and event monetization readiness.',
-  },
-  {
     key: 'paid-content',
     planId: 'creator_growth',
     icon: 'cart',
@@ -194,7 +183,6 @@ export default function ChannelStudioScreen({ legacyFeeds, liveCount, expiresAt,
   // real tier, meaning this always evaluated as Free and blocked every
   // Partner/Partner Pro account from live streaming. AdminUserManagementScreen.tsx
   // and AdminUsersPanel.tsx already read user.tier directly - matching that.
-  const canUseLiveStreaming = isTierAtLeast(user?.tier ?? null, 'partner');
   const [activeTab, setActiveTab] = useState<StudioTab>('dashboard');
   const [activeCategory, setActiveCategory] = useState<StudioTabCategory>(categoryForTab('dashboard'));
   const [selectedContent, setSelectedContent] = useState<BroadcastChannelContent | null>(null);
@@ -207,7 +195,6 @@ export default function ChannelStudioScreen({ legacyFeeds, liveCount, expiresAt,
   const [channelForm, setChannelForm] = useState<ChannelForm>(EMPTY_FORM);
   const [channelError, setChannelError] = useState<string | null>(null);
   const [lastCreatedHandle, setLastCreatedHandle] = useState<string | null>(null);
-  const [channelBroadcasting, setChannelBroadcasting] = useState(false);
   const [contentBroadcastingId, setContentBroadcastingId] = useState<string | null>(null);
   const [contentPublishingId, setContentPublishingId] = useState<string | null>(null);
   const [contentMembersOnlyTogglingId, setContentMembersOnlyTogglingId] = useState<string | null>(null);
@@ -377,40 +364,6 @@ export default function ChannelStudioScreen({ legacyFeeds, liveCount, expiresAt,
     }
   }, [contents, selectedContent]);
 
-  const handleToggleChannelBroadcast = useCallback(async () => {
-    if (!selectedChannel?.id || channelBroadcasting) return;
-    setChannelBroadcasting(true);
-    try {
-      await setChannelBroadcastState(selectedChannel.id, !selectedChannel.is_broadcast);
-      await refresh();
-    } finally {
-      setChannelBroadcasting(false);
-    }
-  }, [channelBroadcasting, refresh, selectedChannel?.id, selectedChannel?.is_broadcast]);
-
-  // Turning broadcast ON is low-stakes (nothing changes for existing
-  // subscribers until there's something to see), but turning it OFF
-  // immediately hides the channel and all of its public content from
-  // subscribers — a channel-wide, high-visibility action with no prior
-  // confirmation. Gate only the "stop broadcasting" direction, matching
-  // the confirm-only-on-destructive pattern used for "End stream" in
-  // LiveControlRoom and "Remove" in ChannelModerationPanel.
-  const confirmToggleChannelBroadcast = useCallback(() => {
-    if (!selectedChannel) return;
-    if (!selectedChannel.is_broadcast) {
-      void handleToggleChannelBroadcast();
-      return;
-    }
-    Alert.alert(
-      'Stop broadcasting this channel?',
-      'Your channel and its public content will be hidden from subscribers until you broadcast again.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Stop broadcasting', style: 'destructive', onPress: () => void handleToggleChannelBroadcast() },
-      ],
-    );
-  }, [selectedChannel, handleToggleChannelBroadcast]);
-
   const handleToggleContentBroadcast = useCallback(async (content: BroadcastChannelContent, nextState: boolean) => {
     if (!content?.id) return;
     setContentBroadcastingId(content.id);
@@ -457,14 +410,12 @@ export default function ChannelStudioScreen({ legacyFeeds, liveCount, expiresAt,
     }
   }, [refreshContent]);
 
-  const renderCreatorPremiumPreview = (context: 'dashboard' | 'create' | 'analytics' | 'live' | 'settings' = 'dashboard') => {
+  const renderCreatorPremiumPreview = (context: 'dashboard' | 'create' | 'analytics' | 'settings' = 'dashboard') => {
     const features =
       context === 'create'
         ? CREATOR_PREMIUM_FEATURES.filter(feature => ['channel-limit', 'scheduled-posts', 'paid-content'].includes(feature.key))
         : context === 'analytics'
         ? CREATOR_PREMIUM_FEATURES.filter(feature => ['analytics', 'embeds', 'promotion'].includes(feature.key))
-        : context === 'live'
-        ? CREATOR_PREMIUM_FEATURES.filter(feature => ['live', 'paid-content', 'promotion'].includes(feature.key))
         : context === 'settings'
         ? CREATOR_PREMIUM_FEATURES.filter(feature => ['embeds', 'promotion', 'paid-content'].includes(feature.key))
         : CREATOR_PREMIUM_FEATURES;
@@ -698,37 +649,6 @@ export default function ChannelStudioScreen({ legacyFeeds, liveCount, expiresAt,
         </View>
       );
     }
-    if (activeTab === 'live') {
-      if (!canUseLiveStreaming) {
-        return (
-          <View style={[styles.upgradePrompt, { backgroundColor: palette.surface, borderColor: palette.border }]}>
-            <KISIcon name="channel" size={32} color={palette.primaryStrong} />
-            <Text style={[styles.upgradeTitle, { color: palette.text }]}>Live Streaming</Text>
-            <Text style={[styles.upgradeText, { color: palette.subtext }]}>
-              Live streaming is available on Partner plans and above. Upgrade your account to schedule and broadcast live streams to your subscribers.
-            </Text>
-            {/* Previously a dead end - text only, no way to actually act on
-                it. Upgrading itself (tier lookup, discount/reward
-                application, Flutterwave checkout) lives in
-                useProfileController.upgradeTier, which needs profile/tiers
-                data this screen doesn't have - rather than duplicate that
-                payment logic here, this hands off to the Profile tab where
-                the real, working "Upgrade" entry point already is. */}
-            <KISButton
-              title="Go to Profile to upgrade"
-              onPress={() => navigation.navigate('MainTabs')}
-              style={{ marginTop: 14 }}
-            />
-          </View>
-        );
-      }
-      return (
-        <>
-          {renderCreatorPremiumPreview('live')}
-          <LiveControlRoom channel={selectedChannel} onOpenWatch={stream => navigation.navigate('LiveWatch', { streamId: stream.id, stream })} />
-        </>
-      );
-    }
     if (activeTab === 'revenue') return <RevenueAnalyticsPanel channelId={selectedChannel.id} />;
     if (activeTab === 'audience') return <AudienceDemographicsPanel channelId={selectedChannel.id} />;
     if (activeTab === 'copyright') return <CopyrightClaimsPanel channelId={selectedChannel.id} />;
@@ -805,13 +725,6 @@ export default function ChannelStudioScreen({ legacyFeeds, liveCount, expiresAt,
         {selectedChannel ? (
           <View style={[styles.headerActions, compact && { width: '100%', justifyContent: 'flex-start' }]}>
             <KISButton
-              title={compact ? (selectedChannel.is_broadcast ? 'Stop broadcast' : 'Broadcast') : (selectedChannel.is_broadcast ? 'Stop broadcasting channel' : 'Broadcast channel')}
-              variant={selectedChannel.is_broadcast ? 'danger' : 'outline'}
-              onPress={confirmToggleChannelBroadcast}
-              disabled={channelBroadcasting}
-              loading={channelBroadcasting}
-            />
-            <KISButton
               title={compact ? 'Create' : createLabel}
               onPress={() => onCreate(selectedChannel)}
               left={<KISIcon name="add" size={16} color={palette.onPrimary} />}
@@ -826,10 +739,6 @@ export default function ChannelStudioScreen({ legacyFeeds, liveCount, expiresAt,
             <Text style={[styles.metricLabel, { color: palette.subtext }]}>Studio items</Text>
           </View>
           <View style={[styles.metricTile, { borderColor: palette.goldMuted ?? palette.border, backgroundColor: tone === 'dark' ? palette.primarySoft : palette.surface }]}>
-            <Text style={[styles.metricValue, { color: palette.text }]}>{selectedChannel.is_broadcast ? 'Live' : 'Private'}</Text>
-            <Text style={[styles.metricLabel, { color: palette.subtext }]}>Broadcast state</Text>
-          </View>
-          <View style={[styles.metricTile, { borderColor: palette.goldMuted ?? palette.border, backgroundColor: tone === 'dark' ? palette.primarySoft : palette.surface }]}>
             <Text style={[styles.metricValue, { color: palette.text }]}>{selectedChannel.subscriber_count || 0}</Text>
             <Text style={[styles.metricLabel, { color: palette.subtext }]}>Subscribers</Text>
           </View>
@@ -842,7 +751,7 @@ export default function ChannelStudioScreen({ legacyFeeds, liveCount, expiresAt,
             return (
               <KISButton
                 key={channel.id}
-                title={`@${channel.handle}${channel.is_broadcast ? ' · LIVE' : ''}`}
+                title={`@${channel.handle}`}
                 size="xs"
                 variant={active ? 'primary' : 'outline'}
                 onPress={() => setSelectedChannelId(channel.id)}
