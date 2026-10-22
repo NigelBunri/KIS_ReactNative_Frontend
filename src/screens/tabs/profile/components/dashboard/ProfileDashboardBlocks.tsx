@@ -218,6 +218,65 @@ const BIG_AVATAR_SIZE_COMPACT = 84;
 const BIG_AVATAR_SIZE_REGULAR = 100;
 
 /**
+ * Cover photo / decorative-gradient layer for the Profile gold section —
+ * passed to useGoldenSectionContent's `backdrop` slot (ProfileScreen.tsx),
+ * not `content`. GoldHeaderShell paints `backdrop` full-bleed behind its
+ * `marginTop: 20` breathing room, the same footprint as the header gradient
+ * itself — so this reaches the shell's true top edge instead of being cut
+ * off 20px short of it the way it was when it lived inside ProfileHeroCard's
+ * `content` (which GoldHeaderShell always pushes below that 20px gap). Plain
+ * text/icon golden-section content (Messages, Bible, Broadcast, Partners)
+ * never needed this split — more gold gradient showing through that gap is
+ * invisible — but a cover PHOTO stopping short of it there reads as a bug.
+ *
+ * Fades out in sync with ProfileHeroCard's own collapse (same scrollY, same
+ * opacity curve) so by the time the compact sticky bar is fully visible,
+ * this has faded to nothing and only the plain gold gradient shows behind
+ * it — matching what ProfileHeroCard's collapse already did before this
+ * layer was split out; the only new behavior is where it is rendered.
+ */
+export const ProfileHeroBackdrop = ({
+  coverUrl,
+  scrollY,
+}: {
+  coverUrl?: string | null;
+  scrollY: SharedValue<number>;
+}) => {
+  const { palette } = useDashboardTheme();
+  const fadeStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(
+      scrollY.value,
+      [0, HERO_COLLAPSE_DISTANCE * 0.6],
+      [1, 0],
+      Extrapolation.CLAMP,
+    ),
+  }));
+
+  return (
+    <Animated.View style={[StyleSheet.absoluteFillObject, fadeStyle]}>
+      {coverUrl ? (
+        <>
+          <Image source={{ uri: coverUrl }} style={dashboardStyles.heroCoverImage} />
+          <LinearGradient
+            colors={['transparent', 'rgba(18,10,0,0.45)']}
+            locations={[0.35, 1]}
+            style={StyleSheet.absoluteFillObject}
+          />
+        </>
+      ) : (
+        <>
+          <View style={[dashboardStyles.heroGlowPrimary, { backgroundColor: palette.gold, opacity: 0.40 }]} />
+          <View style={[dashboardStyles.heroGlowSecondary, { backgroundColor: palette.goldDeep, opacity: 0.35 }]} />
+          <View style={[dashboardStyles.heroGlowAccent, { backgroundColor: palette.goldReadable, opacity: 0.30 }]} />
+          <View style={[dashboardStyles.heroArcLarge, { borderColor: withAlpha(palette.goldHighlight, 0.15) }]} />
+          <View style={[dashboardStyles.heroArcSmall, { borderColor: withAlpha(palette.goldHighlight, 0.10) }]} />
+        </>
+      )}
+    </Animated.View>
+  );
+};
+
+/**
  * The Profile gold section — registered via useGoldenSectionContent (see
  * ProfileScreen.tsx) and rendered inside the shared, fixed Golden Section
  * host in App.tsx. LinkedIn-style: a cover-image banner with the profile
@@ -233,7 +292,6 @@ const BIG_AVATAR_SIZE_REGULAR = 100;
  *    total height).
  */
 export const ProfileHeroCard = ({
-  coverUrl,
   avatarUrl,
   workStatus,
   displayName,
@@ -250,7 +308,6 @@ export const ProfileHeroCard = ({
   topInset,
   scrollY,
 }: {
-  coverUrl?: string | null;
   avatarUrl?: string | null;
   workStatus?: string | null;
   displayName: string;
@@ -373,38 +430,16 @@ export const ProfileHeroCard = ({
           }}
           style={{ position: 'relative', overflow: 'hidden' }}
         >
-          {/* Background — real cover photo or the decorative gold gradient
-              fallback — spans the *entire* hero, all the way to y=0 (behind
-              the status bar/notch too), not just a top strip starting below
-              topInset. This View used to carry `paddingTop: topInset`
-              itself, which (per RN/Yoga's absolute-positioning model, same
-              as CSS) pushed this absoluteFillObject background down by that
-              same inset along with everything else - leaving a gap of bare
-              GoldHeaderShell backdrop above the cover photo on every device
-              with a non-zero safe-area inset. The inset still needs to push
-              the avatar/name row down below the status bar - moved onto
-              that row's own paddingTop just below instead, which only
-              affects the CONTENT, not this backdrop. */}
-          <View style={StyleSheet.absoluteFillObject}>
-            {coverUrl ? (
-              <>
-                <Image source={{ uri: coverUrl }} style={dashboardStyles.heroCoverImage} />
-                <LinearGradient
-                  colors={['transparent', 'rgba(18,10,0,0.45)']}
-                  locations={[0.35, 1]}
-                  style={StyleSheet.absoluteFillObject}
-                />
-              </>
-            ) : (
-              <>
-                <View style={[dashboardStyles.heroGlowPrimary, { backgroundColor: palette.gold, opacity: 0.40 }]} />
-                <View style={[dashboardStyles.heroGlowSecondary, { backgroundColor: palette.goldDeep, opacity: 0.35 }]} />
-                <View style={[dashboardStyles.heroGlowAccent, { backgroundColor: palette.goldReadable, opacity: 0.30 }]} />
-                <View style={[dashboardStyles.heroArcLarge, { borderColor: withAlpha(palette.goldHighlight, 0.15) }]} />
-                <View style={[dashboardStyles.heroArcSmall, { borderColor: withAlpha(palette.goldHighlight, 0.10) }]} />
-              </>
-            )}
-          </View>
+          {/* No background layer here anymore — it's rendered by
+              ProfileHeroBackdrop, passed to useGoldenSectionContent's
+              `backdrop` slot instead of `content`. That slot paints behind
+              GoldHeaderShell's `marginTop: 20` breathing room, i.e. all the
+              way to this shell's true y=0 (same footprint as the gold
+              gradient itself) — this box staying transparent lets that
+              backdrop show through underneath, so the cover photo reads as
+              one continuous image instead of being cut off 20px short of
+              the gradient's own top edge. See ProfileHeroBackdrop's doc
+              comment. */}
 
           {/* Avatar + name/handle + actions — one row, LinkedIn-style.
               paddingTop carries both the fixed 44 breathing room below the

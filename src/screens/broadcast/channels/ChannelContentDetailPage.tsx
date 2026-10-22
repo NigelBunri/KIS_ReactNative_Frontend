@@ -84,6 +84,10 @@ function TypeBadge({ type }: { type?: string }) {
   );
 }
 
+// Mirrors backend `_user_can_manage_channel` (apps/broadcasts/views.py) — the
+// embed-token endpoint only allows these roles, so the button must match.
+const CHANNEL_MANAGER_ROLES = new Set(['staff', 'owner', 'manager']);
+
 const SPEED_OPTIONS = [0.5, 1, 1.25, 1.5, 2] as const;
 type SpeedOption = typeof SPEED_OPTIONS[number];
 
@@ -940,6 +944,13 @@ export default function ChannelContentDetailPage() {
   const [selectedTipAmount, setSelectedTipAmount] = useState<number | null>(null);
   const [ageConfirmed, setAgeConfirmed] = useState(false);
   const [commentsModalVisible, setCommentsModalVisible] = useState(false);
+  // Stable identity so ChannelCommentsPanel's onCountChange effect doesn't
+  // retrigger every time this component re-renders (an inline arrow here
+  // would get a new identity each render, re-firing that effect, which
+  // calls setCounts, which re-renders this component - infinite loop).
+  const handleCommentCountChange = useCallback((count: number) => {
+    setCounts(prev => (prev.comments === count ? prev : { ...prev, comments: count }));
+  }, []);
   const scrollViewRef = useRef<React.ComponentRef<typeof ScrollView>>(null);
   const channel = (content?.channel || route.params?.channel || null) as BroadcastChannelSummary | null;
 
@@ -980,7 +991,7 @@ export default function ChannelContentDetailPage() {
   }, [content?.id]);
 
   const applyCounts = useCallback((payload: any) => {
-    if (payload?.engagement_counts) setCounts(payload.engagement_counts);
+    if (payload?.engagement_counts) setCounts(prev => ({ ...prev, ...payload.engagement_counts }));
   }, []);
 
   // Real toggle, matching ChannelContentReactView's actual semantics
@@ -1256,13 +1267,15 @@ export default function ChannelContentDetailPage() {
         const seconds = parseInt(secondsStr || '0', 10);
         const t = isNaN(seconds) ? 0 : seconds;
         const url = `https://kis.app/content/${content.id}?t=${t}`;
-        await Share.share({ message: `${content.title || 'KIS content'}\n${url}`, url });
+        const result = await Share.share({ message: `${content.title || 'KIS content'}\n${url}`, url });
+        const completed = result.action === Share.sharedAction;
+        if (completed) applyCounts(await shareChannelContent(content.id, true));
       },
       'plain-text',
       '0',
       'number-pad',
     );
-  }, [content?.id, content?.title]);
+  }, [applyCounts, content?.id, content?.title]);
 
   if (loading && !content) {
     return <SafeAreaView style={[styles.centered, { backgroundColor: palette.bg, }]}><ActivityIndicator color={palette.primaryStrong} /></SafeAreaView>;
@@ -1377,7 +1390,7 @@ export default function ChannelContentDetailPage() {
 
           <View style={[styles.actionGrid, { gap: compact ? 8 : 10 }]}>
             <ActionButton icon="heart" label="Like" value={compactNumber(counts.reactions)} onPress={handleReact} active={myReaction === 'like'} />
-            <ActionButton icon="warning" label="Dislike" value={compactNumber(counts.dislikes)} onPress={handleDislike} active={myReaction === 'dislike'} />
+            <ActionButton icon="thumbs-down" label="Dislike" value={compactNumber(counts.dislikes)} onPress={handleDislike} active={myReaction === 'dislike'} tone="danger" />
             <ActionButton icon="comment" label="Comment" value={compactNumber(counts.comments)} onPress={() => setCommentsModalVisible(true)} />
             <ActionButton icon="share" label="Share" value={compactNumber(counts.shares)} onPress={handleShare} />
             <ActionButton icon="qr-code" label="QR code" value="Share" onPress={handleShowQr} />
@@ -1388,7 +1401,9 @@ export default function ChannelContentDetailPage() {
             <ActionButton icon="edit" label="Create Clip" value="Clip it" onPress={() => setClipModalOpen(true)} />
             <ActionButton icon="play" label="Clips" value="My clips" onPress={() => navigation.navigate('ClipsListScreen', { contentId: content.id })} />
             <ActionButton icon="download" label="Download" value="Offline" onPress={handleDownload} />
-            <ActionButton icon="link" label="Embed" value="Token" onPress={handleEmbed} />
+            {CHANNEL_MANAGER_ROLES.has(channel?.viewer_role ?? '') && (
+              <ActionButton icon="link" label="Embed" value="Token" onPress={handleEmbed} />
+            )}
             <ActionButton icon="heart" label="Super Thanks" value="Tip" onPress={handleSuperThanks} />
             <ActionButton icon="report" label="Report" value="Report" onPress={handleReport} />
           </View>
@@ -1410,7 +1425,7 @@ export default function ChannelContentDetailPage() {
             <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 32 }}>
               <ChannelCommentsPanel
                 contentId={content.id}
-                onCountChange={count => setCounts(prev => ({ ...prev, comments: count }))}
+                onCountChange={handleCommentCountChange}
               />
             </ScrollView>
           </SafeAreaView>
@@ -1610,25 +1625,28 @@ export default function ChannelContentDetailPage() {
   );
 }
 
-function ActionButton({ icon, label, value, onPress, active = false }: { icon: string; label: string; value: string; onPress: () => void; active?: boolean }) {
+function ActionButton({ icon, label, value, onPress, active = false, tone = 'primary' }: { icon: string; label: string; value: string; onPress: () => void; active?: boolean; tone?: 'primary' | 'danger' }) {
   const { palette } = useKISTheme();
   const responsive = useResponsiveLayout();
   const compact = responsive.isWatch || responsive.isCompactPhone;
+  const activeBg = tone === 'danger' ? palette.dangerSoft : palette.primarySoft;
+  const activeBorder = tone === 'danger' ? palette.danger : palette.primary;
+  const activeFg = tone === 'danger' ? palette.danger : palette.primaryStrong;
   return (
     <Pressable
       onPress={onPress}
       style={[
         styles.actionButton,
         {
-          backgroundColor: active ? palette.primarySoft : palette.surfaceElevated,
-          borderColor: active ? palette.primary : palette.border,
+          backgroundColor: active ? activeBg : palette.surfaceElevated,
+          borderColor: active ? activeBorder : palette.border,
           width: compact ? '47%' : '30.5%',
           minHeight: compact ? 68 : 76,
         },
       ]}
     >
-      <KISIcon name={icon} size={18} focused={active} color={palette.primaryStrong} />
-      <Text style={[styles.actionLabel, { color: active ? palette.primaryStrong : palette.text }]}>{label}</Text>
+      <KISIcon name={icon} size={18} focused={active} color={active ? activeFg : palette.primaryStrong} />
+      <Text style={[styles.actionLabel, { color: active ? activeFg : palette.text }]}>{label}</Text>
       <Text style={[styles.actionValue, { color: palette.subtext }]}>{value}</Text>
     </Pressable>
   );

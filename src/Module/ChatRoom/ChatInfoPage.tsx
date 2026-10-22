@@ -378,6 +378,12 @@ export const ChatInfoPage: React.FC<ChatInfoPageProps> = ({
     }
   }, [isGroup, directContact, avatarUrl, chat.participants, currentUserId]);
 
+  // Only meaningful for 1:1 chats - a group avatar has no single person's
+  // work status to show. Mirrors the same profile shape already used for
+  // avatarUrl above and for the already-wrapped member list ring (line
+  // ~1687's `(p.user as any)?.profile?.work_status`).
+  const heroWorkStatus = isGroup ? undefined : (directContact?.user as any)?.profile?.work_status;
+
   useEffect(() => {
     let active = true;
     const loadMembers = async () => {
@@ -1184,11 +1190,13 @@ export const ChatInfoPage: React.FC<ChatInfoPageProps> = ({
                 borderRadius: 46,
               }}
             >
-              {avatarUrl ? (
-                <Image source={{ uri: avatarUrl }} style={styles.avatar} />
-              ) : (
-                <ImagePlaceholder size={88} radius={44} style={styles.avatar} />
-              )}
+              <WorkStatusRing size={88} workStatus={heroWorkStatus}>
+                {avatarUrl ? (
+                  <Image source={{ uri: avatarUrl }} style={styles.avatar} />
+                ) : (
+                  <ImagePlaceholder size={88} radius={44} style={styles.avatar} />
+                )}
+              </WorkStatusRing>
             </View>
           </Pressable>
           {isGroup && isAdmin && editingName ? (
@@ -1310,11 +1318,13 @@ export const ChatInfoPage: React.FC<ChatInfoPageProps> = ({
                   <Image source={{ uri: publicProfile.profile.cover_url }} style={styles.profileCover} />
                 ) : null}
                 <View style={styles.profileHeader}>
-                  {publicProfile?.profile?.avatar_url ? (
-                    <Image source={{ uri: publicProfile.profile.avatar_url }} style={styles.profileAvatar} />
-                  ) : (
-                    <ImagePlaceholder size={56} radius={18} />
-                  )}
+                  <WorkStatusRing size={56} workStatus={publicProfile?.profile?.work_status}>
+                    {publicProfile?.profile?.avatar_url ? (
+                      <Image source={{ uri: publicProfile.profile.avatar_url }} style={styles.profileAvatar} />
+                    ) : (
+                      <ImagePlaceholder size={56} radius={18} />
+                    )}
+                  </WorkStatusRing>
                   <View style={{ flex: 1 }}>
                     <Text style={[styles.profileName, { color: palette.text }]} numberOfLines={1}>
                       {publicProfile?.user?.display_name || 'Profile'}

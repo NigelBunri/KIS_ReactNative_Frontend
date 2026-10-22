@@ -23,6 +23,11 @@ export type GoldenSectionPayload = {
    *  (matching a gradient below the shell that must seam with it exactly). */
   gradientStart?: { x: number; y: number };
   gradientEnd?: { x: number; y: number };
+  /** Passthrough to GoldHeaderShell's own `backdrop` — see that component's
+   *  doc comment. Only needed when `content` is/contains an image that must
+   *  reach the shell's true top edge (e.g. Profile's cover photo); plain
+   *  text/icon content never needs this. */
+  backdrop?: React.ReactNode;
 };
 
 // A unique token per registering screen instance. Lets a blurring screen's

@@ -34,6 +34,7 @@ import { deleteRequest } from '@/network/delete';
 import { enqueueMutation } from '@/services/pendingMutationsQueue';
 import { KISIcon } from '@/constants/kisIcons';
 import ImagePlaceholder from '@/components/common/ImagePlaceholder';
+import WorkStatusRing from '@/components/common/WorkStatusRing';
 import Skeleton from '@/components/common/Skeleton';
 import type { Chat } from '@/Module/ChatRoom/messagesUtils';
 import { styles as chatListStyles } from '@/Module/ChatRoom/messagesUtils';
@@ -67,7 +68,7 @@ type Post = {
   text_plain?: string;
   text_preview?: string;
   created_at?: string;
-  author?: { id?: string | number; display_name?: string };
+  author?: { id?: string | number; display_name?: string; avatar_url?: string; work_status?: string };
   author_id?: string | number;
   attachments?: any[];
 };
@@ -961,7 +962,13 @@ const CommunitiesTab = forwardRef<ScrollableHandle, CommunitiesTabProps>(functio
                       ]}
                     >
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                        <ImagePlaceholder size={30} radius={15} />
+                        <WorkStatusRing size={30} workStatus={item.author?.work_status}>
+                          {item.author?.avatar_url ? (
+                            <Image source={{ uri: item.author.avatar_url }} style={{ width: 30, height: 30 }} resizeMode="cover" />
+                          ) : (
+                            <ImagePlaceholder size={30} radius={15} />
+                          )}
+                        </WorkStatusRing>
                         <View style={{ flex: 1 }}>
                           <Text style={{ color: palette.text, fontWeight: '700' }} numberOfLines={1}>
                             {item.author?.display_name ?? 'Member'}

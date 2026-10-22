@@ -2228,7 +2228,8 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
     const accentColor = palette.senderNameColor ?? palette.primary;
 
     const handleTap = () => {
-      DeviceEventEmitter.emit('member.tap', { userId: resolvedSenderId, name: effectiveName, avatarUrl: effectiveAvatar });
+      const workStatus = resolvedSenderId ? participantWorkStatusMap?.[resolvedSenderId] : undefined;
+      DeviceEventEmitter.emit('member.tap', { userId: resolvedSenderId, name: effectiveName, avatarUrl: effectiveAvatar, workStatus });
     };
 
     return (

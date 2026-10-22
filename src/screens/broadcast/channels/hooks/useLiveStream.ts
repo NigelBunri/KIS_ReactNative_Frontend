@@ -12,6 +12,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { DeviceEventEmitter } from 'react-native';
 import { getRequest }  from '@/network/get';
 import { postRequest } from '@/network/post';
+import { deleteRequest } from '@/network/delete';
 import ROUTES from '@/network';
 import { normalizeLiveStream } from './useChannelsData';
 import type { BroadcastChannelLiveStream } from '../api/channels.types';
@@ -32,6 +33,8 @@ export type LiveChatMessage = {
   is_member?: boolean;
 };
 
+export type IncomingReaction = { id: number; emoji: string; userId: string };
+
 export type UseLiveStreamResult = {
   stream:          BroadcastChannelLiveStream | null;
   loading:         boolean;
@@ -39,7 +42,15 @@ export type UseLiveStreamResult = {
   chatMessages:    LiveChatMessage[];
   cameraSources:   CameraSource[];
   activeCameraId:  string | null;
+  // Ephemeral - the most recent reaction from ANOTHER viewer (D6 of the
+  // YouTube-parity batch). Not accumulated into a list - the UI consumes
+  // each one once (keyed by `id`) to trigger a floating-emoji animation,
+  // the same way a toast is consumed once, not appended to a feed.
+  lastReaction:    IncomingReaction | null;
   sendChatMessage: (text: string) => Promise<void>;
+  deleteChatMessage: (messageId: string) => Promise<void>;
+  reportChatMessage: (messageId: string, reason?: string) => Promise<void>;
+  sendReaction:    (emoji: string) => void;
   switchCamera:    (sourceId: string) => Promise<void>;
   refresh:         () => Promise<void>;
 };
@@ -61,6 +72,8 @@ export function useLiveStream(
   const [chatMessages,   setChatMessages]   = useState<LiveChatMessage[]>([]);
   const [cameraSources,  setCameraSources]  = useState<CameraSource[]>([]);
   const [activeCameraId, setActiveCameraId] = useState<string | null>(null);
+  const [lastReaction,   setLastReaction]   = useState<IncomingReaction | null>(null);
+  const reactionIdRef = useRef(0);
 
   const mountedRef    = useRef(true);
   const pollTimerRef  = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -164,11 +177,13 @@ export function useLiveStream(
     if (!streamId) return;
 
     const schedule = () => {
+      if (!mountedRef.current) return;
       const status = stream?.status ?? '';
       if (status === 'ended' || status === 'cancelled') return; // stop polling
 
       const ms = status === 'live' ? POLL_LIVE_MS : POLL_PENDING_MS;
       pollTimerRef.current = setTimeout(async () => {
+        if (!mountedRef.current) return;
         // REST fallback for chat, same role as the viewer-count ping below —
         // covers any viewer whose socket connection drops or missed an
         // emit, so messages don't silently stop appearing. Only worth the
@@ -178,7 +193,13 @@ export function useLiveStream(
         } else {
           await fetchStream();
         }
-        schedule();
+        // Re-check after the await — the component may have unmounted
+        // while the request was in flight. Without this, the recursive
+        // schedule() call below sets a new timer *after* the effect's own
+        // cleanup already ran (it only clears whatever timer existed at
+        // that instant), so polling silently continued forever on an
+        // unmounted screen.
+        if (mountedRef.current) schedule();
       }, ms);
     };
 
@@ -228,7 +249,41 @@ export function useLiveStream(
     onLiveEnded: () => {
       void fetchStream();
     },
+
+    onChatMessageDeleted: ({ id }) => {
+      if (!mountedRef.current) return;
+      setChatMessages(prev => prev.filter(m => m.id !== id));
+    },
+
+    // C6 of the YouTube-parity batch: updates status immediately from the
+    // stream-room push (notify_live_stream_status_changed) instead of
+    // waiting up to POLL_LIVE_MS/POLL_PENDING_MS for the next poll tick.
+    // The poll above is left in place unchanged as a fallback for a
+    // dropped/reconnecting socket - this just makes the common case instant.
+    onLiveStatusChanged: ({ status: newStatus }) => {
+      if (!mountedRef.current || !newStatus) return;
+      setStream(prev => (prev ? { ...prev, status: newStatus as typeof prev.status } : prev));
+    },
+
+    // D6 of the YouTube-parity batch: the server echoes every reaction,
+    // including the sender's own, back to the whole room - best-effort
+    // filtering out this viewer's own tap when currentUserId is known
+    // (it's already animated locally and instantly by the caller). When
+    // currentUserId isn't passed, the sender's own tap simply animates
+    // twice in quick succession - a harmless cosmetic redundancy for a
+    // low-weight ephemeral feature, not worth a client-generated-nonce
+    // correlation scheme to fully eliminate.
+    onLiveReaction: ({ emoji, userId }) => {
+      if (!mountedRef.current) return;
+      if (currentUserId && userId === String(currentUserId)) return;
+      setLastReaction({ id: reactionIdRef.current++, emoji, userId });
+    },
   });
+
+  const sendReaction = useCallback((emoji: string) => {
+    if (!streamId) return;
+    DeviceEventEmitter.emit('channel.live.reaction.send', { streamId, emoji });
+  }, [streamId]);
 
   // ── Emit viewer presence events for real-time viewer count ─────────────────
   // Join the stream room on the socket so NestJS can count active viewers.
@@ -305,6 +360,35 @@ export function useLiveStream(
     }
   }, [streamId, currentUserId]);
 
+  const deleteChatMessage = useCallback(async (messageId: string) => {
+    if (!streamId) return;
+    // Optimistic removal - the socket broadcast (channel.chat.message_deleted)
+    // will also fire and re-filter, but that's a no-op by then; this is what
+    // makes it feel instant for the moderator who just tapped Delete.
+    const prevMessages = chatMessages;
+    setChatMessages(prev => prev.filter(m => m.id !== messageId));
+    const res = await deleteRequest(
+      ROUTES.broadcasts.liveStreamChatMessageModerate(streamId, messageId),
+      { errorMessage: 'Unable to delete message.' },
+    );
+    if (!res?.success) {
+      setChatMessages(prevMessages); // restore on failure
+      throw new Error(res?.message || 'Unable to delete message.');
+    }
+  }, [streamId, chatMessages]);
+
+  const reportChatMessage = useCallback(async (messageId: string, reason?: string) => {
+    if (!streamId) return;
+    const res = await postRequest(
+      ROUTES.broadcasts.liveStreamChatMessageModerate(streamId, messageId),
+      { reason: reason || 'Reported by viewer' },
+      { errorMessage: 'Unable to report message.' },
+    );
+    if (!res?.success) {
+      throw new Error(res?.message || 'Unable to report message.');
+    }
+  }, [streamId]);
+
   const switchCamera = useCallback(async (sourceId: string) => {
     if (!streamId) return;
     // Optimistic
@@ -329,7 +413,11 @@ export function useLiveStream(
     chatMessages,
     cameraSources,
     activeCameraId,
+    lastReaction,
     sendChatMessage,
+    deleteChatMessage,
+    reportChatMessage,
+    sendReaction,
     switchCamera,
     refresh,
   };

@@ -52,10 +52,15 @@ export interface KISUserProfile {
   display_name?: string | null;
   bio?: string | null;
   avatar?: string | null;
+  avatar_url?: string | null;
   cover_image?: string | null;
   // Misleading: ProfileSerializer never actually populates this - real
   // tier is KISUser.tier above, not this field. Kept for now since other
   // code may reference it; don't add new reads of user.profile.tier.
   tier?: string | null;
   verified?: boolean;
+  // 'none' | 'open_for_work' | 'hiring', viewer-gated server-side (see
+  // apps/accounts/visibility.py get_visible_work_status) - already public
+  // by default unless the user explicitly restricts it.
+  work_status?: string | null;
 }

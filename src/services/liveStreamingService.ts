@@ -85,7 +85,8 @@ const ICE_SERVERS = [
 
 type StatsCallback = (stats: StreamHealthStats) => void;
 type ErrorCallback = (error: Error) => void;
-type StateCallback = (state: 'idle' | 'connecting' | 'live' | 'stopped') => void;
+type ServiceState = 'idle' | 'connecting' | 'live' | 'reconnecting' | 'stopped';
+type StateCallback = (state: ServiceState) => void;
 
 class LiveStreamingService {
   private pc: any = null;
@@ -106,9 +107,20 @@ class LiveStreamingService {
   private stateCbs: StateCallback[]  = [];
   private pendingCandidates: any[]   = [];
   private _facing: CameraFacing      = 'front';
-  private _state: 'idle' | 'connecting' | 'live' | 'stopped' = 'idle';
+  private _state: ServiceState = 'idle';
   private consecutiveIceTrickleFailures = 0;
   private consecutiveStatsFailures = 0;
+  private lastConfig: BroadcastConfig | null = null;
+  private intentionalStop = false;
+  private reconnectAttempts = 0;
+  private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  // WHIP reconnection is re-establishing a whole PeerConnection (new
+  // capture, new SDP offer/answer, new ingest session) - not a lightweight
+  // retry - so a short, capped backoff (doubling, 1s/2s/4s/8s) bounds how
+  // long a broadcaster sits on "Reconnecting..." before getting a clear
+  // final failure, rather than retrying forever or hammering the server.
+  private static readonly MAX_RECONNECT_ATTEMPTS = 4;
+  private static readonly RECONNECT_BASE_DELAY_MS = 1000;
 
   // ── Public getters ──────────────────────────────────────────────────────────
 
@@ -140,7 +152,7 @@ class LiveStreamingService {
   private emitError(e: Error) {
     this.errorCbs.forEach(cb => cb(e));
   }
-  private setState(s: 'idle' | 'connecting' | 'live' | 'stopped') {
+  private setState(s: ServiceState) {
     this._state = s;
     this.stateCbs.forEach(cb => cb(s));
     DeviceEventEmitter.emit('livestream.state', { state: s });
@@ -154,9 +166,20 @@ class LiveStreamingService {
         'WebRTC is not available. Use OBS/RTMP ingest instead.',
       );
     }
-    if (this._state === 'connecting' || this._state === 'live') return;
+    if (this._state === 'connecting' || this._state === 'live' || this._state === 'reconnecting') return;
 
-    this.setState('connecting');
+    this.lastConfig = config;
+    this.intentionalStop = false;
+    this.reconnectAttempts = 0;
+    if (this.reconnectTimer) { clearTimeout(this.reconnectTimer); this.reconnectTimer = null; }
+    await this.connect(config);
+  }
+
+  // Shared by the initial startBroadcast() call and every reconnect retry -
+  // the only difference is which state (`connecting` vs `reconnecting`)
+  // gets surfaced to the UI and whether a fresh attempt counter was reset.
+  private async connect(config: BroadcastConfig): Promise<void> {
+    this.setState(this.reconnectAttempts > 0 ? 'reconnecting' : 'connecting');
     this._facing = config.facing ?? 'front';
 
     try {
@@ -215,9 +238,18 @@ class LiveStreamingService {
 
       this.pc.addEventListener('connectionstatechange', () => {
         const cs: string = this.pc?.connectionState ?? '';
-        if (cs === 'connected') this.setState('live');
-        if (cs === 'failed' || cs === 'closed') {
-          this.emitError(new Error(`Connection ${cs}`));
+        if (cs === 'connected') {
+          this.reconnectAttempts = 0;
+          this.setState('live');
+        }
+        if (cs === 'failed') {
+          // An ICE/DTLS failure mid-broadcast, not a user-initiated stop -
+          // worth automatically retrying rather than immediately surfacing
+          // a dead stream (see handleUnexpectedDisconnect's own reasoning).
+          this.handleUnexpectedDisconnect(new Error('Connection failed'));
+        } else if (cs === 'closed' && !this.intentionalStop) {
+          this.handleUnexpectedDisconnect(new Error('Connection closed unexpectedly'));
+        } else if (cs === 'closed') {
           this.setState('stopped');
         }
         DeviceEventEmitter.emit('livestream.connection', { state: cs });
@@ -282,6 +314,11 @@ class LiveStreamingService {
 
   async stopBroadcast(): Promise<void> {
     if (this._state === 'idle' || this._state === 'stopped') return;
+    // Must be set before anything else: a stop requested mid-reconnect
+    // (state 'reconnecting', a retry already scheduled via setTimeout)
+    // would otherwise still fire that pending retry after teardown.
+    this.intentionalStop = true;
+    if (this.reconnectTimer) { clearTimeout(this.reconnectTimer); this.reconnectTimer = null; }
     this.setState('stopped');
     this.stopStatsPolling();
 
@@ -313,6 +350,37 @@ class LiveStreamingService {
     this._state = 'idle';
     this.consecutiveIceTrickleFailures = 0;
     this.consecutiveStatsFailures = 0;
+  }
+
+  // ── Reconnection ────────────────────────────────────────────────────────────
+  // Only reached from connectionstatechange 'failed' (or an unexpected
+  // 'closed' not caused by stopBroadcast) - i.e. a connection that was
+  // already established and then dropped mid-broadcast (a real network
+  // interruption), not a setup-time failure like a permission denial or a
+  // bad WHIP response, which still fail immediately via connect()'s own
+  // catch block and are not retried (retrying those wastes the whole
+  // backoff window on an error that will never resolve itself).
+  private handleUnexpectedDisconnect(err: Error): void {
+    if (this.intentionalStop || !this.lastConfig) return;
+    if (__DEV__) console.warn('[liveStreamingService] unexpected disconnect, will attempt reconnect', err);
+    this.stopStatsPolling();
+    this.cleanup();
+    this.whipResourceUrl = null; // the ingest session died with the connection - nothing to DELETE
+
+    if (this.reconnectAttempts >= LiveStreamingService.MAX_RECONNECT_ATTEMPTS) {
+      this.setState('stopped');
+      this.emitError(new Error(`Connection lost. Unable to reconnect after multiple attempts (${err.message}).`));
+      return;
+    }
+
+    this.reconnectAttempts += 1;
+    this.setState('reconnecting');
+    const delay = LiveStreamingService.RECONNECT_BASE_DELAY_MS * 2 ** (this.reconnectAttempts - 1);
+    this.reconnectTimer = setTimeout(() => {
+      this.reconnectTimer = null;
+      if (this.intentionalStop || !this.lastConfig) return;
+      this.connect(this.lastConfig).catch((e: any) => this.handleUnexpectedDisconnect(e));
+    }, delay);
   }
 
   // ── Camera switching ────────────────────────────────────────────────────────

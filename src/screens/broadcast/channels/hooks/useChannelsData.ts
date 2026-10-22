@@ -19,9 +19,11 @@ import {
   channelPlaylistsEndpoint,
   channelSubscribeEndpoint,
   channelLiveStreamsEndpoint,
+  liveNowEndpoint,
   liveStreamDetailEndpoint,
   liveStreamEndEndpoint,
   liveStreamStartEndpoint,
+  liveStreamCancelEndpoint,
   channelContentCommentsEndpoint,
   channelAnalyticsEndpoint,
   channelCommentModerateEndpoint,
@@ -631,6 +633,7 @@ export const normalizeLiveStream = (item: any): BroadcastChannelLiveStream | nul
     playback_url: item.playback_url || item.playbackUrl || '',
     replay_url: item.replay_url || item.replayUrl || '',
     thumbnail_url: item.thumbnail_url || item.thumbnailUrl || '',
+    thumbnail_media_type: item.thumbnail_media_type || item.thumbnailMediaType || '',
     viewer_count: Number(item.viewer_count ?? item.viewerCount ?? 0),
     peak_viewer_count: Number(item.peak_viewer_count ?? item.peakViewerCount ?? 0),
     metadata: item.metadata && typeof item.metadata === 'object' ? item.metadata : {},
@@ -641,6 +644,13 @@ export const normalizeLiveStream = (item: any): BroadcastChannelLiveStream | nul
 
 export const fetchChannelLiveStreams = async (channelId: string): Promise<BroadcastChannelLiveStream[]> => {
   const response = await getRequest(`${channelLiveStreamsEndpoint(channelId)}${buildQuery({ limit: 24 })}`, { errorMessage: 'Unable to load live streams.' });
+  if (!response?.success) return [];
+  return unwrapRows(response.data || {}).map(normalizeLiveStream).filter(Boolean) as BroadcastChannelLiveStream[];
+};
+
+// C1 of the YouTube-parity batch: cross-channel "Live Now" discovery.
+export const fetchLiveNow = async (limit = 20): Promise<BroadcastChannelLiveStream[]> => {
+  const response = await getRequest(liveNowEndpoint(limit), { errorMessage: '' });
   if (!response?.success) return [];
   return unwrapRows(response.data || {}).map(normalizeLiveStream).filter(Boolean) as BroadcastChannelLiveStream[];
 };
@@ -663,6 +673,16 @@ export const startLiveStream = async (streamId: string): Promise<BroadcastChanne
 
 export const endLiveStream = async (streamId: string): Promise<BroadcastChannelLiveStream | null> => {
   const response = await postRequest(liveStreamEndEndpoint(streamId), {}, { errorMessage: 'Unable to end live stream.' });
+  return response?.success ? normalizeLiveStream(response.data) : null;
+};
+
+export const editLiveStream = async (streamId: string, payload: Record<string, any>): Promise<BroadcastChannelLiveStream | null> => {
+  const response = await patchRequest(liveStreamDetailEndpoint(streamId), payload, { errorMessage: 'Unable to edit live stream.' });
+  return response?.success ? normalizeLiveStream(response.data) : null;
+};
+
+export const cancelLiveStream = async (streamId: string): Promise<BroadcastChannelLiveStream | null> => {
+  const response = await postRequest(liveStreamCancelEndpoint(streamId), {}, { errorMessage: 'Unable to cancel live stream.' });
   return response?.success ? normalizeLiveStream(response.data) : null;
 };
 

@@ -87,6 +87,7 @@ export type KISIconName =
   | 'card'
   | 'gift'
   | 'warning'
+  | 'thumbs-down'
   | 'crown'
   | 'message'
   | 'lock'
@@ -330,6 +331,7 @@ const ion: IonMap = {
   card: { filled: 'card', outline: 'card-outline' },
   gift: { filled: 'gift', outline: 'gift-outline' },
   warning: { filled: 'warning', outline: 'warning-outline' },
+  'thumbs-down': { filled: 'thumbs-down', outline: 'thumbs-down-outline' },
   message: { filled: 'chatbubble-ellipses', outline: 'chatbubble-ellipses-outline' },
   lock: { filled: 'lock-closed', outline: 'lock-closed-outline' },
   list: { filled: 'list', outline: 'list-outline' },

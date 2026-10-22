@@ -2340,6 +2340,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     let joinLiveSub: { remove: () => void } | null = null;
     let leaveLiveSub: { remove: () => void } | null = null;
+    let reactionLiveSub: { remove: () => void } | null = null;
 
     const connect = async () => {
       const netState = await NetInfo.fetch().catch(() => null);
@@ -2500,13 +2501,33 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       const onChannelChatMessage = (payload: any) => DeviceEventEmitter.emit('channel.chat.message', payload);
       const onChannelContentPublished = (payload: any) => DeviceEventEmitter.emit('channel.content.published', payload);
       const onChannelSubscribed  = (payload: any) => DeviceEventEmitter.emit('channel.subscribed', payload);
+      // Added alongside channel.live.status_changed below - useChannelSocket.ts
+      // has listened for this since the chat-moderation batch added
+      // notify_live_chat_message_deleted on the Django side, but this
+      // socket-to-DeviceEventEmitter forwarder was never added here, so a
+      // moderator's delete never actually reached any viewer's screen in
+      // real time (REST history refetch was the only way it'd ever show up).
+      const onChannelChatMessageDeleted = (payload: any) => DeviceEventEmitter.emit('channel.chat.message_deleted', payload);
+      // C6 of the YouTube-parity batch: pushes a stream's live/ended status
+      // into the stream room so LiveWatchPage updates immediately instead
+      // of waiting on its next poll tick (see notify_live_stream_status_changed
+      // in apps/broadcasts/realtime.py).
+      const onChannelLiveStatusChanged = (payload: any) => DeviceEventEmitter.emit('channel.live.status_changed', payload);
+      // Inbound leg - the server echoes every reaction (including the
+      // sender's own) back to the whole stream room; LiveWatchPage filters
+      // out its own userId to avoid double-animating a tap it already
+      // animated locally and instantly, and only animates other viewers'.
+      const onChannelLiveReaction = (payload: any) => DeviceEventEmitter.emit('channel.live.reaction', payload);
 
       s.on('channel.live.started',      onChannelLiveStarted);
       s.on('channel.live.ended',        onChannelLiveEnded);
       s.on('channel.viewer.count',      onChannelViewerCount);
       s.on('channel.chat.message',      onChannelChatMessage);
+      s.on('channel.chat.message_deleted', onChannelChatMessageDeleted);
       s.on('channel.content.published', onChannelContentPublished);
       s.on('channel.subscribed',        onChannelSubscribed);
+      s.on('channel.live.status_changed', onChannelLiveStatusChanged);
+      s.on('channel.live.reaction',     onChannelLiveReaction);
 
       /* ── Scheduled message status changes (sent/failed/cancelled) — lets
        * the Scheduled Messages screen update live instead of polling. ── */
@@ -2519,6 +2540,13 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       });
       leaveLiveSub = DeviceEventEmitter.addListener('channel.live.leave', (p: any) => {
         if (s.connected) s.emit('channel.live.leave', p);
+      });
+      // D6 of the YouTube-parity batch: outbound leg of the ephemeral
+      // reaction burst - LiveWatchPage.tsx's sendReaction() emits this to
+      // animate the sender's own tap locally AND notify the server, same
+      // fire-and-forget shape as join/leave above.
+      reactionLiveSub = DeviceEventEmitter.addListener('channel.live.reaction.send', (p: any) => {
+        if (s.connected) s.emit('channel.live.reaction', p);
       });
 
       /* ── CALL EVENTS ── */
@@ -3557,6 +3585,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       audioRouteManager.stop();
       joinLiveSub?.remove();
       leaveLiveSub?.remove();
+      reactionLiveSub?.remove();
       if (socketRef.current) {
         socketRef.current.removeAllListeners();
         socketRef.current.disconnect();

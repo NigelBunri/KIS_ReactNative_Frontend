@@ -17,6 +17,7 @@ import React, {
 import {
   ActivityIndicator,
   Animated,
+  AppState,
   Image,
   Platform,
   Pressable,
@@ -30,13 +31,14 @@ import {
 } from 'react-native';
 import Video from 'react-native-video';
 import LinearGradient from 'react-native-linear-gradient';
-import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
+import { RouteProp, useIsFocused, useNavigation, useRoute } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { KISIcon } from '@/constants/kisIcons';
 import QrCodeShareModal from '@/components/common/QrCodeShareModal';
 import KISButton from '@/constants/KISButton';
-import { resolveBackendAssetUrl } from '@/network';
+import ROUTES, { resolveBackendAssetUrl } from '@/network';
+import { postRequest } from '@/network/post';
 import type { RootStackParamList } from '@/navigation/types';
 import { useKISTheme } from '@/theme/useTheme';
 import { useResponsiveLayout } from '@/theme/responsive';
@@ -117,6 +119,8 @@ function ScheduledOverlay({
   countdown,
   channelName,
   thumb,
+  waitVideoUrl,
+  waitVideoPaused,
   palette,
   styles,
 }: {
@@ -124,12 +128,29 @@ function ScheduledOverlay({
   countdown: string;
   channelName?: string;
   thumb?: string;
+  waitVideoUrl?: string | null;
+  waitVideoPaused?: boolean;
   palette: any;
   styles: any;
 }) {
   return (
     <View style={StyleSheet.absoluteFillObject}>
-      {thumb ? (
+      {waitVideoUrl ? (
+        // Broadcaster-set "wait" video: always playing/looping, never
+        // gated behind a tap-to-play control, right up until the stream
+        // flips to live (this overlay only renders while status is
+        // 'scheduled' - see the render-branch above). Muted since there's
+        // no audio mix with anything else on this screen yet.
+        <Video
+          source={{ uri: waitVideoUrl }}
+          style={StyleSheet.absoluteFillObject}
+          resizeMode="cover"
+          muted
+          repeat
+          controls={false}
+          paused={Boolean(waitVideoPaused)}
+        />
+      ) : thumb ? (
         <Image source={{ uri: thumb }} style={StyleSheet.absoluteFillObject} resizeMode="cover" />
       ) : (
         <LinearGradient
@@ -207,8 +228,19 @@ export default function LiveWatchPage() {
 
   const streamId: string = route.params?.streamId ?? route.params?.stream?.id ?? '';
 
-  const { stream, loading, viewerCount, chatMessages, sendChatMessage } =
+  const { stream, loading, viewerCount, chatMessages, lastReaction, sendChatMessage, deleteChatMessage, reportChatMessage, sendReaction: emitReaction } =
     useLiveStream(streamId);
+
+  // Reuses BroadcastChannelSummarySerializer.viewer_role (already computed
+  // server-side off the authenticated request, same field the channel
+  // detail screen's admin UI keys off of) rather than inventing a second,
+  // client-side ownership check - the backend endpoints this gates
+  // (ChannelLiveChatMessageModerationView, ChannelLiveChatBansView) are the
+  // real authorization boundary regardless; this only controls whether the
+  // Delete affordance appears in the long-press sheet.
+  const canModerateChat = ['owner', 'manager', 'moderator', 'staff'].includes(
+    stream?.channel?.viewer_role ?? '',
+  );
 
   const pinnedMessage = chatMessages.find(m => m.is_pinned) ?? null;
   const slowModeSecs: number = (stream?.metadata?.slow_mode_seconds as number) ?? 0;
@@ -216,9 +248,21 @@ export default function LiveWatchPage() {
 
   const countdown = useCountdown(stream?.scheduled_start_at);
 
+  const isWaitVideo = stream?.thumbnail_media_type === 'video';
+
+  // A static image: used both as the scheduled-screen background and the
+  // fallback/failed/ended-not-playing thumbnail elsewhere on this screen.
   const thumb = useMemo(
-    () => resolveBackendAssetUrl(stream?.thumbnail_url ?? ''),
-    [stream?.thumbnail_url],
+    () => (isWaitVideo ? '' : resolveBackendAssetUrl(stream?.thumbnail_url ?? '')),
+    [stream?.thumbnail_url, isWaitVideo],
+  );
+
+  // A looping "wait" video: scheduled-screen only (see ScheduledOverlay) -
+  // never used as the generic fallback thumbnail elsewhere on this screen,
+  // since those surfaces only ever render a static <Image>.
+  const waitVideoUrl = useMemo(
+    () => (isWaitVideo ? resolveBackendAssetUrl(stream?.thumbnail_url ?? '') : null),
+    [stream?.thumbnail_url, isWaitVideo],
   );
 
   // ── Player state ────────────────────────────────────────────────────────────
@@ -271,7 +315,10 @@ export default function LiveWatchPage() {
   const [floaters, setFloaters] = useState<FloatingEmoji[]>([]);
   const nextId = useRef(0);
 
-  const sendReaction = useCallback((emoji: string) => {
+  // Pure local animation - used both for this viewer's own tap (instant,
+  // no network round-trip needed to see your own reaction) and for an
+  // incoming reaction from someone else (lastReaction effect below).
+  const animateReaction = useCallback((emoji: string) => {
     const id = nextId.current++;
     const x = 20 + Math.random() * (SCREEN_W * 0.35);
     const anim = new Animated.Value(0);
@@ -281,11 +328,31 @@ export default function LiveWatchPage() {
     });
   }, [SCREEN_W]);
 
+  // Tap handler (D6 of the YouTube-parity batch): animates immediately,
+  // and separately notifies the server so every other viewer in the
+  // stream room sees the same burst (see channel.live.reaction in
+  // backend/Nestjs/src/realtime/handlers/live.ts) - previously this only
+  // ever animated on the tapping viewer's own screen.
+  const sendReaction = useCallback((emoji: string) => {
+    animateReaction(emoji);
+    emitReaction(emoji);
+  }, [animateReaction, emitReaction]);
+
+  useEffect(() => {
+    if (lastReaction) animateReaction(lastReaction.emoji);
+  }, [lastReaction, animateReaction]);
+
   // ── Share ───────────────────────────────────────────────────────────────────
   // No public URL was ever actually passed to Share.share here — previously
   // message-only, so the share sheet (and anything downstream of it, like a
-  // QR code) had nothing real to point at.
-  const streamShareUrl = streamId ? `https://kis.app/live/${streamId}` : '';
+  // QR code) had nothing real to point at. `kis.app` was also never a real
+  // deep-link domain - it isn't in NavigationContainer's `linking.prefixes`
+  // (App.tsx), so even with a route mapping this URL could never have
+  // opened the app at all. kingdomimpactventures.org is the real registered
+  // domain (same pattern BroadcastDetailScreen.tsx already uses for its own
+  // share URL), matched here by the new `LiveWatch: 'live/:streamId'` entry
+  // added to that same linking config.
+  const streamShareUrl = streamId ? `https://kingdomimpactventures.org/live/${streamId}` : '';
 
   const handleShare = useCallback(async () => {
     if (!stream) return;
@@ -297,6 +364,54 @@ export default function LiveWatchPage() {
   }, [stream, streamShareUrl]);
 
   const [showQr, setShowQr] = useState(false);
+
+  // Pauses playback (audio included) when this screen loses focus or the
+  // app backgrounds — same caller-owned useIsFocused()/AppState convention
+  // VideoPlayer.tsx's `externalPause` doc comment already establishes for
+  // BroadcastFeedVideoPreview.tsx/BroadcastDetailScreen.tsx. This screen
+  // uses react-native-video's <Video> directly rather than that wrapper,
+  // but was the one caller of player UI in this app with no focus/
+  // background gate at all — previously the HLS stream (audio included)
+  // kept playing after navigating away or backgrounding, exactly the bug
+  // that convention exists to prevent elsewhere.
+  const isFocused = useIsFocused();
+  const [appActive, setAppActive] = useState(AppState.currentState === 'active');
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (state) => {
+      setAppActive(state === 'active');
+    });
+    return () => sub.remove();
+  }, []);
+  const effectivePaused = paused || !isFocused || !appActive;
+
+  // Forces a clean <Video> remount to re-establish the HLS connection.
+  // Previously onError just set videoError and stopped — nothing ever
+  // retried, so a transient manifest/network blip left the viewer stuck on
+  // a permanent error card for the rest of the broadcast with no way back
+  // in short of leaving and re-entering the screen.
+  const [reloadKey, setReloadKey] = useState(0);
+  const handleRetryPlayback = useCallback(() => {
+    setVideoError(null);
+    setBuffering(true);
+    setReloadKey(k => k + 1);
+  }, []);
+
+  // E4 of the analytics batch: reports playback failures back to Django so
+  // they show up somewhere instead of only ever existing as this client-
+  // local retry. Fire-and-forget - never blocks the retry UX on it.
+  // "startup_failure" vs "playback_error" distinguishes a stream that never
+  // played at all from one that dropped mid-watch, mirroring this app's
+  // honesty bar elsewhere (don't conflate different failure shapes).
+  const hasLoadedOnceRef = useRef(false);
+  const reportPlaybackEvent = useCallback((reason: string) => {
+    if (!streamId) return;
+    const event = hasLoadedOnceRef.current ? 'playback_error' : 'startup_failure';
+    void postRequest(
+      ROUTES.broadcasts.liveStreamPlaybackEvent(streamId),
+      { event, reason: reason.slice(0, 300) },
+      { errorMessage: '' },
+    );
+  }, [streamId]);
 
   // ── Loading / initial state ─────────────────────────────────────────────────
   if (loading && !stream) {
@@ -321,10 +436,11 @@ export default function LiveWatchPage() {
       <Pressable style={StyleSheet.absoluteFillObject} onPress={showControls}>
         {playbackUrl ? (
           <Video
+            key={reloadKey}
             source={{ uri: playbackUrl }}
             style={StyleSheet.absoluteFillObject}
             resizeMode="cover"
-            paused={paused}
+            paused={effectivePaused}
             controls={false}
             repeat={false}
             bufferConfig={{
@@ -334,8 +450,12 @@ export default function LiveWatchPage() {
               bufferForPlaybackAfterRebufferMs: 2000,
             }}
             onBuffer={({ isBuffering }) => setBuffering(isBuffering)}
-            onError={(e) => setVideoError(e?.error?.localizedDescription ?? 'Playback error')}
-            onLoad={() => { setBuffering(false); setVideoError(null); }}
+            onLoad={() => { setBuffering(false); setVideoError(null); hasLoadedOnceRef.current = true; }}
+            onError={(e) => {
+              const reason = e?.error?.localizedDescription ?? 'Playback error';
+              setVideoError(reason);
+              reportPlaybackEvent(reason);
+            }}
           />
         ) : status === 'scheduled' ? (
           <ScheduledOverlay
@@ -343,6 +463,8 @@ export default function LiveWatchPage() {
             countdown={countdown}
             channelName={stream?.channel?.display_name}
             thumb={thumb || undefined}
+            waitVideoUrl={waitVideoUrl}
+            waitVideoPaused={effectivePaused}
             palette={palette}
             styles={styles}
           />
@@ -370,9 +492,14 @@ export default function LiveWatchPage() {
 
         {/* Video error */}
         {videoError && (
-          <View style={styles.bufferWrap} pointerEvents="none">
+          <View style={styles.bufferWrap} pointerEvents="box-none">
             <KISIcon name="warning" size={32} color={palette.ivory} />
             <Text style={styles.errorText}>{videoError}</Text>
+            <Pressable onPress={handleRetryPlayback} hitSlop={12}>
+              <Text style={[styles.errorText, { textDecorationLine: 'underline', marginTop: 8 }]}>
+                Tap to retry
+              </Text>
+            </Pressable>
           </View>
         )}
 
@@ -640,6 +767,9 @@ export default function LiveWatchPage() {
               disabled={!isLive}
               collapsed={!chatOpen}
               onToggleCollapse={() => setChatOpen(o => !o)}
+              canModerate={canModerateChat}
+              onDeleteMessage={deleteChatMessage}
+              onReportMessage={reportChatMessage}
             />
           )}
           {activePanel === 'polls' && streamId ? (

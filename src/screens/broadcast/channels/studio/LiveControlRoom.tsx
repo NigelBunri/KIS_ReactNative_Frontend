@@ -34,16 +34,22 @@ import {
   Text,
   View,
 } from 'react-native';
+import { launchImageLibrary } from 'react-native-image-picker';
 import { KISIcon } from '@/constants/kisIcons';
 import KISButton from '@/constants/KISButton';
 import KISTextInput from '@/constants/KISTextInput';
 import KISDateTimeInput from '@/constants/KISDateTimeInput';
 import { useKISTheme } from '@/theme/useTheme';
-import ROUTES from '@/network';
+import ROUTES, { CHAT_BASE_URL } from '@/network';
 import { getRequest } from '@/network/get';
+import { postRequest } from '@/network/post';
 import { deleteRequest } from '@/network/delete';
 import { patchRequest } from '@/network/patch';
+import { uploadFileToBackend } from '@/Module/ChatRoom/uploadFileToBackend';
+import { getAccessToken } from '@/security/authStorage';
 import {
+  cancelLiveStream,
+  editLiveStream,
   endLiveStream,
   fetchChannelLiveStreams,
   scheduleChannelLiveStream,
@@ -385,6 +391,7 @@ function BroadcasterPanel({
   const [healthStats, setHealthStats]   = useState<StreamHealthStats>(emptyStats);
   const [streamKey,   setStreamKey]     = useState('');
   const [keyLoading,  setKeyLoading]    = useState(false);
+  const [rotating,    setRotating]      = useState(false);
   const [switching,   setSwitching]     = useState(false);
   // liveStreamingService previously swallowed ICE-trickle/teardown/stats
   // failures with `.catch(() => {})` — a broadcaster could sit stuck on
@@ -437,6 +444,22 @@ function BroadcasterPanel({
     switchCamera,
   } = useLiveStream(stream.id);
 
+  // Reports publisher-side connection health back to Django (E3 of the
+  // analytics batch) - "good" is debounced to at most once per 15s since
+  // onStats ticks frequently, "error" always reports immediately since
+  // it's a discrete, notable event, not a steady-state tick.
+  const lastHealthReportAtRef = useRef(0);
+  const reportHealth = useCallback((healthStatus: 'good' | 'degraded' | 'error', detail?: string) => {
+    const now = Date.now();
+    if (healthStatus === 'good' && now - lastHealthReportAtRef.current < 15_000) return;
+    lastHealthReportAtRef.current = now;
+    void postRequest(
+      ROUTES.broadcasts.liveStreamHealth(stream.id),
+      { status: healthStatus, detail: detail || '' },
+      { errorMessage: '' },
+    );
+  }, [stream.id]);
+
   // Subscribe to service state + stats + errors
   useEffect(() => {
     const unsub1 = liveStreamingService.onStateChange(state => {
@@ -444,9 +467,13 @@ function BroadcasterPanel({
       // A fresh connection attempt shouldn't show a stale error banner.
       if (state === 'connecting' || state === 'live') setConnectionErrorMessage(null);
     });
-    const unsub2 = liveStreamingService.onStats(setHealthStats);
+    const unsub2 = liveStreamingService.onStats(stats => {
+      setHealthStats(stats);
+      reportHealth('good');
+    });
     const unsub3 = liveStreamingService.onError(err => {
       setConnectionErrorMessage(err?.message || 'A connection problem occurred.');
+      reportHealth('error', err?.message);
     });
     setServiceState(liveStreamingService.state);
     setHealthStats(liveStreamingService.stats);
@@ -459,15 +486,19 @@ function BroadcasterPanel({
       // liveStreamingService.state reads the singleton's current state
       // directly, not stale closure state, so this is accurate at the
       // actual moment of unmount.
-      if (liveStreamingService.state === 'live' || liveStreamingService.state === 'connecting') {
+      if (['live', 'connecting', 'reconnecting'].includes(liveStreamingService.state)) {
         void liveStreamingService.stopBroadcast();
       }
     };
-  }, []);
+  }, [reportHealth]);
 
-  // Fetch stream key for RTMP/OBS section
+  // Fetch stream key for RTMP/OBS section. Previously guarded on `streamKey`
+  // too, which meant that once a key was loaded, the button's onPress was a
+  // permanent no-op — tapping "Stream key loaded" again looked actionable
+  // (not disabled) but silently did nothing, with no way to re-fetch from
+  // this screen at all.
   const fetchStreamKey = useCallback(async () => {
-    if (keyLoading || streamKey) return;
+    if (keyLoading) return;
     setKeyLoading(true);
     try {
       const res = await getRequest(
@@ -480,7 +511,42 @@ function BroadcasterPanel({
     } finally {
       setKeyLoading(false);
     }
-  }, [stream.id, keyLoading, streamKey]);
+  }, [stream.id, keyLoading]);
+
+  // Rotate the stream key: invalidates whatever's currently pasted into
+  // OBS, so this is a destructive confirm, not a plain button press.
+  // Server-side blocks this while status === 'live' (no supported
+  // encoder client can swap keys mid-broadcast) - this check is a UX
+  // short-circuit for that same rule, not the actual enforcement.
+  const rotateStreamKey = useCallback(() => {
+    if (rotating || stream.status === 'live') return;
+    Alert.alert(
+      'Rotate stream key?',
+      'The current key will stop working immediately. Anything already set up in OBS will need the new key pasted in.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Rotate',
+          style: 'destructive',
+          onPress: async () => {
+            setRotating(true);
+            try {
+              const res = await postRequest(
+                ROUTES.broadcasts.liveStreamStreamKeyRotate(stream.id),
+                {},
+                { errorMessage: 'Unable to rotate stream key.' },
+              );
+              if (res?.success) {
+                setStreamKey(String(res.data?.stream_key ?? ''));
+              }
+            } finally {
+              setRotating(false);
+            }
+          },
+        },
+      ],
+    );
+  }, [stream.id, stream.status, rotating]);
 
   // Go live (WebRTC/WHIP from device camera)
   const handleGoLive = useCallback(() => {
@@ -555,6 +621,7 @@ function BroadcasterPanel({
 
   const isDeviceLive    = serviceState === 'live';
   const isConnecting    = serviceState === 'connecting';
+  const isReconnecting  = serviceState === 'reconnecting';
   const ingestUrl       = stream.ingest_url ?? '';
 
   return (
@@ -562,7 +629,7 @@ function BroadcasterPanel({
       {/* Non-blocking connection diagnostics banner — previously these
           failures were swallowed silently and the broadcaster had no way
           to know why they were stuck on "CONNECTING". */}
-      {connectionErrorMessage && (isDeviceLive || isConnecting) && (
+      {connectionErrorMessage && (isDeviceLive || isConnecting || isReconnecting) && (
         <View
           style={{
             flexDirection: 'row',
@@ -593,7 +660,7 @@ function BroadcasterPanel({
       )}
 
       {/* Health bar (when device is broadcasting) */}
-      {(isDeviceLive || isConnecting) && (
+      {(isDeviceLive || isConnecting || isReconnecting) && (
         <StreamHealthBar
           stats={healthStats}
           viewerCount={viewerCount}
@@ -616,7 +683,7 @@ function BroadcasterPanel({
       {/* Device broadcast controls */}
       {webRTCStreamingAvailable && (
         <View style={styles.deviceRow}>
-          {!isDeviceLive && !isConnecting ? (
+          {!isDeviceLive && !isConnecting && !isReconnecting ? (
             <KISButton
               variant="danger"
               title="Go Live from Device"
@@ -626,13 +693,13 @@ function BroadcasterPanel({
           ) : (
             <>
               <View style={[styles.liveIndicator, { backgroundColor: `${palette.danger}22` }]}>
-                {isConnecting ? (
+                {isConnecting || isReconnecting ? (
                   <ActivityIndicator size="small" color={palette.danger} />
                 ) : (
                   <View style={[styles.liveDot, { backgroundColor: palette.danger }]} />
                 )}
                 <Text style={[styles.liveIndicatorText, { color: palette.danger }]}>
-                  {isConnecting ? 'Connecting…' : 'LIVE from device'}
+                  {isReconnecting ? 'Reconnecting…' : isConnecting ? 'Connecting…' : 'LIVE from device'}
                 </Text>
               </View>
               {isDeviceLive && (
@@ -655,10 +722,22 @@ function BroadcasterPanel({
       <KISButton
         variant="outline"
         onPress={fetchStreamKey}
-        title={keyLoading ? 'Loading…' : streamKey ? 'Stream key loaded' : 'Load stream key for OBS'}
+        disabled={keyLoading}
+        title={keyLoading ? 'Loading…' : streamKey ? 'Reload stream key for OBS' : 'Load stream key for OBS'}
         left={<KISIcon name="key" size={14} color={palette.primaryStrong} />}
         right={keyLoading ? <ActivityIndicator size="small" color={palette.primaryStrong} /> : undefined}
       />
+
+      {streamKey && stream.status !== 'live' && (
+        <KISButton
+          variant="ghost"
+          onPress={rotateStreamKey}
+          disabled={rotating}
+          title={rotating ? 'Rotating…' : 'Rotate stream key'}
+          left={<KISIcon name="refresh" size={14} color={palette.subtext} />}
+          right={rotating ? <ActivityIndicator size="small" color={palette.subtext} /> : undefined}
+        />
+      )}
 
       {(ingestUrl || streamKey) && (
         <OBSGuide
@@ -733,10 +812,37 @@ export default function LiveControlRoom({ channel, onOpenWatch }: Props) {
   const [streams,    setStreams]    = useState<BroadcastChannelLiveStream[]>([]);
   const [loading,    setLoading]    = useState(false);
   const [saving,     setSaving]     = useState(false);
+  const [editingStreamId, setEditingStreamId] = useState<string | null>(null);
   const [title,      setTitle]      = useState('');
   const [scheduledAt, setScheduledAt] = useState('');
   const [description, setDescription] = useState('');
+  // The "wait" asset shown to viewers on the pre-live screen before this
+  // scheduled stream goes live — either a static image or an always-playing
+  // looping video. Leaving both blank falls back to the viewer's default
+  // loading screen (LiveWatchPage.tsx), unchanged from today.
+  const [waitMediaUrl, setWaitMediaUrl] = useState('');
+  const [waitMediaType, setWaitMediaType] = useState<'image' | 'video' | ''>('');
+  const [waitMediaUploading, setWaitMediaUploading] = useState(false);
   const [activeId,   setActiveId]   = useState<string | null>(null);
+  // Guards Start/End against duplicate requests for the same stream — e.g.
+  // a slow network leaving the button tappable long enough for a second
+  // tap (new Alert → confirm) to fire a second startLiveStream/endLiveStream
+  // call before the first one resolves. Keyed by stream id since several
+  // stream cards can be mid-action independently.
+  const [pendingIds, setPendingIds] = useState<Set<string>>(new Set());
+
+  const withPending = useCallback(async (streamId: string, action: () => Promise<void>) => {
+    setPendingIds(prev => new Set(prev).add(streamId));
+    try {
+      await action();
+    } finally {
+      setPendingIds(prev => {
+        const next = new Set(prev);
+        next.delete(streamId);
+        return next;
+      });
+    }
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -759,10 +865,88 @@ export default function LiveControlRoom({ channel, onOpenWatch }: Props) {
     [streams],
   );
 
+  const handlePickWaitMedia = useCallback(async () => {
+    if (waitMediaUploading) return;
+    const picked = await launchImageLibrary({ mediaType: 'mixed', selectionLimit: 1, quality: 0.9 });
+    if (picked.didCancel) return;
+    const asset = picked.assets?.[0];
+    if (!asset?.uri) return;
+    const mediaType: 'image' | 'video' = String(asset.type || '').startsWith('video/') ? 'video' : 'image';
+    const token = await getAccessToken();
+    if (!token) { Alert.alert('Not signed in', 'Please log in again.'); return; }
+    try {
+      setWaitMediaUploading(true);
+      const uploaded = await uploadFileToBackend({
+        file: {
+          uri: asset.uri,
+          name: asset.fileName ?? (mediaType === 'video' ? 'live-wait.mp4' : 'live-wait.jpg'),
+          type: asset.type ?? (mediaType === 'video' ? 'video/mp4' : 'image/jpeg'),
+          size: asset.fileSize,
+          durationMs: asset.duration ? asset.duration * 1000 : undefined,
+        },
+        authToken: token,
+        baseUrl: CHAT_BASE_URL,
+        context: 'broadcast_live_wait_media',
+      });
+      setWaitMediaUrl(uploaded.url);
+      setWaitMediaType(mediaType);
+    } catch (err: any) {
+      Alert.alert('Upload failed', err?.message || 'Unable to upload wait image/video.');
+    } finally {
+      setWaitMediaUploading(false);
+    }
+  }, [waitMediaUploading]);
+
+  const handleClearWaitMedia = useCallback(() => {
+    setWaitMediaUrl('');
+    setWaitMediaType('');
+  }, []);
+
+  const updateStream = useCallback((next: BroadcastChannelLiveStream | null) => {
+    if (!next) return;
+    setStreams(prev => prev.map(s => s.id === next.id ? next : s));
+  }, []);
+
+  const resetForm = useCallback(() => {
+    setEditingStreamId(null);
+    setTitle('');
+    setDescription('');
+    setScheduledAt('');
+    setWaitMediaUrl('');
+    setWaitMediaType('');
+  }, []);
+
+  const handleEditPress = useCallback((stream: BroadcastChannelLiveStream) => {
+    setEditingStreamId(stream.id);
+    setTitle(stream.title || '');
+    setDescription(stream.description || '');
+    setScheduledAt(stream.scheduled_start_at || '');
+    setWaitMediaUrl(stream.thumbnail_url || '');
+    setWaitMediaType((stream.thumbnail_media_type as 'image' | 'video' | '') || '');
+  }, []);
+
   const handleSchedule = useCallback(async () => {
     if (!title.trim()) return;
     setSaving(true);
     try {
+      if (editingStreamId) {
+        // editLiveStream resolves null (never throws) on failure — same
+        // silent-no-op risk the create path below already guards against.
+        const next = await editLiveStream(editingStreamId, {
+          title:        title.trim(),
+          description:  description.trim(),
+          scheduled_start_at: scheduledAt.trim() || undefined,
+          thumbnail_url: waitMediaUrl || undefined,
+          thumbnail_media_type: waitMediaUrl ? waitMediaType : undefined,
+        });
+        if (next) {
+          setStreams(prev => prev.map(s => s.id === next.id ? next : s));
+          resetForm();
+        } else {
+          Alert.alert('Could not save changes', 'Please check the details and try again.');
+        }
+        return;
+      }
       // scheduleChannelLiveStream resolves null (never throws) on failure —
       // without an else branch here, a failed schedule attempt just left
       // the form filled in with zero feedback that nothing was saved.
@@ -770,28 +954,45 @@ export default function LiveControlRoom({ channel, onOpenWatch }: Props) {
         title:        title.trim(),
         description:  description.trim(),
         scheduled_start_at: scheduledAt.trim() || undefined,
+        thumbnail_url: waitMediaUrl || undefined,
+        thumbnail_media_type: waitMediaUrl ? waitMediaType : undefined,
       });
       if (next) {
         setStreams(prev => [next, ...prev]);
-        setTitle('');
-        setDescription('');
-        setScheduledAt('');
+        resetForm();
       } else {
         Alert.alert('Could not schedule stream', 'Please check the details and try again.');
       }
     } finally {
       setSaving(false);
     }
-  }, [channel.id, description, scheduledAt, title]);
+  }, [channel.id, description, editingStreamId, resetForm, scheduledAt, title, waitMediaUrl, waitMediaType]);
 
-  const updateStream = useCallback((next: BroadcastChannelLiveStream | null) => {
-    if (!next) return;
-    setStreams(prev => prev.map(s => s.id === next.id ? next : s));
-  }, []);
+  const handleCancelStream = useCallback((stream: BroadcastChannelLiveStream) => {
+    if (pendingIds.has(stream.id)) return;
+    Alert.alert('Cancel this stream?', `"${stream.title}" will be removed from the schedule. This cannot be undone.`, [
+      { text: 'Keep it', style: 'cancel' },
+      {
+        text: 'Cancel stream',
+        style: 'destructive',
+        onPress: () => {
+          void withPending(stream.id, async () => {
+            const next = await cancelLiveStream(stream.id);
+            if (next) {
+              updateStream(next);
+              if (editingStreamId === stream.id) resetForm();
+            } else {
+              Alert.alert('Could not cancel stream', 'Please try again.');
+            }
+          });
+        },
+      },
+    ]);
+  }, [editingStreamId, pendingIds, resetForm, updateStream, withPending]);
 
   const handleStart = useCallback((stream: BroadcastChannelLiveStream) => {
-    if (stream.status === 'live') {
-      Alert.alert('Already live');
+    if (stream.status === 'live' || pendingIds.has(stream.id)) {
+      if (stream.status === 'live') Alert.alert('Already live');
       return;
     }
     Alert.alert(
@@ -802,11 +1003,12 @@ export default function LiveControlRoom({ channel, onOpenWatch }: Props) {
         {
           text: 'Start',
           onPress: () => {
-            // startLiveStream resolves null (never throws) on failure —
-            // piping straight into updateStream (a no-op on null) meant a
-            // failed "Start" tap did nothing with zero feedback that the
-            // stream never actually went live.
-            void startLiveStream(stream.id).then(next => {
+            void withPending(stream.id, async () => {
+              // startLiveStream resolves null (never throws) on failure —
+              // piping straight into updateStream (a no-op on null) meant a
+              // failed "Start" tap did nothing with zero feedback that the
+              // stream never actually went live.
+              const next = await startLiveStream(stream.id);
               if (next) {
                 updateStream(next);
               } else {
@@ -817,7 +1019,30 @@ export default function LiveControlRoom({ channel, onOpenWatch }: Props) {
         },
       ],
     );
-  }, [updateStream]);
+  }, [updateStream, withPending, pendingIds]);
+
+  const handleEnd = useCallback((stream: BroadcastChannelLiveStream) => {
+    if (pendingIds.has(stream.id)) return;
+    Alert.alert('End stream?', `"${stream.title}" will end for all viewers.`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'End',
+        style: 'destructive',
+        onPress: () => {
+          void withPending(stream.id, async () => {
+            // endLiveStream resolves null (never throws) on failure — same
+            // silent-no-op risk as handleStart above.
+            const next = await endLiveStream(stream.id);
+            if (next) {
+              updateStream(next);
+            } else {
+              Alert.alert('Could not end stream', 'Please try again.');
+            }
+          });
+        },
+      },
+    ]);
+  }, [updateStream, withPending, pendingIds]);
 
   return (
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
@@ -840,7 +1065,14 @@ export default function LiveControlRoom({ channel, onOpenWatch }: Props) {
 
       {/* Schedule form */}
       <View style={[styles.form, { borderColor: palette.border }]}>
-        <Text style={[styles.sectionLabel, { color: palette.subtext }]}>Schedule a new stream</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+          <Text style={[styles.sectionLabel, { color: palette.subtext }]}>
+            {editingStreamId ? 'Edit scheduled stream' : 'Schedule a new stream'}
+          </Text>
+          {editingStreamId ? (
+            <KISButton variant="ghost" size="xs" title="Cancel edit" onPress={resetForm} />
+          ) : null}
+        </View>
         <KISTextInput label="Title" value={title} onChangeText={setTitle} />
         <KISDateTimeInput
           label="Scheduled start (optional)"
@@ -856,11 +1088,39 @@ export default function LiveControlRoom({ channel, onOpenWatch }: Props) {
           multiline
           style={{ minHeight: 64 }}
         />
+        <Text style={[styles.sectionLabel, { color: palette.subtext, marginTop: 4 }]}>
+          Wait screen (optional)
+        </Text>
+        <Text style={[styles.panelSubtitle, { color: palette.subtext, marginBottom: 6 }]}>
+          Shown to viewers before you go live. Pick an image, or a video that will
+          play on a continuous loop until start time — if you don't set one, the
+          default loading screen is shown instead.
+        </Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+          <KISButton
+            variant="secondary"
+            disabled={waitMediaUploading}
+            loading={waitMediaUploading}
+            onPress={handlePickWaitMedia}
+            title={waitMediaUrl ? 'Replace wait image/video' : 'Pick wait image/video'}
+            left={<KISIcon name="image" size={15} color={palette.primaryStrong} />}
+          />
+          {waitMediaUrl ? (
+            <KISButton variant="ghost" onPress={handleClearWaitMedia} accessibilityLabel="Remove wait image/video">
+              <KISIcon name="close" size={16} color={palette.subtext} />
+            </KISButton>
+          ) : null}
+        </View>
+        {waitMediaUrl ? (
+          <Text style={[styles.panelSubtitle, { color: palette.subtext }]}>
+            {waitMediaType === 'video' ? 'Video selected — will loop continuously.' : 'Image selected.'}
+          </Text>
+        ) : null}
         <KISButton
-          disabled={saving || !title.trim()}
+          disabled={saving || !title.trim() || waitMediaUploading}
           loading={saving}
           onPress={handleSchedule}
-          title="Schedule stream"
+          title={editingStreamId ? 'Save changes' : 'Schedule stream'}
           left={<KISIcon name="calendar" size={15} color={palette.onPrimary} />}
         />
       </View>
@@ -924,10 +1184,35 @@ export default function LiveControlRoom({ channel, onOpenWatch }: Props) {
                   onPress={() => onOpenWatch?.(stream)}
                 />
 
+                {stream.status === 'scheduled' && (
+                  <KISButton
+                    size="xs"
+                    variant="outline"
+                    title="Edit"
+                    disabled={pendingIds.has(stream.id)}
+                    left={<KISIcon name="edit" size={13} color={palette.subtext} />}
+                    onPress={() => handleEditPress(stream)}
+                  />
+                )}
+
+                {stream.status === 'scheduled' && (
+                  <KISButton
+                    size="xs"
+                    variant="outline"
+                    title="Cancel"
+                    loading={pendingIds.has(stream.id)}
+                    disabled={pendingIds.has(stream.id)}
+                    left={<KISIcon name="close" size={13} color={palette.subtext} />}
+                    onPress={() => handleCancelStream(stream)}
+                  />
+                )}
+
                 {stream.status !== 'live' && (
                   <KISButton
                     size="xs"
                     title="Start"
+                    loading={pendingIds.has(stream.id)}
+                    disabled={pendingIds.has(stream.id)}
                     left={<KISIcon name="play" size={13} color={palette.onPrimary} />}
                     onPress={() => handleStart(stream)}
                   />
@@ -938,28 +1223,10 @@ export default function LiveControlRoom({ channel, onOpenWatch }: Props) {
                     size="xs"
                     variant="danger"
                     title="End"
+                    loading={pendingIds.has(stream.id)}
+                    disabled={pendingIds.has(stream.id)}
                     left={<KISIcon name="square" size={13} color={palette.onPrimary} />}
-                    onPress={() =>
-                      Alert.alert('End stream?', `"${stream.title}" will end for all viewers.`, [
-                        { text: 'Cancel', style: 'cancel' },
-                        {
-                          text: 'End',
-                          style: 'destructive',
-                          onPress: () => {
-                            // endLiveStream resolves null (never throws) on
-                            // failure — same silent-no-op risk as
-                            // handleStart above.
-                            void endLiveStream(stream.id).then(next => {
-                              if (next) {
-                                updateStream(next);
-                              } else {
-                                Alert.alert('Could not end stream', 'Please try again.');
-                              }
-                            });
-                          },
-                        },
-                      ])
-                    }
+                    onPress={() => handleEnd(stream)}
                   />
                 )}
               </View>

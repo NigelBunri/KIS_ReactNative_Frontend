@@ -206,6 +206,7 @@ import {
   LanguageSelectorCard,
   MarketplaceOrdersSummary,
   PartnerOrganizationSummary,
+  ProfileHeroBackdrop,
   ProfileHeroCard,
   ProfileSnapshotCard,
   type ProfileSnapshotTile,
@@ -2657,9 +2658,14 @@ export default function ProfileScreen() {
   );
 
   useGoldenSectionContent({
+    backdrop: (
+      <ProfileHeroBackdrop
+        coverUrl={c.profile?.profile?.cover_url}
+        scrollY={profileHeaderY}
+      />
+    ),
     content: (
       <ProfileHeroCard
-        coverUrl={c.profile?.profile?.cover_url}
         avatarUrl={appendCacheBust(c.profile?.profile?.avatar_url, c.avatarVersion)}
         workStatus={workStatus}
         displayName={profileDisplayName}

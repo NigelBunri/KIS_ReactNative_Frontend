@@ -7,6 +7,7 @@ import CommentThreadPanel from '@/components/feeds/CommentThreadPanel';
 import { useResponsiveLayout } from '@/theme/responsive';
 import { KISIcon } from '@/constants/kisIcons';
 import UserBadgeRow from '@/components/common/UserBadgeRow';
+import WorkStatusRing from '@/components/common/WorkStatusRing';
 import KISText from '@/components/common/KISText';
 import { resolveBackendAssetUrl } from '@/network';
 import RichTextRenderer from '@/components/feeds/RichTextRenderer';
@@ -363,16 +364,26 @@ export default function BroadcastFeedCard({
       shadowColor: palette.goldDeep ?? '#000',
     },
   ];
+  const avatarSize = compact ? 36 : 44;
+  const avatarContent = isGoAuthor ? (
+    <Image source={fallbackAvatar} style={avatarSizeStyle} />
+  ) : resolvedAvatarUri ? (
+    <Image source={{ uri: resolvedAvatarUri }} style={avatarSizeStyle} />
+  ) : (
+    <View style={[avatarSizeStyle, styles.avatarEmojiWrap]}>
+      <Text style={{ fontSize: compact ? 16 : 20 }}>{placeholderEmoji}</Text>
+    </View>
+  );
   const headerBlock = (
       <View style={styles.headerRow}>
-        {isGoAuthor ? (
-          <Image source={fallbackAvatar} style={avatarSizeStyle} />
-        ) : resolvedAvatarUri ? (
-          <Image source={{ uri: resolvedAvatarUri }} style={avatarSizeStyle} />
+        {/* Only real people (not channels/communities/partners/Go) get the
+            work-status ring - an org avatar has no individual work status. */}
+        {isUserSource && !isGoAuthor ? (
+          <WorkStatusRing size={avatarSize} workStatus={(item.author as any)?.work_status}>
+            {avatarContent}
+          </WorkStatusRing>
         ) : (
-          <View style={[avatarSizeStyle, styles.avatarEmojiWrap]}>
-            <Text style={{ fontSize: compact ? 16 : 20 }}>{placeholderEmoji}</Text>
-          </View>
+          avatarContent
         )}
 
         <View style={{ flex: 1 }}>

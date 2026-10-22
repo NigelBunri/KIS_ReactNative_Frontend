@@ -36,6 +36,7 @@ import {
   getAttachmentPreviewInfo,
 } from '@/components/broadcast/attachmentPreview';
 import { isUserBroadcastSource } from '@/components/broadcast/authorProfileUtils';
+import WorkStatusRing from '@/components/common/WorkStatusRing';
 import { getFeedPlainText } from '@/components/feeds/richTextValue';
 
 type Item = Record<string, any>;
@@ -286,10 +287,19 @@ function FeedFullScreenCard({
                 accessibilityRole="button"
                 accessibilityLabel={displayName ? `View ${displayName}'s profile` : 'View profile'}
               >
-                <Image
-                  source={authorAvatarUri ? { uri: authorAvatarUri } : fallbackAvatar}
-                  style={[styles.avatar, { borderColor: palette.ivory }]}
-                />
+                {isUserSource ? (
+                  <WorkStatusRing size={42} workStatus={(item.author as any)?.work_status}>
+                    <Image
+                      source={authorAvatarUri ? { uri: authorAvatarUri } : fallbackAvatar}
+                      style={[styles.avatar, { borderColor: palette.ivory }]}
+                    />
+                  </WorkStatusRing>
+                ) : (
+                  <Image
+                    source={authorAvatarUri ? { uri: authorAvatarUri } : fallbackAvatar}
+                    style={[styles.avatar, { borderColor: palette.ivory }]}
+                  />
+                )}
                 {canSubscribe ? (
                   <Pressable
                     onPress={() => onSubscribe?.(item)}

@@ -128,6 +128,7 @@ export type BroadcastChannelLiveStream = {
   playback_url?: string;
   replay_url?: string;
   thumbnail_url?: string;
+  thumbnail_media_type?: 'image' | 'video' | '' | string;
   viewer_count?: number;
   peak_viewer_count?: number;
   metadata?: Record<string, any>;

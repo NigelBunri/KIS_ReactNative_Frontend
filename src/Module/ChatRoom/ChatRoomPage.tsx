@@ -127,6 +127,7 @@ import { normalizeChatDisplayText, normalizeChatSendText } from './safeChatText'
 import { useRawTopInset } from '@/hooks/useSafeTopInset';
 import { dismissNotificationsForConversation } from '@/services/pushNotificationDismissal';
 import { refreshFromDeviceAndBackend, type KISContact } from '@/Module/AddContacts/contactsService';
+import WorkStatusRing from '@/components/common/WorkStatusRing';
 
 /* -------------------------------------------------------------------------- */
 /*                                   HELPERS                                  */
@@ -619,7 +620,7 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
   const composerViewOnceRef = useRef(false);
 
   // member.tap popup (group sender avatar/name tap)
-  const [memberTap, setMemberTap] = useState<{ userId?: string; name: string; avatarUrl?: string } | null>(null);
+  const [memberTap, setMemberTap] = useState<{ userId?: string; name: string; avatarUrl?: string; workStatus?: string } | null>(null);
 
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const typingDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -2631,7 +2632,7 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
 
   useEffect(() => {
     const sub = DeviceEventEmitter.addListener('member.tap', (payload: any) => {
-      setMemberTap({ userId: payload?.userId, name: String(payload?.name ?? ''), avatarUrl: payload?.avatarUrl });
+      setMemberTap({ userId: payload?.userId, name: String(payload?.name ?? ''), avatarUrl: payload?.avatarUrl, workStatus: payload?.workStatus });
     });
     return () => { sub.remove(); };
   }, []);
@@ -2969,15 +2970,17 @@ export const ChatRoomPage: React.FC<ExtendedChatRoomPageProps> = ({
             <Pressable onPress={() => {}} style={{ width: 280, borderRadius: 20, overflow: 'hidden', backgroundColor: palette.card }}>
               {/* Avatar */}
               <View style={{ alignItems: 'center', paddingTop: 28, paddingBottom: 16, backgroundColor: palette.surface }}>
-                <View style={{ width: 72, height: 72, borderRadius: 36, overflow: 'hidden', backgroundColor: `${palette.primary}33`, alignItems: 'center', justifyContent: 'center' }}>
-                  {memberTap.avatarUrl ? (
-                    <Image source={{ uri: memberTap.avatarUrl }} style={{ width: 72, height: 72 }} resizeMode="cover" />
-                  ) : (
-                    <Text style={{ fontSize: 26, fontWeight: '700', color: palette.primary }}>
-                      {(memberTap.name ?? '').trim().split(' ').map((w: string) => w[0]).slice(0, 2).join('').toUpperCase()}
-                    </Text>
-                  )}
-                </View>
+                <WorkStatusRing size={72} workStatus={memberTap.workStatus}>
+                  <View style={{ width: 72, height: 72, borderRadius: 36, overflow: 'hidden', backgroundColor: `${palette.primary}33`, alignItems: 'center', justifyContent: 'center' }}>
+                    {memberTap.avatarUrl ? (
+                      <Image source={{ uri: memberTap.avatarUrl }} style={{ width: 72, height: 72 }} resizeMode="cover" />
+                    ) : (
+                      <Text style={{ fontSize: 26, fontWeight: '700', color: palette.primary }}>
+                        {(memberTap.name ?? '').trim().split(' ').map((w: string) => w[0]).slice(0, 2).join('').toUpperCase()}
+                      </Text>
+                    )}
+                  </View>
+                </WorkStatusRing>
                 <Text style={{ marginTop: 10, fontSize: 16, fontWeight: '700', color: palette.text }} numberOfLines={1}>{memberTap.name}</Text>
               </View>
 

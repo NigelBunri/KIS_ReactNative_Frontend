@@ -15,14 +15,14 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { KISIcon } from '@/constants/kisIcons';
 import { useKISTheme } from '@/theme/useTheme';
 import { useResponsiveLayout } from '@/theme/responsive';
-import { useChannelsData } from '@/screens/broadcast/channels/hooks/useChannelsData';
+import { useChannelsData, fetchLiveNow } from '@/screens/broadcast/channels/hooks/useChannelsData';
 import {
   fetchSocialRecommendationFoundation,
   type RecommendationItem,
   type SocialRecommendationFoundation,
 } from '@/services/socialRecommendationService';
 import type { RootStackParamList } from '@/navigation/types';
-import type { BroadcastChannelSummary } from '@/screens/broadcast/channels/api/channels.types';
+import type { BroadcastChannelSummary, BroadcastChannelLiveStream } from '@/screens/broadcast/channels/api/channels.types';
 import { useSafeTopInset } from '@/hooks/useSafeTopInset';
 import ChannelAvatar from '@/components/broadcast/ChannelAvatar';
 
@@ -171,6 +171,73 @@ function FeaturedChannelCard({
   );
 }
 
+// C1 of the YouTube-parity batch: a dedicated "Live Now" rail - previously
+// live streams only surfaced inside the general content feed, with no
+// cross-channel discovery surface specifically for "what's live right now".
+function LiveNowCard({
+  stream,
+  onOpen,
+}: {
+  stream: BroadcastChannelLiveStream;
+  onOpen: (stream: BroadcastChannelLiveStream) => void;
+}) {
+  const { palette } = useKISTheme();
+  const responsive = useResponsiveLayout();
+  const compact = responsive.isWatch || responsive.isCompactPhone;
+  const cardWidth = compact ? Math.max(180, responsive.width - responsive.pageGutter * 3.5) : 220;
+  const thumb = stream.thumbnail_url || stream.channel?.avatar_url;
+
+  return (
+    <Pressable
+      onPress={() => onOpen(stream)}
+      style={({ pressed }) => [
+        styles.featuredCard,
+        {
+          backgroundColor: palette.surface,
+          borderColor: palette.goldMuted ?? palette.border,
+          width: cardWidth,
+          opacity: pressed ? 0.92 : 1,
+        },
+      ]}
+    >
+      <View style={styles.bannerWrap}>
+        {thumb ? (
+          <Image source={{ uri: thumb }} style={StyleSheet.absoluteFillObject} resizeMode="cover" />
+        ) : (
+          <View style={[StyleSheet.absoluteFillObject, { backgroundColor: palette.royalInk }]} />
+        )}
+        <LinearGradient
+          colors={['transparent', palette.overlay]}
+          style={[StyleSheet.absoluteFillObject, { top: '40%' }]}
+        />
+        <View style={styles.bannerTopRight}>
+          <View style={[styles.livePill, { backgroundColor: palette.danger }]}>
+            <View style={[styles.liveDot, { backgroundColor: palette.ivory }]} />
+            <Text style={[styles.livePillText, { color: palette.ivory }]}>LIVE</Text>
+          </View>
+        </View>
+        <View style={[styles.bannerSubCount, { backgroundColor: palette.overlay }]}>
+          <KISIcon name="person" size={11} color={palette.ivory} />
+          <Text style={[styles.bannerSubCountText, { color: palette.ivory }]}>
+            {compactNumber(stream.viewer_count)} watching
+          </Text>
+        </View>
+        <View style={styles.avatarLift}>
+          <ChannelAvatar channel={stream.channel ?? ({} as BroadcastChannelSummary)} size={compact ? 46 : 52} />
+        </View>
+      </View>
+      <View style={[styles.featuredBody, { paddingTop: compact ? 32 : 38 }]}>
+        <Text numberOfLines={1} style={[styles.featuredTitle, { color: palette.text, fontSize: compact ? 13 : 15 }]}>
+          {stream.title}
+        </Text>
+        <Text numberOfLines={1} style={[styles.handleText, { color: palette.subtext }]}>
+          {stream.channel?.display_name ?? ''}
+        </Text>
+      </View>
+    </Pressable>
+  );
+}
+
 function ChannelListRow({
   channel,
   onOpen,
@@ -289,6 +356,12 @@ export default function ChannelsDiscoverPage({ searchTerm = '', searchContext = 
   const compact = responsive.isWatch || responsive.isCompactPhone;
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [recommendations, setRecommendations] = useState<SocialRecommendationFoundation | null>(null);
+  const [liveNow, setLiveNow] = useState<BroadcastChannelLiveStream[]>([]);
+  useEffect(() => {
+    let mounted = true;
+    void fetchLiveNow(20).then(rows => { if (mounted) setLiveNow(rows); });
+    return () => { mounted = false; };
+  }, []);
   const activeCategory = searchContext || 'all';
   const { channels, loading, refreshing, error, loadMore } = useChannelsData({
     q: searchTerm,
@@ -313,6 +386,13 @@ export default function ChannelsDiscoverPage({ searchTerm = '', searchContext = 
   const openChannel = useCallback(
     (channel: BroadcastChannelSummary) => {
       navigation.navigate('ChannelHome', { channelId: channel.id, handle: channel.handle, channel });
+    },
+    [navigation],
+  );
+
+  const openLiveStream = useCallback(
+    (stream: BroadcastChannelLiveStream) => {
+      navigation.navigate('LiveWatch', { streamId: stream.id, stream: stream as any });
     },
     [navigation],
   );
@@ -418,6 +498,29 @@ export default function ChannelsDiscoverPage({ searchTerm = '', searchContext = 
           ) : null}
         </View>
       </View>
+
+      {/* ── Live Now ─────────────────────────────────────────────── */}
+      {liveNow.length > 0 ? (
+        <View style={styles.sectionHeaderRow}>
+          <View>
+            <Text style={[styles.sectionTitle, { color: palette.text }]}>Live now</Text>
+            <Text style={[styles.sectionSubtitle, { color: palette.subtext }]}>
+              Join a broadcast happening right now.
+            </Text>
+          </View>
+        </View>
+      ) : null}
+      {liveNow.length > 0 ? (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.featuredRow}
+        >
+          {liveNow.map(stream => (
+            <LiveNowCard key={stream.id} stream={stream} onOpen={openLiveStream} />
+          ))}
+        </ScrollView>
+      ) : null}
 
       {/* ── For your journey (recommendations) ─────────────────── */}
       {recommendedItems.length > 0 ? (

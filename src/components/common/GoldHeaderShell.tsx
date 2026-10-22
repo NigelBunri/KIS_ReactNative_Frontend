@@ -20,6 +20,16 @@ type GoldHeaderShellProps = {
    * same colors/start/end blend perfectly regardless of each box's height. */
   gradientStart?: GradientPoint;
   gradientEnd?: GradientPoint;
+  /** Optional layer painted full-bleed over the gradient, same footprint as
+   * the gradient itself — i.e. it also reaches this shell's true top edge,
+   * ignoring the `marginTop: 20` breathing room every screen's `children`
+   * get pushed below. Plain gold text/icon content never needed this (more
+   * gold showing through that gap is invisible), but a screen whose content
+   * IS an image — Profile's cover photo — looked cut off 20px short of the
+   * gradient's own top edge without it. Render order (behind `children`,
+   * on top of the gradient) makes it read as one continuous backdrop that
+   * content sits on, not a separate layer. */
+  backdrop?: React.ReactNode;
 };
 
 /**
@@ -38,7 +48,7 @@ type GoldHeaderShellProps = {
  * with no per-device offset to hand-tune, unlike the old negative-marginTop
  * approach this replaces.
  */
-export function GoldHeaderShell({ children, style, colors, gradientStart, gradientEnd }: GoldHeaderShellProps) {
+export function GoldHeaderShell({ children, style, colors, gradientStart, gradientEnd, backdrop }: GoldHeaderShellProps) {
   const { gradients } = useKISTheme();
   return (
     <View style={[styles.base, style]}>
@@ -48,6 +58,7 @@ export function GoldHeaderShell({ children, style, colors, gradientStart, gradie
         end={gradientEnd ?? { x: 1, y: 1 }}
         style={StyleSheet.absoluteFillObject}
       />
+      {backdrop ? <View style={StyleSheet.absoluteFillObject}>{backdrop}</View> : null}
       <View style={{ marginTop: 20 }}>
         {children}
       </View>

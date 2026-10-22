@@ -418,6 +418,7 @@ function GoldenSection() {
         style={payload.shellStyle}
         gradientStart={payload.gradientStart}
         gradientEnd={payload.gradientEnd}
+        backdrop={payload.backdrop}
       >
         {payload.content}
       </GoldHeaderShell>
@@ -1313,6 +1314,7 @@ function AppContent() {
 
                   ChannelHome: 'channels/:channelId',
                   ChannelContentDetail: 'content/:contentId',
+                  LiveWatch: 'live/:streamId',
 
                   ShopDetail: 'shops/:slug',
                   ProductDetail: 'products/:slug',

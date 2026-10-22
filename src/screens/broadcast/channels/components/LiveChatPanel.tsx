@@ -27,6 +27,13 @@ type Props = {
   disabled?:       boolean;   // true when stream is not live
   collapsed?:      boolean;
   onToggleCollapse?: () => void;
+  // Chat moderation (D4/D5 parity batch) - canModerate gates the Delete
+  // action in the long-press sheet; Report is always offered. Both are
+  // optional so existing call sites that haven't wired them up yet degrade
+  // to long-press doing nothing, rather than crashing.
+  canModerate?:    boolean;
+  onDeleteMessage?: (messageId: string) => Promise<void>;
+  onReportMessage?: (messageId: string) => Promise<void>;
 };
 
 export default function LiveChatPanel({
@@ -36,6 +43,9 @@ export default function LiveChatPanel({
   disabled = false,
   collapsed = false,
   onToggleCollapse,
+  canModerate = false,
+  onDeleteMessage,
+  onReportMessage,
 }: Props) {
   const [draft,    setDraft]    = useState('');
   const [sending,  setSending]  = useState(false);
@@ -76,8 +86,41 @@ export default function LiveChatPanel({
     }
   }, [draft, sending, disabled, onSend]);
 
+  const handleLongPressMessage = useCallback((item: LiveChatMessage) => {
+    if (!onDeleteMessage && !onReportMessage) return;
+    const options: Array<{ text: string; style?: 'destructive' | 'cancel'; onPress?: () => void }> = [];
+    if (canModerate && onDeleteMessage) {
+      options.push({
+        text: 'Delete message',
+        style: 'destructive',
+        onPress: () => {
+          onDeleteMessage(item.id).catch(() =>
+            Alert.alert('Unable to delete', 'Could not delete this message. Please try again.'),
+          );
+        },
+      });
+    }
+    if (onReportMessage) {
+      options.push({
+        text: 'Report message',
+        onPress: () => {
+          onReportMessage(item.id)
+            .then(() => Alert.alert('Reported', 'Thanks — our team will review this message.'))
+            .catch(() => Alert.alert('Unable to report', 'Could not report this message. Please try again.'));
+        },
+      });
+    }
+    if (!options.length) return;
+    options.push({ text: 'Cancel', style: 'cancel' });
+    Alert.alert('Message options', undefined, options);
+  }, [canModerate, onDeleteMessage, onReportMessage]);
+
   const renderItem = useCallback(({ item }: { item: LiveChatMessage }) => (
-    <View style={[styles.msgRow, item.isMine && styles.msgRowMine]}>
+    <Pressable
+      style={[styles.msgRow, item.isMine && styles.msgRowMine]}
+      onLongPress={() => handleLongPressMessage(item)}
+      delayLongPress={350}
+    >
       <View style={[
         styles.bubble,
         item.isMine
@@ -98,8 +141,8 @@ export default function LiveChatPanel({
         )}
         <Text style={[styles.msgText, { color: palette.ivory }]}>{item.text}</Text>
       </View>
-    </View>
-  ), [palette.primary, palette.primaryStrong, palette.royalInk, palette.ivory]);
+    </Pressable>
+  ), [palette.primary, palette.primaryStrong, palette.royalInk, palette.ivory, palette.gold, handleLongPressMessage]);
 
   return (
     <View style={styles.container} pointerEvents="box-none">

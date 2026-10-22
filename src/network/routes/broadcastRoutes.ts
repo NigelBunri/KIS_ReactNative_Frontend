@@ -507,15 +507,22 @@ const broadcastRoutes = {
       `${API_BASE_URL}/api/v1/broadcasts/channels/${channelId}/playlists/`,
     channelLiveStreams: (channelId: string) =>
       `${API_BASE_URL}/api/v1/broadcasts/channels/${channelId}/live-streams/`,
+    // C1 of the YouTube-parity batch: cross-channel "Live Now" discovery
+    liveNow: (limit = 20) =>
+      `${API_BASE_URL}/api/v1/broadcasts/live-streams/live-now/?limit=${limit}`,
     liveStreamDetail: (streamId: string) =>
       `${API_BASE_URL}/api/v1/broadcasts/live-streams/${streamId}/`,
     liveStreamStart: (streamId: string) =>
       `${API_BASE_URL}/api/v1/broadcasts/live-streams/${streamId}/start/`,
     liveStreamEnd: (streamId: string) =>
       `${API_BASE_URL}/api/v1/broadcasts/live-streams/${streamId}/end/`,
+    liveStreamCancel: (streamId: string) =>
+      `${API_BASE_URL}/api/v1/broadcasts/live-streams/${streamId}/cancel/`,
     // Streaming credentials & ingest
     liveStreamStreamKey: (streamId: string) =>
       `${API_BASE_URL}/api/v1/broadcasts/live-streams/${streamId}/stream-key/`,
+    liveStreamStreamKeyRotate: (streamId: string) =>
+      `${API_BASE_URL}/api/v1/broadcasts/live-streams/${streamId}/stream-key/rotate/`,
     liveStreamWhip: (streamId: string) =>
       `${API_BASE_URL}/api/v1/broadcasts/live-streams/${streamId}/whip/`,
     // Multi-camera source management
@@ -526,6 +533,12 @@ const broadcastRoutes = {
     // Live chat for a specific stream
     liveStreamChat: (streamId: string) =>
       `${API_BASE_URL}/api/v1/broadcasts/live-streams/${streamId}/chat/`,
+    // Delete (own message or channel manager) / report a live chat message
+    liveStreamChatMessageModerate: (streamId: string, messageId: string) =>
+      `${API_BASE_URL}/api/v1/broadcasts/live-streams/${streamId}/chat/${messageId}/`,
+    // Channel-manager-only: ban/unban/list banned chatters for a channel's live chat
+    channelChatBans: (channelId: string) =>
+      `${API_BASE_URL}/api/v1/broadcasts/channels/${channelId}/chat-bans/`,
     recordings: (streamId: string) =>
       `${API_BASE_URL}/api/v1/broadcasts/live-streams/${streamId}/recordings/`,
     recordingDetail: (recordingId: string) =>
@@ -582,6 +595,12 @@ const broadcastRoutes = {
     // Live stream viewer presence (REST fallback for when socket is unavailable)
     liveStreamViewerPing: (streamId: string) =>
       `${API_BASE_URL}/api/v1/broadcasts/live-streams/${streamId}/viewer-ping/`,
+    // Publisher-side connection health reporting (bitrate drops, reconnects)
+    liveStreamHealth: (streamId: string) =>
+      `${API_BASE_URL}/api/v1/broadcasts/live-streams/${streamId}/health/`,
+    // Viewer-side playback failure/stall reporting
+    liveStreamPlaybackEvent: (streamId: string) =>
+      `${API_BASE_URL}/api/v1/broadcasts/live-streams/${streamId}/playback-events/`,
     // User-created personal playlists (cross-device, server-persisted)
     userPlaylists: `${API_BASE_URL}/api/v1/broadcasts/user-playlists/`,
     userPlaylistDetail: (id: string) =>

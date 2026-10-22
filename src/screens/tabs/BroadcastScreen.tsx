@@ -674,7 +674,7 @@ export default function BroadcastScreen() {
 
       {/* Cart FAB (market tab only) */}
       {activeMainTab === 'market' && (
-        <View pointerEvents="box-none" style={styles.cartOverlay}>
+        <View pointerEvents="box-none" style={styles.fabOverlay}>
           <View>
             <KISFab
               icon="cart"
@@ -690,6 +690,24 @@ export default function BroadcastScreen() {
               </View>
             )}
           </View>
+        </View>
+      )}
+
+      {/* Library FAB (channels tab only) - LibraryScreen already bundles
+          Watch History, Liked Videos, Playlists (incl. Watch Later),
+          Subscriptions, Downloads, and Shorts in one hub; it was registered
+          in the navigator but had no entry point anywhere in the app, so
+          none of those six features were reachable. This FAB is that entry
+          point. */}
+      {activeMainTab === 'channels' && (
+        <View pointerEvents="box-none" style={styles.fabOverlay}>
+          <KISFab
+            icon="grid"
+            iconSize={22}
+            onPress={() => (navigation as any).navigate('LibraryScreen')}
+            size={compactBroadcast ? 48 : 56}
+            accessibilityLabel="Open library: history, liked videos, playlists, subscriptions, downloads and shorts"
+          />
         </View>
       )}
 
@@ -783,7 +801,7 @@ const makeStyles = (palette: ReturnType<typeof useKISTheme>['palette']) =>
       marginTop: 2,
       letterSpacing: 0.05,
     },
-    cartOverlay: {
+    fabOverlay: {
       ...StyleSheet.absoluteFillObject,
       justifyContent: 'flex-end',
       alignItems: 'flex-end',

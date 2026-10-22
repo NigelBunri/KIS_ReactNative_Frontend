@@ -9,6 +9,7 @@
 import React, { useRef } from 'react';
 import {
   Animated,
+  Image,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -16,6 +17,7 @@ import {
   View,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
+import WorkStatusRing from '@/components/common/WorkStatusRing';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { KISIcon, type KISIconName } from '@/constants/kisIcons';
@@ -197,12 +199,18 @@ export function Sidebar({
           accessibilityLabel="View profile"
           style={[styles.profileRow, collapsed && styles.profileRowCollapsed]}
         >
-          <LinearGradient
-            colors={gradients.tabSelected as unknown as string[]}
-            style={styles.avatar}
-          >
-            <Text style={[styles.avatarText, { color: isDark ? palette.royalInk : palette.ivory }]}>{initials}</Text>
-          </LinearGradient>
+          <WorkStatusRing size={44} workStatus={user?.profile?.work_status}>
+            {user?.profile?.avatar_url ? (
+              <Image source={{ uri: user.profile.avatar_url }} style={styles.avatar} />
+            ) : (
+              <LinearGradient
+                colors={gradients.tabSelected as unknown as string[]}
+                style={styles.avatar}
+              >
+                <Text style={[styles.avatarText, { color: isDark ? palette.royalInk : palette.ivory }]}>{initials}</Text>
+              </LinearGradient>
+            )}
+          </WorkStatusRing>
           {!collapsed ? (
             <View style={styles.profileTextWrap}>
               <Text style={[styles.profileName, { color: palette.text }]} numberOfLines={1}>

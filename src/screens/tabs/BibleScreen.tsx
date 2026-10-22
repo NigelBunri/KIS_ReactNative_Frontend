@@ -361,7 +361,7 @@ export default function BibleScreen() {
                     minHeight: tinyBible ? 30 : 34,
                     paddingHorizontal: compactBible ? 10 : 14,
                   }}
-                  textStyle={{ fontSize: compactBible ? 11 : 13 }}
+                  textStyle={{ fontSize: compactBible ? 11 : 13, color: '#FFFFFF' }}
                   left={
                     <KISIcon
                       name={tab.icon as any}

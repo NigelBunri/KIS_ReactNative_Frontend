@@ -8,6 +8,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Image,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -19,6 +20,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import WorkStatusRing from '@/components/common/WorkStatusRing';
 import Clipboard from '@react-native-clipboard/clipboard';
 import { useKISTheme } from '@/theme/useTheme';
 import ROUTES from '@/network';
@@ -38,6 +40,8 @@ type Guest = {
   email?: string;
   role: GuestRole;
   status: GuestStatus;
+  user_avatar_url?: string | null;
+  user_work_status?: string | null;
 };
 
 type Props = {
@@ -230,11 +234,17 @@ export default function GuestInviteSheet({
                   key={guest.id}
                   style={[styles.guestRow, { backgroundColor: palette.surfaceElevated }]}
                 >
-                  <View style={[styles.avatar, { backgroundColor: palette.gold }]}>
-                    <Text style={[styles.avatarLetter, { color: palette.ivory }]}>
-                      {(guest.display_name || '?').charAt(0).toUpperCase()}
-                    </Text>
-                  </View>
+                  <WorkStatusRing size={38} workStatus={guest.user_work_status}>
+                    {guest.user_avatar_url ? (
+                      <Image source={{ uri: guest.user_avatar_url }} style={styles.avatar} />
+                    ) : (
+                      <View style={[styles.avatar, { backgroundColor: palette.gold }]}>
+                        <Text style={[styles.avatarLetter, { color: palette.ivory }]}>
+                          {(guest.display_name || '?').charAt(0).toUpperCase()}
+                        </Text>
+                      </View>
+                    )}
+                  </WorkStatusRing>
 
                   <View style={styles.guestInfo}>
                     <Text style={[styles.guestName, { color: palette.text }]}>
