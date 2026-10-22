@@ -25,6 +25,7 @@
 // ──────────────────────────────────────────────────────────────────────────────
 
 import { DeviceEventEmitter } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getAccessToken } from '@/security/authStorage';
 
 // ── Dynamic WebRTC import ─────────────────────────────────────────────────────
@@ -263,12 +264,20 @@ class LiveStreamingService {
       await this.pc.setLocalDescription(offer);
 
       // 4. WHIP handshake
+      // config.whipEndpoint is Django's own ChannelLiveStreamWhipView proxy,
+      // behind the same DeviceBoundJWTAuthentication every other endpoint
+      // uses - that requires X-Device-Id on every authenticated request,
+      // not just Authorization. This bypasses the app's normal network
+      // client (src/network/post), which already attaches both from the
+      // same AsyncStorage key, so WHIP needs to do it manually here too.
       const token = await getAccessToken();
+      const deviceId = await AsyncStorage.getItem('device_id');
       const res = await fetch(config.whipEndpoint, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/sdp',
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          ...(deviceId ? { 'X-Device-Id': deviceId } : {}),
         },
         body: offer.sdp,
       });
@@ -324,9 +333,13 @@ class LiveStreamingService {
 
     if (this.whipResourceUrl) {
       const token = await getAccessToken();
+      const deviceId = await AsyncStorage.getItem('device_id');
       await fetch(this.whipResourceUrl, {
         method: 'DELETE',
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          ...(deviceId ? { 'X-Device-Id': deviceId } : {}),
+        },
       }).catch((err: any) => {
         // The broadcaster is already tearing down locally either way - a
         // failed DELETE just means the media server may be left with an
@@ -427,11 +440,13 @@ class LiveStreamingService {
   private async sendIceTrickle(candidate: any): Promise<void> {
     if (!this.whipResourceUrl) return;
     const token = await getAccessToken();
+    const deviceId = await AsyncStorage.getItem('device_id');
     await fetch(this.whipResourceUrl, {
       method: 'PATCH',
       headers: {
         'Content-Type': 'application/trickle-ice-sdpfrag',
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(deviceId ? { 'X-Device-Id': deviceId } : {}),
       },
       body: `a=${candidate.candidate}`,
     });
