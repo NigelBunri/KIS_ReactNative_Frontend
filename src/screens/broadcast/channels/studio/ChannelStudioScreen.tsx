@@ -1,11 +1,13 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { KISIcon } from '@/constants/kisIcons';
 import KISButton from '@/constants/KISButton';
 import ChannelAvatar from '@/components/broadcast/ChannelAvatar';
+import PermanentRemoteImage from '@/components/media/PermanentRemoteImage';
+import { resolveBackendAssetUrl } from '@/network';
 import { useKISTheme } from '@/theme/useTheme';
 import { useResponsiveLayout } from '@/theme/responsive';
 import type { RootStackParamList } from '@/navigation/types';
@@ -815,14 +817,31 @@ export default function ChannelStudioScreen({ legacyFeeds, liveCount, expiresAt,
       ) : channels.length ? (
         <View style={styles.channelCardList}>
           {channels.map(channel => (
-            <KISButton
+            <Pressable
               key={channel.id}
-              variant="outline"
               onPress={() => handleOpenChannelDetail(channel.id)}
-              style={styles.channelCard}
+              style={({ pressed }) => [
+                styles.channelCard,
+                { borderColor: palette.border, backgroundColor: palette.surface },
+                pressed && { opacity: 0.85 },
+              ]}
             >
+              {/* Cover image - every channel always shows something here
+                  too: a real banner when set, otherwise a flat brand-color
+                  fill, so the card never has a blank gap up top. */}
+              {channel.banner_url ? (
+                <PermanentRemoteImage
+                  uri={resolveBackendAssetUrl(channel.banner_url)}
+                  domain="Broadcast"
+                  stableKey={`channel_banner_${channel.id}`}
+                  containerStyle={styles.channelCardBanner}
+                  resizeMode="cover"
+                />
+              ) : (
+                <View style={[styles.channelCardBanner, { backgroundColor: palette.primarySoft }]} />
+              )}
               <View style={styles.channelCardRow}>
-                <ChannelAvatar channel={channel} size={44} />
+                <ChannelAvatar channel={channel} size={52} />
                 <View style={{ flex: 1 }}>
                   <Text style={[styles.channelCardName, { color: palette.text }]} numberOfLines={1}>
                     {channel.display_name}{channel.is_broadcast ? ' · LIVE' : ''}
@@ -830,10 +849,18 @@ export default function ChannelStudioScreen({ legacyFeeds, liveCount, expiresAt,
                   <Text style={[styles.channelCardHandle, { color: palette.subtext }]} numberOfLines={1}>
                     @{channel.handle} · {channel.subscriber_count || 0} subscribers
                   </Text>
+                  {channel.description ? (
+                    <Text style={[styles.channelCardDescription, { color: palette.subtext }]} numberOfLines={2}>
+                      {channel.description}
+                    </Text>
+                  ) : null}
+                  {channel.avatar_kind === 'initials' ? (
+                    <Text style={[styles.channelCardNudge, { color: palette.primaryStrong }]}>Add a logo for this channel →</Text>
+                  ) : null}
                 </View>
                 <KISIcon name="chevron-right" size={18} color={palette.subtext} />
               </View>
-            </KISButton>
+            </Pressable>
           ))}
         </View>
       ) : (
@@ -1015,7 +1042,9 @@ export default function ChannelStudioScreen({ legacyFeeds, liveCount, expiresAt,
             <KISIcon name="sub-channel" size={22} color={palette.primaryStrong} />
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={[styles.eyebrow, { color: palette.primaryStrong }]}>CREATOR TOOLS</Text>
+            <Text style={[styles.eyebrow, { color: palette.primaryStrong }]}>
+              {topView === 'overview' ? 'CREATOR TOOLS' : 'CHANNEL STUDIO'}
+            </Text>
             <Text style={[styles.title, { color: palette.text, fontSize: compact ? 18 : 22, lineHeight: compact ? 23 : 27 }]} numberOfLines={2}>
               {topView === 'overview' ? 'Overview' : 'Channel Studio'}
             </Text>
@@ -1174,11 +1203,14 @@ function Placeholder({ title, text }: { title: string; text: string }) {
 const styles = StyleSheet.create({
   topTabBar: { flexDirection: 'row', gap: 8, marginTop: 14 },
   backButton: { alignSelf: 'flex-start', marginBottom: 8 },
-  channelCardList: { gap: 8, marginTop: 14 },
-  channelCard: { alignItems: 'stretch', paddingVertical: 10 },
-  channelCardRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  channelCardList: { gap: 12, marginTop: 14 },
+  channelCard: { borderWidth: 1, borderRadius: 10, overflow: 'hidden' },
+  channelCardBanner: { width: '100%', height: 64 },
+  channelCardRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, padding: 12, marginTop: -26 },
   channelCardName: { fontSize: 14, fontWeight: '800' },
   channelCardHandle: { fontSize: 12, marginTop: 2 },
+  channelCardDescription: { fontSize: 12, marginTop: 4, lineHeight: 16 },
+  channelCardNudge: { fontSize: 11, fontWeight: '800', marginTop: 4 },
   journeyCard: { borderWidth: 1, borderRadius: 8, padding: 14, marginTop: 10, gap: 8 },
   journeyHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   journeyTitle: { fontSize: 15, fontWeight: '900' },
