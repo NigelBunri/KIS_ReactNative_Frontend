@@ -37,11 +37,6 @@ import ContentCardsEditor from '@/screens/broadcast/channels/studio/ContentCards
 import ChannelHomepageShelfEditor from '@/screens/broadcast/channels/studio/ChannelHomepageShelfEditor';
 import MonetizationPanel from '@/screens/broadcast/channels/studio/MonetizationPanel';
 import MembershipTiersPanel from '@/screens/broadcast/channels/studio/MembershipTiersPanel';
-import {
-  KIS_PROMOTIONAL_CREDIT_SAFETY_COPY,
-  getLockedPremiumStateCopy,
-  getProfitabilityPlanById,
-} from '@/services/profitabilityPricing';
 import TrustPromotionRevenuePreviewCard from '@/components/profitability/TrustPromotionRevenuePreviewCard';
 import NotificationRetentionPreviewCard from '@/components/profitability/NotificationRetentionPreviewCard';
 import EnterpriseKcanRevenuePreviewCard from '@/components/profitability/EnterpriseKcanRevenuePreviewCard';
@@ -170,68 +165,6 @@ const EMPTY_FORM: ChannelForm = {
 
 const normalizeHandle = (value: string) => value.toLowerCase().replace(/^@+/, '').replace(/[^a-z0-9_-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40);
 
-const CREATOR_PREMIUM_FEATURES = [
-  {
-    key: 'channel-limit',
-    planId: 'creator_pro',
-    icon: 'sub-channel',
-    title: 'More creator channels',
-    value: '3 channels',
-    detail: 'Creator Pro will raise the free channel limit while keeping existing free channels working.',
-  },
-  {
-    key: 'scheduled-posts',
-    planId: 'creator_pro',
-    icon: 'calendar',
-    title: 'Scheduled publishing',
-    value: 'Creator Pro',
-    detail: 'Prepare posts, videos, files, and announcements for future release windows.',
-  },
-  {
-    key: 'analytics',
-    planId: 'creator_growth',
-    icon: 'poll',
-    title: 'Advanced analytics',
-    value: 'Growth',
-    detail: 'Subscriber trends, content performance, embeds, promotion impact, and conversion reporting.',
-  },
-  {
-    key: 'embeds',
-    planId: 'creator_growth',
-    icon: 'link',
-    title: 'Advanced embeds',
-    value: 'Growth',
-    detail: 'Public/private embed controls and analytics after embed safety policy approval.',
-  },
-  {
-    key: 'live',
-    planId: 'creator_growth',
-    icon: 'channel',
-    title: 'Premieres and event monetization',
-    value: 'Growth',
-    // Core live management (scheduling, going live, chat, moderation) is
-    // free on every tier - see the Live tab's own render branch. Only
-    // these additive extras are a genuine Growth-tier upsell.
-    detail: 'Scheduled premieres, replay packaging, and paid-event monetization readiness for live broadcasts.',
-  },
-  {
-    key: 'paid-content',
-    planId: 'creator_growth',
-    icon: 'cart',
-    title: 'Paid content readiness',
-    value: 'Future',
-    detail: 'Members-only posts and paid content planning with USD direct-provider settlement only.',
-  },
-  {
-    key: 'promotion',
-    planId: 'promotion_packages',
-    icon: 'megaphone',
-    title: 'Promotion packages',
-    value: 'Reviewed',
-    detail: 'Christian-safe featured placement with sponsored labels, staff review, and child-safe filtering.',
-  },
-] as const;
-
 export default function ChannelStudioScreen({ legacyFeeds, liveCount, expiresAt, onCreate }: Props) {
   const { palette, tone } = useKISTheme();
   const responsive = useResponsiveLayout();
@@ -308,8 +241,6 @@ export default function ChannelStudioScreen({ legacyFeeds, liveCount, expiresAt,
     () => channels.find(channel => channel.id === selectedChannelId) || channels[0] || null,
     [channels, selectedChannelId],
   );
-  const creatorProPlan = useMemo(() => getProfitabilityPlanById('creator_pro'), []);
-  const creatorGrowthPlan = useMemo(() => getProfitabilityPlanById('creator_growth'), []);
 
   const journeyStepComplete = useMemo((): Record<JourneyStepId, boolean> => ({
     branding: Boolean(selectedChannel?.banner_url),
@@ -587,80 +518,6 @@ export default function ChannelStudioScreen({ legacyFeeds, liveCount, expiresAt,
       setContentMembersOnlyTogglingId(null);
     }
   }, [refreshContent]);
-
-  const renderCreatorPremiumPreview = (context: 'dashboard' | 'create' | 'analytics' | 'live' | 'settings' = 'dashboard') => {
-    const features =
-      context === 'create'
-        ? CREATOR_PREMIUM_FEATURES.filter(feature => ['channel-limit', 'scheduled-posts', 'paid-content'].includes(feature.key))
-        : context === 'analytics'
-        ? CREATOR_PREMIUM_FEATURES.filter(feature => ['analytics', 'embeds', 'promotion'].includes(feature.key))
-        : context === 'live'
-        ? CREATOR_PREMIUM_FEATURES.filter(feature => ['live', 'paid-content', 'promotion'].includes(feature.key))
-        : context === 'settings'
-        ? CREATOR_PREMIUM_FEATURES.filter(feature => ['embeds', 'promotion', 'paid-content'].includes(feature.key))
-        : CREATOR_PREMIUM_FEATURES;
-    return (
-      <View style={[styles.premiumPanel, { borderColor: palette.goldMuted ?? palette.border, backgroundColor: tone === 'dark' ? palette.primarySoft : palette.surface }]}>
-        <View style={styles.premiumHeaderRow}>
-          <View style={[styles.premiumIcon, { backgroundColor: palette.primarySoft }]}>
-            <KISIcon name="star" size={18} color={palette.primaryStrong} />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={[styles.sectionTitle, { color: palette.text }]}>Creator tools</Text>
-            <Text style={[styles.sectionText, { color: palette.subtext }]}>
-              {channelUsageText}
-            </Text>
-          </View>
-          <View style={[styles.notLiveBadge, { borderColor: palette.goldBorder || palette.border }]}>
-            <Text style={[styles.notLiveText, { color: palette.primaryStrong }]}>NOT LIVE</Text>
-          </View>
-        </View>
-        <View style={styles.planRow}>
-          {[creatorProPlan, creatorGrowthPlan].filter(Boolean).map(plan => (
-            <View key={plan!.id} style={[styles.planCard, { borderColor: palette.border, backgroundColor: palette.card }]}>
-              <Text style={[styles.planName, { color: palette.text }]}>{plan!.name}</Text>
-              <Text style={[styles.planPrice, { color: palette.primaryStrong }]}>{plan!.priceLabel}</Text>
-              <Text style={[styles.planDescription, { color: palette.subtext }]} numberOfLines={2}>{plan!.description}</Text>
-            </View>
-          ))}
-        </View>
-        <View style={styles.premiumGrid}>
-          {features.map(feature => {
-            const state = getLockedPremiumStateCopy(feature.planId, feature.title);
-            return (
-              <View key={feature.key} style={[styles.premiumFeatureCard, { borderColor: palette.border, backgroundColor: palette.surface }]}>
-                <View style={styles.premiumFeatureTop}>
-                  <View style={[styles.premiumFeatureIcon, { backgroundColor: palette.primarySoft }]}>
-                    <KISIcon name={feature.icon as any} size={16} color={palette.primaryStrong} />
-                  </View>
-                  <Text style={[styles.premiumFeatureValue, { color: palette.primaryStrong }]}>{feature.value}</Text>
-                </View>
-                <Text style={[styles.premiumFeatureTitle, { color: palette.text }]}>{state.title}</Text>
-                <Text style={[styles.premiumFeatureText, { color: palette.subtext }]}>{feature.detail}</Text>
-                <Text style={[styles.lockedCopy, { color: palette.subtext }]}>Locked</Text>
-              </View>
-            );
-          })}
-        </View>
-        {/* Previously every feature card above just said "Locked" with no
-            way to act on it - upgrading itself (tier lookup, discount/
-            reward application, Flutterwave checkout) lives in
-            useProfileController.upgradeTier, which needs profile/tiers
-            data this screen doesn't have, so this hands off to the Profile
-            tab's real "Upgrade" entry point - same pattern already used by
-            the Live tab's own upgrade prompt just below in this file. */}
-        <KISButton
-          title="Unlock these features"
-          onPress={() => navigation.navigate('MainTabs')}
-          left={<KISIcon name="star" size={16} color={palette.onPrimary} />}
-          style={{ marginTop: 10 }}
-        />
-        <Text style={[styles.creditSafetyCopy, { color: palette.subtext }]}>
-          {KIS_PROMOTIONAL_CREDIT_SAFETY_COPY}
-        </Text>
-      </View>
-    );
-  };
 
   const renderCreateChannelForm = () => (
     <View style={[styles.createCard, { borderColor: palette.border, backgroundColor: palette.surface }]}>
@@ -994,14 +851,7 @@ export default function ChannelStudioScreen({ legacyFeeds, liveCount, expiresAt,
         </>
       );
     }
-    if (activeTab === 'analytics') {
-      return (
-        <>
-          {renderCreatorPremiumPreview('analytics')}
-          <ChannelAnalyticsPanel channelId={selectedChannel.id} queued={legacyFeeds.length} live={liveCount} subscribers={selectedChannel.subscriber_count} />
-        </>
-      );
-    }
+    if (activeTab === 'analytics') return <ChannelAnalyticsPanel channelId={selectedChannel.id} queued={legacyFeeds.length} live={liveCount} subscribers={selectedChannel.subscriber_count} />;
     if (activeTab === 'content') return <ChannelContentManager contents={contents} legacyFeeds={legacyFeeds} onCreate={() => onCreate(selectedChannel)} onToggleBroadcast={handleToggleContentBroadcast} broadcastingId={contentBroadcastingId} onUpdateTags={handleUpdateContentTags} onPublish={handlePublishContent} publishingId={contentPublishingId} onToggleMembersOnly={handleToggleContentMembersOnly} togglingMembersOnlyId={contentMembersOnlyTogglingId} />;
     if (activeTab === 'moderation') return <ChannelModerationPanel channelId={selectedChannel.id} />;
     if (activeTab === 'create') {
@@ -1014,31 +864,19 @@ export default function ChannelStudioScreen({ legacyFeeds, liveCount, expiresAt,
             onPress={() => onCreate(selectedChannel)}
             left={<KISIcon name="add" size={17} color={palette.onPrimary} />}
           />
-          {renderCreatorPremiumPreview('create')}
         </View>
       );
     }
     if (activeTab === 'playlists') return <ChannelPlaylistsManager channelId={selectedChannel.id} />;
-    if (activeTab === 'live') {
-      // Core live-stream management - scheduling, going live, the control
-      // room, chat/moderation - is ordinary creator functionality, not a
-      // paid-tier feature (matches every free-tier live offering this is
-      // benchmarked against). It used to be flatly blocked below Partner
-      // tier; the only thing that's still a genuine premium upsell is the
-      // advanced stuff in renderCreatorPremiumPreview('live') below
-      // (premieres/replays/event monetization), which is additive, not a
-      // gate on using live streaming itself. Whether a stream can actually
-      // go live is a server-side, infra-readiness concern (the configured
-      // live provider), surfaced by LiveControlRoom's own error handling
-      // when that call is made - not something this screen should guess at
-      // or pre-emptively paywall.
-      return (
-        <>
-          {renderCreatorPremiumPreview('live')}
-          <LiveControlRoom channel={selectedChannel} onOpenWatch={stream => navigation.navigate('LiveWatch', { streamId: stream.id, stream })} />
-        </>
-      );
-    }
+    // Core live-stream management - scheduling, going live, the control
+    // room, chat/moderation - is ordinary creator functionality, not a
+    // paid-tier feature (matches every free-tier live offering this is
+    // benchmarked against). It used to be flatly blocked below Partner
+    // tier. Whether a stream can actually go live is a server-side,
+    // infra-readiness concern (the configured live provider), surfaced by
+    // LiveControlRoom's own error handling when that call is made - not
+    // something this screen should guess at or pre-emptively paywall.
+    if (activeTab === 'live') return <LiveControlRoom channel={selectedChannel} onOpenWatch={stream => navigation.navigate('LiveWatch', { streamId: stream.id, stream })} />;
     if (activeTab === 'revenue') return <RevenueAnalyticsPanel channelId={selectedChannel.id} />;
     if (activeTab === 'audience') return <AudienceDemographicsPanel channelId={selectedChannel.id} />;
     if (activeTab === 'copyright') return <CopyrightClaimsPanel channelId={selectedChannel.id} />;
@@ -1064,13 +902,11 @@ export default function ChannelStudioScreen({ legacyFeeds, liveCount, expiresAt,
         <>
           <ChannelSettingsPanel channel={selectedChannel} onUpdated={refresh} />
           <ChannelManagersSection channel={selectedChannel} />
-          {renderCreatorPremiumPreview('settings')}
         </>
       );
     }
     return (
       <>
-        {renderCreatorPremiumPreview('dashboard')}
         <TrustPromotionRevenuePreviewCard
           palette={palette}
           kind="channel_trust"
@@ -1285,25 +1121,7 @@ const styles = StyleSheet.create({
   metricLabel: { marginTop: 2, fontSize: 10, fontWeight: '800' },
   upsellBanner: { flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1, borderRadius: 8, padding: 12, marginTop: 14 },
   upsellBannerText: { flex: 1, fontSize: 12, lineHeight: 17, fontWeight: '700' },
-  premiumPanel: { borderWidth: 1, borderRadius: 8, padding: 14, marginBottom: 12, gap: 12 },
-  premiumHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   premiumIcon: { width: 40, height: 40, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
-  notLiveBadge: { borderWidth: 1, borderRadius: 999, paddingHorizontal: 9, paddingVertical: 5 },
-  notLiveText: { fontSize: 9, fontWeight: '900', letterSpacing: 0 },
-  planRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  planCard: { flex: 1, minWidth: 180, borderWidth: 1, borderRadius: 8, padding: 12, gap: 5 },
-  planName: { fontSize: 13, fontWeight: '900' },
-  planPrice: { fontSize: 12, fontWeight: '900' },
-  planDescription: { fontSize: 11, lineHeight: 16, fontWeight: '700' },
-  premiumGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  premiumFeatureCard: { flex: 1, minWidth: 150, borderWidth: 1, borderRadius: 8, padding: 12, gap: 7 },
-  premiumFeatureTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
-  premiumFeatureIcon: { width: 32, height: 32, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
-  premiumFeatureValue: { fontSize: 10, fontWeight: '900', textTransform: 'uppercase' },
-  premiumFeatureTitle: { fontSize: 12, fontWeight: '900' },
-  premiumFeatureText: { fontSize: 11, lineHeight: 16, fontWeight: '700' },
-  lockedCopy: { fontSize: 10, lineHeight: 15, fontWeight: '800' },
-  creditSafetyCopy: { fontSize: 10, lineHeight: 15, fontWeight: '800' },
   channelPills: { gap: 8, paddingTop: 14 },
   categoryTabs: { gap: 6 },
   tabs: { gap: 8, paddingVertical: 14 },
