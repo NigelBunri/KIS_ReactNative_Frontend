@@ -56,16 +56,26 @@ async function compressBrandingImage(file: PickedFile): Promise<PreparedImage> {
     0,
   );
   const uri = (resized as any)?.uri ?? (resized as any)?.path;
-  let size = Number((resized as any)?.size) || 0;
   if (!uri) {
     throw new Error('Unable to prepare this image. Please try a different photo.');
   }
+  // CONFIRMED ROOT CAUSE of "upload failed" on real devices (reproduced
+  // against production: the backend's confirm step rejected the upload
+  // with "Uploaded file size does not match what was declared"): react-
+  // native-image-resizer's own reported `size` is unreliable on some
+  // platforms/versions (it can reflect a stale or pre-resize value
+  // instead of the actual output file), but was only distrusted here when
+  // it came back as exactly 0. A non-zero-but-wrong size still gets sent
+  // to /uploads/initiate as size_bytes, and the backend later compares
+  // THAT declared number against the real S3 object's actual size at
+  // confirm time (apps/media/upload_intent.py's 0.5x-2x tolerance check) -
+  // a resizer size that's merely inaccurate (not just missing) fails that
+  // check exactly like this. Always stat the real file on disk instead of
+  // ever trusting the resizer's self-reported size.
+  const stat = await RNFS.stat(uri.replace(/^file:\/\//, '')).catch(() => null);
+  const size = stat ? Number((stat as any).size) || 0 : 0;
   if (size <= 0) {
-    // Some platforms omit `size` from the resizer's result — stat the
-    // actual resized file rather than sending size_bytes: 0, which the
-    // backend's initiate validation rejects outright (must be > 0).
-    const stat = await RNFS.stat(uri.replace(/^file:\/\//, '')).catch(() => null);
-    size = stat ? Number((stat as any).size) || 0 : 0;
+    throw new Error('Unable to prepare this image. Please try a different photo.');
   }
   return { uri, name: withJpegExtension(file.name || 'image.jpg'), type: 'image/jpeg', size };
 }
