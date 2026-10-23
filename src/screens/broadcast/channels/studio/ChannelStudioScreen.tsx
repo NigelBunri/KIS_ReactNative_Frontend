@@ -335,12 +335,14 @@ export default function ChannelStudioScreen({ legacyFeeds, liveCount, expiresAt,
     setActiveTab(step.tab);
   }, []);
 
-  const handleOpenChannelDetail = useCallback((channelId: string) => {
+  const handleOpenChannelDetail = useCallback((channelId: string, landingTab: StudioTab = 'dashboard') => {
     setSelectedChannelId(channelId);
     // Reset to a clean landing tab each time a channel is opened, rather
-    // than leaving whichever tab a previous channel happened to be on.
-    setActiveCategory(categoryForTab('dashboard'));
-    setActiveTab('dashboard');
+    // than leaving whichever tab a previous channel happened to be on -
+    // defaults to Dashboard, but the card's Edit button jumps straight to
+    // Branding instead, since that's specifically what it's for.
+    setActiveCategory(categoryForTab(landingTab));
+    setActiveTab(landingTab);
     // The create-channel form lives inside the list view - closing it on
     // navigation avoids it reappearing (stale open state) if it was left
     // open when a channel card was tapped.
@@ -646,6 +648,19 @@ export default function ChannelStudioScreen({ legacyFeeds, liveCount, expiresAt,
             );
           })}
         </View>
+        {/* Previously every feature card above just said "Locked" with no
+            way to act on it - upgrading itself (tier lookup, discount/
+            reward application, Flutterwave checkout) lives in
+            useProfileController.upgradeTier, which needs profile/tiers
+            data this screen doesn't have, so this hands off to the Profile
+            tab's real "Upgrade" entry point - same pattern already used by
+            the Live tab's own upgrade prompt just below in this file. */}
+        <KISButton
+          title="Unlock these features"
+          onPress={() => navigation.navigate('MainTabs')}
+          left={<KISIcon name="star" size={16} color={palette.onPrimary} />}
+          style={{ marginTop: 10 }}
+        />
         <Text style={[styles.creditSafetyCopy, { color: palette.subtext }]}>
           {KIS_PROMOTIONAL_CREDIT_SAFETY_COPY}
         </Text>
@@ -838,8 +853,21 @@ export default function ChannelStudioScreen({ legacyFeeds, liveCount, expiresAt,
                   resizeMode="cover"
                 />
               ) : (
-                <View style={[styles.channelCardBanner, { backgroundColor: palette.primarySoft }]} />
+                <View style={[styles.channelCardBanner, { backgroundColor: palette.primarySoft, alignItems: 'center', justifyContent: 'center' }]}>
+                  <Text style={[styles.channelCardNudge, { color: palette.primaryStrong, marginTop: 0 }]}>No cover image yet</Text>
+                </View>
               )}
+              {/* Jumps straight to the Branding tab rather than the card's
+                  own onPress (which lands on Dashboard) - a nested
+                  Pressable is its own touch responder in RN, so this
+                  doesn't also trigger the outer card's onPress. */}
+              <Pressable
+                onPress={() => handleOpenChannelDetail(channel.id, 'branding')}
+                style={({ pressed }) => [styles.channelCardEditButton, { backgroundColor: palette.card }, pressed && { opacity: 0.7 }]}
+                accessibilityLabel={`Edit ${channel.display_name}'s branding`}
+              >
+                <KISIcon name="edit" size={14} color={palette.primaryStrong} />
+              </Pressable>
               <View style={styles.channelCardRow}>
                 <ChannelAvatar channel={channel} size={52} />
                 <View style={{ flex: 1 }}>
@@ -1206,6 +1234,7 @@ const styles = StyleSheet.create({
   channelCardList: { gap: 12, marginTop: 14 },
   channelCard: { borderWidth: 1, borderRadius: 10, overflow: 'hidden' },
   channelCardBanner: { width: '100%', height: 64 },
+  channelCardEditButton: { position: 'absolute', top: 8, right: 8, width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
   channelCardRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, padding: 12, marginTop: -26 },
   channelCardName: { fontSize: 14, fontWeight: '800' },
   channelCardHandle: { fontSize: 12, marginTop: 2 },

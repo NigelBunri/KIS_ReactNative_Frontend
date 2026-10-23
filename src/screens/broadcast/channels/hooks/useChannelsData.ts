@@ -110,6 +110,14 @@ export const normalizeChannel = (item: any): BroadcastChannelSummary | null => {
     description: item.description ? String(item.description) : '',
     avatar_url: item.avatar_url || item.avatarUrl || '',
     banner_url: item.banner_url || item.bannerUrl || '',
+    // Server-computed display fields (apps/broadcasts/serializers.py's
+    // _resolve_channel_avatar) - ChannelAvatar always prefers these over
+    // the raw avatar_url per its own docstring, so dropping them here
+    // meant every channel silently fell back to its avatar_kind default
+    // ('initials') regardless of whether a real photo/logo was set.
+    avatar_kind: item.avatar_kind || item.avatarKind || undefined,
+    avatar_display_url: item.avatar_display_url || item.avatarDisplayUrl || '',
+    avatar_initials: item.avatar_initials || item.avatarInitials || '',
     category: item.category || '',
     language: item.language || '',
     country: item.country || '',
