@@ -778,41 +778,104 @@ export default function ChannelStudioScreen({ legacyFeeds, liveCount, expiresAt,
   // creator owns, plus the premium-feature preview that previously sat
   // inside the per-channel Dashboard tab (it was never actually
   // channel-specific content, just always rendered there by default).
-  const renderOverview = () => (
+  // Each tile is now a real navigation shortcut, not a static number - the
+  // whole point of an "overview" is to jump straight into whatever the
+  // number is about, not just display it.
+  const renderOverview = () => {
+    const openFirstChannel = (landingTab: StudioTab) => {
+      if (!channels.length) {
+        setTopView('list');
+        return;
+      }
+      handleOpenChannelDetail(channels[0].id, landingTab);
+    };
+    return (
     <>
       {loading && !channels.length ? (
         <View style={styles.loadingRow}><ActivityIndicator color={palette.primaryStrong} /><Text style={[styles.loadingText, { color: palette.subtext }]}>Loading your channels</Text></View>
       ) : (
         <View style={styles.studioMetrics}>
-          <View style={[styles.metricTile, { borderColor: palette.goldMuted ?? palette.border, backgroundColor: tone === 'dark' ? palette.primarySoft : palette.surface }]}>
+          <Pressable
+            onPress={() => setTopView('list')}
+            style={[styles.metricTile, { borderColor: palette.goldMuted ?? palette.border, backgroundColor: tone === 'dark' ? palette.primarySoft : palette.surface }]}
+            accessibilityRole="button"
+            accessibilityLabel={`${aggregateStats.channelCount} channels - go to Channel Studio`}
+          >
             <Text style={[styles.metricValue, { color: palette.text }]}>{aggregateStats.channelCount}</Text>
             <Text style={[styles.metricLabel, { color: palette.subtext }]}>Channels</Text>
-          </View>
-          <View style={[styles.metricTile, { borderColor: palette.goldMuted ?? palette.border, backgroundColor: tone === 'dark' ? palette.primarySoft : palette.surface }]}>
+          </Pressable>
+          <Pressable
+            onPress={() => openFirstChannel('audience')}
+            style={[styles.metricTile, { borderColor: palette.goldMuted ?? palette.border, backgroundColor: tone === 'dark' ? palette.primarySoft : palette.surface }]}
+            accessibilityRole="button"
+            accessibilityLabel={`${aggregateStats.totalSubscribers} total subscribers - view audience`}
+          >
             <Text style={[styles.metricValue, { color: palette.text }]}>{aggregateStats.totalSubscribers}</Text>
             <Text style={[styles.metricLabel, { color: palette.subtext }]}>Total subscribers</Text>
-          </View>
-          <View style={[styles.metricTile, { borderColor: palette.goldMuted ?? palette.border, backgroundColor: tone === 'dark' ? palette.primarySoft : palette.surface }]}>
+          </Pressable>
+          <Pressable
+            onPress={() => openFirstChannel('content')}
+            style={[styles.metricTile, { borderColor: palette.goldMuted ?? palette.border, backgroundColor: tone === 'dark' ? palette.primarySoft : palette.surface }]}
+            accessibilityRole="button"
+            accessibilityLabel={`${aggregateStats.totalContent} published items - view content`}
+          >
             <Text style={[styles.metricValue, { color: palette.text }]}>{aggregateStats.totalContent}</Text>
             <Text style={[styles.metricLabel, { color: palette.subtext }]}>Published items</Text>
-          </View>
+          </Pressable>
           {aggregateStats.liveCount > 0 ? (
-            <View style={[styles.metricTile, { borderColor: palette.goldMuted ?? palette.border, backgroundColor: tone === 'dark' ? palette.primarySoft : palette.surface }]}>
+            <Pressable
+              onPress={() => openFirstChannel('live')}
+              style={[styles.metricTile, { borderColor: palette.goldMuted ?? palette.border, backgroundColor: tone === 'dark' ? palette.primarySoft : palette.surface }]}
+              accessibilityRole="button"
+              accessibilityLabel={`${aggregateStats.liveCount} live now - view live control room`}
+            >
               <Text style={[styles.metricValue, { color: palette.text }]}>{aggregateStats.liveCount}</Text>
               <Text style={[styles.metricLabel, { color: palette.subtext }]}>Live now</Text>
-            </View>
+            </Pressable>
           ) : null}
         </View>
       )}
+
+      {/* The one thing most people open this screen to do - previously
+          buried several taps deep (Overview -> Channel Studio -> pick a
+          channel -> Content category -> Create tab), with no shortcut
+          here at all. */}
       <KISButton
-        title="Go to Channel Studio"
-        onPress={() => setTopView('list')}
-        left={<KISIcon name="sub-channel" size={16} color={palette.onPrimary} />}
+        title="Create content"
+        onPress={() => onCreate(channels[0] ?? null)}
+        left={<KISIcon name="add" size={17} color={palette.onPrimary} />}
         style={{ marginTop: 14 }}
       />
-      {renderCreatorPremiumPreview('dashboard')}
+      <KISButton
+        title="Go to Channel Studio"
+        variant="outline"
+        onPress={() => setTopView('list')}
+        left={<KISIcon name="sub-channel" size={16} color={palette.primaryStrong} />}
+        style={{ marginTop: 8 }}
+      />
+
+      {/* Previously a full plan-card + 7-feature-card wall every time this
+          screen loaded, with nothing on it a user could act on besides a
+          single button at the very bottom - all the weight, none of the
+          interaction. Condensed to one line + one button; the full
+          feature breakdown still lives in the contexts where someone is
+          actually about to hit the specific limit it explains (Create,
+          Live, Analytics, Settings). */}
+      <Pressable
+        onPress={() => navigation.navigate('MainTabs')}
+        style={[styles.upsellBanner, { borderColor: palette.goldMuted ?? palette.border, backgroundColor: tone === 'dark' ? palette.primarySoft : palette.surface }]}
+        accessibilityRole="button"
+        accessibilityLabel="See what Creator Pro and Growth offer"
+      >
+        <View style={[styles.premiumIcon, { backgroundColor: palette.primarySoft }]}>
+          <KISIcon name="star" size={16} color={palette.primaryStrong} />
+        </View>
+        <Text style={[styles.upsellBannerText, { color: palette.text }]}>More channels, scheduling, and advanced analytics are available on Creator Pro and Growth.</Text>
+        <KISIcon name="chevron-right" size={16} color={palette.subtext} />
+      </Pressable>
     </>
-  );
+    );
+  };
 
   // The channel picker: every channel as a tappable card (avatar, name,
   // handle, subscribers, LIVE badge) rather than the small horizontal
@@ -1220,6 +1283,8 @@ const styles = StyleSheet.create({
   metricTile: { flex: 1, minWidth: 92, borderWidth: 1, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10 },
   metricValue: { fontSize: 15, fontWeight: '900' },
   metricLabel: { marginTop: 2, fontSize: 10, fontWeight: '800' },
+  upsellBanner: { flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1, borderRadius: 8, padding: 12, marginTop: 14 },
+  upsellBannerText: { flex: 1, fontSize: 12, lineHeight: 17, fontWeight: '700' },
   premiumPanel: { borderWidth: 1, borderRadius: 8, padding: 14, marginBottom: 12, gap: 12 },
   premiumHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   premiumIcon: { width: 40, height: 40, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
