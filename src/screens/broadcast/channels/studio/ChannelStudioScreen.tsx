@@ -11,14 +11,15 @@ import { resolveBackendAssetUrl } from '@/network';
 import { useKISTheme } from '@/theme/useTheme';
 import { useResponsiveLayout } from '@/theme/responsive';
 import type { RootStackParamList } from '@/navigation/types';
-import type { BroadcastChannelContent, BroadcastChannelPlaylist, BroadcastChannelSummary } from '@/screens/broadcast/channels/api/channels.types';
-import { createBroadcastChannel, fetchChannelContents, fetchChannelPlaylists, publishChannelContent, setChannelBroadcastState, setChannelContentBroadcastState, setChannelContentTags, setChannelContentVisibility, useChannelsData } from '@/screens/broadcast/channels/hooks/useChannelsData';
+import type { BroadcastChannelContent, BroadcastChannelSummary } from '@/screens/broadcast/channels/api/channels.types';
+import { createBroadcastChannel, fetchChannelContents, publishChannelContent, setChannelBroadcastState, setChannelContentBroadcastState, setChannelContentTags, setChannelContentVisibility, useChannelsData } from '@/screens/broadcast/channels/hooks/useChannelsData';
+import ChannelPlaylistsManager from '@/screens/broadcast/channels/studio/ChannelPlaylistsManager';
 import ROUTES from '@/network';
 import { getRequest } from '@/network/get';
-import { isTierAtLeast } from '@/services/tierAccess';
 import { useAuth } from '../../../../../App';
 import ChannelAnalyticsPanel from '@/screens/broadcast/channels/studio/ChannelAnalyticsPanel';
 import ChannelBrandingEditor from '@/screens/broadcast/channels/studio/ChannelBrandingEditor';
+import ChannelSettingsPanel, { ChannelManagersSection } from '@/screens/broadcast/channels/studio/ChannelSettingsPanel';
 import ChannelContentManager from '@/screens/broadcast/channels/studio/ChannelContentManager';
 import ChannelModerationPanel from '@/screens/broadcast/channels/studio/ChannelModerationPanel';
 import LiveControlRoom from '@/screens/broadcast/channels/studio/LiveControlRoom';
@@ -206,9 +207,12 @@ const CREATOR_PREMIUM_FEATURES = [
     key: 'live',
     planId: 'creator_growth',
     icon: 'channel',
-    title: 'Live and premieres',
+    title: 'Premieres and event monetization',
     value: 'Growth',
-    detail: 'Live provider controls, premieres, replays, moderation, and event monetization readiness.',
+    // Core live management (scheduling, going live, chat, moderation) is
+    // free on every tier - see the Live tab's own render branch. Only
+    // these additive extras are a genuine Growth-tier upsell.
+    detail: 'Scheduled premieres, replay packaging, and paid-event monetization readiness for live broadcasts.',
   },
   {
     key: 'paid-content',
@@ -234,13 +238,6 @@ export default function ChannelStudioScreen({ legacyFeeds, liveCount, expiresAt,
   const compact = responsive.isWatch || responsive.isCompactPhone;
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { user } = useAuth();
-  // Tier lives at the top level of the /users/me/ response (UserSerializer),
-  // not nested under profile - ProfileSerializer has no tier field at all,
-  // so user?.profile?.tier was always undefined regardless of the account's
-  // real tier, meaning this always evaluated as Free and blocked every
-  // Partner/Partner Pro account from live streaming. AdminUserManagementScreen.tsx
-  // and AdminUsersPanel.tsx already read user.tier directly - matching that.
-  const canUseLiveStreaming = isTierAtLeast(user?.tier ?? null, 'partner');
   // Top-level flow: Overview (aggregate, channel-agnostic) -> Channel
   // Studio (pick which channel) -> channel detail (the full 22-tab studio
   // below, now reached as a drill-in rather than always showing whichever
@@ -255,7 +252,6 @@ export default function ChannelStudioScreen({ legacyFeeds, liveCount, expiresAt,
   const [selectedContent, setSelectedContent] = useState<BroadcastChannelContent | null>(null);
   const [selectedChannelId, setSelectedChannelId] = useState<string | null>(null);
   const [contents, setContents] = useState<BroadcastChannelContent[]>([]);
-  const [playlists, setPlaylists] = useState<BroadcastChannelPlaylist[]>([]);
   const [loadingContent, setLoadingContent] = useState(false);
   const [createFormVisible, setCreateFormVisible] = useState(false);
   const [creatingChannel, setCreatingChannel] = useState(false);
@@ -493,12 +489,10 @@ export default function ChannelStudioScreen({ legacyFeeds, liveCount, expiresAt,
     if (!selectedChannel?.id) return;
     setLoadingContent(true);
     try {
-      const [contentRows, playlistRows] = await Promise.all([
-        fetchChannelContents(selectedChannel.id, { limit: 20 }),
-        fetchChannelPlaylists(selectedChannel.id),
-      ]);
+      // Playlists own their own fetch now (ChannelPlaylistsManager) - this
+      // only ever feeds the Content tab/dashboard's content list.
+      const contentRows = await fetchChannelContents(selectedChannel.id, { limit: 20 });
       setContents(contentRows.contents);
-      setPlaylists(playlistRows);
     } finally {
       setLoadingContent(false);
     }
@@ -961,38 +955,20 @@ export default function ChannelStudioScreen({ legacyFeeds, liveCount, expiresAt,
         </View>
       );
     }
-    if (activeTab === 'playlists') {
-      return (
-        <View style={[styles.emptyChannel, { borderColor: palette.border, backgroundColor: palette.surface }]}> 
-          <Text style={[styles.sectionTitle, { color: palette.text }]}>Playlists</Text>
-          {playlists.length ? playlists.map(item => <Text key={item.id} style={[styles.sectionText, { color: palette.subtext }]}>- {item.title}</Text>) : <Text style={[styles.sectionText, { color: palette.subtext }]}>Playlist creation and reorder UI is prepared for the playlist API; no public playlists are available yet.</Text>}
-        </View>
-      );
-    }
+    if (activeTab === 'playlists') return <ChannelPlaylistsManager channelId={selectedChannel.id} />;
     if (activeTab === 'live') {
-      if (!canUseLiveStreaming) {
-        return (
-          <View style={[styles.upgradePrompt, { backgroundColor: palette.surface, borderColor: palette.border }]}>
-            <KISIcon name="channel" size={32} color={palette.primaryStrong} />
-            <Text style={[styles.upgradeTitle, { color: palette.text }]}>Live Streaming</Text>
-            <Text style={[styles.upgradeText, { color: palette.subtext }]}>
-              Live streaming is available on Partner plans and above. Upgrade your account to schedule and broadcast live streams to your subscribers.
-            </Text>
-            {/* Previously a dead end - text only, no way to actually act on
-                it. Upgrading itself (tier lookup, discount/reward
-                application, Flutterwave checkout) lives in
-                useProfileController.upgradeTier, which needs profile/tiers
-                data this screen doesn't have - rather than duplicate that
-                payment logic here, this hands off to the Profile tab where
-                the real, working "Upgrade" entry point already is. */}
-            <KISButton
-              title="Go to Profile to upgrade"
-              onPress={() => navigation.navigate('MainTabs')}
-              style={{ marginTop: 14 }}
-            />
-          </View>
-        );
-      }
+      // Core live-stream management - scheduling, going live, the control
+      // room, chat/moderation - is ordinary creator functionality, not a
+      // paid-tier feature (matches every free-tier live offering this is
+      // benchmarked against). It used to be flatly blocked below Partner
+      // tier; the only thing that's still a genuine premium upsell is the
+      // advanced stuff in renderCreatorPremiumPreview('live') below
+      // (premieres/replays/event monetization), which is additive, not a
+      // gate on using live streaming itself. Whether a stream can actually
+      // go live is a server-side, infra-readiness concern (the configured
+      // live provider), surfaced by LiveControlRoom's own error handling
+      // when that call is made - not something this screen should guess at
+      // or pre-emptively paywall.
       return (
         <>
           {renderCreatorPremiumPreview('live')}
@@ -1023,14 +999,9 @@ export default function ChannelStudioScreen({ legacyFeeds, liveCount, expiresAt,
     if (activeTab === 'settings') {
       return (
         <>
+          <ChannelSettingsPanel channel={selectedChannel} onUpdated={refresh} />
+          <ChannelManagersSection channel={selectedChannel} />
           {renderCreatorPremiumPreview('settings')}
-          <TrustPromotionRevenuePreviewCard
-            palette={palette}
-            kind="promotion_entry"
-            title="Promotion campaign preview"
-            subtitle="Campaign packages, sponsored labels, and review states are visible here for planning only."
-          />
-          <Placeholder title="Channel settings" text="Visibility, comments, embed allowlist, moderation defaults, and channel permissions will be wired as backend policies are finalized." />
         </>
       );
     }
@@ -1218,16 +1189,6 @@ export default function ChannelStudioScreen({ legacyFeeds, liveCount, expiresAt,
   );
 }
 
-function Placeholder({ title, text }: { title: string; text: string }) {
-  const { palette } = useKISTheme();
-  return (
-    <View style={[styles.emptyChannel, { borderColor: palette.border, backgroundColor: palette.surface }]}> 
-      <Text style={[styles.sectionTitle, { color: palette.text }]}>{title}</Text>
-      <Text style={[styles.sectionText, { color: palette.subtext }]}>{text}</Text>
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
   topTabBar: { flexDirection: 'row', gap: 8, marginTop: 14 },
   backButton: { alignSelf: 'flex-start', marginBottom: 8 },
@@ -1295,7 +1256,4 @@ const styles = StyleSheet.create({
   textarea: { minHeight: 82, textAlignVertical: 'top' },
   errorText: { fontSize: 12, lineHeight: 17, fontWeight: '800' },
   headerActions: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' },
-  upgradePrompt: { borderWidth: 1, borderRadius: 8, padding: 24, marginBottom: 12, alignItems: 'center', gap: 12 },
-  upgradeTitle: { fontSize: 18, fontWeight: '900', textAlign: 'center' },
-  upgradeText: { fontSize: 13, lineHeight: 19, fontWeight: '700', textAlign: 'center' },
 });

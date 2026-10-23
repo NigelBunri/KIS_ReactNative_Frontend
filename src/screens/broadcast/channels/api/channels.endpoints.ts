@@ -18,11 +18,14 @@ export const channelContentSaveEndpoint = ROUTES.broadcasts.channelContentSave;
 export const channelContentShareEndpoint = ROUTES.broadcasts.channelContentShare;
 export const channelContentViewEndpoint = ROUTES.broadcasts.channelContentView;
 export const channelContentCommentsEndpoint = ROUTES.broadcasts.channelContentComments;
+export const playlistDetailEndpoint = ROUTES.broadcasts.playlistDetail;
 export const playlistItemsEndpoint = ROUTES.broadcasts.playlistItems;
 export const playlistItemDetailEndpoint = ROUTES.broadcasts.playlistItemDetail;
 
 export const channelReportEndpoint = ROUTES.broadcasts.channelReport;
 export const channelModerationEndpoint = ROUTES.broadcasts.channelModeration;
+export const channelManagersEndpoint = ROUTES.broadcasts.channelManagers;
+export const channelManagerDetailEndpoint = ROUTES.broadcasts.channelManagerDetail;
 export const channelAnalyticsEndpoint = ROUTES.broadcasts.channelAnalytics;
 export const channelBroadcastEndpoint = ROUTES.broadcasts.channelBroadcast;
 export const channelContentReportEndpoint = ROUTES.broadcasts.channelContentReport;

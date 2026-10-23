@@ -27,6 +27,11 @@ export type BroadcastChannelSummary = {
   // | 'none') - null/absent when the viewer isn't subscribed at all.
   notification_level?: 'all' | 'personalized' | 'none' | null;
   viewer_role?: string;
+  // Whether anyone other than a channel manager can see this channel at
+  // all (apps/broadcasts/views.py's BroadcastChannelDetailView.get 404s a
+  // private channel for non-managers) - already in the backend's summary
+  // serializer, just missing here until now.
+  is_public?: boolean;
 };
 
 export type BroadcastChannelContentAsset = {
@@ -90,6 +95,7 @@ export type BroadcastChannelPlaylist = {
   description?: string;
   visibility?: string;
   sort_order?: number;
+  shuffle_enabled?: boolean;
   metadata?: Record<string, any>;
   created_at?: string;
   updated_at?: string;

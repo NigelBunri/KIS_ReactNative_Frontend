@@ -17,6 +17,11 @@ import {
   channelContentsEndpoint,
   channelDetailEndpoint,
   channelPlaylistsEndpoint,
+  playlistDetailEndpoint,
+  playlistItemsEndpoint,
+  playlistItemDetailEndpoint,
+  channelManagersEndpoint,
+  channelManagerDetailEndpoint,
   channelSubscribeEndpoint,
   channelLiveStreamsEndpoint,
   liveNowEndpoint,
@@ -101,7 +106,7 @@ const buildQuery = (params: Record<string, any>) => {
 
 export const buildChannelQuery = buildQuery;
 
-export const normalizeChannel = (item: any): BroadcastChannelSummary | null => {
+export const normalizeChannel = (item: any): BroadcastChannelDetail | null => {
   if (!item || typeof item !== 'object' || !item.id) return null;
   return {
     id: String(item.id),
@@ -129,6 +134,16 @@ export const normalizeChannel = (item: any): BroadcastChannelSummary | null => {
     content_count: Number(item.content_count ?? item.contentCount ?? 0),
     is_subscribed: Boolean(item.is_subscribed ?? item.isSubscribed),
     viewer_role: item.viewer_role || item.viewerRole || '',
+    is_public: item.is_public ?? item.isPublic,
+    // Detail-only fields (BroadcastChannelDetailSerializer) - absent on
+    // list-endpoint rows (BroadcastChannelSummarySerializer), which is why
+    // these stay optional/undefined rather than defaulting to {}/[] here:
+    // a channel-settings UI reading `undefined` vs `{}` needs to be able to
+    // tell "this came from the list endpoint, go fetch the real detail"
+    // apart from "the detail endpoint said there really is nothing here".
+    settings: item.settings && typeof item.settings === 'object' ? item.settings : undefined,
+    branding: item.branding && typeof item.branding === 'object' ? item.branding : undefined,
+    links: Array.isArray(item.links) ? item.links : undefined,
   };
 };
 
@@ -195,6 +210,7 @@ export const normalizePlaylist = (item: any): BroadcastChannelPlaylist | null =>
     description: item.description || '',
     visibility: item.visibility || '',
     sort_order: Number(item.sort_order ?? item.sortOrder ?? 0),
+    shuffle_enabled: Boolean(item.shuffle_enabled ?? item.shuffleEnabled),
     metadata: item.metadata && typeof item.metadata === 'object' ? item.metadata : {},
     created_at: item.created_at || item.createdAt || '',
     updated_at: item.updated_at || item.updatedAt || '',
@@ -237,6 +253,92 @@ export const fetchChannelPlaylists = async (channelId: string): Promise<Broadcas
   const response = await getRequest(`${channelPlaylistsEndpoint(channelId)}${buildQuery({ limit: 24 })}`, { errorMessage: 'Unable to load playlists.' });
   if (!response?.success) return [];
   return unwrapRows(response.data || {}).map(normalizePlaylist).filter(Boolean) as BroadcastChannelPlaylist[];
+};
+
+export const createChannelPlaylist = async (
+  channelId: string,
+  payload: { title: string; description?: string; visibility?: string },
+): Promise<BroadcastChannelPlaylist> => {
+  const response = await postRequest(channelPlaylistsEndpoint(channelId), payload, { errorMessage: 'Unable to create playlist.' });
+  if (!response?.success) throw new Error(response?.message || 'Unable to create playlist.');
+  const normalized = normalizePlaylist(response.data);
+  if (!normalized) throw new Error('Unable to create playlist.');
+  return normalized;
+};
+
+export const updateChannelPlaylist = async (
+  playlistId: string,
+  payload: { title?: string; description?: string; visibility?: string; shuffle_enabled?: boolean },
+): Promise<BroadcastChannelPlaylist | null> => {
+  const response = await patchRequest(playlistDetailEndpoint(playlistId), payload, { errorMessage: 'Unable to update playlist.' });
+  if (!response?.success) return null;
+  return normalizePlaylist(response.data);
+};
+
+export const deleteChannelPlaylist = async (playlistId: string): Promise<boolean> => {
+  const response = await deleteRequest(playlistDetailEndpoint(playlistId), { errorMessage: 'Unable to delete playlist.' });
+  return Boolean(response?.success);
+};
+
+export type ChannelPlaylistItemRow = { itemId: string; sortOrder: number; content: BroadcastChannelContent };
+
+export const fetchChannelPlaylistItems = async (
+  playlistId: string,
+): Promise<{ playlist: BroadcastChannelPlaylist | null; items: ChannelPlaylistItemRow[] }> => {
+  const response = await getRequest(playlistItemsEndpoint(playlistId), { errorMessage: 'Unable to load playlist items.' });
+  if (!response?.success) return { playlist: null, items: [] };
+  const payload: any = response.data || {};
+  const items = unwrapRows(payload)
+    .map((row: any) => {
+      const content = normalizeChannelContent(row?.content);
+      if (!content || row?.id == null) return null;
+      // `id` here is the BroadcastPlaylistItem row's own PK - distinct
+      // from content.id - reordering (BroadcastPlaylistItemView.patch)
+      // keys on THIS id, not the content id, so it has to survive
+      // normalization even though the content itself is what renders.
+      return { itemId: String(row.id), sortOrder: Number(row.sort_order ?? 0), content } as ChannelPlaylistItemRow;
+    })
+    .filter(Boolean) as ChannelPlaylistItemRow[];
+  return { playlist: normalizePlaylist(payload.playlist), items };
+};
+
+export const addChannelPlaylistItem = async (playlistId: string, contentId: string): Promise<boolean> => {
+  const response = await postRequest(playlistItemsEndpoint(playlistId), { content_id: contentId }, { errorMessage: 'Unable to add to playlist.' });
+  return Boolean(response?.success);
+};
+
+export const removeChannelPlaylistItem = async (playlistId: string, contentId: string): Promise<boolean> => {
+  const response = await deleteRequest(playlistItemDetailEndpoint(playlistId, contentId), { errorMessage: 'Unable to remove from playlist.' });
+  return Boolean(response?.success);
+};
+
+// `orderedItemIds` are BroadcastPlaylistItem row ids (ChannelPlaylistItemRow.itemId),
+// never content ids - see BroadcastPlaylistItemView.patch's reorder branch,
+// which filters `BroadcastPlaylistItem.objects.filter(id=item_id)`.
+export const reorderChannelPlaylistItems = async (playlistId: string, orderedItemIds: string[]): Promise<boolean> => {
+  const response = await patchRequest(playlistItemsEndpoint(playlistId), { order: orderedItemIds }, { errorMessage: 'Unable to reorder playlist.' });
+  return Boolean(response?.success);
+};
+
+// ── Channel managers ────────────────────────────────────────────────────
+
+export type ChannelManager = { user_id: string; display_name: string; phone: string; role: string };
+
+export const fetchChannelManagers = async (channelId: string): Promise<ChannelManager[]> => {
+  const response = await getRequest(channelManagersEndpoint(channelId), { errorMessage: 'Unable to load managers.' });
+  if (!response?.success) return [];
+  return unwrapRows(response.data || {}) as ChannelManager[];
+};
+
+export const addChannelManager = async (channelId: string, phone: string): Promise<ChannelManager> => {
+  const response = await postRequest(channelManagersEndpoint(channelId), { phone }, { errorMessage: 'Unable to add this manager.' });
+  if (!response?.success) throw new Error(response?.message || 'Unable to add this manager.');
+  return response.data as ChannelManager;
+};
+
+export const removeChannelManager = async (channelId: string, userId: string): Promise<boolean> => {
+  const response = await deleteRequest(channelManagerDetailEndpoint(channelId, userId), { errorMessage: 'Unable to remove this manager.' });
+  return Boolean(response?.success);
 };
 
 export const fetchChannelContentDetail = async (contentId: string): Promise<BroadcastChannelContent | null> => {

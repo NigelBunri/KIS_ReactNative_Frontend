@@ -497,6 +497,10 @@ const broadcastRoutes = {
       `${API_BASE_URL}/api/v1/broadcasts/channels/${channelId}/report/`,
     channelModeration: (channelId: string) =>
       `${API_BASE_URL}/api/v1/broadcasts/channels/${channelId}/moderation/`,
+    channelManagers: (channelId: string) =>
+      `${API_BASE_URL}/api/v1/broadcasts/channels/${channelId}/managers/`,
+    channelManagerDetail: (channelId: string, userId: string) =>
+      `${API_BASE_URL}/api/v1/broadcasts/channels/${channelId}/managers/${userId}/`,
     channelAnalytics: (channelId: string) =>
       `${API_BASE_URL}/api/v1/broadcasts/channels/${channelId}/analytics/`,
     channelBroadcast: (channelId: string) =>
@@ -588,6 +592,8 @@ const broadcastRoutes = {
     watchHistory: `${API_BASE_URL}/api/v1/broadcasts/watch-history/`,
     channelContentClip: (contentId: string) =>
       `${API_BASE_URL}/api/v1/broadcasts/channel-contents/${contentId}/clip/`,
+    playlistDetail: (playlistId: string) =>
+      `${API_BASE_URL}/api/v1/broadcasts/playlists/${playlistId}/`,
     playlistItems: (playlistId: string) =>
       `${API_BASE_URL}/api/v1/broadcasts/playlists/${playlistId}/items/`,
     playlistItemDetail: (playlistId: string, contentId: string) =>
