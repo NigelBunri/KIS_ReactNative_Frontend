@@ -5,6 +5,7 @@ import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { KISIcon } from '@/constants/kisIcons';
 import KISButton from '@/constants/KISButton';
+import ChannelAvatar from '@/components/broadcast/ChannelAvatar';
 import { useKISTheme } from '@/theme/useTheme';
 import { useResponsiveLayout } from '@/theme/responsive';
 import type { RootStackParamList } from '@/navigation/types';
@@ -238,6 +239,15 @@ export default function ChannelStudioScreen({ legacyFeeds, liveCount, expiresAt,
   // Partner/Partner Pro account from live streaming. AdminUserManagementScreen.tsx
   // and AdminUsersPanel.tsx already read user.tier directly - matching that.
   const canUseLiveStreaming = isTierAtLeast(user?.tier ?? null, 'partner');
+  // Top-level flow: Overview (aggregate, channel-agnostic) -> Channel
+  // Studio (pick which channel) -> channel detail (the full 22-tab studio
+  // below, now reached as a drill-in rather than always showing whichever
+  // channel happened to be first). "detail" hides the Overview/Channel
+  // Studio tab bar in favor of a back button, matching a normal
+  // push-navigation feel rather than three permanently-visible tab bars
+  // stacked on top of each other.
+  type StudioTopView = 'overview' | 'list' | 'detail';
+  const [topView, setTopView] = useState<StudioTopView>('overview');
   const [activeTab, setActiveTab] = useState<StudioTab>('dashboard');
   const [activeCategory, setActiveCategory] = useState<StudioTabCategory>(categoryForTab('dashboard'));
   const [selectedContent, setSelectedContent] = useState<BroadcastChannelContent | null>(null);
@@ -322,6 +332,30 @@ export default function ChannelStudioScreen({ legacyFeeds, liveCount, expiresAt,
     setActiveCategory(step.category);
     setActiveTab(step.tab);
   }, []);
+
+  const handleOpenChannelDetail = useCallback((channelId: string) => {
+    setSelectedChannelId(channelId);
+    // Reset to a clean landing tab each time a channel is opened, rather
+    // than leaving whichever tab a previous channel happened to be on.
+    setActiveCategory(categoryForTab('dashboard'));
+    setActiveTab('dashboard');
+    // The create-channel form lives inside the list view - closing it on
+    // navigation avoids it reappearing (stale open state) if it was left
+    // open when a channel card was tapped.
+    setCreateFormVisible(false);
+    setTopView('detail');
+  }, []);
+
+  const handleBackToChannelList = useCallback(() => {
+    setTopView('list');
+  }, []);
+
+  const aggregateStats = useMemo(() => ({
+    channelCount: channels.length,
+    totalSubscribers: channels.reduce((sum, channel) => sum + (channel.subscriber_count || 0), 0),
+    totalContent: channels.reduce((sum, channel) => sum + (channel.content_count || 0), 0),
+    liveCount: channels.filter(channel => channel.is_broadcast).length,
+  }), [channels]);
 
   const createLabel = selectedChannel?.handle ? `Create in @${selectedChannel.handle}` : 'Create feed/content';
   const channelUsageText = channels.length
@@ -729,6 +763,89 @@ export default function ChannelStudioScreen({ legacyFeeds, liveCount, expiresAt,
     </View>
   );
 
+  // Channel-agnostic hub: aggregate numbers across every channel the
+  // creator owns, plus the premium-feature preview that previously sat
+  // inside the per-channel Dashboard tab (it was never actually
+  // channel-specific content, just always rendered there by default).
+  const renderOverview = () => (
+    <>
+      {loading && !channels.length ? (
+        <View style={styles.loadingRow}><ActivityIndicator color={palette.primaryStrong} /><Text style={[styles.loadingText, { color: palette.subtext }]}>Loading your channels</Text></View>
+      ) : (
+        <View style={styles.studioMetrics}>
+          <View style={[styles.metricTile, { borderColor: palette.goldMuted ?? palette.border, backgroundColor: tone === 'dark' ? palette.primarySoft : palette.surface }]}>
+            <Text style={[styles.metricValue, { color: palette.text }]}>{aggregateStats.channelCount}</Text>
+            <Text style={[styles.metricLabel, { color: palette.subtext }]}>Channels</Text>
+          </View>
+          <View style={[styles.metricTile, { borderColor: palette.goldMuted ?? palette.border, backgroundColor: tone === 'dark' ? palette.primarySoft : palette.surface }]}>
+            <Text style={[styles.metricValue, { color: palette.text }]}>{aggregateStats.totalSubscribers}</Text>
+            <Text style={[styles.metricLabel, { color: palette.subtext }]}>Total subscribers</Text>
+          </View>
+          <View style={[styles.metricTile, { borderColor: palette.goldMuted ?? palette.border, backgroundColor: tone === 'dark' ? palette.primarySoft : palette.surface }]}>
+            <Text style={[styles.metricValue, { color: palette.text }]}>{aggregateStats.totalContent}</Text>
+            <Text style={[styles.metricLabel, { color: palette.subtext }]}>Published items</Text>
+          </View>
+          {aggregateStats.liveCount > 0 ? (
+            <View style={[styles.metricTile, { borderColor: palette.goldMuted ?? palette.border, backgroundColor: tone === 'dark' ? palette.primarySoft : palette.surface }]}>
+              <Text style={[styles.metricValue, { color: palette.text }]}>{aggregateStats.liveCount}</Text>
+              <Text style={[styles.metricLabel, { color: palette.subtext }]}>Live now</Text>
+            </View>
+          ) : null}
+        </View>
+      )}
+      <KISButton
+        title="Go to Channel Studio"
+        onPress={() => setTopView('list')}
+        left={<KISIcon name="sub-channel" size={16} color={palette.onPrimary} />}
+        style={{ marginTop: 14 }}
+      />
+      {renderCreatorPremiumPreview('dashboard')}
+    </>
+  );
+
+  // The channel picker: every channel as a tappable card (avatar, name,
+  // handle, subscribers, LIVE badge) rather than the small horizontal
+  // pills this replaced - tapping one drills into its full studio
+  // (renderBody/the category+tab system below) via handleOpenChannelDetail.
+  const renderChannelList = () => (
+    <>
+      {createFormVisible ? renderCreateChannelForm() : null}
+      {loading && !channels.length ? (
+        <View style={styles.loadingRow}><ActivityIndicator color={palette.primaryStrong} /><Text style={[styles.loadingText, { color: palette.subtext }]}>Loading your channels</Text></View>
+      ) : channels.length ? (
+        <View style={styles.channelCardList}>
+          {channels.map(channel => (
+            <KISButton
+              key={channel.id}
+              variant="outline"
+              onPress={() => handleOpenChannelDetail(channel.id)}
+              style={styles.channelCard}
+            >
+              <View style={styles.channelCardRow}>
+                <ChannelAvatar channel={channel} size={44} />
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.channelCardName, { color: palette.text }]} numberOfLines={1}>
+                    {channel.display_name}{channel.is_broadcast ? ' · LIVE' : ''}
+                  </Text>
+                  <Text style={[styles.channelCardHandle, { color: palette.subtext }]} numberOfLines={1}>
+                    @{channel.handle} · {channel.subscriber_count || 0} subscribers
+                  </Text>
+                </View>
+                <KISIcon name="chevron-right" size={18} color={palette.subtext} />
+              </View>
+            </KISButton>
+          ))}
+        </View>
+      ) : (
+        <View style={[styles.emptyChannel, { borderColor: palette.border, backgroundColor: palette.surface }]}>
+          <Text style={[styles.sectionTitle, { color: palette.text }]}>No channels yet</Text>
+          <Text style={[styles.sectionText, { color: palette.subtext }]}>{channelUsageText}</Text>
+        </View>
+      )}
+      <KISButton title="+ New Channel" size="sm" variant="outline" onPress={() => setCreateFormVisible(true)} style={{ marginTop: 10 }} />
+    </>
+  );
+
   const renderBody = () => {
     if (loading && !selectedChannel) {
       return <View style={styles.loadingRow}><ActivityIndicator color={palette.primaryStrong} /><Text style={[styles.loadingText, { color: palette.subtext }]}>Loading channels</Text></View>;
@@ -890,8 +1007,35 @@ export default function ChannelStudioScreen({ legacyFeeds, liveCount, expiresAt,
     );
   };
 
+  if (topView !== 'detail') {
+    return (
+      <View style={[styles.shell, { backgroundColor: palette.card, borderColor: palette.border, padding: compact ? 11 : 16 }]}>
+        <View style={[styles.headerRow, compact && { alignItems: 'flex-start' }]}>
+          <View style={[styles.logo, { backgroundColor: palette.primarySoft, borderColor: palette.gold, width: compact ? 40 : 48, height: compact ? 40 : 48 }]}>
+            <KISIcon name="sub-channel" size={22} color={palette.primaryStrong} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.eyebrow, { color: palette.primaryStrong }]}>CREATOR TOOLS</Text>
+            <Text style={[styles.title, { color: palette.text, fontSize: compact ? 18 : 22, lineHeight: compact ? 23 : 27 }]} numberOfLines={2}>
+              {topView === 'overview' ? 'Overview' : 'Channel Studio'}
+            </Text>
+            <Text style={[styles.subtitle, { color: palette.subtext }]} numberOfLines={compact ? 2 : 1}>
+              {topView === 'overview' ? 'Everything across your channels, at a glance.' : 'Pick a channel to manage its content, branding, and more.'}
+            </Text>
+          </View>
+        </View>
+        <View style={styles.topTabBar}>
+          <KISButton title="Overview" size="sm" variant={topView === 'overview' ? 'primary' : 'outline'} onPress={() => setTopView('overview')} style={{ flex: 1 }} />
+          <KISButton title="Channel Studio" size="sm" variant={topView === 'list' ? 'primary' : 'outline'} onPress={() => setTopView('list')} style={{ flex: 1 }} />
+        </View>
+        {topView === 'overview' ? renderOverview() : renderChannelList()}
+      </View>
+    );
+  }
+
   return (
-    <View style={[styles.shell, { backgroundColor: palette.card, borderColor: palette.border, padding: compact ? 11 : 16 }]}> 
+    <View style={[styles.shell, { backgroundColor: palette.card, borderColor: palette.border, padding: compact ? 11 : 16 }]}>
+      <KISButton title="← All channels" size="xs" variant="ghost" onPress={handleBackToChannelList} style={styles.backButton} />
       <View style={[styles.headerRow, compact && { alignItems: 'flex-start' }]}>
         <View style={[styles.logo, { backgroundColor: palette.primarySoft, borderColor: palette.gold, width: compact ? 40 : 48, height: compact ? 40 : 48 }]}>
           <KISIcon name="sub-channel" size={22} color={palette.primaryStrong} />
@@ -934,24 +1078,6 @@ export default function ChannelStudioScreen({ legacyFeeds, liveCount, expiresAt,
           </View>
         </View>
       ) : null}
-      {channels.length ? (
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[styles.channelPills, { paddingTop: compact ? 10 : 14 }]}> 
-          {channels.map(channel => {
-            const active = channel.id === selectedChannel?.id;
-            return (
-              <KISButton
-                key={channel.id}
-                title={`@${channel.handle}${channel.is_broadcast ? ' · LIVE' : ''}`}
-                size="xs"
-                variant={active ? 'primary' : 'outline'}
-                onPress={() => setSelectedChannelId(channel.id)}
-              />
-            );
-          })}
-          <KISButton title="+ New Channel" size="sm" variant="outline" onPress={() => setCreateFormVisible(true)} />
-        </ScrollView>
-      ) : null}
-      {createFormVisible && (selectedChannel || lastCreatedHandle) ? renderCreateChannelForm() : null}
       {showJourney ? (
         <View style={[styles.journeyCard, { borderColor: palette.goldMuted ?? palette.border, backgroundColor: tone === 'dark' ? palette.primarySoft : palette.surface }]}>
           <View style={styles.journeyHeaderRow}>
@@ -1046,6 +1172,13 @@ function Placeholder({ title, text }: { title: string; text: string }) {
 }
 
 const styles = StyleSheet.create({
+  topTabBar: { flexDirection: 'row', gap: 8, marginTop: 14 },
+  backButton: { alignSelf: 'flex-start', marginBottom: 8 },
+  channelCardList: { gap: 8, marginTop: 14 },
+  channelCard: { alignItems: 'stretch', paddingVertical: 10 },
+  channelCardRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  channelCardName: { fontSize: 14, fontWeight: '800' },
+  channelCardHandle: { fontSize: 12, marginTop: 2 },
   journeyCard: { borderWidth: 1, borderRadius: 8, padding: 14, marginTop: 10, gap: 8 },
   journeyHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   journeyTitle: { fontSize: 15, fontWeight: '900' },
