@@ -375,6 +375,7 @@ export default function FeedComposerSheet({
       visible={visible}
       animationType="fade"
       onRequestClose={requestClose}
+      statusBarTranslucent
     >
       <Pressable style={styles.backdrop} onPress={requestClose} accessibilityLabel="Dismiss" />
       <Animated.View
