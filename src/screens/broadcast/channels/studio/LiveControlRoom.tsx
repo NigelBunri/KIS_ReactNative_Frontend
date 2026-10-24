@@ -24,6 +24,7 @@ import {
   ActivityIndicator,
   Alert,
   Clipboard,
+  Image,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -35,6 +36,7 @@ import {
   View,
 } from 'react-native';
 import { launchImageLibrary } from 'react-native-image-picker';
+import Video from 'react-native-video';
 import { KISIcon } from '@/constants/kisIcons';
 import KISButton from '@/constants/KISButton';
 import KISTextInput from '@/constants/KISTextInput';
@@ -463,6 +465,7 @@ function BroadcasterPanel({
   // Subscribe to service state + stats + errors
   useEffect(() => {
     const unsub1 = liveStreamingService.onStateChange(state => {
+      console.log('[LiveControlRoom] liveStreamingService state ->', state);
       setServiceState(state);
       // A fresh connection attempt shouldn't show a stale error banner.
       if (state === 'connecting' || state === 'live') setConnectionErrorMessage(null);
@@ -472,6 +475,7 @@ function BroadcasterPanel({
       reportHealth('good');
     });
     const unsub3 = liveStreamingService.onError(err => {
+      console.error('[LiveControlRoom] liveStreamingService onError ->', err?.message ?? err);
       setConnectionErrorMessage(err?.message || 'A connection problem occurred.');
       reportHealth('error', err?.message);
     });
@@ -499,15 +503,26 @@ function BroadcasterPanel({
   // this screen at all.
   const fetchStreamKey = useCallback(async () => {
     if (keyLoading) return;
+    console.log('[LiveControlRoom] fetchStreamKey -> GET', ROUTES.broadcasts.liveStreamStreamKey(stream.id));
     setKeyLoading(true);
     try {
       const res = await getRequest(
         ROUTES.broadcasts.liveStreamStreamKey(stream.id),
         { errorMessage: 'Unable to load stream key.' },
       );
+      console.log('[LiveControlRoom] fetchStreamKey response', {
+        success: res?.success,
+        provider: res?.data?.provider,
+        hasStreamKey: !!(res?.data?.stream_key ?? res?.data?.key),
+        ingestUrl: res?.data?.ingest_url,
+      });
       if (res?.success) {
         setStreamKey(String(res.data?.stream_key ?? res.data?.key ?? ''));
+      } else {
+        console.error('[LiveControlRoom] fetchStreamKey failed', res);
       }
+    } catch (e: any) {
+      console.error('[LiveControlRoom] fetchStreamKey threw', e?.message ?? e);
     } finally {
       setKeyLoading(false);
     }
@@ -529,6 +544,7 @@ function BroadcasterPanel({
           text: 'Rotate',
           style: 'destructive',
           onPress: async () => {
+            console.log('[LiveControlRoom] rotateStreamKey -> POST', ROUTES.broadcasts.liveStreamStreamKeyRotate(stream.id));
             setRotating(true);
             try {
               const res = await postRequest(
@@ -536,9 +552,17 @@ function BroadcasterPanel({
                 {},
                 { errorMessage: 'Unable to rotate stream key.' },
               );
+              console.log('[LiveControlRoom] rotateStreamKey response', {
+                success: res?.success, provider: res?.data?.provider,
+                hasStreamKey: !!res?.data?.stream_key,
+              });
               if (res?.success) {
                 setStreamKey(String(res.data?.stream_key ?? ''));
+              } else {
+                console.error('[LiveControlRoom] rotateStreamKey failed', res);
               }
+            } catch (e: any) {
+              console.error('[LiveControlRoom] rotateStreamKey threw', e?.message ?? e);
             } finally {
               setRotating(false);
             }
@@ -566,12 +590,18 @@ function BroadcasterPanel({
           text: 'Go Live',
           style: 'destructive',
           onPress: async () => {
+            console.log('[LiveControlRoom] handleGoLive -> startBroadcast', {
+              streamId: stream.id,
+              whipEndpoint: ROUTES.broadcasts.liveStreamWhip(stream.id),
+            });
             try {
               await liveStreamingService.startBroadcast({
                 streamId: stream.id,
                 whipEndpoint: ROUTES.broadcasts.liveStreamWhip(stream.id),
               });
+              console.log('[LiveControlRoom] startBroadcast resolved — connect() setup finished');
             } catch (e: any) {
+              console.error('[LiveControlRoom] startBroadcast threw', e?.message ?? e);
               Alert.alert('Start failed', e?.message ?? 'Unable to start broadcast.');
             }
           },
@@ -591,8 +621,14 @@ function BroadcasterPanel({
           text: 'End Stream',
           style: 'destructive',
           onPress: async () => {
-            await liveStreamingService.stopBroadcast();
-            await endLiveStream(stream.id);
+            console.log('[LiveControlRoom] handleStop -> stopBroadcast + endLiveStream', stream.id);
+            try {
+              await liveStreamingService.stopBroadcast();
+              await endLiveStream(stream.id);
+              console.log('[LiveControlRoom] handleStop complete');
+            } catch (e: any) {
+              console.error('[LiveControlRoom] handleStop threw', e?.message ?? e);
+            }
           },
         },
       ],
@@ -1112,9 +1148,31 @@ export default function LiveControlRoom({ channel, onOpenWatch }: Props) {
           ) : null}
         </View>
         {waitMediaUrl ? (
-          <Text style={[styles.panelSubtitle, { color: palette.subtext }]}>
-            {waitMediaType === 'video' ? 'Video selected — will loop continuously.' : 'Image selected.'}
-          </Text>
+          <View style={styles.waitMediaPreviewWrap}>
+            <View style={[styles.waitMediaPreviewFrame, { borderColor: palette.border }]}>
+              {waitMediaType === 'video' ? (
+                <Video
+                  source={{ uri: waitMediaUrl }}
+                  style={styles.waitMediaPreviewMedia}
+                  resizeMode="cover"
+                  controls
+                  paused
+                  repeat
+                />
+              ) : (
+                <Image
+                  source={{ uri: waitMediaUrl }}
+                  style={styles.waitMediaPreviewMedia}
+                  resizeMode="cover"
+                />
+              )}
+            </View>
+            <Text style={[styles.panelSubtitle, { color: palette.subtext, marginTop: 0 }]}>
+              {waitMediaType === 'video'
+                ? 'This is exactly what viewers will see, looping, before you go live.'
+                : 'This is exactly what viewers will see before you go live.'}
+            </Text>
+          </View>
         ) : null}
         <KISButton
           disabled={saving || !title.trim() || waitMediaUploading}
@@ -1295,6 +1353,17 @@ const styles = StyleSheet.create({
   panelSubtitle: { marginTop: 3, fontSize: 11, lineHeight: 16, fontWeight: '700' },
 
   sectionLabel: { fontSize: 11, fontWeight: '800', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.8 },
+
+  waitMediaPreviewWrap: { gap: 6 },
+  waitMediaPreviewFrame: {
+    width: 180,
+    height: 180,
+    borderRadius: 16,
+    borderWidth: 2,
+    overflow: 'hidden',
+    backgroundColor: '#000',
+  },
+  waitMediaPreviewMedia: { width: '100%', height: '100%' },
 
   form: {
     borderWidth: 1,

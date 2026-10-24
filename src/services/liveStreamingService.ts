@@ -162,12 +162,23 @@ class LiveStreamingService {
   // ── Start broadcast ─────────────────────────────────────────────────────────
 
   async startBroadcast(config: BroadcastConfig): Promise<void> {
+    console.log('[liveStreamingService] startBroadcast called', {
+      streamId: config.streamId,
+      whipEndpoint: config.whipEndpoint,
+      facing: config.facing ?? 'front',
+      webRTCStreamingAvailable,
+      currentState: this._state,
+    });
     if (!webRTCStreamingAvailable) {
+      console.error('[liveStreamingService] WebRTC unavailable — react-native-webrtc failed to load');
       throw new Error(
         'WebRTC is not available. Use OBS/RTMP ingest instead.',
       );
     }
-    if (this._state === 'connecting' || this._state === 'live' || this._state === 'reconnecting') return;
+    if (this._state === 'connecting' || this._state === 'live' || this._state === 'reconnecting') {
+      console.warn('[liveStreamingService] startBroadcast ignored — already in state', this._state);
+      return;
+    }
 
     this.lastConfig = config;
     this.intentionalStop = false;
@@ -180,11 +191,14 @@ class LiveStreamingService {
   // the only difference is which state (`connecting` vs `reconnecting`)
   // gets surfaced to the UI and whether a fresh attempt counter was reset.
   private async connect(config: BroadcastConfig): Promise<void> {
-    this.setState(this.reconnectAttempts > 0 ? 'reconnecting' : 'connecting');
+    const attempt = this.reconnectAttempts;
+    console.log(`[liveStreamingService] connect() attempt=${attempt} streamId=${config.streamId}`);
+    this.setState(attempt > 0 ? 'reconnecting' : 'connecting');
     this._facing = config.facing ?? 'front';
 
     try {
       // 1. Capture device camera
+      console.log('[liveStreamingService] requesting getUserMedia facing=', this._facing);
       this.localStream = await _mediaDevices.getUserMedia({
         video: {
           facingMode: this._facing === 'back' ? 'environment' : 'user',
@@ -198,12 +212,17 @@ class LiveStreamingService {
           sampleRate: 48000,
         },
       });
+      console.log(
+        '[liveStreamingService] getUserMedia ok — tracks:',
+        this.localStream.getTracks().map((t: any) => `${t.kind}:${t.readyState}`),
+      );
 
       // 2. Create peer connection
       this.pc = new _RTCPeerConnection({
         iceServers: ICE_SERVERS,
         sdpSemantics: 'unified-plan',
       });
+      console.log('[liveStreamingService] RTCPeerConnection created');
       this.pendingCandidates = [];
 
       this.localStream.getTracks().forEach((track: any) => {
@@ -237,8 +256,13 @@ class LiveStreamingService {
         }
       });
 
+      this.pc.addEventListener('iceconnectionstatechange', () => {
+        console.log('[liveStreamingService] iceConnectionState ->', this.pc?.iceConnectionState);
+      });
+
       this.pc.addEventListener('connectionstatechange', () => {
         const cs: string = this.pc?.connectionState ?? '';
+        console.log('[liveStreamingService] connectionState ->', cs);
         if (cs === 'connected') {
           this.reconnectAttempts = 0;
           this.setState('live');
@@ -247,8 +271,10 @@ class LiveStreamingService {
           // An ICE/DTLS failure mid-broadcast, not a user-initiated stop -
           // worth automatically retrying rather than immediately surfacing
           // a dead stream (see handleUnexpectedDisconnect's own reasoning).
+          console.error('[liveStreamingService] connectionState=failed — treating as unexpected disconnect');
           this.handleUnexpectedDisconnect(new Error('Connection failed'));
         } else if (cs === 'closed' && !this.intentionalStop) {
+          console.error('[liveStreamingService] connectionState=closed unexpectedly (not an intentional stop)');
           this.handleUnexpectedDisconnect(new Error('Connection closed unexpectedly'));
         } else if (cs === 'closed') {
           this.setState('stopped');
@@ -262,6 +288,7 @@ class LiveStreamingService {
         offerToReceiveVideo: false,
       });
       await this.pc.setLocalDescription(offer);
+      console.log('[liveStreamingService] local SDP offer set, length=', offer.sdp?.length ?? 0);
 
       // 4. WHIP handshake
       // config.whipEndpoint is Django's own ChannelLiveStreamWhipView proxy,
@@ -272,6 +299,10 @@ class LiveStreamingService {
       // same AsyncStorage key, so WHIP needs to do it manually here too.
       const token = await getAccessToken();
       const deviceId = await AsyncStorage.getItem('device_id');
+      console.log('[liveStreamingService] POST WHIP offer ->', config.whipEndpoint, {
+        hasToken: !!token,
+        hasDeviceId: !!deviceId,
+      });
       const res = await fetch(config.whipEndpoint, {
         method: 'POST',
         headers: {
@@ -281,9 +312,11 @@ class LiveStreamingService {
         },
         body: offer.sdp,
       });
+      console.log('[liveStreamingService] WHIP response status=', res.status, 'location=', res.headers.get('Location'));
 
       if (!res.ok) {
         const body = await res.text().catch(() => '');
+        console.error('[liveStreamingService] WHIP offer rejected', res.status, body);
         throw new Error(`WHIP failed ${res.status}: ${body}`);
       }
 
@@ -297,22 +330,28 @@ class LiveStreamingService {
         } catch {
           this.whipResourceUrl = loc;
         }
+      } else {
+        console.warn('[liveStreamingService] WHIP response had no Location header — ICE trickle/teardown will be unavailable');
       }
 
       const answerSdp = await res.text();
+      console.log('[liveStreamingService] setting remote SDP answer, length=', answerSdp.length);
       await this.pc.setRemoteDescription(
         new _RTCSessionDescription({ type: 'answer', sdp: answerSdp }),
       );
 
       // Drain buffered candidates
+      console.log('[liveStreamingService] draining', this.pendingCandidates.length, 'buffered ICE candidate(s)');
       for (const c of this.pendingCandidates) {
         await this.trickleCandidate(c);
       }
       this.pendingCandidates = [];
 
       this.startStatsPolling();
+      console.log('[liveStreamingService] connect() finished setup — waiting on connectionstatechange for "live"');
       DeviceEventEmitter.emit('livestream.started', { streamId: config.streamId });
     } catch (err: any) {
+      console.error('[liveStreamingService] connect() failed:', err?.message ?? err, err);
       this.setState('stopped');
       this.cleanup();
       throw err;
@@ -322,6 +361,7 @@ class LiveStreamingService {
   // ── Stop broadcast ──────────────────────────────────────────────────────────
 
   async stopBroadcast(): Promise<void> {
+    console.log('[liveStreamingService] stopBroadcast called, currentState=', this._state);
     if (this._state === 'idle' || this._state === 'stopped') return;
     // Must be set before anything else: a stop requested mid-reconnect
     // (state 'reconnecting', a retry already scheduled via setTimeout)
@@ -334,23 +374,27 @@ class LiveStreamingService {
     if (this.whipResourceUrl) {
       const token = await getAccessToken();
       const deviceId = await AsyncStorage.getItem('device_id');
+      console.log('[liveStreamingService] DELETE WHIP resource ->', this.whipResourceUrl);
       await fetch(this.whipResourceUrl, {
         method: 'DELETE',
         headers: {
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
           ...(deviceId ? { 'X-Device-Id': deviceId } : {}),
         },
+      }).then((res) => {
+        console.log('[liveStreamingService] WHIP teardown DELETE status=', res.status);
       }).catch((err: any) => {
         // The broadcaster is already tearing down locally either way - a
         // failed DELETE just means the media server may be left with an
         // orphaned ingest session, so this is diagnostic-only, not
         // something the user needs to react to.
-        if (__DEV__) console.warn('[liveStreamingService] WHIP teardown DELETE failed', err);
+        console.warn('[liveStreamingService] WHIP teardown DELETE failed', err);
       });
       this.whipResourceUrl = null;
     }
 
     this.cleanup();
+    console.log('[liveStreamingService] stopBroadcast complete, state=idle');
     DeviceEventEmitter.emit('livestream.stopped', {});
   }
 
@@ -375,12 +419,16 @@ class LiveStreamingService {
   // backoff window on an error that will never resolve itself).
   private handleUnexpectedDisconnect(err: Error): void {
     if (this.intentionalStop || !this.lastConfig) return;
-    if (__DEV__) console.warn('[liveStreamingService] unexpected disconnect, will attempt reconnect', err);
+    console.warn(
+      '[liveStreamingService] unexpected disconnect, will attempt reconnect',
+      err?.message ?? err, 'attempt=', this.reconnectAttempts,
+    );
     this.stopStatsPolling();
     this.cleanup();
     this.whipResourceUrl = null; // the ingest session died with the connection - nothing to DELETE
 
     if (this.reconnectAttempts >= LiveStreamingService.MAX_RECONNECT_ATTEMPTS) {
+      console.error('[liveStreamingService] giving up — reached MAX_RECONNECT_ATTEMPTS =', LiveStreamingService.MAX_RECONNECT_ATTEMPTS);
       this.setState('stopped');
       this.emitError(new Error(`Connection lost. Unable to reconnect after multiple attempts (${err.message}).`));
       return;
@@ -389,6 +437,7 @@ class LiveStreamingService {
     this.reconnectAttempts += 1;
     this.setState('reconnecting');
     const delay = LiveStreamingService.RECONNECT_BASE_DELAY_MS * 2 ** (this.reconnectAttempts - 1);
+    console.log(`[liveStreamingService] scheduling reconnect attempt ${this.reconnectAttempts} in ${delay}ms`);
     this.reconnectTimer = setTimeout(() => {
       this.reconnectTimer = null;
       if (this.intentionalStop || !this.lastConfig) return;
@@ -429,8 +478,10 @@ class LiveStreamingService {
       }
       this.localStream.addTrack(newTrack);
       this._facing = next;
+      console.log('[liveStreamingService] switched camera to', next);
       DeviceEventEmitter.emit('livestream.camera.switched', { facing: next });
     } catch (err: any) {
+      console.error('[liveStreamingService] switchDeviceCamera failed:', err?.message ?? err);
       this.emitError(err);
     }
   }
@@ -466,7 +517,7 @@ class LiveStreamingService {
       this.consecutiveIceTrickleFailures = 0;
     } catch (err: any) {
       this.consecutiveIceTrickleFailures += 1;
-      if (__DEV__) console.warn('[liveStreamingService] ICE trickle PATCH failed', err);
+      console.warn('[liveStreamingService] ICE trickle PATCH failed (consecutive=%s)', this.consecutiveIceTrickleFailures, err?.message ?? err);
       if (
         this.consecutiveIceTrickleFailures ===
         LiveStreamingService.ICE_TRICKLE_FAILURE_ALERT_THRESHOLD
@@ -532,7 +583,7 @@ class LiveStreamingService {
       });
     } catch (err: any) {
       this.consecutiveStatsFailures += 1;
-      if (__DEV__) console.warn('[liveStreamingService] getStats() failed', err);
+      console.warn('[liveStreamingService] getStats() failed (consecutive=%s)', this.consecutiveStatsFailures, err?.message ?? err);
       // getStats() failing repeatedly means the health bar is showing
       // stale numbers with no indication they've stopped updating -
       // surface that once, rather than freezing silently forever.
