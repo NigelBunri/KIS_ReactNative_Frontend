@@ -168,7 +168,7 @@ export default function LiveChatPanel({
       </Pressable>
 
       <Animated.View
-        style={[styles.panel, { opacity: fadeAnim }]}
+        style={[styles.panel, { opacity: fadeAnim }, collapsed && styles.panelCollapsed]}
         pointerEvents={collapsed ? 'none' : 'box-none'}
       >
         {/* Message list */}
@@ -233,10 +233,21 @@ export default function LiveChatPanel({
 
 const styles = StyleSheet.create({
   container: {
-    position: 'absolute',
-    bottom: 0,
-    right: 0,
-    width: 220,
+    // Was position: 'absolute', bottom: 0, right: 0, width: 220 - its own
+    // independent screen-relative positioning, completely detached from
+    // its parent's layout (LiveWatchPage.tsx's bottomPanelWrap, which has
+    // its own Chat/Polls/Q&A tab row stacked above where this renders).
+    // Since this escaped the parent's normal flow, the parent's own
+    // height collapsed down to just its tab row, and this panel's
+    // independent "bottom: 0" pinned it to the exact same screen-bottom
+    // corner as that tab row - the two overlapped directly instead of
+    // stacking, visually crushing the tabs, message list, and input into
+    // one cramped cluster. Flowing in the parent's own stack (which
+    // already sizes/positions the whole column, including safe-area
+    // clearance) fixes that; width matches the parent's own dynamic
+    // chatPanelWidth via '100%' instead of a second, slightly different
+    // hardcoded value.
+    width: '100%',
     maxHeight: 360,
   },
   toggleBtn: {
@@ -262,6 +273,13 @@ const styles = StyleSheet.create({
   },
   countText: { fontSize: 9, fontWeight: '800' },
   panel: { flex: 1 },
+  // Now that `container` flows in its parent's normal layout (not its
+  // old independent absolute positioning - see that style's comment),
+  // opacity alone no longer hides this when collapsed: a 0-opacity View
+  // still reserves its full layout height, so collapsing chat would
+  // otherwise leave a big invisible gap below the tab row instead of
+  // actually shrinking the column back down to it.
+  panelCollapsed: { height: 0, overflow: 'hidden' },
   list: { maxHeight: 260 },
   listContent: { paddingHorizontal: 8, paddingVertical: 4 },
   msgRow: {

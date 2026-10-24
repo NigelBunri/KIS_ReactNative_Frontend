@@ -528,6 +528,15 @@ function BroadcasterPanel({
     }
   }, [stream.id, keyLoading]);
 
+  // The "RTMP URL" row above reads straight from the `stream` prop and
+  // shows immediately; "Stream Key" sat empty ("—") until a broadcaster
+  // found and tapped the separate "Load stream key for OBS" button
+  // further down this screen - from a first-time user's perspective that
+  // looked like a bug ("the URL shows but the key doesn't"), not a
+  // deliberate two-step flow. Auto-loading once per stream removes that
+  // step for the common case; the button stays for an explicit re-fetch.
+  useEffect(() => { void fetchStreamKey(); }, [stream.id]);
+
   // Rotate the stream key: invalidates whatever's currently pasted into
   // OBS, so this is a destructive confirm, not a plain button press.
   // Server-side blocks this while status === 'live' (no supported
@@ -1141,11 +1150,6 @@ export default function LiveControlRoom({ channel, onOpenWatch }: Props) {
             title={waitMediaUrl ? 'Replace wait image/video' : 'Pick wait image/video'}
             left={<KISIcon name="image" size={15} color={palette.primaryStrong} />}
           />
-          {waitMediaUrl ? (
-            <KISButton variant="ghost" onPress={handleClearWaitMedia} accessibilityLabel="Remove wait image/video">
-              <KISIcon name="close" size={16} color={palette.subtext} />
-            </KISButton>
-          ) : null}
         </View>
         {waitMediaUrl ? (
           <View style={styles.waitMediaPreviewWrap}>
@@ -1166,6 +1170,13 @@ export default function LiveControlRoom({ channel, onOpenWatch }: Props) {
                   resizeMode="cover"
                 />
               )}
+              <Pressable
+                onPress={handleClearWaitMedia}
+                accessibilityLabel="Remove wait image/video"
+                style={styles.waitMediaRemoveBadge}
+              >
+                <KISIcon name="close" size={14} color="#FFFFFF" />
+              </Pressable>
             </View>
             <Text style={[styles.panelSubtitle, { color: palette.subtext, marginTop: 0 }]}>
               {waitMediaType === 'video'
@@ -1364,6 +1375,17 @@ const styles = StyleSheet.create({
     backgroundColor: '#000',
   },
   waitMediaPreviewMedia: { width: '100%', height: '100%' },
+  waitMediaRemoveBadge: {
+    position: 'absolute',
+    top: 6,
+    right: 6,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
 
   form: {
     borderWidth: 1,

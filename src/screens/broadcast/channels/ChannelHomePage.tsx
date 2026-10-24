@@ -213,9 +213,25 @@ export default function ChannelHomePage() {
   }, [load]);
 
   const openContent = useCallback((content: BroadcastChannelContent) => {
-    const isLiveContent = content.content_type === 'live_stream' || content.status === 'live' || content.status === 'scheduled';
-    if (isLiveContent) {
-      navigation.navigate('LiveWatch', { streamId: content.id, stream: content as any });
+    // content_type === 'live_stream' is the authoritative signal - it's
+    // set once at creation and never changes. content.status was being
+    // reused here too ('live' / 'scheduled'), but that's ChannelContent's
+    // own PUBLISHING status (draft/scheduled/published/...), which a
+    // perfectly ordinary scheduled text post or scheduled video also has
+    // - that false-matched here and sent non-live content to the live
+    // watch screen.
+    if (content.content_type === 'live_stream') {
+      // ChannelLiveStream.content is a reverse OneToOneField onto this
+      // row (related_name "live_stream") - content.id is THIS
+      // ChannelContent row's own id, a different id space entirely from
+      // the ChannelLiveStream id the watch screen's useLiveStream() hook
+      // actually fetches by by (see ChannelContentListSerializer's
+      // live_stream_id field). Passing content.id there 404s silently,
+      // leaving `stream` null, which the watch page's own status
+      // fallback (`stream?.status ?? 'scheduled'`) then shows as an
+      // upcoming broadcast even when it's actually live - confirmed via
+      // the reported bug, not a hypothetical.
+      navigation.navigate('LiveWatch', { streamId: content.live_stream_id || content.id, stream: content as any });
     } else {
       navigation.navigate('ChannelContentDetail', { contentId: content.id, item: content, channel });
     }
@@ -296,7 +312,7 @@ export default function ChannelHomePage() {
             )}
             <View style={styles.heroShade} />
           </View>
-          <Pressable onPress={() => navigation.goBack()} accessibilityRole="button" accessibilityLabel="Go back" style={[styles.backButton, { top: topInset + 8 }]}>
+          <Pressable onPress={() => navigation.goBack()} accessibilityRole="button" accessibilityLabel="Go back" style={[styles.backButton, { top: topInset }]}>
             <KISIcon name="arrow-left" size={20} color={palette.ivory} />
           </Pressable>
         </View>

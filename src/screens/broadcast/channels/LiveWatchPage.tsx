@@ -19,6 +19,7 @@ import {
   Animated,
   AppState,
   Image,
+  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -36,12 +37,10 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { KISIcon } from '@/constants/kisIcons';
 import QrCodeShareModal from '@/components/common/QrCodeShareModal';
-import KISButton from '@/constants/KISButton';
 import ROUTES, { resolveBackendAssetUrl } from '@/network';
 import { postRequest } from '@/network/post';
 import type { RootStackParamList } from '@/navigation/types';
 import { useKISTheme } from '@/theme/useTheme';
-import { useResponsiveLayout } from '@/theme/responsive';
 import { useLiveStream } from './hooks/useLiveStream';
 import LiveChatPanel from './components/LiveChatPanel';
 import SuperChatPanel from './components/SuperChatPanel';
@@ -216,14 +215,6 @@ export default function LiveWatchPage() {
   // now-stale, too-narrow band instead of spreading across the actual
   // current width.
   const { width: SCREEN_W, height: SCREEN_H } = useWindowDimensions();
-  const { isTablet } = useResponsiveLayout();
-  // The chat/polls/Q&A side panel was hardcoded to 230pt regardless of
-  // screen size - not broken on tablet (the video is still full-bleed,
-  // the panel still works), but a fixed 230pt becomes a much smaller
-  // fraction of a 1024pt+ wide tablet screen than it is on a phone.
-  // Scaled up on tablet, capped so it never eats more than ~40% of the
-  // width on a narrower/split-view tablet window.
-  const chatPanelWidth = isTablet ? Math.min(360, Math.round(SCREEN_W * 0.32)) : 230;
   const styles = useMemo(() => makeStyles(palette), [palette]);
 
   const streamId: string = route.params?.streamId ?? route.params?.stream?.id ?? '';
@@ -270,7 +261,36 @@ export default function LiveWatchPage() {
   const [buffering,     setBuffering]     = useState(false);
   const [videoError,    setVideoError]    = useState<string | null>(null);
   const [showReplay,    setShowReplay]    = useState(false);
-  const [chatOpen,      setChatOpen]      = useState(true);
+  // The player used to be a single StyleSheet.absoluteFillObject layer
+  // filling the entire device screen, with every control floating over
+  // it - the "immersive by default" pattern this whole redesign moves
+  // away from (see styles.playerBox below). resizeMode was "cover" too,
+  // which crops whatever doesn't fit a 9:16-ish frame - fine for a
+  // full-bleed layout, wrong once the player is a bounded, aspect-ratio-
+  // respecting box (cropping a broadcaster's actual content to fill an
+  // arbitrary box is exactly what "never crop to fill the container"
+  // rules out). videoAspectRatio defaults to 16:9 (the common case) and
+  // is corrected once the real source dimensions are known via onLoad's
+  // naturalSize - a portrait or square broadcast gets a correctly
+  // proportioned box instead of being squeezed into a landscape one.
+  const videoRef = useRef<any>(null);
+  const [videoAspectRatio, setVideoAspectRatio] = useState(16 / 9);
+  const handleEnterFullscreen = useCallback(() => {
+    // react-native-video's own native presentFullscreenPlayer - the same
+    // proven approach ChannelContentDetailPage's VideoPlayerControls
+    // already uses for recorded videos (see its own comment there). This
+    // hands off to the OS's native fullscreen video presentation, which
+    // handles landscape rotation and safe-area chrome itself - the app's
+    // own navigation/orientation policy is never touched, so there's no
+    // risk of this leaking into a global landscape mode the rest of the
+    // app isn't built for.
+    videoRef.current?.presentFullscreenPlayer?.();
+  }, []);
+  // Replaces the old separate rightActions column (Share/QR/Super Chat)
+  // and bottomPanelWrap (Chat/Polls/Q&A tabs + messages) - every
+  // secondary feature now lives in one bottom-sheet modal behind a
+  // single FAB (see styles.fab/styles.featuresModal below).
+  const [featuresOpen,  setFeaturesOpen]  = useState(false);
   const [activePanel,   setActivePanel]   = useState<'chat' | 'polls' | 'qa'>('chat');
   const [superChatOpen, setSuperChatOpen] = useState(false);
   const [controlsVisible, setControlsVisible] = useState(true);
@@ -279,18 +299,18 @@ export default function LiveWatchPage() {
   // playPauseCenter (the invisible full-screen tap-to-pause Pressable
   // rendered below) used to span the entire screen via top/left/right/
   // bottom: 0, which put it directly over topOverlay's back button and
-  // the real Share/Super Chat/Subscribe/reactions buttons in rightActions
-  // and bottomOverlay — the exact "full-span invisible tap zone wins the
-  // touch over real controls on real devices" bug confirmed in
-  // UpdatesTab.tsx's Status viewer, even though those buttons paint on top
-  // (they're later siblings, same as the already-fixed case). Measuring
-  // each real overlay's actual on-screen position and clamping
-  // playPauseCenter's span to the gap between them fixes it the same way.
-  // All four views share the same parent (styles.root), so each onLayout's
-  // `y` is directly comparable. Defaults are conservative guesses used
-  // only until the real onLayout measurements land.
+  // the real Subscribe/reactions/FAB buttons in bottomOverlay and fab —
+  // the exact "full-span invisible tap zone wins the touch over real
+  // controls on real devices" bug confirmed in UpdatesTab.tsx's Status
+  // viewer, even though those buttons paint on top (they're later
+  // siblings, same as the already-fixed case). Measuring each real
+  // overlay's actual on-screen position and clamping playPauseCenter's
+  // span to the gap between them fixes it the same way. All views share
+  // the same parent (styles.root), so each onLayout's `y` is directly
+  // comparable. Defaults are conservative guesses used only until the
+  // real onLayout measurements land.
   const [topOverlayBottom, setTopOverlayBottom] = useState(90);
-  const [rightActionsTop, setRightActionsTop] = useState(SCREEN_H);
+  const [fabTop, setFabTop] = useState(SCREEN_H);
   const [bottomOverlayTop, setBottomOverlayTop] = useState(SCREEN_H);
 
   const playbackUrl = useMemo(() => {
@@ -396,6 +416,27 @@ export default function LiveWatchPage() {
     setReloadKey(k => k + 1);
   }, []);
 
+  // A changed playback_url deserves a fresh attempt regardless of
+  // whatever error is currently showing - without this, a viewer who
+  // opened the screen before the broadcaster's stream got reprovisioned
+  // (e.g. a stream-key rotation, or kisvideo-live's ingest-proxy
+  // assigning a new path) stayed stuck on the OLD error card forever,
+  // even once the new URL was confirmed working server-side, because
+  // nothing except a manual "Tap to retry" tap ever cleared videoError -
+  // polling updates `stream.playback_url` in state just fine, but the
+  // <Video> below only reloads cleanly on a `reloadKey` bump.
+  useEffect(() => {
+    setVideoError(null);
+    // Only an actual playbackUrl mounts a <Video> that will ever fire
+    // onLoad/onBuffer to clear this - confirmed via a real device test
+    // (not assumed): setting this unconditionally left the buffering
+    // spinner stuck permanently visible over the scheduled/ended-without-
+    // replay/failed states, which render NO <Video> at all, so nothing
+    // was ever there to turn it back off.
+    setBuffering(Boolean(playbackUrl));
+    setReloadKey(k => k + 1);
+  }, [playbackUrl]);
+
   // E4 of the analytics batch: reports playback failures back to Django so
   // they show up somewhere instead of only ever existing as this client-
   // local retry. Fire-and-forget - never blocks the retry UX on it.
@@ -412,6 +453,24 @@ export default function LiveWatchPage() {
       { errorMessage: '' },
     );
   }, [streamId]);
+
+  // A real HLS manifest/segment either loads within a few seconds or it
+  // isn't going to - without this, a genuinely stuck connection (DNS,
+  // a captive portal, a manifest that 404s in a way the player's own
+  // error handler never fires for) just spun the buffering indicator
+  // forever with no way out except leaving the screen. 15s is generous
+  // for a live HLS start (segments here are 2s each, see kisvideo-live's
+  // mediamtx.yml) while still bounding the worst case to something a
+  // viewer won't give up and leave over.
+  useEffect(() => {
+    if (!buffering || videoError) return;
+    const timer = setTimeout(() => {
+      setVideoError('Taking too long to load. Check your connection and try again.');
+      setBuffering(false);
+      reportPlaybackEvent('buffering_timeout');
+    }, 15_000);
+    return () => clearTimeout(timer);
+  }, [buffering, videoError, reportPlaybackEvent]);
 
   // ── Loading / initial state ─────────────────────────────────────────────────
   if (loading && !stream) {
@@ -432,14 +491,18 @@ export default function LiveWatchPage() {
     <View style={styles.root}>
       <StatusBar barStyle="light-content" backgroundColor={palette.royalInk} translucent />
 
-      {/* ── Video / background layer ── */}
+      {/* ── Player box: bounded to the video's own aspect ratio, not the
+          whole device screen - fullscreen is now the explicit button
+          below, never the default presentation. ── */}
+      <View style={[styles.playerBox, { aspectRatio: videoAspectRatio }]}>
       <Pressable style={StyleSheet.absoluteFillObject} onPress={showControls}>
         {playbackUrl ? (
           <Video
+            ref={videoRef}
             key={reloadKey}
             source={{ uri: playbackUrl }}
             style={StyleSheet.absoluteFillObject}
-            resizeMode="cover"
+            resizeMode="contain"
             paused={effectivePaused}
             controls={false}
             repeat={false}
@@ -450,7 +513,14 @@ export default function LiveWatchPage() {
               bufferForPlaybackAfterRebufferMs: 2000,
             }}
             onBuffer={({ isBuffering }) => setBuffering(isBuffering)}
-            onLoad={() => { setBuffering(false); setVideoError(null); hasLoadedOnceRef.current = true; }}
+            onLoad={(e: any) => {
+              setBuffering(false);
+              setVideoError(null);
+              hasLoadedOnceRef.current = true;
+              const w = e?.naturalSize?.width;
+              const h = e?.naturalSize?.height;
+              if (w && h && w > 0 && h > 0) setVideoAspectRatio(w / h);
+            }}
             onError={(e) => {
               const reason = e?.error?.localizedDescription ?? 'Playback error';
               setVideoError(reason);
@@ -590,6 +660,22 @@ export default function LiveWatchPage() {
               <Text style={styles.membersOnlyText}>Members</Text>
             </View>
           )}
+
+          {/* Explicit fullscreen control - the only way the video ever
+              goes fullscreen now; see handleEnterFullscreen's own
+              comment for why this hands off to the native player API
+              rather than anything that touches app-wide orientation. */}
+          {playbackUrl ? (
+            <Pressable
+              onPress={handleEnterFullscreen}
+              style={styles.iconBtn}
+              hitSlop={12}
+              accessibilityRole="button"
+              accessibilityLabel="Enter fullscreen"
+            >
+              <KISIcon name="fullscreen" size={18} color={palette.ivory} />
+            </Pressable>
+          ) : null}
         </View>
       </Animated.View>
 
@@ -600,7 +686,7 @@ export default function LiveWatchPage() {
             styles.playPauseCenter,
             {
               top: topOverlayBottom,
-              height: Math.max(0, Math.min(rightActionsTop, bottomOverlayTop) - topOverlayBottom),
+              height: Math.max(0, Math.min(fabTop, bottomOverlayTop) - topOverlayBottom),
             },
           ]}
           onPress={() => { setPaused(p => !p); showControls(); }}
@@ -616,36 +702,32 @@ export default function LiveWatchPage() {
         </Pressable>
       )}
 
-      {/* ── Right-side action column ── */}
-      <View
-        style={[
-          styles.rightActions,
-          { bottom: insets.bottom + 90 },
-        ]}
-        pointerEvents="box-none"
-        onLayout={(e) => setRightActionsTop(e.nativeEvent.layout.y)}
-      >
-        <Pressable style={styles.actionBtn} onPress={handleShare} accessibilityRole="button" accessibilityLabel="Share stream">
-          <KISIcon name="share" size={22} color={palette.ivory} />
-          <Text style={styles.actionLabel}>Share</Text>
+      {/* ── Features FAB: Chat/Polls/Q&A/Share/Super Chat, all behind one
+          button instead of permanently reserving screen space ── */}
+      {(isLive || isEnded) && (
+        <Pressable
+          style={[styles.fab, { bottom: insets.bottom + 100 }]}
+          onPress={() => setFeaturesOpen(true)}
+          onLayout={(e) => setFabTop(e.nativeEvent.layout.y)}
+          accessibilityRole="button"
+          accessibilityLabel="Chat, polls, Q&A and more"
+        >
+          <KISIcon name="grid" size={22} color={palette.ivory} />
+          {chatMessages.length > 0 && (
+            <View style={styles.fabBadge}>
+              <Text style={styles.fabBadgeText}>
+                {chatMessages.length > 99 ? '99+' : chatMessages.length}
+              </Text>
+            </View>
+          )}
         </Pressable>
-        <Pressable style={styles.actionBtn} onPress={() => setShowQr(true)} accessibilityRole="button" accessibilityLabel="QR code for stream">
-          <KISIcon name="qr-code" size={22} color={palette.ivory} />
-          <Text style={styles.actionLabel}>QR</Text>
-        </Pressable>
-        {isLive && streamId ? (
-          <Pressable style={styles.actionBtn} onPress={() => setSuperChatOpen(true)} accessibilityRole="button" accessibilityLabel="Send Super Chat">
-            <KISIcon name="star" size={22} color={palette.gold} />
-            <Text style={[styles.actionLabel, { color: palette.gold }]}>Super Chat</Text>
-          </Pressable>
-        ) : null}
-      </View>
+      )}
 
       {/* ── Bottom overlay: reactions + subscribe ── */}
       <View
         style={[
           styles.bottomOverlay,
-          { paddingBottom: insets.bottom + 10, right: chatPanelWidth },
+          { paddingBottom: insets.bottom + 10 },
         ]}
         pointerEvents="box-none"
         onLayout={(e) => setBottomOverlayTop(e.nativeEvent.layout.y)}
@@ -709,13 +791,13 @@ export default function LiveWatchPage() {
         )}
       </View>
 
-      {/* ── Pinned message banner ── */}
+      {/* ── Pinned message banner - scoped to the player box now, same as
+          the other floating controls, instead of a full-screen-relative
+          offset that no longer means anything once the player is
+          bounded. ── */}
       {pinnedMessage && (
         <View
-          style={[
-            styles.pinnedBanner,
-            { bottom: insets.bottom + (chatOpen ? 280 : 110), right: chatPanelWidth + 10 },
-          ]}
+          style={[styles.pinnedBanner, { top: 56, right: 10, left: 10 }]}
           pointerEvents="none"
         >
           <KISIcon name="pin" size={13} color={palette.gold} />
@@ -725,73 +807,150 @@ export default function LiveWatchPage() {
           </View>
         </View>
       )}
+      </View>
+      {/* ── playerBox ends here - everything above is bounded to the
+          video's own aspect ratio; everything below is a normal
+          scrollable page, not floating overlay chrome. ── */}
 
-      {/* ── Bottom panel (chat / polls / Q&A tabs) ── */}
-      {(isLive || isEnded) && (
-        <View style={[styles.bottomPanelWrap, { width: chatPanelWidth }]}>
-          {/* Tab selector */}
-          <View style={styles.panelTabRow}>
-            {([
-              { key: 'chat',  label: 'Chat',  icon: 'comment'  },
-              { key: 'polls', label: 'Polls', icon: 'list'     },
-              { key: 'qa',    label: 'Q&A',   icon: 'audio'    },
-            ] as const).map(tab => {
-              const active = activePanel === tab.key;
-              return (
-                <KISButton
-                  key={tab.key}
-                  variant={active ? 'primary' : 'outline'}
-                  size="xs"
-                  onPress={() => { setActivePanel(tab.key); setChatOpen(true); }}
-                  style={{ flex: 1, borderRadius: 0, paddingHorizontal: 4 }}
-                  left={
-                    <KISIcon
-                      name={tab.icon}
-                      size={13}
-                      color={active ? palette.onGold : palette.divider}
-                    />
-                  }
-                  textStyle={!active ? { color: palette.divider } : undefined}
-                  title={tab.label}
+      <ScrollView style={styles.belowPlayer} contentContainerStyle={styles.belowPlayerContent}>
+        <Text style={styles.pageTitle}>{stream?.title ?? ''}</Text>
+        {stream?.channel ? (
+          <View style={styles.pageChannelRow}>
+            <View style={styles.channelInfo}>
+              {stream.channel.avatar_url ? (
+                <Image
+                  source={{ uri: resolveBackendAssetUrl(stream.channel.avatar_url) }}
+                  style={styles.channelAvatar}
                 />
-              );
-            })}
-          </View>
-
-          {/* Active panel content */}
-          {activePanel === 'chat' && (
-            <LiveChatPanel
-              messages={chatMessages}
-              onSend={sendChatMessage}
-              palette={palette}
-              disabled={!isLive}
-              collapsed={!chatOpen}
-              onToggleCollapse={() => setChatOpen(o => !o)}
-              canModerate={canModerateChat}
-              onDeleteMessage={deleteChatMessage}
-              onReportMessage={reportChatMessage}
+              ) : (
+                <View style={[styles.channelAvatar, { backgroundColor: palette.primary }]}>
+                  <KISIcon name="broadcast" size={14} color={palette.onPrimary} />
+                </View>
+              )}
+              <Text style={styles.channelName} numberOfLines={1}>
+                {stream.channel.display_name}
+              </Text>
+            </View>
+            <SubscribeBellButton
+              channelId={stream.channel.id}
+              initialSubscribed={stream.channel.is_subscribed}
+              compact
             />
-          )}
-          {activePanel === 'polls' && streamId ? (
-            <View style={[styles.sidePanelWrap, { backgroundColor: 'rgba(0,0,0,0.75)' }]}>
-              <LivePollsPanel
-                streamId={streamId}
-                isManager={false}
-                palette={palette}
-              />
+          </View>
+        ) : null}
+        {stream?.description ? (
+          <Text style={styles.pageDescription}>
+            {stream.description}
+          </Text>
+        ) : null}
+      </ScrollView>
+
+      {/* ── Features modal: Chat / Polls / Q&A + Share / QR / Super Chat,
+          all consolidated behind the single FAB above. Plain Modal +
+          animationType="slide", the same pattern SuperChatPanel/
+          QrCodeShareModal already use elsewhere in this app - fixed 40%
+          height per design, not maxHeight, so it's a predictable,
+          consistent sheet rather than growing/shrinking with content. ── */}
+      <Modal
+        visible={featuresOpen}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setFeaturesOpen(false)}
+      >
+        <View style={styles.featuresOverlay}>
+          <Pressable style={styles.featuresBackdrop} onPress={() => setFeaturesOpen(false)} />
+          <View style={[styles.featuresPanel, { paddingBottom: insets.bottom || 12 }]}>
+            {/* Tab selector - plain text/underline active state, no gold
+                gradient fill (KISButton's variant="primary" renders one,
+                which read as heavy/out of place floating over video). */}
+            <View style={styles.featuresHeader}>
+              <View style={styles.panelTabRow}>
+                {([
+                  { key: 'chat',  label: 'Chat',  icon: 'comment' },
+                  { key: 'polls', label: 'Polls', icon: 'list'    },
+                  { key: 'qa',    label: 'Q&A',   icon: 'audio'   },
+                ] as const).map(tab => {
+                  const active = activePanel === tab.key;
+                  return (
+                    <Pressable
+                      key={tab.key}
+                      onPress={() => setActivePanel(tab.key)}
+                      style={[styles.panelTab, active && styles.panelTabActive]}
+                      accessibilityRole="button"
+                      accessibilityLabel={tab.label}
+                    >
+                      <KISIcon name={tab.icon} size={14} color={active ? palette.ivory : palette.subtext} />
+                      <Text style={[styles.panelTabLabel, { color: active ? palette.ivory : palette.subtext }]}>
+                        {tab.label}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+              <Pressable
+                onPress={() => setFeaturesOpen(false)}
+                style={styles.featuresCloseBtn}
+                accessibilityRole="button"
+                accessibilityLabel="Close"
+              >
+                <KISIcon name="close" size={18} color={palette.subtext} />
+              </Pressable>
             </View>
-          ) : null}
-          {activePanel === 'qa' && streamId ? (
-            <View style={[styles.sidePanelWrap, { backgroundColor: 'rgba(0,0,0,0.75)' }]}>
-              <LiveQAPanel
-                streamId={streamId}
-                isManager={false}
-                palette={palette}
-              />
+
+            {/* Secondary one-shot actions - always available regardless of
+                which content tab is active. */}
+            <View style={styles.featuresActionsRow}>
+              <Pressable style={styles.featuresActionBtn} onPress={handleShare} accessibilityRole="button" accessibilityLabel="Share stream">
+                <KISIcon name="share" size={18} color={palette.ivory} />
+                <Text style={styles.featuresActionLabel}>Share</Text>
+              </Pressable>
+              <Pressable style={styles.featuresActionBtn} onPress={() => setShowQr(true)} accessibilityRole="button" accessibilityLabel="QR code for stream">
+                <KISIcon name="qr-code" size={18} color={palette.ivory} />
+                <Text style={styles.featuresActionLabel}>QR Code</Text>
+              </Pressable>
+              {isLive && streamId ? (
+                <Pressable style={styles.featuresActionBtn} onPress={() => setSuperChatOpen(true)} accessibilityRole="button" accessibilityLabel="Send Super Chat">
+                  <KISIcon name="star" size={18} color={palette.ivory} />
+                  <Text style={styles.featuresActionLabel}>Super Chat</Text>
+                </Pressable>
+              ) : null}
             </View>
-          ) : null}
+
+            {/* Active panel content */}
+            <View style={styles.featuresContent}>
+              {activePanel === 'chat' && (
+                <LiveChatPanel
+                  messages={chatMessages}
+                  onSend={sendChatMessage}
+                  palette={palette}
+                  disabled={!isLive}
+                  collapsed={false}
+                  onToggleCollapse={() => setFeaturesOpen(false)}
+                  canModerate={canModerateChat}
+                  onDeleteMessage={deleteChatMessage}
+                  onReportMessage={reportChatMessage}
+                />
+              )}
+              {activePanel === 'polls' && streamId ? (
+                <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 16 }}>
+                  <LivePollsPanel
+                    streamId={streamId}
+                    isManager={false}
+                    palette={palette}
+                  />
+                </ScrollView>
+              ) : null}
+              {activePanel === 'qa' && streamId ? (
+                <LiveQAPanel
+                  streamId={streamId}
+                  isManager={false}
+                  palette={palette}
+                />
+              ) : null}
+            </View>
+          </View>
         </View>
-      )}
+      </Modal>
 
       {/* ── Super Chat modal ── */}
       {streamId ? (
@@ -820,6 +979,39 @@ function makeStyles(p: any) {
   root: {
     flex: 1,
     backgroundColor: p.royalInk,
+  },
+  // Bounded to the video's own aspect ratio (set inline via
+  // `aspectRatio`, not here) instead of filling the screen - every
+  // floating control (top bar, reactions, FAB, pinned banner) nests
+  // inside this box now, so their existing position:'absolute' styles
+  // scope to it automatically rather than the whole device.
+  playerBox: {
+    width: '100%',
+    backgroundColor: '#000',
+    overflow: 'hidden',
+  },
+  belowPlayer: {
+    flex: 1,
+  },
+  belowPlayerContent: {
+    padding: 16,
+    gap: 10,
+  },
+  pageTitle: {
+    color: p.ivory,
+    fontSize: 16,
+    fontWeight: '800',
+    lineHeight: 22,
+  },
+  pageChannelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  pageDescription: {
+    color: p.divider ?? p.ivory,
+    fontSize: 13,
+    lineHeight: 19,
   },
   centered: {
     flex: 1,
@@ -932,14 +1124,29 @@ function makeStyles(p: any) {
   },
   reactionEmoji: { fontSize: 20 },
 
-  rightActions: {
+  fab: {
     position: 'absolute',
-    right: 10,
+    right: 14,
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: 'rgba(0,0,0,0.55)',
     alignItems: 'center',
-    gap: 18,
+    justifyContent: 'center',
   },
-  actionBtn: { alignItems: 'center', gap: 4 },
-  actionLabel: { color: p.ivory, fontSize: 10, fontWeight: '700' },
+  fabBadge: {
+    position: 'absolute',
+    top: -2,
+    right: -2,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: p.danger,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+  },
+  fabBadgeText: { color: p.onPrimary, fontSize: 10, fontWeight: '800' },
 
   // play/pause center
   playPauseCenter: {
@@ -1102,40 +1309,79 @@ function makeStyles(p: any) {
   pinnedText: { color: p.ivory, fontSize: 12, fontWeight: '600', lineHeight: 17 },
 
   // bottom panel tabs
-  bottomPanelWrap: {
-    position: 'absolute',
-    bottom: 0,
-    right: 0,
-    width: 230,
+  // ── Features modal (Chat/Polls/Q&A + Share/QR/Super Chat) ──────────────
+  featuresOverlay: {
+    flex: 1,
+    justifyContent: 'flex-end',
+  },
+  featuresBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  featuresPanel: {
+    height: '40%',
+    backgroundColor: p.royalInk,
+    borderTopLeftRadius: 18,
+    borderTopRightRadius: 18,
+    overflow: 'hidden',
+  },
+  featuresHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingTop: 10,
+    paddingHorizontal: 10,
+    gap: 8,
   },
   panelTabRow: {
+    flex: 1,
     flexDirection: 'row',
-    backgroundColor: 'rgba(0,0,0,0.75)',
-    borderTopLeftRadius: 10,
-    borderTopRightRadius: 0,
-    overflow: 'hidden',
+    gap: 6,
   },
   panelTab: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 4,
-    paddingVertical: 7,
-    paddingHorizontal: 4,
+    gap: 6,
+    paddingVertical: 10,
+    borderRadius: 8,
   },
+  // Deliberately a flat fill, not KISButton's variant="primary" gradient -
+  // that read as heavy/branding-first floating over a live video, not a
+  // simple content-tab affordance. Plain color change is enough here.
   panelTabActive: {
-    borderBottomWidth: 2,
-    borderBottomColor: p.gold,
+    backgroundColor: 'rgba(255,255,255,0.12)',
   },
   panelTabLabel: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '800',
   },
-  sidePanelWrap: {
-    borderBottomLeftRadius: 10,
-    overflow: 'hidden',
-    maxHeight: 340,
+  featuresCloseBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  featuresActionsRow: {
+    flexDirection: 'row',
+    gap: 10,
+    paddingHorizontal: 10,
+    paddingTop: 10,
+  },
+  featuresActionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderRadius: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+  },
+  featuresActionLabel: { color: p.ivory, fontSize: 12, fontWeight: '700' },
+  featuresContent: {
+    flex: 1,
+    marginTop: 8,
   },
   });
 }

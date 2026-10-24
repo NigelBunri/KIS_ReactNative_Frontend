@@ -661,6 +661,7 @@ function PollCard({ content }: { content: BroadcastChannelContent }) {
 
 function MediaStage({ content, relatedContent }: { content: BroadcastChannelContent; relatedContent?: { id: string; title: string; thumbnail_url?: string; channel?: { name: string } }[] }) {
   const { palette } = useKISTheme();
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const responsive = useResponsiveLayout();
   const compact = responsive.isWatch || responsive.isCompactPhone;
   const stageHeight = compact ? 240 : responsive.isTablet && responsive.isLandscape ? 420 : 340;
@@ -791,13 +792,28 @@ function MediaStage({ content, relatedContent }: { content: BroadcastChannelCont
   }
 
   if (type === 'live_stream') {
+    // Was a static badge with no way to actually watch - any entry point
+    // that lands on THIS detail page for live content (search results,
+    // playlists, trending - anywhere that doesn't go through
+    // ChannelHomePage's own openContent()) was a dead end with no path to
+    // the real watch experience at all. live_stream_id is the
+    // ChannelLiveStream id (see ChannelContentListSerializer's field of
+    // the same name) - the canonical id LiveWatchPage's useLiveStream()
+    // hook actually fetches by, distinct from this ChannelContent row's
+    // own id.
     return (
-      <View style={[styles.mediaStage, { backgroundColor: palette.surfaceElevated, height: stageHeight }]}>
+      <Pressable
+        style={[styles.mediaStage, { backgroundColor: palette.surfaceElevated, height: stageHeight }]}
+        disabled={!content.live_stream_id}
+        onPress={() => navigation.navigate('LiveWatch', { streamId: content.live_stream_id!, stream: content as any })}
+        accessibilityRole={content.live_stream_id ? 'button' : undefined}
+        accessibilityLabel={content.live_stream_id ? 'Watch live stream' : undefined}
+      >
         {imageUrl ? <Image source={{ uri: imageUrl }} style={StyleSheet.absoluteFillObject} resizeMode="cover" /> : <LinearGradient colors={[palette.primarySoft, palette.surfaceElevated, palette.surface]} style={StyleSheet.absoluteFillObject} />}
         <View style={styles.mediaOverlay} />
-        <View style={[styles.liveBadge, { backgroundColor: palette.danger }]}><Text style={[styles.liveBadgeText, { color: palette.ivory }]}>{content.status === 'scheduled' ? 'Scheduled' : 'Live'}</Text></View>
-        <KISIcon name="broadcast" size={46} color={palette.ivory} />
-      </View>
+        <View style={[styles.liveBadge, { backgroundColor: palette.danger }]}><Text style={[styles.liveBadgeText, { color: palette.ivory }]}>{content.live_stream_status === 'scheduled' ? 'Scheduled' : 'Live'}</Text></View>
+        <KISIcon name={content.live_stream_status === 'live' ? 'play' : 'broadcast'} size={46} color={palette.ivory} />
+      </Pressable>
     );
   }
 

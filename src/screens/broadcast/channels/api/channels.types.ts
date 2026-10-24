@@ -65,6 +65,11 @@ export type BroadcastChannelContent = {
   status?: string;
   is_broadcast?: boolean;
   broadcast_id?: string;
+  // The canonical id to navigate with for the LiveWatch screen when this
+  // content is a live stream - distinct from this row's own `id`. See
+  // ChannelContentListSerializer.get_live_stream_id on the backend.
+  live_stream_id?: string;
+  live_stream_status?: string;
   visibility?: string;
   published_at?: string;
   duration_seconds?: number;
@@ -135,6 +140,12 @@ export type BroadcastChannelLiveStream = {
   replay_url?: string;
   thumbnail_url?: string;
   thumbnail_media_type?: 'image' | 'video' | '' | string;
+  // Full intended lifecycle (see ChannelLiveStream.RecordingStatus on the
+  // backend) - only 'not_started' (default), 'ready', and 'failed' are
+  // reachable today. No automatic recording pipeline exists yet, so a
+  // stream sits at 'not_started' forever unless something calls the
+  // (currently unused in production) archive webhook.
+  recording_status?: 'not_started' | 'recording' | 'finalizing' | 'processing' | 'ready' | 'failed' | 'deleted' | string;
   viewer_count?: number;
   peak_viewer_count?: number;
   metadata?: Record<string, any>;
