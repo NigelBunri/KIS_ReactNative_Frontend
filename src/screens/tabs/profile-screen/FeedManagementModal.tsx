@@ -27,6 +27,11 @@ import { KISIcon } from '@/constants/kisIcons';
 import BroadcastFeedVideoPreview from '@/components/broadcast/BroadcastFeedVideoPreview';
 import { getAttachmentPreviewInfo } from '@/components/broadcast/attachmentPreview';
 import ChannelStudioScreen from '@/screens/broadcast/channels/studio/ChannelStudioScreen';
+import LinearGradient from 'react-native-linear-gradient';
+import { KIS_ROYAL_GRADIENTS } from '@/theme/constants';
+import FeedComposerSheet, {
+  type FeedComposerPayload,
+} from '@/components/feeds/FeedComposerSheet';
 
 const alpha = (hex: string | undefined, opacity: string) => {
   const value = String(hex || '').trim();
@@ -310,7 +315,7 @@ export type FeedManagementModalProps = {
   handleDeleteFeedItem: (id: string) => void;
   handleBroadcastFeedItem: (feed: any) => void;
   handleRemoveBroadcastFeedItem: (feed: any) => void;
-  onOpenAdvancedComposer: (channel?: { id?: string; handle?: string; display_name?: string } | null) => void;
+  onSubmitAdvancedComposer: (payload: FeedComposerPayload) => Promise<void> | void;
   setPanelFeedExistingAttachments: React.Dispatch<React.SetStateAction<any[]>>;
   setPanelFeedMediaType: React.Dispatch<React.SetStateAction<FeedMediaType>>;
   setPanelFeedItemTitle: React.Dispatch<React.SetStateAction<string>>;
@@ -348,7 +353,7 @@ export function FeedManagementModal(props: FeedManagementModalProps) {
     handleDeleteFeedItem,
     handleBroadcastFeedItem,
     handleRemoveBroadcastFeedItem,
-    onOpenAdvancedComposer,
+    onSubmitAdvancedComposer,
     setPanelFeedExistingAttachments,
     setPanelFeedMediaType,
     setPanelFeedItemTitle,
@@ -364,6 +369,7 @@ export function FeedManagementModal(props: FeedManagementModalProps) {
   // per-media-type styling form) aren't mounted inline on the default
   // hub view, only when the user explicitly opens them.
   const [screen, setScreen] = useState<'hub' | 'channelStudio' | 'styleOptions'>('hub');
+  const [composerVisible, setComposerVisible] = useState(false);
 
   const numberOfBroadcastFeeds = feeds.filter(
     (feed: any) => feed.is_broadcast === true,
@@ -431,7 +437,7 @@ export function FeedManagementModal(props: FeedManagementModalProps) {
               legacyFeeds={feeds}
               liveCount={numberOfBroadcastFeeds}
               expiresAt={expiresAt}
-              onCreate={onOpenAdvancedComposer}
+              onSubmitAdvancedComposer={onSubmitAdvancedComposer}
             />
           </View>
         </ScrollView>
@@ -596,28 +602,32 @@ export function FeedManagementModal(props: FeedManagementModalProps) {
 
       <Pressable
         onPress={() => setScreen('channelStudio')}
-        style={[
-          modalStyles.toolRow,
-          { borderColor: palette.divider, backgroundColor: palette.surface },
-        ]}
+        style={modalStyles.studioCtaShadow}
       >
-        <View
-          style={[
-            modalStyles.feedIconFrame,
-            { backgroundColor: studioTint, borderColor: premiumBorder },
-          ]}
+        <LinearGradient
+          colors={[...KIS_ROYAL_GRADIENTS.goldHeader]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={modalStyles.studioCta}
         >
-          <KISIcon name="grid" size={17} color={palette.primaryStrong} />
-        </View>
-        <View style={{ flex: 1 }}>
-          <Text style={[modalStyles.toolRowTitle, { color: palette.text }]}>
-            Channel Studio
-          </Text>
-          <Text style={[modalStyles.toolRowSubtitle, { color: palette.subtext }]}>
+          <View style={modalStyles.studioCtaTopRow}>
+            <View style={modalStyles.studioCtaIconFrame}>
+              <KISIcon name="video" size={24} color="#FFFFFF" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <View style={modalStyles.studioCtaBadge}>
+                <Text style={modalStyles.studioCtaBadgeText}>GO LIVE</Text>
+              </View>
+              <Text style={modalStyles.studioCtaTitle}>
+                Channel Studio
+              </Text>
+            </View>
+            <KISIcon name="chevron-right" size={22} color="#FFFFFF" />
+          </View>
+          <Text style={modalStyles.studioCtaSubtitle}>
             Manage channels, content, analytics, and go live.
           </Text>
-        </View>
-        <KISIcon name="chevron-right" size={18} color={palette.subtext} />
+        </LinearGradient>
       </Pressable>
 
       <View
@@ -950,7 +960,7 @@ export function FeedManagementModal(props: FeedManagementModalProps) {
             title="Open advanced composer"
             variant="outline"
             size="sm"
-            onPress={onOpenAdvancedComposer}
+            onPress={() => setComposerVisible(true)}
           />
         ) : null}
 
@@ -1211,6 +1221,11 @@ export function FeedManagementModal(props: FeedManagementModalProps) {
         </Text>
       </View>
     </ScrollView>
+    <FeedComposerSheet
+      visible={composerVisible}
+      onClose={() => setComposerVisible(false)}
+      onSubmit={onSubmitAdvancedComposer}
+    />
     </KeyboardAvoidingView>
   );
 }
@@ -1828,6 +1843,59 @@ const modalStyles = StyleSheet.create({
     borderRadius: 16,
     paddingHorizontal: 14,
     paddingVertical: 12,
+  },
+  studioCtaShadow: {
+    borderRadius: 20,
+    shadowColor: '#9A6A14',
+    shadowOpacity: 0.35,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 6,
+  },
+  studioCta: {
+    borderRadius: 20,
+    paddingHorizontal: 18,
+    paddingVertical: 18,
+    gap: 12,
+  },
+  studioCtaTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+  },
+  studioCtaIconFrame: {
+    width: 48,
+    height: 48,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255,255,255,0.22)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.35)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  studioCtaBadge: {
+    alignSelf: 'flex-start',
+    backgroundColor: 'rgba(255,255,255,0.25)',
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    marginBottom: 4,
+  },
+  studioCtaBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: '900',
+    letterSpacing: 0.5,
+  },
+  studioCtaTitle: {
+    fontSize: 19,
+    fontWeight: '900',
+    color: '#FFFFFF',
+  },
+  studioCtaSubtitle: {
+    fontSize: 13,
+    lineHeight: 18,
+    color: 'rgba(255,255,255,0.9)',
   },
   toolRowTitle: {
     fontSize: 14,

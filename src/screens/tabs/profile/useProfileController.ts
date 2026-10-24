@@ -765,13 +765,15 @@ export const useProfileController = (opts: {
     [],
   );
 
-  type BroadcastAttachmentPayload = { uri: string; name: string; type: string };
+  type BroadcastAttachmentPayload = { uri: string; name: string; type: string; caption?: string };
   type BroadcastFeedEntryExtras = Partial<FeedComposerPayload> & {
     attachmentPayloads?: any[];
   };
 
   const appendBroadcastAttachments = useCallback(
     (form: FormData, files?: BroadcastAttachmentPayload[]) => {
+      const captions: string[] = [];
+      let hasCaption = false;
       (files ?? []).forEach(file => {
         if (file?.uri) {
           form.append('attachments', {
@@ -779,8 +781,17 @@ export const useProfileController = (opts: {
             name: file.name,
             type: file.type,
           } as any);
+          captions.push(file.caption || '');
+          if (file.caption) hasCaption = true;
         }
       });
+      // Index-aligned with the 'attachments' files above — gallery mode
+      // (multiple images) lets each image carry its own caption, which a
+      // raw multipart file part has no field for, so it rides alongside
+      // as JSON instead.
+      if (hasCaption) {
+        form.append('attachment_captions', JSON.stringify(captions));
+      }
     },
     [],
   );
@@ -818,6 +829,14 @@ export const useProfileController = (opts: {
           'embed_allowed',
           String(Boolean(extras.embed_allowed ?? extras.embedAllowed)),
         );
+      }
+      if (extras.linkPreviewTitle) form.append('link_preview_title', extras.linkPreviewTitle);
+      if (extras.linkPreviewDescription) {
+        form.append('link_preview_description', extras.linkPreviewDescription);
+      }
+      if (extras.linkPreviewImage) form.append('link_preview_image', extras.linkPreviewImage);
+      if (extras.linkOpenExternally !== undefined) {
+        form.append('link_open_externally', String(Boolean(extras.linkOpenExternally)));
       }
       const attachmentPayloads =
         extras.attachmentPayloads ??

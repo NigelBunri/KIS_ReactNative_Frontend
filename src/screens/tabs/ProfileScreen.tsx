@@ -68,9 +68,7 @@ import {
 } from '@/services/inAppNotificationService';
 import EvidenceWorkflowPlanCard from '@/components/dashboard/EvidenceWorkflowPlanCard';
 import { filterInstitutionsForVisibleRoles } from '@/screens/health/accessControl';
-import FeedComposerSheet, {
-  type FeedComposerPayload,
-} from '@/components/feeds/FeedComposerSheet';
+import { type FeedComposerPayload } from '@/components/feeds/FeedComposerSheet';
 import { prepareBroadcastVideoPayload } from '@/components/feeds/videoAttachmentHelpers';
 import {
   VerificationCenterSheet,
@@ -137,12 +135,6 @@ type VerificationCenterTarget = {
   subtitle?: string;
   summary?: VerificationSummary | null;
 };
-
-type AdvancedFeedChannelContext = {
-  channelId?: string;
-  channelHandle?: string;
-  channelName?: string;
-} | null;
 
 const getBookingServiceId = (booking: any) => {
   if (!booking) return null;
@@ -344,10 +336,6 @@ export default function ProfileScreen() {
   const [panelFeedBroadcastingId, setPanelFeedBroadcastingId] = useState<
     string | null
   >(null);
-  const [advancedFeedComposerVisible, setAdvancedFeedComposerVisible] =
-    useState(false);
-  const [advancedFeedChannelContext, setAdvancedFeedChannelContext] =
-    useState<AdvancedFeedChannelContext>(null);
   const managementPanelOffset = useRef(
     new Animated.Value(profileLayout.SCREEN_WIDTH),
   ).current;
@@ -925,22 +913,6 @@ export default function ProfileScreen() {
     resetFeedForm,
   ]);
 
-  const openAdvancedFeedComposer = useCallback(
-    (channel?: { id?: string; handle?: string; display_name?: string } | null) => {
-      setAdvancedFeedChannelContext(
-        channel?.id
-          ? {
-              channelId: String(channel.id),
-              channelHandle: channel.handle ? String(channel.handle) : undefined,
-              channelName: channel.display_name ? String(channel.display_name) : undefined,
-            }
-          : null,
-      );
-      setAdvancedFeedComposerVisible(true);
-    },
-    [],
-  );
-
   const handleAdvancedFeedSubmit = useCallback(
     async (payload: FeedComposerPayload) => {
       const prepared = await prepareBroadcastVideoPayload(payload);
@@ -975,12 +947,13 @@ export default function ProfileScreen() {
               attachment?.mimeType ??
               attachment?.type ??
               'application/octet-stream',
+            caption: attachment?.caption || undefined,
           };
         })
         .filter(
           (
             attachment,
-          ): attachment is { uri: string; name: string; type: string } =>
+          ): attachment is { uri: string; name: string; type: string; caption: string | undefined } =>
             Boolean(attachment),
         );
       const remoteAttachments = attachments.filter(attachment => {
@@ -1015,8 +988,6 @@ export default function ProfileScreen() {
           attachmentPayloads: remoteAttachments,
         },
       );
-      setAdvancedFeedComposerVisible(false);
-      setAdvancedFeedChannelContext(null);
       Alert.alert('Broadcast item', 'Advanced feed item saved to your queue.');
       } catch (error: any) {
         // Previously unguarded - c.addBroadcastFeedEntry throws on any
@@ -2407,7 +2378,7 @@ export default function ProfileScreen() {
           handleDeleteFeedItem={handleDeleteFeedItem}
           handleBroadcastFeedItem={handleBroadcastFeedItem}
           handleRemoveBroadcastFeedItem={handleRemoveBroadcastFeedItem}
-          onOpenAdvancedComposer={openAdvancedFeedComposer}
+          onSubmitAdvancedComposer={handleAdvancedFeedSubmit}
           panelFeedBroadcastingId={panelFeedBroadcastingId}
           setPanelFeedExistingAttachments={setPanelFeedExistingAttachments}
           setPanelFeedMediaType={setPanelFeedMediaType}
@@ -4131,15 +4102,6 @@ export default function ProfileScreen() {
           </BottomSheet>
         )}
       </Modal>
-      <FeedComposerSheet
-        visible={advancedFeedComposerVisible}
-        onClose={() => {
-          setAdvancedFeedComposerVisible(false);
-          setAdvancedFeedChannelContext(null);
-        }}
-        onSubmit={handleAdvancedFeedSubmit}
-        channelContext={advancedFeedChannelContext ?? undefined}
-      />
     </View>
   );
 }

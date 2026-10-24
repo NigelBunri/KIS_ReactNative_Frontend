@@ -1,2 +1,3 @@
 export { default } from './composer/FeedComposerSheet';
-export type { FeedComposerPayload } from './composer/types';
+export { toChannelComposerContext } from './composer/types';
+export type { ChannelComposerContext, FeedComposerPayload } from './composer/types';

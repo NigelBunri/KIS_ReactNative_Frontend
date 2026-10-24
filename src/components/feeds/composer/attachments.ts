@@ -6,6 +6,7 @@ export const makeAttachment = (file: {
   type?: string | null;
   size?: number | null;
   kind?: string;
+  caption?: string;
 }) => ({
   id: `local_${Date.now()}_${Math.random().toString(36).slice(2)}`,
   url: file.uri,
@@ -13,4 +14,5 @@ export const makeAttachment = (file: {
   mimeType: file.type || 'application/octet-stream',
   size: file.size ?? 0,
   kind: file.kind ?? 'file',
+  caption: file.caption || '',
 });

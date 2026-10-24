@@ -3,13 +3,18 @@ import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, StyleShee
 import { KISIcon } from '@/constants/kisIcons';
 import KISButton from '@/constants/KISButton';
 import { useKISTheme } from '@/theme/useTheme';
-import type { BroadcastChannelContent } from '@/screens/broadcast/channels/api/channels.types';
+import type { BroadcastChannelContent, BroadcastChannelSummary } from '@/screens/broadcast/channels/api/channels.types';
 import ThumbnailPickerSheet from '@/screens/broadcast/channels/components/ThumbnailPickerSheet';
+import FeedComposerSheet, {
+  type FeedComposerPayload,
+  toChannelComposerContext,
+} from '@/components/feeds/FeedComposerSheet';
 
 type Props = {
   contents: BroadcastChannelContent[];
   legacyFeeds: any[];
-  onCreate: () => void;
+  channel?: BroadcastChannelSummary | null;
+  onSubmitAdvancedComposer: (payload: FeedComposerPayload) => Promise<void> | void;
   onToggleBroadcast?: (content: BroadcastChannelContent, nextState: boolean) => void | Promise<void>;
   broadcastingId?: string | null;
   onUpdateTags?: (contentId: string, tags: string[]) => void;
@@ -31,12 +36,13 @@ type Props = {
 
 const statusLabel = (value?: string) => String(value || 'draft').replace(/_/g, ' ').toUpperCase();
 
-export default function ChannelContentManager({ contents, legacyFeeds, onCreate, onToggleBroadcast, broadcastingId, onUpdateTags, onPublish, publishingId, onToggleMembersOnly, togglingMembersOnlyId }: Props) {
+export default function ChannelContentManager({ contents, legacyFeeds, channel, onSubmitAdvancedComposer, onToggleBroadcast, broadcastingId, onUpdateTags, onPublish, publishingId, onToggleMembersOnly, togglingMembersOnlyId }: Props) {
   const { palette } = useKISTheme();
   const [tagsMap, setTagsMap] = useState<Record<string, string[]>>({});
   const [tagInput, setTagInput] = useState<Record<string, string>>({});
   const [expandedTags, setExpandedTags] = useState<Record<string, boolean>>({});
   const [thumbnailTarget, setThumbnailTarget] = useState<BroadcastChannelContent | null>(null);
+  const [composerVisible, setComposerVisible] = useState(false);
 
   const getTags = useCallback((item: BroadcastChannelContent) => {
     if (tagsMap[item.id] !== undefined) return tagsMap[item.id];
@@ -90,7 +96,7 @@ export default function ChannelContentManager({ contents, legacyFeeds, onCreate,
           size="sm"
           title="Create"
           left={<KISIcon name="add" size={16} color={palette.onGold} />}
-          onPress={onCreate}
+          onPress={() => setComposerVisible(true)}
         />
       </View>
       {rows.length ? rows.slice(0, 6).map(item => {
@@ -234,6 +240,12 @@ export default function ChannelContentManager({ contents, legacyFeeds, onCreate,
         />
       )}
     </View>
+    <FeedComposerSheet
+      visible={composerVisible}
+      onClose={() => setComposerVisible(false)}
+      onSubmit={onSubmitAdvancedComposer}
+      channelContext={toChannelComposerContext(channel)}
+    />
     </KeyboardAvoidingView>
   );
 }

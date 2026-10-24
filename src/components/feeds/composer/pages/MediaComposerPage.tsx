@@ -1,8 +1,9 @@
 // src/components/feeds/composer/pages/MediaComposerPage.tsx
-import React, { useCallback, useMemo } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
   Image,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -18,6 +19,36 @@ import { useResponsiveLayout } from '@/theme/responsive';
 
 import type { ComposerType, RichComposerState } from '../types';
 import { makeAttachment } from '../attachments';
+
+const MAX_IMAGES = 10;
+const MAX_FILE_SIZE_MB: Partial<Record<ComposerType, number>> = {
+  image: 20,
+  video: 500,
+  short_video: 200,
+  document: 50,
+  audio: 100,
+};
+
+const validateSize = (type: ComposerType, sizeBytes?: number | null): string | null => {
+  const maxMb = MAX_FILE_SIZE_MB[type];
+  if (!maxMb || !sizeBytes) return null;
+  const mb = sizeBytes / (1024 * 1024);
+  if (mb > maxMb) return `File is too large (max ${maxMb}MB, picked ${mb.toFixed(1)}MB).`;
+  return null;
+};
+
+const formatDuration = (seconds?: number | null) => {
+  if (!seconds || seconds <= 0) return null;
+  const mins = Math.floor(seconds / 60);
+  const secs = Math.floor(seconds % 60);
+  return `${mins}:${String(secs).padStart(2, '0')}`;
+};
+
+const formatSize = (bytes?: number | null) => {
+  if (!bytes) return null;
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)}KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)}MB`;
+};
 
 export function MediaComposerPage({
   type,
@@ -40,32 +71,97 @@ export function MediaComposerPage({
 }) {
   const { palette } = useKISTheme();
   const responsive = useResponsiveLayout();
+  const [fileError, setFileError] = useState<string | null>(null);
+  const [videoDuration, setVideoDuration] = useState<number | null>(null);
 
-  const pickImage = useCallback(async () => {
-    const result = await launchImageLibrary({ mediaType: 'photo', selectionLimit: 1 });
+  const isImage = type === 'image';
+  const isVideo = type === 'video' || type === 'short_video';
+  const isGalleryMode = isImage;
+
+  const pickImages = useCallback(async () => {
+    setFileError(null);
+    const remaining = MAX_IMAGES - attachments.length;
+    if (remaining <= 0) {
+      setFileError(`You can add up to ${MAX_IMAGES} images.`);
+      return;
+    }
+    const result = await launchImageLibrary({
+      mediaType: 'photo',
+      selectionLimit: remaining,
+    });
     if (result.didCancel || !result.assets?.length) return;
-    const a = result.assets[0];
-    if (!a?.uri) return;
 
-    setAttachments([
-      makeAttachment({
-        uri: a.uri,
-        name: a.fileName ?? 'photo.jpg',
-        type: a.type,
-        size: a.fileSize,
-        kind: 'image',
-      }),
-    ]);
-  }, [setAttachments]);
+    const accepted: any[] = [];
+    let rejected = 0;
+    result.assets.forEach(a => {
+      if (!a?.uri) return;
+      const sizeError = validateSize('image', a.fileSize);
+      if (sizeError) {
+        rejected += 1;
+        return;
+      }
+      accepted.push(
+        makeAttachment({
+          uri: a.uri,
+          name: a.fileName ?? 'photo.jpg',
+          type: a.type,
+          size: a.fileSize,
+          kind: 'image',
+        }),
+      );
+    });
+
+    if (rejected) {
+      setFileError(
+        `${rejected} image${rejected > 1 ? 's' : ''} skipped — over the ${MAX_FILE_SIZE_MB.image}MB limit.`,
+      );
+    }
+    setAttachments(prev => [...prev, ...accepted].slice(0, MAX_IMAGES));
+  }, [attachments.length, setAttachments]);
+
+  const removeImage = useCallback(
+    (id: string) => {
+      setAttachments(prev => prev.filter(a => a.id !== id));
+    },
+    [setAttachments],
+  );
+
+  const moveImage = useCallback(
+    (index: number, direction: -1 | 1) => {
+      setAttachments(prev => {
+        const next = [...prev];
+        const target = index + direction;
+        if (target < 0 || target >= next.length) return prev;
+        [next[index], next[target]] = [next[target], next[index]];
+        return next;
+      });
+    },
+    [setAttachments],
+  );
+
+  const setImageCaption = useCallback(
+    (id: string, caption: string) => {
+      setAttachments(prev => prev.map(a => (a.id === id ? { ...a, caption } : a)));
+    },
+    [setAttachments],
+  );
 
   const pickVideo = useCallback(async () => {
+    setFileError(null);
     const result = await launchImageLibrary({ mediaType: 'video', selectionLimit: 1 });
     if (result.didCancel || !result.assets?.length) return;
     const a = result.assets[0];
     if (!a?.uri) return;
 
+    const sizeError = validateSize(type, a.fileSize);
+    if (sizeError) {
+      setFileError(sizeError);
+      return;
+    }
+
     // reset thumb when a new video is chosen
     setVideoThumbUri(null);
+    setVideoDuration(a.duration ?? null);
 
     setAttachments([
       makeAttachment({
@@ -76,15 +172,22 @@ export function MediaComposerPage({
         kind: 'video',
       }),
     ]);
-  }, [setAttachments, setVideoThumbUri]);
+  }, [setAttachments, setVideoThumbUri, type]);
 
   const pickDocument = useCallback(
     async (kind: 'document' | 'audio') => {
+      setFileError(null);
       try {
         const docTypes = [DocumentPicker.types.pdf, DocumentPicker.types.doc, DocumentPicker.types.docx].filter(Boolean);
         const doc = await DocumentPicker.pickSingle({
           type: kind === 'audio' ? DocumentPicker.types.audio : docTypes,
         });
+
+        const sizeError = validateSize(type, doc.size);
+        if (sizeError) {
+          setFileError(sizeError);
+          return;
+        }
 
         setAttachments([
           makeAttachment({
@@ -97,7 +200,7 @@ export function MediaComposerPage({
         ]);
       } catch {}
     },
-    [setAttachments],
+    [setAttachments, type],
   );
 
   const pickVideoThumbnail = useCallback(async () => {
@@ -107,26 +210,37 @@ export function MediaComposerPage({
     if (a?.uri) setVideoThumbUri(a.uri);
   }, [setVideoThumbUri]);
 
+  const removeSingleAttachment = useCallback(() => {
+    setAttachments([]);
+    setVideoThumbUri(null);
+    setVideoDuration(null);
+    setFileError(null);
+  }, [setAttachments, setVideoThumbUri]);
+
+  const replaceSingleAttachment = useCallback(() => {
+    if (isVideo) pickVideo();
+    else if (type === 'audio') pickDocument('audio');
+    else pickDocument('document');
+  }, [isVideo, pickDocument, pickVideo, type]);
+
   const pickLabel = useMemo(() => {
-    if (type === 'image') return 'Pick image';
-    if (type === 'video' || type === 'short_video') return 'Pick video';
+    if (isImage) return attachments.length ? 'Add more photos' : 'Pick photos';
+    if (isVideo) return 'Pick video';
     if (type === 'audio') return 'Pick audio';
     return 'Pick document';
-  }, [type]);
+  }, [attachments.length, isImage, isVideo, type]);
 
   const pickIcon = useMemo(() => {
-    if (type === 'image') return { name: 'image-outline' as const, bg: '#4F8EF7' };
-    if (type === 'video' || type === 'short_video') return { name: 'videocam-outline' as const, bg: '#7C5CFA' };
+    if (isImage) return { name: 'image-outline' as const, bg: '#4F8EF7' };
+    if (isVideo) return { name: 'videocam-outline' as const, bg: '#7C5CFA' };
     if (type === 'audio') return { name: 'mic-outline' as const, bg: '#2FBF71' };
     return { name: 'document-text-outline' as const, bg: '#FF9F2E' };
-  }, [type]);
+  }, [isImage, isVideo, type]);
 
   const selected = attachments?.[0] ?? null;
   const selectedUri = selected?.url ?? selected?.uri ?? null;
   const selectedName = selected?.originalName ?? selected?.name ?? 'file';
-
-  const isImage = type === 'image';
-  const isVideo = type === 'video' || type === 'short_video';
+  const selectedSize = formatSize(selected?.size);
 
   const border = palette.divider;
   const text = palette.text;
@@ -134,21 +248,79 @@ export function MediaComposerPage({
 
   return (
     <View style={[styles.page, { backgroundColor: palette.bg, }]}>
-      {/* Main pick button */}
-      <Pressable
-        onPress={() => {
-          if (type === 'image') pickImage();
-          else if (isVideo) pickVideo();
-          else if (type === 'audio') pickDocument('audio');
-          else pickDocument('document');
-        }}
-        style={[styles.bigButton, { borderColor: border, backgroundColor: palette.card ?? '#FFFFFF' }]}
-      >
-        <View style={[styles.iconChip, { backgroundColor: pickIcon.bg }]}>
-          <Ionicons name={pickIcon.name} size={18} color="#FFFFFF" />
-        </View>
-        <Text style={[styles.bigButtonText, { color: text }]}>{pickLabel}</Text>
-      </Pressable>
+      {/* Main pick button — gallery mode keeps offering "add more" until the cap */}
+      {(isGalleryMode && attachments.length < MAX_IMAGES) || (!isGalleryMode && !attachments.length) ? (
+        <Pressable
+          onPress={() => {
+            if (isImage) pickImages();
+            else if (isVideo) pickVideo();
+            else if (type === 'audio') pickDocument('audio');
+            else pickDocument('document');
+          }}
+          style={[styles.bigButton, { borderColor: border, backgroundColor: palette.card ?? '#FFFFFF' }]}
+        >
+          <View style={[styles.iconChip, { backgroundColor: pickIcon.bg }]}>
+            <Ionicons name={pickIcon.name} size={18} color="#FFFFFF" />
+          </View>
+          <Text style={[styles.bigButtonText, { color: text }]}>{pickLabel}</Text>
+        </Pressable>
+      ) : null}
+
+      {fileError ? (
+        <Text style={[styles.errorText, { color: palette.danger }]}>{fileError}</Text>
+      ) : null}
+
+      {/* Gallery mode — multi-image strip with remove/reorder/caption */}
+      {isGalleryMode && attachments.length ? (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.galleryRow}>
+          {attachments.map((a, index) => {
+            const uri = a.url ?? a.uri;
+            return (
+              <View key={a.id ?? index} style={[styles.galleryCard, { borderColor: border, backgroundColor: palette.card ?? '#FFFFFF' }]}>
+                <View style={styles.galleryImageWrap}>
+                  <Image source={{ uri }} style={styles.galleryImage} resizeMode="cover" />
+                  <Pressable
+                    onPress={() => removeImage(a.id)}
+                    style={styles.galleryRemove}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Remove image ${index + 1}`}
+                  >
+                    <Ionicons name="close" size={14} color="#FFFFFF" />
+                  </Pressable>
+                </View>
+                <View style={styles.galleryReorderRow}>
+                  <Pressable
+                    onPress={() => moveImage(index, -1)}
+                    disabled={index === 0}
+                    style={{ opacity: index === 0 ? 0.3 : 1 }}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Move image ${index + 1} left`}
+                  >
+                    <Ionicons name="chevron-back" size={16} color={text} />
+                  </Pressable>
+                  <Text style={{ color: subtext, fontSize: 11, fontWeight: '700' }}>{index + 1}/{attachments.length}</Text>
+                  <Pressable
+                    onPress={() => moveImage(index, 1)}
+                    disabled={index === attachments.length - 1}
+                    style={{ opacity: index === attachments.length - 1 ? 0.3 : 1 }}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Move image ${index + 1} right`}
+                  >
+                    <Ionicons name="chevron-forward" size={16} color={text} />
+                  </Pressable>
+                </View>
+                <TextInput
+                  placeholder="Caption (optional)"
+                  placeholderTextColor={subtext}
+                  value={a.caption ?? ''}
+                  onChangeText={v => setImageCaption(a.id, v)}
+                  style={[styles.galleryCaptionInput, { color: text, borderColor: border }]}
+                />
+              </View>
+            );
+          })}
+        </ScrollView>
+      ) : null}
 
       {/* Thumbnail picker button — visible at all times for video, above preview */}
       {isVideo && (
@@ -190,17 +362,7 @@ export function MediaComposerPage({
         )
       )}
 
-      {/* PREVIEW AREA */}
-      {isImage && selectedUri ? (
-        <View style={styles.previewWrap}>
-          <Image
-            source={{ uri: selectedUri }}
-            style={[styles.previewSquare, { borderColor: border }]}
-            resizeMode="cover"
-          />
-        </View>
-      ) : null}
-
+      {/* PREVIEW AREA — single-file modes only (video/doc/audio) */}
       {isVideo && selectedUri ? (
         <View style={styles.previewWrap}>
           <View style={[styles.videoFrame, { borderColor: border }]}>
@@ -214,30 +376,72 @@ export function MediaComposerPage({
               posterResizeMode="cover"
             />
           </View>
+          <View style={styles.singleFileActionsRow}>
+            {formatDuration(videoDuration) ? (
+              <Text style={[styles.helperText, { color: subtext }]}>{formatDuration(videoDuration)}</Text>
+            ) : null}
+            {selectedSize ? <Text style={[styles.helperText, { color: subtext }]}>{selectedSize}</Text> : null}
+            <Pressable onPress={replaceSingleAttachment} accessibilityRole="button" accessibilityLabel="Replace video">
+              <Text style={{ color: palette.primaryStrong, fontWeight: '800', fontSize: 12 }}>Replace</Text>
+            </Pressable>
+            <Pressable onPress={removeSingleAttachment} accessibilityRole="button" accessibilityLabel="Remove video">
+              <Text style={{ color: palette.danger, fontWeight: '800', fontSize: 12 }}>Remove</Text>
+            </Pressable>
+          </View>
         </View>
       ) : null}
 
       {/* For non-image/video attachments, show selected file name */}
       {!isImage && !isVideo && attachments.length ? (
-        <Text style={[styles.helperText, { color: subtext }]}>Selected: {selectedName}</Text>
+        <View style={styles.singleFileRow}>
+          <Text style={[styles.helperText, { color: subtext }]}>
+            {selectedName}{selectedSize ? ` · ${selectedSize}` : ''}
+          </Text>
+          <View style={styles.singleFileActionsRow}>
+            <Pressable onPress={replaceSingleAttachment} accessibilityRole="button" accessibilityLabel="Replace file">
+              <Text style={{ color: palette.primaryStrong, fontWeight: '800', fontSize: 12 }}>Replace</Text>
+            </Pressable>
+            <Pressable onPress={removeSingleAttachment} accessibilityRole="button" accessibilityLabel="Remove file">
+              <Text style={{ color: palette.danger, fontWeight: '800', fontSize: 12 }}>Remove</Text>
+            </Pressable>
+          </View>
+        </View>
       ) : null}
 
-      {/* Caption input */}
-      <TextInput
-        placeholder="Add a caption (optional)"
-        placeholderTextColor={subtext}
-        value={rich.text}
-        onChangeText={(t) => setRich((p) => ({ ...p, text: t }))}
-        multiline
-        style={[
-          styles.captionInput,
-          {
-            color: text,
-            borderColor: border,
-            backgroundColor: palette.card ?? '#FFFFFF',
-          },
-        ]}
-      />
+      {/* Caption input — single caption field for non-gallery modes; gallery mode captions are per-image above */}
+      {!isGalleryMode ? (
+        <TextInput
+          placeholder="Add a caption (optional)"
+          placeholderTextColor={subtext}
+          value={rich.text}
+          onChangeText={(t) => setRich((p) => ({ ...p, text: t }))}
+          multiline
+          style={[
+            styles.captionInput,
+            {
+              color: text,
+              borderColor: border,
+              backgroundColor: palette.card ?? '#FFFFFF',
+            },
+          ]}
+        />
+      ) : (
+        <TextInput
+          placeholder="Add an overall caption for this gallery (optional)"
+          placeholderTextColor={subtext}
+          value={rich.text}
+          onChangeText={(t) => setRich((p) => ({ ...p, text: t }))}
+          multiline
+          style={[
+            styles.captionInput,
+            {
+              color: text,
+              borderColor: border,
+              backgroundColor: palette.card ?? '#FFFFFF',
+            },
+          ]}
+        />
+      )}
     </View>
   );
 }
@@ -276,24 +480,49 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
 
+  errorText: {
+    fontSize: 12,
+    fontWeight: '800',
+  },
+
+  galleryRow: { flexDirection: 'row', gap: 10, paddingVertical: 4 },
+  galleryCard: {
+    width: 140,
+    borderWidth: 2,
+    borderRadius: 16,
+    padding: 8,
+    gap: 6,
+  },
+  galleryImageWrap: { width: '100%', height: 120, borderRadius: 12, overflow: 'hidden' },
+  galleryImage: { width: '100%', height: '100%' },
+  galleryRemove: {
+    position: 'absolute',
+    top: 6,
+    right: 6,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  galleryReorderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  galleryCaptionInput: {
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    fontSize: 11,
+  },
+
   previewWrap: {
     alignItems: 'center',
     marginTop: 4,
-  },
-
-  // used for image preview to match the design
-  previewSquare: {
-    width: 240,
-    height: 240,
-    borderRadius: 22,
-    borderWidth: 2,
-    backgroundColor: 'transparent',
-
-    shadowColor: '#000',
-    shadowOpacity: 0.08,
-    shadowRadius: 14,
-    shadowOffset: { width: 0, height: 10 },
-    elevation: 3,
+    gap: 8,
   },
 
   videoFrame: {
@@ -316,9 +545,15 @@ const styles = StyleSheet.create({
   },
 
   helperText: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
-    textAlign: 'center',
+  },
+
+  singleFileRow: { gap: 6 },
+  singleFileActionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
   },
 
   // Thumbnail preview row

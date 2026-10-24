@@ -11,7 +11,7 @@ import { resolveBackendAssetUrl } from '@/network';
 import { useKISTheme } from '@/theme/useTheme';
 import { useResponsiveLayout } from '@/theme/responsive';
 import type { RootStackParamList } from '@/navigation/types';
-import type { BroadcastChannelContent, BroadcastChannelSummary } from '@/screens/broadcast/channels/api/channels.types';
+import type { BroadcastChannelContent } from '@/screens/broadcast/channels/api/channels.types';
 import { createBroadcastChannel, fetchChannelContents, publishChannelContent, setChannelBroadcastState, setChannelContentBroadcastState, setChannelContentTags, setChannelContentVisibility, useChannelsData } from '@/screens/broadcast/channels/hooks/useChannelsData';
 import ChannelPlaylistsManager from '@/screens/broadcast/channels/studio/ChannelPlaylistsManager';
 import ROUTES from '@/network';
@@ -40,6 +40,10 @@ import MembershipTiersPanel from '@/screens/broadcast/channels/studio/Membership
 import TrustPromotionRevenuePreviewCard from '@/components/profitability/TrustPromotionRevenuePreviewCard';
 import NotificationRetentionPreviewCard from '@/components/profitability/NotificationRetentionPreviewCard';
 import EnterpriseKcanRevenuePreviewCard from '@/components/profitability/EnterpriseKcanRevenuePreviewCard';
+import FeedComposerSheet, {
+  type FeedComposerPayload,
+  toChannelComposerContext,
+} from '@/components/feeds/FeedComposerSheet';
 
 type StudioTab = 'dashboard' | 'content' | 'create' | 'branding' | 'playlists' | 'live' | 'analytics' | 'moderation' | 'revenue' | 'audience' | 'copyright' | 'ads' | 'impressions' | 'traffic' | 'subtitles' | 'chapters' | 'endscreens' | 'cards' | 'shelves' | 'products' | 'monetization' | 'membership' | 'settings';
 
@@ -47,7 +51,7 @@ type Props = {
   legacyFeeds: any[];
   liveCount: number;
   expiresAt: string;
-  onCreate: (channel?: BroadcastChannelSummary | null) => void;
+  onSubmitAdvancedComposer: (payload: FeedComposerPayload) => Promise<void> | void;
 };
 
 type ChannelOwnerType = 'user' | 'shop' | 'health' | 'education' | 'partner';
@@ -165,7 +169,7 @@ const EMPTY_FORM: ChannelForm = {
 
 const normalizeHandle = (value: string) => value.toLowerCase().replace(/^@+/, '').replace(/[^a-z0-9_-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40);
 
-export default function ChannelStudioScreen({ legacyFeeds, liveCount, expiresAt, onCreate }: Props) {
+export default function ChannelStudioScreen({ legacyFeeds, liveCount, expiresAt, onSubmitAdvancedComposer }: Props) {
   const { palette, tone } = useKISTheme();
   const responsive = useResponsiveLayout();
   const compact = responsive.isWatch || responsive.isCompactPhone;
@@ -197,6 +201,7 @@ export default function ChannelStudioScreen({ legacyFeeds, liveCount, expiresAt,
   const [contentMembersOnlyTogglingId, setContentMembersOnlyTogglingId] = useState<string | null>(null);
   const [monetizationVisited, setMonetizationVisited] = useState(false);
   const [journeyDismissed, setJourneyDismissed] = useState(false);
+  const [composerVisible, setComposerVisible] = useState(false);
   const { channels, loading, refresh } = useChannelsData({ mine: true });
 
   useEffect(() => {
@@ -699,7 +704,7 @@ export default function ChannelStudioScreen({ legacyFeeds, liveCount, expiresAt,
           here at all. */}
       <KISButton
         title="Create content"
-        onPress={() => onCreate(channels[0] ?? null)}
+        onPress={() => setComposerVisible(true)}
         left={<KISIcon name="add" size={17} color={palette.onPrimary} />}
         style={{ marginTop: 14 }}
       />
@@ -852,7 +857,7 @@ export default function ChannelStudioScreen({ legacyFeeds, liveCount, expiresAt,
       );
     }
     if (activeTab === 'analytics') return <ChannelAnalyticsPanel channelId={selectedChannel.id} queued={legacyFeeds.length} live={liveCount} subscribers={selectedChannel.subscriber_count} />;
-    if (activeTab === 'content') return <ChannelContentManager contents={contents} legacyFeeds={legacyFeeds} onCreate={() => onCreate(selectedChannel)} onToggleBroadcast={handleToggleContentBroadcast} broadcastingId={contentBroadcastingId} onUpdateTags={handleUpdateContentTags} onPublish={handlePublishContent} publishingId={contentPublishingId} onToggleMembersOnly={handleToggleContentMembersOnly} togglingMembersOnlyId={contentMembersOnlyTogglingId} />;
+    if (activeTab === 'content') return <ChannelContentManager contents={contents} legacyFeeds={legacyFeeds} channel={selectedChannel} onSubmitAdvancedComposer={onSubmitAdvancedComposer} onToggleBroadcast={handleToggleContentBroadcast} broadcastingId={contentBroadcastingId} onUpdateTags={handleUpdateContentTags} onPublish={handlePublishContent} publishingId={contentPublishingId} onToggleMembersOnly={handleToggleContentMembersOnly} togglingMembersOnlyId={contentMembersOnlyTogglingId} />;
     if (activeTab === 'moderation') return <ChannelModerationPanel channelId={selectedChannel.id} />;
     if (activeTab === 'create') {
       return (
@@ -861,7 +866,7 @@ export default function ChannelStudioScreen({ legacyFeeds, liveCount, expiresAt,
           <Text style={[styles.sectionText, { color: palette.subtext }]}>The advanced composer will save this feed inside the selected channel and still preserve the old profile feed queue for compatibility.</Text>
           <KISButton
             title={createLabel}
-            onPress={() => onCreate(selectedChannel)}
+            onPress={() => setComposerVisible(true)}
             left={<KISIcon name="add" size={17} color={palette.onPrimary} />}
           />
         </View>
@@ -926,7 +931,7 @@ export default function ChannelStudioScreen({ legacyFeeds, liveCount, expiresAt,
           subtitle="Creator, ministry, education, and institution media networks are packaged for future annual contracts only."
         />
         <ChannelAnalyticsPanel channelId={selectedChannel.id} queued={legacyFeeds.length} live={liveCount} subscribers={selectedChannel.subscriber_count} />
-        <ChannelContentManager contents={contents.slice(0, 4)} legacyFeeds={legacyFeeds.slice(0, 4)} onCreate={() => onCreate(selectedChannel)} onToggleBroadcast={handleToggleContentBroadcast} broadcastingId={contentBroadcastingId} onUpdateTags={handleUpdateContentTags} onPublish={handlePublishContent} publishingId={contentPublishingId} onToggleMembersOnly={handleToggleContentMembersOnly} togglingMembersOnlyId={contentMembersOnlyTogglingId} />
+        <ChannelContentManager contents={contents.slice(0, 4)} legacyFeeds={legacyFeeds.slice(0, 4)} channel={selectedChannel} onSubmitAdvancedComposer={onSubmitAdvancedComposer} onToggleBroadcast={handleToggleContentBroadcast} broadcastingId={contentBroadcastingId} onUpdateTags={handleUpdateContentTags} onPublish={handlePublishContent} publishingId={contentPublishingId} onToggleMembersOnly={handleToggleContentMembersOnly} togglingMembersOnlyId={contentMembersOnlyTogglingId} />
         {loadingContent ? <ActivityIndicator color={palette.primaryStrong} /> : null}
       </>
     );
@@ -956,6 +961,12 @@ export default function ChannelStudioScreen({ legacyFeeds, liveCount, expiresAt,
           <KISButton title="Channel Studio" size="sm" variant={topView === 'list' ? 'primary' : 'outline'} onPress={() => setTopView('list')} style={{ flex: 1 }} />
         </View>
         {topView === 'overview' ? renderOverview() : renderChannelList()}
+        <FeedComposerSheet
+          visible={composerVisible}
+          onClose={() => setComposerVisible(false)}
+          onSubmit={onSubmitAdvancedComposer}
+          channelContext={toChannelComposerContext(selectedChannel)}
+        />
       </View>
     );
   }
@@ -983,7 +994,7 @@ export default function ChannelStudioScreen({ legacyFeeds, liveCount, expiresAt,
             />
             <KISButton
               title={compact ? 'Create' : createLabel}
-              onPress={() => onCreate(selectedChannel)}
+              onPress={() => setComposerVisible(true)}
               left={<KISIcon name="add" size={16} color={palette.onPrimary} />}
             />
           </View>
@@ -1084,6 +1095,12 @@ export default function ChannelStudioScreen({ legacyFeeds, liveCount, expiresAt,
         })}
       </ScrollView>
       {renderBody()}
+      <FeedComposerSheet
+        visible={composerVisible}
+        onClose={() => setComposerVisible(false)}
+        onSubmit={onSubmitAdvancedComposer}
+        channelContext={toChannelComposerContext(selectedChannel)}
+      />
     </View>
   );
 }
