@@ -604,6 +604,11 @@ export const publishChannelContent = async (contentId: string): Promise<Broadcas
   return response?.success ? normalizeChannelContent(response.data) : null;
 };
 
+export const deleteChannelContent = async (contentId: string): Promise<boolean> => {
+  const response = await deleteRequest(channelContentDetailEndpoint(contentId), { errorMessage: 'Unable to delete content.' });
+  return Boolean(response?.success);
+};
+
 export const setChannelContentVisibility = async (contentId: string, visibility: 'public' | 'members_only'): Promise<BroadcastChannelContent | null> => {
   const response = await patchRequest(
     channelContentDetailEndpoint(contentId),
@@ -747,6 +752,7 @@ export const normalizeLiveStream = (item: any): BroadcastChannelLiveStream | nul
     thumbnail_url: item.thumbnail_url || item.thumbnailUrl || '',
     thumbnail_media_type: item.thumbnail_media_type || item.thumbnailMediaType || '',
     recording_status: item.recording_status || item.recordingStatus || 'not_started',
+    replay_content_id: item.replay_content_id || item.replayContentId || '',
     viewer_count: Number(item.viewer_count ?? item.viewerCount ?? 0),
     peak_viewer_count: Number(item.peak_viewer_count ?? item.peakViewerCount ?? 0),
     metadata: item.metadata && typeof item.metadata === 'object' ? item.metadata : {},

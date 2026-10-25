@@ -543,10 +543,6 @@ const broadcastRoutes = {
     // Channel-manager-only: ban/unban/list banned chatters for a channel's live chat
     channelChatBans: (channelId: string) =>
       `${API_BASE_URL}/api/v1/broadcasts/channels/${channelId}/chat-bans/`,
-    recordings: (streamId: string) =>
-      `${API_BASE_URL}/api/v1/broadcasts/live-streams/${streamId}/recordings/`,
-    recordingDetail: (recordingId: string) =>
-      `${API_BASE_URL}/api/v1/broadcasts/recordings/${recordingId}/`,
     // Per-channel notification preference (notify on live / new content)
     channelNotificationPreference: (channelId: string) =>
       `${API_BASE_URL}/api/v1/broadcasts/channels/${channelId}/notification-preference/`,

@@ -140,12 +140,15 @@ export type BroadcastChannelLiveStream = {
   replay_url?: string;
   thumbnail_url?: string;
   thumbnail_media_type?: 'image' | 'video' | '' | string;
-  // Full intended lifecycle (see ChannelLiveStream.RecordingStatus on the
-  // backend) - only 'not_started' (default), 'ready', and 'failed' are
-  // reachable today. No automatic recording pipeline exists yet, so a
-  // stream sits at 'not_started' forever unless something calls the
-  // (currently unused in production) archive webhook.
+  // Full lifecycle, all states reachable - kisvideo-live's recording
+  // pipeline drives not_started -> recording -> finalizing -> processing
+  // -> ready/failed automatically once a broadcast ends; deleted is set
+  // when the creator removes the replay. See
+  // ChannelLiveStream.RecordingStatus on the backend.
   recording_status?: 'not_started' | 'recording' | 'finalizing' | 'processing' | 'ready' | 'failed' | 'deleted' | string;
+  // Only populated once recording_status === 'ready' - see
+  // ChannelLiveStreamSerializer.get_replay_content_id on the backend.
+  replay_content_id?: string;
   viewer_count?: number;
   peak_viewer_count?: number;
   metadata?: Record<string, any>;

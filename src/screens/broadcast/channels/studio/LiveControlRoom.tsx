@@ -28,8 +28,6 @@ import {
   KeyboardAvoidingView,
   Platform,
   Pressable,
-  ScrollView,
-  Share,
   StyleSheet,
   Switch,
   Text,
@@ -37,6 +35,9 @@ import {
 } from 'react-native';
 import { launchImageLibrary } from 'react-native-image-picker';
 import Video from 'react-native-video';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import type { RootStackParamList } from '@/navigation/types';
 import { KISIcon } from '@/constants/kisIcons';
 import KISButton from '@/constants/KISButton';
 import KISTextInput from '@/constants/KISTextInput';
@@ -45,19 +46,22 @@ import { useKISTheme } from '@/theme/useTheme';
 import ROUTES, { CHAT_BASE_URL } from '@/network';
 import { getRequest } from '@/network/get';
 import { postRequest } from '@/network/post';
-import { deleteRequest } from '@/network/delete';
 import { patchRequest } from '@/network/patch';
 import { uploadFileToBackend } from '@/Module/ChatRoom/uploadFileToBackend';
 import { getAccessToken } from '@/security/authStorage';
 import {
   cancelLiveStream,
+  deleteChannelContent,
   editLiveStream,
   endLiveStream,
+  fetchChannelContentDetail,
   fetchChannelLiveStreams,
+  publishChannelContent,
   scheduleChannelLiveStream,
   startLiveStream,
 } from '@/screens/broadcast/channels/hooks/useChannelsData';
 import type {
+  BroadcastChannelContent,
   BroadcastChannelLiveStream,
   BroadcastChannelSummary,
 } from '@/screens/broadcast/channels/api/channels.types';
@@ -200,81 +204,110 @@ function CredRow({
   );
 }
 
-// ── Recordings panel (shown when stream status === 'ended') ──────────────────
+// ── Replay panel (shown when stream status === 'ended') ──────────────────────
+// Reflects ChannelLiveStream.recording_status - kisvideo-live's automatic
+// recording pipeline drives not_started -> recording -> finalizing ->
+// processing -> ready/failed once a broadcast ends; this panel polls the
+// stream's own detail endpoint while a recording is in flight and shows the
+// real replay (a normal ChannelContent row, found via replay_content_id)
+// once it's ready. There is at most one replay per stream (the archive
+// webhook is idempotent), never a list, unlike the panel this replaces.
 
-type Recording = {
-  id: string;
-  title?: string;
-  thumbnail_url?: string;
-  playback_url?: string;
-  duration?: number;
-  created_at?: string;
+const RECORDING_STATUS_LABEL: Record<string, string> = {
+  not_started: 'No recording',
+  recording: 'Recording…',
+  finalizing: 'Finalizing…',
+  processing: 'Processing…',
+  ready: 'Replay ready',
+  failed: 'Recording failed',
+  deleted: 'Replay deleted',
 };
+const RECORDING_IN_PROGRESS = new Set(['recording', 'finalizing', 'processing']);
+const RECORDING_POLL_MS = 5000;
 
-function RecordingsPanel({
-  streamId,
+function ReplayPanel({
+  stream,
   palette,
+  onOpenReplay,
 }: {
-  streamId: string;
+  stream: BroadcastChannelLiveStream;
   palette: any;
+  onOpenReplay: (contentId: string) => void;
 }) {
-  const [recordings, setRecordings] = useState<Recording[]>([]);
-  const [loading, setLoading]       = useState(false);
-  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [recordingStatus, setRecordingStatus] = useState(stream.recording_status || 'not_started');
+  const [replayContentId, setReplayContentId] = useState(stream.replay_content_id || '');
+  const [errorDetail, setErrorDetail] = useState('');
+  const [replay, setReplay] = useState<BroadcastChannelContent | null>(null);
+  const [loadingReplay, setLoadingReplay] = useState(false);
+  const [publishing, setPublishing] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const pollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  const pollStatus = useCallback(async () => {
+    const res = await getRequest(ROUTES.broadcasts.liveStreamDetail(stream.id), { errorMessage: '' });
+    const data = res?.data;
+    if (!data) return;
+    setRecordingStatus(data.recording_status || 'not_started');
+    setReplayContentId(data.replay_content_id || '');
+    setErrorDetail((data.metadata && data.metadata.recording_error) || '');
+  }, [stream.id]);
+
+  useEffect(() => {
+    if (!RECORDING_IN_PROGRESS.has(recordingStatus)) return undefined;
+    pollTimerRef.current = setTimeout(() => { void pollStatus(); }, RECORDING_POLL_MS);
+    return () => { if (pollTimerRef.current) clearTimeout(pollTimerRef.current); };
+  }, [recordingStatus, pollStatus]);
+
+  useEffect(() => {
+    if (recordingStatus !== 'ready' || !replayContentId) { setReplay(null); return undefined; }
+    let cancelled = false;
+    setLoadingReplay(true);
+    fetchChannelContentDetail(replayContentId)
+      .then(result => { if (!cancelled) setReplay(result); })
+      .finally(() => { if (!cancelled) setLoadingReplay(false); });
+    return () => { cancelled = true; };
+  }, [recordingStatus, replayContentId]);
+
+  const handlePublish = useCallback(async () => {
+    if (!replayContentId) return;
+    setPublishing(true);
     try {
-      const res = await getRequest(
-        ROUTES.broadcasts.recordings(streamId),
-        { errorMessage: '' },
-      );
-      const list: Recording[] = Array.isArray(res?.data)
-        ? res.data
-        : Array.isArray(res)
-        ? (res as any)
-        : [];
-      setRecordings(list);
+      const updated = await publishChannelContent(replayContentId);
+      if (updated) setReplay(updated);
+      else Alert.alert('Publish failed', 'Unable to publish this replay. Please try again.');
     } finally {
-      setLoading(false);
+      setPublishing(false);
     }
-  }, [streamId]);
+  }, [replayContentId]);
 
-  useEffect(() => { void load(); }, [load]);
-
-  const handleShare = useCallback((recording: Recording) => {
-    const url = recording.playback_url ?? '';
-    if (!url) {
-      Alert.alert('Share', 'Playback URL not available for this recording.');
-      return;
-    }
-    void Share.share({ message: url });
-  }, []);
-
-  const handleDelete = useCallback((recording: Recording) => {
+  const handleDelete = useCallback(() => {
+    if (!replayContentId) return;
     Alert.alert(
-      'Delete recording?',
-      `"${recording.title ?? 'This recording'}" will be permanently deleted.`,
+      'Delete replay?',
+      'This replay will be permanently deleted and removed from your channel.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Delete',
           style: 'destructive',
           onPress: async () => {
-            setDeletingId(recording.id);
+            setDeleting(true);
             try {
-              await deleteRequest(ROUTES.broadcasts.recordingDetail(recording.id));
-              setRecordings(prev => prev.filter(r => r.id !== recording.id));
-            } catch {
-              Alert.alert('Delete failed', 'Unable to delete recording. Please try again.');
+              const ok = await deleteChannelContent(replayContentId);
+              if (ok) {
+                setRecordingStatus('deleted');
+                setReplay(null);
+              } else {
+                Alert.alert('Delete failed', 'Unable to delete this replay. Please try again.');
+              }
             } finally {
-              setDeletingId(null);
+              setDeleting(false);
             }
           },
         },
       ],
     );
-  }, []);
+  }, [replayContentId]);
 
   const formatDuration = (seconds?: number) => {
     if (!seconds) return '';
@@ -283,56 +316,89 @@ function RecordingsPanel({
     return `${m}:${String(s).padStart(2, '0')}`;
   };
 
+  const statusLabel = RECORDING_STATUS_LABEL[recordingStatus] || recordingStatus;
+  const isInProgress = RECORDING_IN_PROGRESS.has(recordingStatus);
+  const isReady = recordingStatus === 'ready';
+
   return (
     <View style={[recStyles.panel, { borderColor: palette.border, backgroundColor: palette.card }]}>
       <View style={recStyles.header}>
         <KISIcon name="video" size={15} color={palette.primaryStrong} />
-        <Text style={[recStyles.title, { color: palette.text }]}>Recordings</Text>
-        {loading
-          ? <ActivityIndicator size="small" color={palette.primaryStrong} />
-          : <KISButton variant="ghost" onPress={load} accessibilityLabel="Refresh recordings">
-              <KISIcon name="refresh" size={14} color={palette.subtext} />
-            </KISButton>
-        }
+        <Text style={[recStyles.title, { color: palette.text }]}>Replay</Text>
+        {isInProgress && <ActivityIndicator size="small" color={palette.primaryStrong} />}
       </View>
 
-      {!loading && recordings.length === 0 && (
+      {recordingStatus === 'not_started' && (
         <Text style={[recStyles.empty, { color: palette.subtext }]}>
-          No recordings found for this stream.
+          No recording was captured for this stream.
         </Text>
       )}
 
-      {recordings.map(rec => (
-        <View key={rec.id} style={[recStyles.row, { borderColor: palette.border }]}>
+      {isInProgress && (
+        <Text style={[recStyles.empty, { color: palette.subtext }]}>{statusLabel}</Text>
+      )}
+
+      {recordingStatus === 'failed' && (
+        <Text style={[recStyles.empty, { color: palette.danger }]}>
+          {statusLabel}{errorDetail ? `: ${errorDetail}` : ''}
+        </Text>
+      )}
+
+      {recordingStatus === 'deleted' && (
+        <Text style={[recStyles.empty, { color: palette.subtext }]}>Replay deleted.</Text>
+      )}
+
+      {isReady && loadingReplay && (
+        <ActivityIndicator size="small" color={palette.primaryStrong} />
+      )}
+
+      {isReady && !loadingReplay && replay && (
+        <View style={[recStyles.row, { borderColor: palette.border }]}>
           <View style={recStyles.info}>
             <Text style={[recStyles.recTitle, { color: palette.text }]} numberOfLines={1}>
-              {rec.title ?? 'Recording'}
+              {replay.title || 'Replay'}
             </Text>
             <Text style={[recStyles.recMeta, { color: palette.subtext }]}>
-              {rec.created_at ? new Date(rec.created_at).toLocaleDateString() : ''}
-              {rec.duration ? `  ·  ${formatDuration(rec.duration)}` : ''}
+              {replay.status === 'draft' ? 'Draft — not yet published' : 'Published'}
+              {replay.duration_seconds ? `  ·  ${formatDuration(replay.duration_seconds)}` : ''}
             </Text>
           </View>
           <View style={recStyles.actions}>
             <KISButton
               size="xs"
               variant="outline"
-              title="Share"
-              left={<KISIcon name="share" size={14} color={palette.primaryStrong} />}
-              onPress={() => handleShare(rec)}
+              title="View"
+              left={<KISIcon name="play" size={14} color={palette.primaryStrong} />}
+              onPress={() => onOpenReplay(replayContentId)}
             />
+            {replay.status === 'draft' && (
+              <KISButton
+                size="xs"
+                variant="primary"
+                title="Publish"
+                loading={publishing}
+                disabled={publishing}
+                onPress={handlePublish}
+              />
+            )}
             <KISButton
               size="xs"
               variant="danger"
               title="Delete"
-              loading={deletingId === rec.id}
-              disabled={deletingId === rec.id}
-              left={deletingId === rec.id ? undefined : <KISIcon name="trash" size={14} color={palette.onPrimary} />}
-              onPress={() => handleDelete(rec)}
+              loading={deleting}
+              disabled={deleting}
+              left={deleting ? undefined : <KISIcon name="trash" size={14} color={palette.onPrimary} />}
+              onPress={handleDelete}
             />
           </View>
         </View>
-      ))}
+      )}
+
+      {isReady && !loadingReplay && !replay && (
+        <Text style={[recStyles.empty, { color: palette.subtext }]}>
+          Unable to load replay details.
+        </Text>
+      )}
     </View>
   );
 }
@@ -401,6 +467,7 @@ function BroadcasterPanel({
   // now reports via onError as a small dismissible banner, non-blocking.
   const [connectionErrorMessage, setConnectionErrorMessage] = useState<string | null>(null);
 
+
   // Stream settings state
   const [latencyMode, setLatencyMode] = useState<LatencyMode>(stream.latency_mode ?? 'normal');
   const [dvrEnabled, setDvrEnabled]   = useState<boolean>(stream.dvr_enabled ?? false);
@@ -440,11 +507,17 @@ function BroadcasterPanel({
   }, [patchSettings]);
 
   const {
+    stream: polledStream,
     viewerCount,
     cameraSources,
     activeCameraId,
     switchCamera,
   } = useLiveStream(stream.id);
+  // useLiveStream polls the stream's own detail endpoint while live (see
+  // that hook's own POLL_LIVE_MS), so this reflects kisvideo-live's
+  // recording pipeline in real time rather than the one-time `stream`
+  // prop snapshot this panel otherwise only receives on mount.
+  const liveRecordingStatus = polledStream?.recording_status || stream.recording_status || 'not_started';
 
   // Reports publisher-side connection health back to Django (E3 of the
   // analytics batch) - "good" is debounced to at most once per 15s since
@@ -714,6 +787,28 @@ function BroadcasterPanel({
         />
       )}
 
+      {/* During-stream recording indicator - kisvideo-live's recording
+          pipeline starts as soon as MediaMTX sees the publisher, which can
+          be moments after this device itself reports "live". */}
+      {isDeviceLive && liveRecordingStatus === 'recording' && (
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 6,
+            alignSelf: 'flex-start',
+            paddingHorizontal: 10,
+            paddingVertical: 4,
+            borderRadius: 999,
+            marginBottom: 8,
+            backgroundColor: `${palette.danger}1a`,
+          }}
+        >
+          <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: palette.danger }} />
+          <Text style={{ fontSize: 11, fontWeight: '800', color: palette.danger }}>Recording</Text>
+        </View>
+      )}
+
       {/* Camera source grid (server-side sources) */}
       {cameraSources.length > 0 && (
         <CameraSourceSelector
@@ -854,6 +949,10 @@ function BroadcasterPanel({
 
 export default function LiveControlRoom({ channel, onOpenWatch }: Props) {
   const { palette } = useKISTheme();
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const handleOpenReplay = useCallback((contentId: string) => {
+    navigation.navigate('ChannelContentDetail', { contentId });
+  }, [navigation]);
   const [streams,    setStreams]    = useState<BroadcastChannelLiveStream[]>([]);
   const [loading,    setLoading]    = useState(false);
   const [saving,     setSaving]     = useState(false);
@@ -1334,7 +1433,7 @@ export default function LiveControlRoom({ channel, onOpenWatch }: Props) {
                   </Text>
                 </View>
               </View>
-              <RecordingsPanel streamId={stream.id} palette={palette} />
+              <ReplayPanel stream={stream} palette={palette} onOpenReplay={handleOpenReplay} />
             </View>
           ))}
         </>
