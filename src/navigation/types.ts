@@ -63,6 +63,20 @@ export type RootStackParamList = {
     streamId: string;
     stream?: any;
   };
+  // Global creator workspace (Overview/Channels/Content/Analytics/Create) -
+  // replaces the old FeedManagementModal entry point, which had no real
+  // route at all (it was a modal-embedded state machine with no back
+  // button, no deep-linking, and no way to land directly on a channel).
+  BroadcastWorkspace: undefined;
+  // Per-channel studio - a real pushable/back-able/deep-linkable route
+  // (ChannelStudioScreen.tsx previously only existed mounted inside
+  // FeedManagementModal, never registered here). `tab` lets a caller land
+  // directly on a specific section (e.g. Live) instead of always starting
+  // at Dashboard.
+  ChannelStudio: {
+    channelId?: string;
+    tab?: 'dashboard' | 'content' | 'live' | 'growth' | 'branding';
+  };
   PartnerInsights: undefined;
   AdminTools: undefined;
   AdminDashboard: { target: string; title: string };

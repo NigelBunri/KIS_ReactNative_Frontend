@@ -85,6 +85,8 @@ import PlaylistDetailScreen from '@/screens/broadcast/playlists/PlaylistDetailSc
 import ChannelHomePage from '@/screens/broadcast/channels/ChannelHomePage';
 import ChannelContentDetailPage from '@/screens/broadcast/channels/ChannelContentDetailPage';
 import LiveWatchPage from '@/screens/broadcast/channels/LiveWatchPage';
+import BroadcastWorkspaceScreen from '@/screens/broadcast/workspace/BroadcastWorkspaceScreen';
+import ChannelStudioScreen from '@/screens/broadcast/channels/studio/ChannelStudioScreen';
 import WatchHistoryScreen from '@/screens/broadcast/channels/WatchHistoryScreen';
 import ShortsScreen from '@/screens/broadcast/channels/ShortsScreen';
 import LikedVideosScreen from '@/screens/broadcast/channels/LikedVideosScreen';
@@ -1315,6 +1317,8 @@ function AppContent() {
                   ChannelHome: 'channels/:channelId',
                   ChannelContentDetail: 'content/:contentId',
                   LiveWatch: 'live/:streamId',
+                  BroadcastWorkspace: 'workspace',
+                  ChannelStudio: 'studio/:channelId',
 
                   ShopDetail: 'shops/:slug',
                   ProductDetail: 'products/:slug',
@@ -1375,6 +1379,14 @@ function AppContent() {
                     <RootStack.Screen
                       name="LiveWatch"
                       getComponent={() => LiveWatchPage}
+                    />
+                    <RootStack.Screen
+                      name="BroadcastWorkspace"
+                      getComponent={() => BroadcastWorkspaceScreen}
+                    />
+                    <RootStack.Screen
+                      name="ChannelStudio"
+                      getComponent={() => ChannelStudioScreen}
                     />
                     <RootStack.Screen
                       name="WatchHistory"

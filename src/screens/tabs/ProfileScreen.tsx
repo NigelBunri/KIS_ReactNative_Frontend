@@ -1099,15 +1099,26 @@ export default function ProfileScreen() {
     [c],
   );
 
-  const handleBroadcastCTA = useCallback(
-    (def: (typeof BROADCAST_PROFILE_DEFINITIONS)[number]) => {
-      openManagementPanel(def.profileKey);
-    },
-    [openManagementPanel],
-  );
-
   const rootNavigation =
     tabsNavigation.getParent<NativeStackNavigationProp<RootStackParamList>>();
+
+  const handleBroadcastCTA = useCallback(
+    (def: (typeof BROADCAST_PROFILE_DEFINITIONS)[number]) => {
+      // "Broadcast workspace" now opens the real BroadcastWorkspace route
+      // (a registered screen with its own navigation, back button, and
+      // deep-linking) instead of FeedManagementModal - a modal with no
+      // route at all, no way to land directly on a channel, and no back
+      // button reachable once scrolled into a tab's content. Every other
+      // profile type (health/market/education) still opens its existing
+      // management panel unchanged - only this one entry point moved.
+      if (def.profileKey === 'broadcast_feed') {
+        rootNavigation?.navigate('BroadcastWorkspace');
+        return;
+      }
+      openManagementPanel(def.profileKey);
+    },
+    [openManagementPanel, rootNavigation],
+  );
 
   // Education UX v2: EducationManagementModal is removed. Any trigger that
   // still opens the 'education' management panel (deep links, the generic

@@ -268,7 +268,14 @@ export const BROADCAST_PROFILE_DEFINITIONS: BroadcastProfileDefinition[] = [
   {
     profileKey: 'broadcast_feed',
     label: 'Broadcast feed',
-    helper: '10-day ephemeral queue for drops or events',
+    // Was "10-day ephemeral queue for drops or events" - the backend no
+    // longer expires feed items at all (BroadcastItem.expires_at defaults
+    // to ~100 years now, and _handle_broadcast_feed/
+    // _bootstrap_broadcast_feed_profile both explicitly set
+    // expires_at=None, notes="Feeds do not expire." - see
+    // apps/broadcasts/views.py). This copy was stale, not descriptive of
+    // current behavior.
+    helper: 'Queue drops or events for your channels',
     ownershipLabel: 'Broadcast-owned',
     managementLabel: 'Broadcast workspace',
     icon: 'sparkles',
@@ -276,12 +283,9 @@ export const BROADCAST_PROFILE_DEFINITIONS: BroadcastProfileDefinition[] = [
     creationType: 'broadcast_feed',
     summary: (data) => {
       const feeds = Array.isArray(data?.feeds) ? data.feeds.length : 0;
-      const expires = data?.expires_at
-        ? new Date(data.expires_at).toLocaleDateString()
-        : '10 days';
-      return `${feeds} feeds · expires ${expires}`;
+      return `${feeds} feed${feeds === 1 ? '' : 's'} queued`;
     },
-    emptySummary: 'Create a 10-day broadcast feed to queue your posts.',
+    emptySummary: 'Create a broadcast feed to queue your posts.',
   },
   {
     profileKey: 'health',

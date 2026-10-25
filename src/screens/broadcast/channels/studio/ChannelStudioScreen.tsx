@@ -1,16 +1,19 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { KISIcon } from '@/constants/kisIcons';
 import KISButton from '@/constants/KISButton';
 import ChannelAvatar from '@/components/broadcast/ChannelAvatar';
 import PermanentRemoteImage from '@/components/media/PermanentRemoteImage';
 import { resolveBackendAssetUrl } from '@/network';
-import { useKISTheme } from '@/theme/useTheme';
+import { WORKSPACE_PALETTE } from '@/screens/broadcast/workspace/workspaceTheme';
 import { useResponsiveLayout } from '@/theme/responsive';
 import type { RootStackParamList } from '@/navigation/types';
+import { useProfileController } from '@/screens/tabs/profile/useProfileController';
+import { useAdvancedComposerSubmit } from '@/screens/broadcast/workspace/useAdvancedComposerSubmit';
 import type { BroadcastChannelContent } from '@/screens/broadcast/channels/api/channels.types';
 import { createBroadcastChannel, fetchChannelContents, publishChannelContent, setChannelBroadcastState, setChannelContentBroadcastState, setChannelContentTags, setChannelContentVisibility, useChannelsData } from '@/screens/broadcast/channels/hooks/useChannelsData';
 import ChannelPlaylistsManager from '@/screens/broadcast/channels/studio/ChannelPlaylistsManager';
@@ -48,10 +51,18 @@ import FeedComposerSheet, {
 type StudioTab = 'dashboard' | 'content' | 'create' | 'branding' | 'playlists' | 'live' | 'analytics' | 'moderation' | 'revenue' | 'audience' | 'copyright' | 'ads' | 'impressions' | 'traffic' | 'subtitles' | 'chapters' | 'endscreens' | 'cards' | 'shelves' | 'products' | 'monetization' | 'membership' | 'settings';
 
 type Props = {
-  legacyFeeds: any[];
-  liveCount: number;
-  expiresAt: string;
-  onSubmitAdvancedComposer: (payload: FeedComposerPayload) => Promise<void> | void;
+  // All optional now: this is a real routed screen (RootStackParamList's
+  // "ChannelStudio") rather than only a child embedded inside
+  // FeedManagementModal's modal state machine. When omitted - the normal
+  // case now - the screen fetches/manages the legacy broadcast_feed
+  // profile itself via useProfileController, the exact same controller
+  // ProfileScreen.tsx already uses for this data (see
+  // handleAdvancedFeedSubmit/addBroadcastFeedEntry there) - not a second
+  // implementation of it, just a second call site of the same hook.
+  legacyFeeds?: any[];
+  liveCount?: number;
+  expiresAt?: string;
+  onSubmitAdvancedComposer?: (payload: FeedComposerPayload) => Promise<void> | void;
 };
 
 type ChannelOwnerType = 'user' | 'shop' | 'health' | 'education' | 'partner';
@@ -169,25 +180,56 @@ const EMPTY_FORM: ChannelForm = {
 
 const normalizeHandle = (value: string) => value.toLowerCase().replace(/^@+/, '').replace(/[^a-z0-9_-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40);
 
-export default function ChannelStudioScreen({ legacyFeeds, liveCount, expiresAt, onSubmitAdvancedComposer }: Props) {
-  const { palette, tone } = useKISTheme();
+export default function ChannelStudioScreen(props: Props) {
+  const palette = WORKSPACE_PALETTE;
+  const tone = 'dark' as const;
   const responsive = useResponsiveLayout();
   const compact = responsive.isWatch || responsive.isCompactPhone;
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const { user } = useAuth();
+  const insets = useSafeAreaInsets();
+  const route = useRoute<RouteProp<RootStackParamList, 'ChannelStudio'>>();
+  const routeChannelId = route?.params?.channelId ?? null;
+  const routeTab = route?.params?.tab ?? null;
+  const { user, setAuth, setPhone } = useAuth();
+
+  // Self-sufficient legacy-feed data: when this screen is reached as a real
+  // route (the normal case now) rather than embedded in
+  // FeedManagementModal, legacyFeeds/liveCount/expiresAt/
+  // onSubmitAdvancedComposer aren't passed as props - fetch/manage the same
+  // legacy broadcast_feed profile ProfileScreen.tsx already manages via this
+  // exact hook, rather than inventing a second data path for it.
+  const profileController = useProfileController({ setAuth, setPhone });
+  useEffect(() => {
+    void profileController.refreshBroadcastProfiles();
+    // Only on mount - refreshBroadcastProfiles itself is called again after
+    // every mutation (add/update/delete/broadcast/unbroadcast), so this
+    // effect re-running on every profileController identity change would be
+    // redundant, not more correct.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const legacyBroadcastProfile = profileController.broadcastProfiles?.broadcast_feed;
+  const legacyFeeds: any[] = props.legacyFeeds ?? (Array.isArray(legacyBroadcastProfile?.feeds) ? legacyBroadcastProfile.feeds : []);
+  const liveCount: number = props.liveCount ?? legacyFeeds.filter((feed: any) => feed?.is_broadcast || feed?.broadcast_id).length;
+  const selfSubmitAdvancedComposer = useAdvancedComposerSubmit(profileController);
+  const onSubmitAdvancedComposer = props.onSubmitAdvancedComposer ?? selfSubmitAdvancedComposer;
+
   // Top-level flow: Overview (aggregate, channel-agnostic) -> Channel
   // Studio (pick which channel) -> channel detail (the full 22-tab studio
   // below, now reached as a drill-in rather than always showing whichever
   // channel happened to be first). "detail" hides the Overview/Channel
   // Studio tab bar in favor of a back button, matching a normal
   // push-navigation feel rather than three permanently-visible tab bars
-  // stacked on top of each other.
+  // stacked on top of each other. Arriving via the ChannelStudio route with
+  // a channelId (e.g. tapped from BroadcastWorkspace's channel list) lands
+  // directly on "detail" instead of making the user pick the channel again.
   type StudioTopView = 'overview' | 'list' | 'detail';
-  const [topView, setTopView] = useState<StudioTopView>('overview');
-  const [activeTab, setActiveTab] = useState<StudioTab>('dashboard');
-  const [activeCategory, setActiveCategory] = useState<StudioTabCategory>(categoryForTab('dashboard'));
+  const [topView, setTopView] = useState<StudioTopView>(routeChannelId ? 'detail' : 'overview');
+  const routeTabToStudioTab: Record<string, StudioTab> = { dashboard: 'dashboard', content: 'content', live: 'live', growth: 'revenue', branding: 'branding' };
+  const initialTab: StudioTab = (routeTab && routeTabToStudioTab[routeTab]) || 'dashboard';
+  const [activeTab, setActiveTab] = useState<StudioTab>(initialTab);
+  const [activeCategory, setActiveCategory] = useState<StudioTabCategory>(categoryForTab(initialTab));
   const [selectedContent, setSelectedContent] = useState<BroadcastChannelContent | null>(null);
-  const [selectedChannelId, setSelectedChannelId] = useState<string | null>(null);
+  const [selectedChannelId, setSelectedChannelId] = useState<string | null>(routeChannelId);
   const [contents, setContents] = useState<BroadcastChannelContent[]>([]);
   const [loadingContent, setLoadingContent] = useState(false);
   const [createFormVisible, setCreateFormVisible] = useState(false);
@@ -937,30 +979,52 @@ export default function ChannelStudioScreen({ legacyFeeds, liveCount, expiresAt,
     );
   };
 
+  // A real close/back control, distinct from the in-screen "switch channel"
+  // action below - this is specifically what was missing (no header, no way
+  // to leave the live/video view without hunting for a scrolled-away
+  // button). Falls back to the global workspace when there's nothing to pop
+  // back to (e.g. this screen was the first thing opened via a deep link).
+  const handleClose = useCallback(() => {
+    if (navigation.canGoBack()) {
+      navigation.goBack();
+    } else {
+      navigation.navigate('BroadcastWorkspace');
+    }
+  }, [navigation]);
+
   if (topView !== 'detail') {
     return (
-      <View style={[styles.shell, { backgroundColor: palette.card, borderColor: palette.border, padding: compact ? 11 : 16 }]}>
-        <View style={[styles.headerRow, compact && { alignItems: 'flex-start' }]}>
-          <View style={[styles.logo, { backgroundColor: palette.primarySoft, borderColor: palette.gold, width: compact ? 40 : 48, height: compact ? 40 : 48 }]}>
-            <KISIcon name="sub-channel" size={22} color={palette.primaryStrong} />
+      <View style={[styles.root, { backgroundColor: palette.bg }]}>
+        <View style={[styles.stickyHeader, { paddingTop: insets.top + 10, backgroundColor: palette.bg, borderBottomColor: palette.border }]}>
+          <View style={styles.closeRow}>
+            <Pressable onPress={handleClose} style={styles.closeBtn} accessibilityRole="button" accessibilityLabel="Close">
+              <KISIcon name="arrow-left" size={20} color={palette.text} />
+            </Pressable>
           </View>
-          <View style={{ flex: 1 }}>
-            <Text style={[styles.eyebrow, { color: palette.primaryStrong }]}>
-              {topView === 'overview' ? 'CREATOR TOOLS' : 'CHANNEL STUDIO'}
-            </Text>
-            <Text style={[styles.title, { color: palette.text, fontSize: compact ? 18 : 22, lineHeight: compact ? 23 : 27 }]} numberOfLines={2}>
-              {topView === 'overview' ? 'Overview' : 'Channel Studio'}
-            </Text>
-            <Text style={[styles.subtitle, { color: palette.subtext }]} numberOfLines={compact ? 2 : 1}>
-              {topView === 'overview' ? 'Everything across your channels, at a glance.' : 'Pick a channel to manage its content, branding, and more.'}
-            </Text>
+          <View style={[styles.headerRow, compact && { alignItems: 'flex-start' }]}>
+            <View style={[styles.logo, { backgroundColor: palette.primarySoft, borderColor: palette.gold, width: compact ? 40 : 48, height: compact ? 40 : 48 }]}>
+              <KISIcon name="sub-channel" size={22} color={palette.primaryStrong} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.eyebrow, { color: palette.primaryStrong }]}>
+                {topView === 'overview' ? 'CREATOR TOOLS' : 'CHANNEL STUDIO'}
+              </Text>
+              <Text style={[styles.title, { color: palette.text, fontSize: compact ? 18 : 22, lineHeight: compact ? 23 : 27 }]} numberOfLines={2}>
+                {topView === 'overview' ? 'Overview' : 'Channel Studio'}
+              </Text>
+              <Text style={[styles.subtitle, { color: palette.subtext }]} numberOfLines={compact ? 2 : 1}>
+                {topView === 'overview' ? 'Everything across your channels, at a glance.' : 'Pick a channel to manage its content, branding, and more.'}
+              </Text>
+            </View>
+          </View>
+          <View style={styles.topTabBar}>
+            <KISButton title="Overview" size="sm" variant={topView === 'overview' ? 'primary' : 'outline'} onPress={() => setTopView('overview')} style={{ flex: 1 }} />
+            <KISButton title="Channel Studio" size="sm" variant={topView === 'list' ? 'primary' : 'outline'} onPress={() => setTopView('list')} style={{ flex: 1 }} />
           </View>
         </View>
-        <View style={styles.topTabBar}>
-          <KISButton title="Overview" size="sm" variant={topView === 'overview' ? 'primary' : 'outline'} onPress={() => setTopView('overview')} style={{ flex: 1 }} />
-          <KISButton title="Channel Studio" size="sm" variant={topView === 'list' ? 'primary' : 'outline'} onPress={() => setTopView('list')} style={{ flex: 1 }} />
-        </View>
-        {topView === 'overview' ? renderOverview() : renderChannelList()}
+        <ScrollView style={{ flex: 1 }} contentContainerStyle={[styles.scrollBody, { paddingBottom: insets.bottom + 24 }]}>
+          {topView === 'overview' ? renderOverview() : renderChannelList()}
+        </ScrollView>
         <FeedComposerSheet
           visible={composerVisible}
           onClose={() => setComposerVisible(false)}
@@ -972,34 +1036,76 @@ export default function ChannelStudioScreen({ legacyFeeds, liveCount, expiresAt,
   }
 
   return (
-    <View style={[styles.shell, { backgroundColor: palette.card, borderColor: palette.border, padding: compact ? 11 : 16 }]}>
-      <KISButton title="← All channels" size="xs" variant="ghost" onPress={handleBackToChannelList} style={styles.backButton} />
-      <View style={[styles.headerRow, compact && { alignItems: 'flex-start' }]}>
-        <View style={[styles.logo, { backgroundColor: palette.primarySoft, borderColor: palette.gold, width: compact ? 40 : 48, height: compact ? 40 : 48 }]}>
-          <KISIcon name="sub-channel" size={22} color={palette.primaryStrong} />
+    <View style={[styles.root, { backgroundColor: palette.bg }]}>
+      {/* Sticky header - always visible above the active tab's content
+          (including Live/video), with a real close button positioned below
+          the status bar/Dynamic Island, never scrolled out of reach. */}
+      <View style={[styles.stickyHeader, { paddingTop: insets.top + 10, backgroundColor: palette.bg, borderBottomColor: palette.border }]}>
+        <View style={styles.closeRow}>
+          <Pressable onPress={handleClose} style={styles.closeBtn} accessibilityRole="button" accessibilityLabel="Close">
+            <KISIcon name="arrow-left" size={20} color={palette.text} />
+          </Pressable>
+          <KISButton title="Switch channel" size="xs" variant="ghost" onPress={handleBackToChannelList} left={<KISIcon name="sub-channel" size={13} color={palette.primaryStrong} />} />
         </View>
-        <View style={{ flex: 1 }}>
-          <Text style={[styles.eyebrow, { color: palette.primaryStrong }]}>CHANNEL STUDIO</Text>
-          <Text style={[styles.title, { color: palette.text, fontSize: compact ? 18 : 22, lineHeight: compact ? 23 : 27 }]} numberOfLines={2}>{selectedChannel?.display_name || 'Creator workspace'}</Text>
-          <Text style={[styles.subtitle, { color: palette.subtext }]} numberOfLines={compact ? 2 : 1}>{selectedChannel ? `@${selectedChannel.handle} · ${expiresAt} cycle` : 'Create a channel to start publishing channel-scoped feeds.'}</Text>
-        </View>
-        {selectedChannel ? (
-          <View style={[styles.headerActions, compact && { width: '100%', justifyContent: 'flex-start' }]}>
-            <KISButton
-              title={compact ? (selectedChannel.is_broadcast ? 'Stop broadcast' : 'Broadcast') : (selectedChannel.is_broadcast ? 'Stop broadcasting channel' : 'Broadcast channel')}
-              variant={selectedChannel.is_broadcast ? 'danger' : 'outline'}
-              onPress={confirmToggleChannelBroadcast}
-              disabled={channelBroadcasting}
-              loading={channelBroadcasting}
-            />
-            <KISButton
-              title={compact ? 'Create' : createLabel}
-              onPress={() => setComposerVisible(true)}
-              left={<KISIcon name="add" size={16} color={palette.onPrimary} />}
-            />
+        <View style={[styles.headerRow, compact && { alignItems: 'flex-start' }]}>
+          <View style={[styles.logo, { backgroundColor: palette.primarySoft, borderColor: palette.gold, width: compact ? 40 : 48, height: compact ? 40 : 48 }]}>
+            <KISIcon name="sub-channel" size={22} color={palette.primaryStrong} />
           </View>
-        ) : null}
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.eyebrow, { color: palette.primaryStrong }]}>CHANNEL STUDIO</Text>
+            <Text style={[styles.title, { color: palette.text, fontSize: compact ? 18 : 22, lineHeight: compact ? 23 : 27 }]} numberOfLines={2}>{selectedChannel?.display_name || 'Creator workspace'}</Text>
+            <Text style={[styles.subtitle, { color: palette.subtext }]} numberOfLines={compact ? 2 : 1}>{selectedChannel ? `@${selectedChannel.handle} · ${selectedChannel.subscriber_count || 0} subscribers` : 'Create a channel to start publishing channel-scoped feeds.'}</Text>
+          </View>
+          {selectedChannel ? (
+            <View style={[styles.headerActions, compact && { width: '100%', justifyContent: 'flex-start' }]}>
+              <KISButton
+                title={compact ? (selectedChannel.is_broadcast ? 'Stop broadcast' : 'Broadcast') : (selectedChannel.is_broadcast ? 'Stop broadcasting channel' : 'Broadcast channel')}
+                variant={selectedChannel.is_broadcast ? 'danger' : 'outline'}
+                onPress={confirmToggleChannelBroadcast}
+                disabled={channelBroadcasting}
+                loading={channelBroadcasting}
+              />
+              <KISButton
+                title={compact ? 'Create' : createLabel}
+                onPress={() => setComposerVisible(true)}
+                left={<KISIcon name="add" size={16} color={palette.onPrimary} />}
+              />
+            </View>
+          ) : null}
+        </View>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[styles.categoryTabs, { paddingTop: compact ? 10 : 12 }]}>
+          {TAB_CATEGORIES.map(category => {
+            const active = activeCategory === category.id;
+            return (
+              <KISButton
+                key={category.id}
+                title={category.label}
+                size="xs"
+                variant={active ? 'primary' : 'outline'}
+                onPress={() => {
+                  setActiveCategory(category.id);
+                  setActiveTab(category.tabs[0]);
+                }}
+              />
+            );
+          })}
+        </ScrollView>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[styles.tabs, { paddingVertical: compact ? 8 : 10 }]}>
+          {TABS.filter(tab => activeCategory === categoryForTab(tab.id)).map(tab => {
+            const active = activeTab === tab.id;
+            return (
+              <KISButton
+                key={tab.id}
+                title={tab.label}
+                size="xs"
+                variant={active ? 'primary' : 'outline'}
+                onPress={() => setActiveTab(tab.id)}
+              />
+            );
+          })}
+        </ScrollView>
       </View>
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={[styles.scrollBody, { paddingBottom: insets.bottom + 24 }]}>
       {selectedChannel ? (
         <View style={styles.studioMetrics}>
           <View style={[styles.metricTile, { borderColor: palette.goldMuted ?? palette.border, backgroundColor: tone === 'dark' ? palette.primarySoft : palette.surface }]}>
@@ -1063,38 +1169,8 @@ export default function ChannelStudioScreen({ legacyFeeds, liveCount, expiresAt,
           })}
         </View>
       ) : null}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[styles.categoryTabs, { paddingTop: compact ? 10 : 14 }]}>
-        {TAB_CATEGORIES.map(category => {
-          const active = activeCategory === category.id;
-          return (
-            <KISButton
-              key={category.id}
-              title={category.label}
-              size="xs"
-              variant={active ? 'primary' : 'outline'}
-              onPress={() => {
-                setActiveCategory(category.id);
-                setActiveTab(category.tabs[0]);
-              }}
-            />
-          );
-        })}
-      </ScrollView>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[styles.tabs, { paddingVertical: compact ? 10 : 14 }]}>
-        {TABS.filter(tab => activeCategory === categoryForTab(tab.id)).map(tab => {
-          const active = activeTab === tab.id;
-          return (
-            <KISButton
-              key={tab.id}
-              title={tab.label}
-              size="xs"
-              variant={active ? 'primary' : 'outline'}
-              onPress={() => setActiveTab(tab.id)}
-            />
-          );
-        })}
-      </ScrollView>
       {renderBody()}
+      </ScrollView>
       <FeedComposerSheet
         visible={composerVisible}
         onClose={() => setComposerVisible(false)}
@@ -1126,7 +1202,14 @@ const styles = StyleSheet.create({
   journeyStepRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 4 },
   journeyStepLabel: { fontSize: 13, fontWeight: '700' },
   journeyStepDescription: { fontSize: 12, marginTop: 2 },
-  shell: { borderWidth: 1, borderRadius: 8, padding: 16, marginBottom: 14, overflow: 'hidden', shadowOpacity: 0.08, shadowRadius: 18, shadowOffset: { width: 0, height: 10 }, elevation: 3 },
+  // Root fills the whole screen; the header stays outside the ScrollView
+  // (sticky) so it - and its close button - are always reachable regardless
+  // of scroll position or which tab (including Live) is active.
+  root: { flex: 1 },
+  stickyHeader: { borderBottomWidth: 1, paddingHorizontal: 16, paddingBottom: 10 },
+  closeRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 },
+  closeBtn: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
+  scrollBody: { padding: 16 },
   headerRow: { flexDirection: 'row', alignItems: 'center', gap: 12, flexWrap: 'wrap' },
   logo: { width: 48, height: 48, borderRadius: 8, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
   eyebrow: { fontSize: 10, fontWeight: '900', letterSpacing: 0 },

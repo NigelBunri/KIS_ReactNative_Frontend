@@ -587,14 +587,21 @@ export function FeedManagementModal(props: FeedManagementModalProps) {
               },
             ]}
           >
-            <KISIcon name="star" size={16} color={palette.primaryStrong} />
+            {/* Was a "Cycle" tile showing the raw expires_at value - the
+                backend no longer expires feed items at all (expires_at is
+                always null now; see apps/broadcasts/views.py's
+                _bootstrap_broadcast_feed_profile), so this always rendered
+                the meaningless "N/A". Replaced with a real, computable
+                number (queued items not yet broadcast) instead of a stale
+                concept. */}
+            <KISIcon name="file-text" size={16} color={palette.primaryStrong} />
             <Text style={[modalStyles.heroStatValue, { color: palette.text }]}>
-              {expiresAt}
+              {Math.max(0, feeds.length - numberOfBroadcastFeeds)}
             </Text>
             <Text
               style={[modalStyles.heroStatLabel, { color: palette.subtext }]}
             >
-              Cycle
+              Drafts
             </Text>
           </View>
         </View>
