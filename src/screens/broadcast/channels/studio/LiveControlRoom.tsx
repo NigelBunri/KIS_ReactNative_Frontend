@@ -243,8 +243,14 @@ function ReplayPanel({
   const [deleting, setDeleting] = useState(false);
   const pollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const pollStatus = useCallback(async () => {
+  const pollStatus = useCallback(async (isCancelled: () => boolean) => {
     const res = await getRequest(ROUTES.broadcasts.liveStreamDetail(stream.id), { errorMessage: '' });
+    // The request can resolve after this effect's own cleanup already
+    // ran (component unmounted, or recordingStatus changed again while
+    // in flight) - without this guard, a late response would call
+    // setState on a stale/unmounted render, same bug class the sibling
+    // replay-content-fetch effect below already guards against.
+    if (isCancelled()) return;
     const data = res?.data;
     if (!data) return;
     setRecordingStatus(data.recording_status || 'not_started');
@@ -254,8 +260,12 @@ function ReplayPanel({
 
   useEffect(() => {
     if (!RECORDING_IN_PROGRESS.has(recordingStatus)) return undefined;
-    pollTimerRef.current = setTimeout(() => { void pollStatus(); }, RECORDING_POLL_MS);
-    return () => { if (pollTimerRef.current) clearTimeout(pollTimerRef.current); };
+    let cancelled = false;
+    pollTimerRef.current = setTimeout(() => { void pollStatus(() => cancelled); }, RECORDING_POLL_MS);
+    return () => {
+      cancelled = true;
+      if (pollTimerRef.current) clearTimeout(pollTimerRef.current);
+    };
   }, [recordingStatus, pollStatus]);
 
   useEffect(() => {
