@@ -867,6 +867,10 @@ const broadcastRoutes = {
     channelCommentHeart: (commentId: string) => `${API_BASE_URL}/api/v1/broadcasts/channel-comments/${commentId}/heart/`,
     channelContentSubtitles: (contentId: string) => `${API_BASE_URL}/api/v1/broadcasts/channel-contents/${contentId}/subtitles/`,
     channelContentRelated: (contentId: string) => `${API_BASE_URL}/api/v1/broadcasts/channel-contents/${contentId}/related/`,
+    // YouTube-style related-content feed below the live-watch player -
+    // keyed by ChannelLiveStream.id (not ChannelContent.id, unlike
+    // channelContentRelated above), ranked primarily by topic relevance.
+    liveStreamRelated: (streamId: string) => `${API_BASE_URL}/api/v1/broadcasts/live-streams/${streamId}/related/`,
     channelContentEndScreen: (contentId: string) => `${API_BASE_URL}/api/v1/broadcasts/channel-contents/${contentId}/end-screen/`,
     channelContentCards: (contentId: string) => `${API_BASE_URL}/api/v1/broadcasts/channel-contents/${contentId}/cards/`,
     channelContentClipDetail: (contentId: string, clipId: string) => `${API_BASE_URL}/api/v1/broadcasts/channel-contents/${contentId}/clips/${clipId}/`,

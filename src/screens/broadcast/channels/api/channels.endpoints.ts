@@ -47,6 +47,7 @@ export const channelCommentDeleteEndpoint = ROUTES.broadcasts.channelCommentDele
 export const channelCommentHeartEndpoint = ROUTES.broadcasts.channelCommentHeart;
 export const channelContentSubtitlesEndpoint = ROUTES.broadcasts.channelContentSubtitles;
 export const channelContentRelatedEndpoint = ROUTES.broadcasts.channelContentRelated;
+export const liveStreamRelatedEndpoint = ROUTES.broadcasts.liveStreamRelated;
 export const channelContentEndScreenEndpoint = ROUTES.broadcasts.channelContentEndScreen;
 export const channelContentCardsEndpoint = ROUTES.broadcasts.channelContentCards;
 export const channelContentClipDetailEndpoint = ROUTES.broadcasts.channelContentClipDetail;

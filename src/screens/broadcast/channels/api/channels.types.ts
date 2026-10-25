@@ -83,6 +83,11 @@ export type BroadcastChannelContent = {
   my_reaction?: 'like' | 'dislike' | null;
   created_at?: string;
   updated_at?: string;
+  // Only present on rows returned from the live-watch related-content
+  // feed (ChannelLiveStreamRelatedView) - which ranking bucket this item
+  // landed in, for optional section grouping ("Live now", "Related topics",
+  // "More from this creator", "Recommended").
+  section?: 'live_now' | 'related_topic' | 'more_from_creator' | 'recommended';
 };
 
 export type BroadcastChannelDetail = BroadcastChannelSummary & {

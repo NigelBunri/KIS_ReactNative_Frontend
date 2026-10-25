@@ -57,6 +57,7 @@ import {
   channelCommentHeartEndpoint,
   channelContentSubtitlesEndpoint,
   channelContentRelatedEndpoint,
+  liveStreamRelatedEndpoint,
   channelContentEndScreenEndpoint,
   channelContentCardsEndpoint,
   channelContentClipDetailEndpoint,
@@ -839,6 +840,41 @@ export const fetchRelatedContent = async (contentId: string): Promise<BroadcastC
   const response = await getRequest(channelContentRelatedEndpoint(contentId), { errorMessage: 'Unable to load related content.' });
   if (!response?.success) return [];
   return Array.isArray(response.data?.results) ? response.data.results : response.data ?? [];
+};
+
+// Related content for the live-watch screen (YouTube-style recommendation
+// rail below the player) - distinct endpoint from fetchRelatedContent above:
+// keyed by ChannelLiveStream.id, ranked primarily by topic relevance, and
+// paginated via an opaque cursor rather than returning everything at once.
+// Silently returns an empty, non-error page on failure so a broken/slow
+// recommendation backend never breaks video playback - this feed is
+// supplementary, not load-bearing.
+export type LiveStreamRelatedPage = {
+  results: BroadcastChannelContent[];
+  cursor: string | null;
+  hasMore: boolean;
+};
+
+export const fetchLiveStreamRelated = async (
+  streamId: string,
+  cursor?: string | null,
+): Promise<LiveStreamRelatedPage> => {
+  const base = liveStreamRelatedEndpoint(streamId);
+  const url = cursor ? `${base}?cursor=${encodeURIComponent(cursor)}` : base;
+  try {
+    const response = await getRequest(url, { errorMessage: '' });
+    if (!response?.success) {
+      return { results: [], cursor: null, hasMore: false };
+    }
+    const data = response.data ?? {};
+    return {
+      results: Array.isArray(data.results) ? data.results : [],
+      cursor: data.cursor ?? null,
+      hasMore: Boolean(data.has_more),
+    };
+  } catch {
+    return { results: [], cursor: null, hasMore: false };
+  }
 };
 
 // Subscribers
