@@ -224,7 +224,7 @@ function EndedOverlay({
 export default function LiveWatchPage() {
   const route = useRoute<RouteProp<RootStackParamList, 'LiveWatch'>>();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList, 'LiveWatch'>>();
-  const { palette } = useKISTheme();
+  const { palette, isDark } = useKISTheme();
   const insets = useSafeAreaInsets();
   const topInset = useSafeTopInset();
   // Was a module-level Dimensions.get('window') snapshot, frozen at bundle
@@ -486,9 +486,9 @@ export default function LiveWatchPage() {
   // ── Loading / initial state ─────────────────────────────────────────────────
   if (loading && !stream) {
     return (
-      <View style={[styles.centered, { backgroundColor: palette.royalInk }]}>
-        <StatusBar barStyle="light-content" backgroundColor={palette.royalInk} />
-        <ActivityIndicator color={palette.ivory} size="large" />
+      <View style={[styles.centered, { backgroundColor: palette.bg }]}>
+        <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={palette.bg} />
+        <ActivityIndicator color={palette.text} size="large" />
       </View>
     );
   }
@@ -817,7 +817,7 @@ export default function LiveWatchPage() {
               accessibilityRole="button"
               accessibilityLabel="Share stream"
             >
-              <KISIcon name="share" size={16} color={palette.ivory} />
+              <KISIcon name="share" size={16} color={palette.text} />
               <Text style={styles.engagementBtnLabel}>Share</Text>
             </Pressable>
             <Pressable
@@ -826,7 +826,7 @@ export default function LiveWatchPage() {
               accessibilityRole="button"
               accessibilityLabel="QR code for stream"
             >
-              <KISIcon name="qr-code" size={16} color={palette.ivory} />
+              <KISIcon name="qr-code" size={16} color={palette.text} />
               <Text style={styles.engagementBtnLabel}>QR Code</Text>
             </Pressable>
             {isLive && streamId ? (
@@ -871,12 +871,12 @@ export default function LiveWatchPage() {
                     <KISIcon
                       name={tab.icon}
                       size={14}
-                      color={active && interactionPanelOpen ? palette.primaryStrong : palette.divider ?? palette.ivory}
+                      color={active && interactionPanelOpen ? palette.primaryStrong : palette.subtext}
                     />
                     <Text
                       style={[
                         styles.interactionTabLabel,
-                        { color: active && interactionPanelOpen ? palette.primaryStrong : palette.divider ?? palette.ivory },
+                        { color: active && interactionPanelOpen ? palette.primaryStrong : palette.subtext },
                       ]}
                     >
                       {tab.label}
@@ -897,7 +897,7 @@ export default function LiveWatchPage() {
                 accessibilityRole="button"
                 accessibilityLabel={interactionPanelOpen ? 'Collapse panel' : 'Expand panel'}
               >
-                <KISIcon name={interactionPanelOpen ? 'chevron-up' : 'chevron-down'} size={16} color={palette.divider ?? palette.ivory} />
+                <KISIcon name={interactionPanelOpen ? 'chevron-up' : 'chevron-down'} size={16} color={palette.subtext} />
               </Pressable>
             </View>
 
@@ -966,9 +966,15 @@ export default function LiveWatchPage() {
 
 function makeStyles(p: any) {
   return StyleSheet.create({
+  // The page itself (everything below the player) follows the app's real
+  // light/dark theme via `p.bg`/`p.text`/etc, same as any other screen -
+  // only the player box and its own overlays (which sit on top of actual
+  // video/thumbnail content, not the page background) stay fixed-dark
+  // below, the same way a video player's chrome does in most apps
+  // regardless of the host app's theme.
   root: {
     flex: 1,
-    backgroundColor: p.royalInk,
+    backgroundColor: p.bg,
   },
   // Bounded to the video's own aspect ratio (set inline via
   // `aspectRatio`, not here) instead of filling the screen - every
@@ -988,13 +994,13 @@ function makeStyles(p: any) {
     gap: 10,
   },
   pageTitle: {
-    color: p.ivory,
+    color: p.text,
     fontSize: 16,
     fontWeight: '800',
     lineHeight: 22,
   },
   pageDescription: {
-    color: p.divider ?? p.ivory,
+    color: p.subtext,
     fontSize: 13,
     lineHeight: 19,
   },
@@ -1068,7 +1074,7 @@ function makeStyles(p: any) {
     borderRadius: 3.5,
   },
   statusLineText: {
-    color: p.divider ?? p.ivory,
+    color: p.subtext,
     fontSize: 13,
     fontWeight: '600',
   },
@@ -1103,13 +1109,16 @@ function makeStyles(p: any) {
     overflow: 'hidden',
   },
   channelName: {
-    color: p.ivory,
+    color: p.text,
     fontSize: 14,
     fontWeight: '800',
     flex: 1,
   },
 
-  // ── Engagement action row (reactions/share/QR/Super Chat) ─────────────
+  // ── Engagement action row (reactions/share/QR/Super Chat) - uses the
+  // real theme surface/border/text tokens (not a dark-video-overlay
+  // translucent-white hack) since this now sits below the player, in the
+  // normal page flow that flips with the app's light/dark theme. ────────
   engagementRow: {
     flexDirection: 'row',
     gap: 8,
@@ -1119,7 +1128,9 @@ function makeStyles(p: any) {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: p.surface,
+    borderWidth: 1,
+    borderColor: p.border,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1129,16 +1140,21 @@ function makeStyles(p: any) {
     alignItems: 'center',
     gap: 6,
     height: 40,
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: p.surface,
+    borderWidth: 1,
+    borderColor: p.border,
     borderRadius: 20,
     paddingHorizontal: 14,
   },
-  engagementBtnLabel: { color: p.ivory, fontSize: 12, fontWeight: '700' },
+  engagementBtnLabel: { color: p.text, fontSize: 12, fontWeight: '700' },
 
   // ── Integrated Chat/Polls/Q&A card (tab row + bounded-height panel,
-  // replaces the old FAB + screen-dimming Modal) ────────────────────────
+  // replaces the old FAB + screen-dimming Modal). Theme-aware surface/
+  // border, same as the engagement row above. ────────────────────────────
   interactionCard: {
-    backgroundColor: p.surfaceElevated ?? 'rgba(255,255,255,0.05)',
+    backgroundColor: p.surface,
+    borderWidth: 1,
+    borderColor: p.border,
     borderRadius: 14,
     overflow: 'hidden',
   },
@@ -1147,7 +1163,7 @@ function makeStyles(p: any) {
     alignItems: 'center',
     paddingHorizontal: 6,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.08)',
+    borderBottomColor: p.border,
   },
   interactionTab: {
     flex: 1,
@@ -1171,7 +1187,7 @@ function makeStyles(p: any) {
     justifyContent: 'center',
     paddingHorizontal: 3,
   },
-  interactionTabBadgeText: { color: p.ivory, fontSize: 9, fontWeight: '800' },
+  interactionTabBadgeText: { color: p.onPrimary ?? '#fff', fontSize: 9, fontWeight: '800' },
   interactionCollapseBtn: {
     width: 36,
     height: 36,

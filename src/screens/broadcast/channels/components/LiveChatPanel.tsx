@@ -115,6 +115,24 @@ export default function LiveChatPanel({
     Alert.alert('Message options', undefined, options);
   }, [canModerate, onDeleteMessage, onReportMessage]);
 
+  // Matches Module/ChatRoom/componets/MessageBubble.tsx's own convention
+  // exactly (outgoingBubble/incomingBubble are the dedicated theme-aware
+  // chat tokens - see theme/constants.ts) rather than inventing a second
+  // one here. outgoingBubble/primary vary enough between light and dark
+  // that a single static text color isn't safe on top of them (unlike
+  // incomingBubble, which the palette already guarantees contrasts with
+  // `text`) - same luminance check the real chat module uses.
+  const outgoingBubbleColor = palette.outgoingBubble ?? palette.primary;
+  const outgoingTextColor = (() => {
+    const hex = String(outgoingBubbleColor || '').replace('#', '');
+    if (hex.length !== 6) return '#ffffff';
+    const r = parseInt(hex.slice(0, 2), 16);
+    const g = parseInt(hex.slice(2, 4), 16);
+    const b = parseInt(hex.slice(4, 6), 16);
+    const yiq = (r * 299 + g * 587 + b * 114) / 1000;
+    return yiq >= 160 ? '#111111' : '#ffffff';
+  })();
+
   const renderItem = useCallback(({ item }: { item: LiveChatMessage }) => (
     <Pressable
       style={[styles.msgRow, item.isMine && styles.msgRowMine]}
@@ -124,8 +142,8 @@ export default function LiveChatPanel({
       <View style={[
         styles.bubble,
         item.isMine
-          ? [styles.bubbleMine, { backgroundColor: palette.primary }]
-          : [styles.bubbleOther, { backgroundColor: palette.royalInk }],
+          ? [styles.bubbleMine, { backgroundColor: outgoingBubbleColor }]
+          : [styles.bubbleOther, { backgroundColor: palette.incomingBubble ?? palette.surface ?? palette.card }],
       ]}>
         {!item.isMine && (
           <View style={styles.msgNameRow}>
@@ -139,28 +157,28 @@ export default function LiveChatPanel({
             )}
           </View>
         )}
-        <Text style={[styles.msgText, { color: palette.ivory }]}>{item.text}</Text>
+        <Text style={[styles.msgText, { color: item.isMine ? outgoingTextColor : palette.text }]}>{item.text}</Text>
       </View>
     </Pressable>
-  ), [palette.primary, palette.primaryStrong, palette.royalInk, palette.ivory, palette.gold, handleLongPressMessage]);
+  ), [outgoingBubbleColor, outgoingTextColor, palette.incomingBubble, palette.surface, palette.card, palette.primaryStrong, palette.gold, palette.royalInk, palette.text, handleLongPressMessage]);
 
   return (
     <View style={styles.container} pointerEvents="box-none">
       {/* Toggle button */}
       <Pressable
         onPress={onToggleCollapse}
-        style={[styles.toggleBtn, { backgroundColor: collapsed ? palette.royalInk : palette.card }]}
+        style={[styles.toggleBtn, { backgroundColor: palette.card ?? palette.surface }]}
         accessibilityRole="button"
         accessibilityLabel={collapsed ? 'Show live chat' : 'Hide live chat'}
       >
         <KISIcon
           name="comment"
           size={16}
-          color={collapsed ? palette.primaryStrong : palette.ivory}
+          color={collapsed ? palette.primaryStrong : palette.text}
         />
         {messages.length > 0 && !collapsed && (
           <View style={[styles.countBadge, { backgroundColor: palette.danger }]}>
-            <Text style={[styles.countText, { color: palette.ivory }]}>
+            <Text style={[styles.countText, { color: palette.onPrimary ?? '#fff' }]}>
               {messages.length > 99 ? '99+' : messages.length}
             </Text>
           </View>
@@ -205,7 +223,14 @@ export default function LiveChatPanel({
               onChangeText={setDraft}
               placeholder={disabled ? 'Live chat unavailable' : 'Say something…'}
               placeholderTextColor={palette.subtext}
-              style={[styles.input, { borderColor: palette.divider, color: palette.ivory }]}
+              style={[
+                styles.input,
+                {
+                  backgroundColor: palette.composerInputBg ?? palette.inputBg,
+                  borderColor: palette.composerInputBorder ?? palette.divider,
+                  color: palette.text,
+                },
+              ]}
               editable={!disabled && !sending}
               onSubmitEditing={handleSend}
               returnKeyType="send"
@@ -222,7 +247,7 @@ export default function LiveChatPanel({
               accessibilityRole="button"
               accessibilityLabel="Send message"
             >
-              <KISIcon name="send" size={16} color={palette.ivory} />
+              <KISIcon name="send" size={16} color={palette.onPrimary ?? '#fff'} />
             </Pressable>
           </View>
         </KeyboardAvoidingView>
