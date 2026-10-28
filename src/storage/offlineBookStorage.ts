@@ -39,6 +39,11 @@ export type StoredPackage = {
   expires_at: string;
   manifest: { nonce: string; ciphertext: string; tag: string };
   chapters: Record<string, { nonce: string; ciphertext: string; tag: string }>;
+  // Optional — absent on a package written before image bundling
+  // existed; readOfflinePackage's JSON.parse of an old on-disk file
+  // simply yields `images: undefined`, treated as "no images" everywhere
+  // this is consumed, never a parse error or a required-field crash.
+  images?: Record<string, { nonce: string; ciphertext: string; tag: string }>;
 };
 
 /** Writes the raw encrypted package exactly as issued by the server —

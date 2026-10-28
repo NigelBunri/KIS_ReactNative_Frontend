@@ -99,19 +99,20 @@ export async function downloadBookForOffline(
 
   const pkg = res.data as {
     license_id: string; book_id: string; package_version: number; package_dek: string;
-    expires_at: string; manifest: any; chapters: Record<string, any>;
+    expires_at: string; manifest: any; chapters: Record<string, any>; images?: Record<string, any>;
   };
 
   // Decrypt once here purely to PROVE the package is intact and to read
   // the book's title/author for the local index — the decrypted
-  // plaintext is never persisted; only the original ciphertext (pkg
-  // itself, minus the DEK) is written to disk below.
+  // plaintext (chapters AND any images) is never persisted; only the
+  // original ciphertext (pkg itself, minus the DEK) is written to disk
+  // below.
   const { manifest } = decryptOfflinePackage(pkg);
 
   onProgress?.({ phase: 'saving', percent: 70 });
   const storedPackage: StoredPackage = {
     license_id: pkg.license_id, book_id: pkg.book_id, package_version: pkg.package_version,
-    expires_at: pkg.expires_at, manifest: pkg.manifest, chapters: pkg.chapters,
+    expires_at: pkg.expires_at, manifest: pkg.manifest, chapters: pkg.chapters, images: pkg.images || {},
   };
   const sizeBytes = await writeOfflinePackage(bookId, storedPackage);
   await storeOfflineBookDek(bookId, pkg.package_dek);

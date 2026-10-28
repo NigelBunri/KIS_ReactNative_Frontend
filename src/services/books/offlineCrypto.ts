@@ -63,7 +63,13 @@ export type OfflineManifest = {
   package_version: number;
   generated_at: string;
   chapters: { stable_id: string; order: number; title: string; word_count: number; content_hash: string }[];
+  // Absent on a package built before image bundling existed, or on an
+  // image-free book — always treated as "no images", never an error
+  // (see decryptOfflinePackage's `manifest.images || []` below).
+  images?: { asset_id: string; content_type: string; width: number; height: number; content_hash: string }[];
 };
+
+export type DecryptedOfflineImage = { contentType: string; width: number; height: number; dataUri: string };
 
 /**
  * Decrypts the full package: the manifest first, then every chapter the
@@ -72,6 +78,14 @@ export type OfflineManifest = {
  * wire). Rejects the whole package — not a partial render — if any
  * chapter the manifest lists is missing from what was delivered, or if
  * any part fails its own integrity check.
+ *
+ * Images are decrypted the same way (same per-part AEAD scheme, same
+ * "manifest declares it, package must deliver it" check) and decoded
+ * straight to an in-memory data: URI — never written to disk as a
+ * separate plaintext file, matching how decrypted chapter text is never
+ * persisted either. A package predating image bundling (or an
+ * image-free book) simply has no `images` declared — rendering zero
+ * images, not an error.
  */
 export function decryptOfflinePackage(pkg: {
   license_id: string;
@@ -80,7 +94,12 @@ export function decryptOfflinePackage(pkg: {
   package_dek: string;
   manifest: EncryptedPart;
   chapters: Record<string, EncryptedPart>;
-}): { manifest: OfflineManifest; chapters: { stable_id: string; order: number; title: string; word_count: number; content_blocks: any[] }[] } {
+  images?: Record<string, EncryptedPart>;
+}): {
+  manifest: OfflineManifest;
+  chapters: { stable_id: string; order: number; title: string; word_count: number; content_blocks: any[] }[];
+  images: Record<string, DecryptedOfflineImage>;
+} {
   const base = { bookId: pkg.book_id, licenseId: pkg.license_id, packageVersion: pkg.package_version };
   const manifest = decryptPackagePart<OfflineManifest>(pkg.package_dek, pkg.manifest, { ...base, part: 'manifest' });
 
@@ -99,5 +118,18 @@ export function decryptOfflinePackage(pkg: {
       return { stable_id: entry.stable_id, order: entry.order, title: entry.title, word_count: entry.word_count, content_blocks: blocks };
     });
 
-  return { manifest, chapters };
+  const images: Record<string, DecryptedOfflineImage> = {};
+  for (const entry of manifest.images || []) {
+    const encryptedImage = (pkg.images || {})[entry.asset_id];
+    if (!encryptedImage) {
+      throw new OfflinePackageIntegrityError(`image:${entry.asset_id} (missing from package)`);
+    }
+    const base64 = decryptPackagePart<string>(pkg.package_dek, encryptedImage, { ...base, part: `image:${entry.asset_id}` });
+    images[entry.asset_id] = {
+      contentType: entry.content_type, width: entry.width, height: entry.height,
+      dataUri: `data:${entry.content_type};base64,${base64}`,
+    };
+  }
+
+  return { manifest, chapters, images };
 }

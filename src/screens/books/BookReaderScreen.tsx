@@ -316,13 +316,26 @@ export default function BookReaderScreen({ navigation, route }: Props) {
     }
   }, [targetHighlightId, loading, blocks, highlights]);
 
-  // Resolves each "image" block's asset to a short-lived signed URL —
-  // never a permanent public link (see BookImageAssetDownloadView).
-  // Online-only for now: an offline copy's image blocks render their
-  // honest "missing" fallback rather than a broken network image (see
-  // this screen's closing report note on offline image bundling).
+  // Resolves each "image" block's asset to a renderable URI. Offline: a
+  // data: URI decoded straight out of the encrypted package (see
+  // offlineCrypto.decryptOfflinePackage) — no network involved, no
+  // plaintext file on disk. Online: a short-lived signed URL, never a
+  // permanent public link (see BookImageAssetDownloadView).
   useEffect(() => {
-    if (isOfflineCopy) return;
+    if (isOfflineCopy) {
+      const offlineImages = offlineBookRef.current?.images;
+      if (!offlineImages) return;
+      const assetIds = Array.from(new Set(
+        blocks.filter((b) => b.type === 'image' && b.asset_id).map((b) => b.asset_id as string),
+      )).filter((aid) => !imageUrls[aid] && offlineImages[aid]);
+      if (assetIds.length === 0) return;
+      setImageUrls((prev) => {
+        const next = { ...prev };
+        for (const aid of assetIds) next[aid] = offlineImages[aid].dataUri;
+        return next;
+      });
+      return;
+    }
     const assetIds = Array.from(new Set(
       blocks.filter((b) => b.type === 'image' && b.asset_id).map((b) => b.asset_id as string),
     )).filter((aid) => !imageUrls[aid]);
@@ -712,7 +725,9 @@ export default function BookReaderScreen({ navigation, route }: Props) {
               <>
                 <KISIcon name="book" size={24} color={palette.subtext} />
                 <Text style={styles.imageMissingText}>
-                  {isOfflineCopy ? 'Image not available offline yet' : 'Image not yet provided by the author'}
+                  {isOfflineCopy
+                    ? 'This image was not included in your offline download — reconnect and redownload to get it'
+                    : 'Image not yet provided by the author'}
                 </Text>
               </>
             )}

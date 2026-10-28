@@ -125,3 +125,108 @@ describe('offlineCrypto', () => {
     expect(serialized).not.toContain('quick brown fox');
   });
 });
+
+describe('offlineCrypto — image bundling', () => {
+  const dek = nodeCrypto.randomBytes(32);
+  const base = { bookId: 'book-1', licenseId: 'license-1', packageVersion: 1 };
+
+  const manifestWithOneImage = {
+    book_id: 'book-1', title: 'A Test Book', author_name: 'A. Author',
+    license_id: 'license-1', package_version: 1, generated_at: new Date().toISOString(),
+    chapters: [{ stable_id: 'c1', order: 1, title: 'First', word_count: 5, content_hash: 'y' }],
+    images: [{ asset_id: 'asset-1', content_type: 'image/png', width: 40, height: 30, content_hash: 'h' }],
+  };
+
+  it('decrypts a bundled image to a renderable data: URI', () => {
+    const manifestPart = encryptPartForTest(dek, manifestWithOneImage, { ...base, part: 'manifest' });
+    const c1 = encryptPartForTest(dek, [{ type: 'paragraph', text: 'First.' }], { ...base, part: 'chapter:c1:1' });
+    const fakeBase64Png = Buffer.from('not a real png but exercises the round-trip').toString('base64');
+    const img = encryptPartForTest(dek, fakeBase64Png, { ...base, part: 'image:asset-1' });
+
+    const result = decryptOfflinePackage({
+      license_id: 'license-1', book_id: 'book-1', package_version: 1, package_dek: dek.toString('base64'),
+      manifest: manifestPart, chapters: { c1 }, images: { 'asset-1': img },
+    });
+
+    expect(result.images['asset-1'].contentType).toBe('image/png');
+    expect(result.images['asset-1'].width).toBe(40);
+    expect(result.images['asset-1'].dataUri).toBe(`data:image/png;base64,${fakeBase64Png}`);
+  });
+
+  it('rejects a package missing an image part the manifest declares', () => {
+    const manifestPart = encryptPartForTest(dek, manifestWithOneImage, { ...base, part: 'manifest' });
+    const c1 = encryptPartForTest(dek, [{ type: 'paragraph', text: 'First.' }], { ...base, part: 'chapter:c1:1' });
+
+    expect(() =>
+      decryptOfflinePackage({
+        license_id: 'license-1', book_id: 'book-1', package_version: 1, package_dek: dek.toString('base64'),
+        manifest: manifestPart, chapters: { c1 }, images: {}, // image missing
+      }),
+    ).toThrow(OfflinePackageIntegrityError);
+  });
+
+  it('rejects a tampered image ciphertext', () => {
+    const manifestPart = encryptPartForTest(dek, manifestWithOneImage, { ...base, part: 'manifest' });
+    const c1 = encryptPartForTest(dek, [{ type: 'paragraph', text: 'First.' }], { ...base, part: 'chapter:c1:1' });
+    const img = encryptPartForTest(dek, Buffer.from('abc').toString('base64'), { ...base, part: 'image:asset-1' });
+    const raw = Buffer.from(img.ciphertext, 'base64');
+    raw[0] ^= 0xff;
+    const tamperedImg = { ...img, ciphertext: raw.toString('base64') };
+
+    expect(() =>
+      decryptOfflinePackage({
+        license_id: 'license-1', book_id: 'book-1', package_version: 1, package_dek: dek.toString('base64'),
+        manifest: manifestPart, chapters: { c1 }, images: { 'asset-1': tamperedImg },
+      }),
+    ).toThrow(OfflinePackageIntegrityError);
+  });
+
+  it('is fully backward-compatible with a manifest that has no images key at all', () => {
+    const manifestNoImages = {
+      book_id: 'book-1', title: 'Image-free book', author_name: 'A. Author',
+      license_id: 'license-1', package_version: 1, generated_at: new Date().toISOString(),
+      chapters: [{ stable_id: 'c1', order: 1, title: 'First', word_count: 5, content_hash: 'y' }],
+      // no `images` field — simulates a package built before this feature existed
+    };
+    const manifestPart = encryptPartForTest(dek, manifestNoImages, { ...base, part: 'manifest' });
+    const c1 = encryptPartForTest(dek, [{ type: 'paragraph', text: 'First.' }], { ...base, part: 'chapter:c1:1' });
+
+    const result = decryptOfflinePackage({
+      license_id: 'license-1', book_id: 'book-1', package_version: 1, package_dek: dek.toString('base64'),
+      manifest: manifestPart, chapters: { c1 }, // no `images` field passed in either
+    });
+
+    expect(result.images).toEqual({});
+    expect(result.chapters).toHaveLength(1);
+  });
+
+  it('bundles the same asset_id once and both placements resolve to the identical data URI', () => {
+    // Mirrors the backend dedup: two blocks reference the same asset_id,
+    // the manifest/package only ever carries ONE image part for it.
+    const manifestPart = encryptPartForTest(dek, manifestWithOneImage, { ...base, part: 'manifest' });
+    const c1 = encryptPartForTest(
+      dek,
+      [
+        { type: 'image', id: 'img-block-1', asset_id: 'asset-1' },
+        { type: 'paragraph', text: 'Middle text.' },
+        { type: 'image', id: 'img-block-2', asset_id: 'asset-1' },
+      ],
+      { ...base, part: 'chapter:c1:1' },
+    );
+    const fakeBase64 = Buffer.from('shared image bytes').toString('base64');
+    const img = encryptPartForTest(dek, fakeBase64, { ...base, part: 'image:asset-1' });
+
+    const result = decryptOfflinePackage({
+      license_id: 'license-1', book_id: 'book-1', package_version: 1, package_dek: dek.toString('base64'),
+      manifest: manifestPart, chapters: { c1 }, images: { 'asset-1': img },
+    });
+
+    const blocks = result.chapters[0].content_blocks;
+    const dataUri = result.images['asset-1'].dataUri;
+    expect(blocks.filter((b: any) => b.type === 'image')).toHaveLength(2);
+    expect(dataUri).toBe(`data:image/png;base64,${fakeBase64}`);
+    // Both placements resolve via the one shared asset_id key.
+    expect(blocks[0].asset_id).toBe('asset-1');
+    expect(blocks[2].asset_id).toBe('asset-1');
+  });
+});
