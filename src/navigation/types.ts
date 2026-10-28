@@ -454,7 +454,21 @@ export type RootStackParamList = {
   PodcastEpisodeScreen: { episodeId: string };
   KingdomMusic: undefined;
   MusicPlaylists: undefined;
-  Ebooks: undefined;
+  // KIS Books Marketplace
+  BooksMarketplace: undefined;
+  BookDetail: { id: string };
+  BookReader: { id: string; chapterStableId?: string; highlightBlockId?: string; targetHighlightId?: string };
+  AuthorStudio: undefined;
+  CreateBook: undefined;
+  EditBook: { id: string };
+  MyEarnings: undefined;
+  ManuscriptUpload: { id: string };
+  BookModerationQueue: undefined;
+  MyLibrary: undefined;
+  MyBooksCenter: undefined;
+  HighlightsComments: undefined;
+  ImagePlacementsReview: { id: string };
+  BookModerationReader: { id: string };
   PPVEvents: undefined;
   KingdomNews: undefined;
   CreatorAnalytics: undefined;

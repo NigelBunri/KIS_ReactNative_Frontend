@@ -29,6 +29,11 @@ type Props = {
   onAddParticipant?: () => void;
   onPromote?: (userId: string, role: string) => void;
   isHost?: boolean;
+  // Local-only "hide for me" — set from a participant tile's 3-dot menu
+  // (see ParticipantMenu); this list is the one place to undo it, since a
+  // hidden participant's tile stops rendering entirely elsewhere.
+  hiddenUserIds?: Set<string>;
+  onToggleHidden?: (userId: string) => void;
 };
 
 const ROLE_LABEL: Record<string, string> = {
@@ -84,7 +89,7 @@ function ParticipantAvatar({
   );
 }
 
-export default function ParticipantsSheet({ participants, visible, onClose, localUserId, isHost, onMute, onRemove, onAddParticipant, onPromote }: Props) {
+export default function ParticipantsSheet({ participants, visible, onClose, localUserId, isHost, onMute, onRemove, onAddParticipant, onPromote, hiddenUserIds, onToggleHidden }: Props) {
   const { palette } = useKISTheme();
   const insets = useSafeAreaInsets();
   const topInset = useSafeTopInset();
@@ -193,6 +198,27 @@ export default function ParticipantsSheet({ participants, visible, onClose, loca
                   color={item.isVideoOff ? palette.danger : palette.subtext}
                 />
               </View>
+
+              {/* Hide for me — local-only, available to every viewer, not
+                  just the host. The only way to undo a tile hidden from a
+                  participant's own 3-dot menu (ParticipantMenu). */}
+              {!isLocal && onToggleHidden && (
+                <View style={styles.actions}>
+                  <Pressable
+                    onPress={() => onToggleHidden(item.userId)}
+                    style={styles.actionBtn}
+                    accessibilityLabel={hiddenUserIds?.has(item.userId) ? `Unhide ${item.displayName}` : `Hide ${item.displayName} for me`}
+                    accessibilityRole="button"
+                    hitSlop={6}
+                  >
+                    <KISIcon
+                      name={hiddenUserIds?.has(item.userId) ? 'eye' : 'eye-closed'}
+                      size={16}
+                      color={hiddenUserIds?.has(item.userId) ? palette.gold : palette.subtext}
+                    />
+                  </Pressable>
+                </View>
+              )}
 
               {/* Host actions */}
               {isHost && !isLocal && (

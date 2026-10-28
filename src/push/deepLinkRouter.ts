@@ -171,6 +171,30 @@ export function routeDeepLink(url: string, navigation: any): boolean {
       return true;
     }
 
+    // KIS Books marketplace / book detail links — mirrors the
+    // market/products/<id> and posts/<id> shapes above. `kis://books`
+    // alone (no id) opens the marketplace home; `kis://books/<id>` opens
+    // a specific book's detail page directly (e.g. from a shared link).
+    // `kis://books/<id>/<chapterStableId>[/<blockId>]` — produced by
+    // BookReaderScreen's "Share to chat" passage flow (mirrors the Bible
+    // verse deep link above) — opens straight into the reader at that
+    // chapter rather than the detail page, since the whole point of
+    // sharing a passage is landing the recipient on the actual passage.
+    // BookReaderScreen itself re-checks reading access server-side, so
+    // this is safe to navigate to directly even for a non-owner.
+    if (first === 'books' && second && third) {
+      navigation.navigate('BookReader', { id: second, chapterStableId: third, highlightBlockId: segments[3] } as any);
+      return true;
+    }
+    if (first === 'books' && second) {
+      navigation.navigate('BookDetail', { id: second });
+      return true;
+    }
+    if (first === 'books') {
+      navigation.navigate('BooksMarketplace');
+      return true;
+    }
+
     if (first === 'bible' && second) {
       const reference = decodeURIComponent(second);
       // 'MainTabs' + screen param is this codebase's established way to

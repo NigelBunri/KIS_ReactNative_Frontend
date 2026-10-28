@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -46,21 +46,47 @@ export default function LiveQAPanel({ streamId, isManager, palette }: Props) {
   const [questionText, setQuestionText] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; };
+  }, []);
+
+  // Shared by the initial load and the background poll below - fetches
+  // the session (so a viewer already on this tab picks up a manager
+  // starting/ending Q&A without switching tabs away and back) and its
+  // questions/upvotes in one pass. `showLoading` is false for the
+  // background poll so it doesn't flash a spinner over the panel every
+  // tick.
+  const load = useCallback(async (showLoading: boolean) => {
+    if (showLoading && mountedRef.current) setLoading(true);
     try {
       const sess = await fetchLiveQA(streamId);
+      if (!mountedRef.current) return;
       setSession(sess);
       if (sess?.id) {
         const qs = await fetchQAQuestions(sess.id);
+        if (!mountedRef.current) return;
         setQuestions([...qs].sort((a: QAQuestion, b: QAQuestion) => (b.upvote_count ?? 0) - (a.upvote_count ?? 0)));
+      } else {
+        setQuestions([]);
       }
     } finally {
-      setLoading(false);
+      if (showLoading && mountedRef.current) setLoading(false);
     }
   }, [streamId]);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => { void load(true); }, [load]);
+
+  // No per-vote/per-question/session-state socket event exists on the
+  // backend to push this instead - see LivePollsPanel.tsx's identical
+  // comment for the same reasoning and the same 10s interval, matching
+  // useLiveStream.ts's proven chat REST-poll fallback.
+  useEffect(() => {
+    if (!streamId) return;
+    const id = setInterval(() => { void load(false); }, 10_000);
+    return () => clearInterval(id);
+  }, [streamId, load]);
 
   const handleStartQA = useCallback(async () => {
     const sess = await startLiveQA(streamId);
@@ -81,10 +107,15 @@ export default function LiveQAPanel({ streamId, isManager, palette }: Props) {
     if (!text || submitting || !session?.id) return;
     setSubmitting(true);
     try {
-      const q = await submitQAQuestion(session.id, text);
-      if (q) {
-        setQuestions(prev => [q, ...prev]);
+      const result = await submitQAQuestion(session.id, text);
+      if (result?.success && result.data) {
+        setQuestions(prev => [result.data, ...prev]);
         setQuestionText('');
+      } else {
+        // Previously fell through silently here on any failure (network
+        // error, expired session, validation rejection) — the send button
+        // looked like it did nothing at all. Now it always says why.
+        Alert.alert('Question not sent', result?.message || 'Could not submit your question. Please try again.');
       }
     } finally {
       setSubmitting(false);
@@ -160,7 +191,11 @@ export default function LiveQAPanel({ streamId, isManager, palette }: Props) {
         )}
       </View>
 
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 16 }}>
+      {/* flexShrink: 1, not flex: 1 - see LiveWatchPage's
+          interactionPanelBody comment; needs to report natural content
+          size so the panel grows with real questions, only shrinking
+          (and scrolling) once the parent's maxHeight caps it. */}
+      <ScrollView style={{ flexShrink: 1 }} contentContainerStyle={{ paddingBottom: 16 }}>
         {questions.length === 0 && (
           <Text style={[styles.emptyText, { color: palette.subtext }]}>No questions yet. Be the first!</Text>
         )}
@@ -219,8 +254,14 @@ export default function LiveQAPanel({ streamId, isManager, palette }: Props) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  centered: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, gap: 12 },
+  // No flex: 1 on either of these - this panel sits directly in
+  // LiveWatchPage's content-driven interactionPanelBody (maxHeight, not a
+  // fixed height), so it needs to report its own natural content size,
+  // not demand a pre-determined parent size it won't get. The questions
+  // ScrollView above (flexShrink: 1) is the one place that actually
+  // shrinks once content exceeds the parent's cap.
+  container: {},
+  centered: { alignItems: 'center', justifyContent: 'center', padding: 24, gap: 12 },
   startBtn: {
     flexDirection: 'row',
     alignItems: 'center',

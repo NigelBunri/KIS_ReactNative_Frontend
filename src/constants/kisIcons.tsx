@@ -156,6 +156,9 @@ export type KISIconName =
   | 'checkmark-circle'  // correct-answer feedback
   | 'close-circle'      // wrong-answer feedback
   | 'timer'             // timed game modes
+  // ── KIS Books ──────────────────────────────────────────────────────────
+  | 'library'           // My Library nav entry point
+  | 'wallet'            // Author earnings/royalties entry point
   // Allow forward-compatible icon names from feature modules.
   | (string & {});
 
@@ -374,6 +377,8 @@ const ion: IonMap = {
   smile: { filled: 'happy', outline: 'happy-outline' },
   'message-square': { filled: 'chatbubble-ellipses', outline: 'chatbubble-ellipses-outline' },
   grid: { filled: 'grid', outline: 'grid-outline' },
+  library: { filled: 'library', outline: 'library-outline' },
+  wallet: { filled: 'wallet', outline: 'wallet-outline' },
 };
 
 export interface KISIconProps {

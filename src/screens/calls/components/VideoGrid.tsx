@@ -13,6 +13,7 @@ import PaginatedTileGrid from './PaginatedTileGrid';
 import { resolveMainStageParticipants, computeGridColumns, computeTileCell } from '../callGridMath';
 import { useKISTheme } from '@/theme/useTheme';
 import { useIOSCallPiP } from '../hooks/useIOSCallPiP';
+import { buildModerationProps, buildViewerPrefs, type ParticipantControls } from './participantControls';
 
 type Props = {
   participants: CallParticipant[];
@@ -29,6 +30,7 @@ type Props = {
   // caller that hasn't been updated to pass it, matching prior behavior of
   // having no gate at all for this layout.
   callActive?: boolean;
+  controls: ParticipantControls;
 };
 
 function pickPipParticipant(
@@ -57,6 +59,7 @@ export default function VideoGrid({
   isAudioOnly = false,
   onPinParticipant,
   callActive = true,
+  controls,
 }: Props) {
   const { palette } = useKISTheme();
   const [containerW, setContainerW] = useState(0);
@@ -106,6 +109,9 @@ export default function VideoGrid({
             isAudioOnly
             cornerRadius={Math.min(containerW, containerH * 0.35)}
             showName
+            onToggleChrome={controls.onToggleChrome}
+            viewerPrefs={buildViewerPrefs(controls, speaker)}
+            moderation={buildModerationProps(controls, speaker)}
           />
         )}
       </View>
@@ -173,6 +179,9 @@ export default function VideoGrid({
                     onLongPress={() => onPinParticipant(null)}
                     isPipSource={p.userId === pipParticipant?.userId}
                     pipRef={pipRef}
+                    onToggleChrome={controls.onToggleChrome}
+                    viewerPrefs={buildViewerPrefs(controls, p, { onPin: () => onPinParticipant(null) })}
+                    moderation={buildModerationProps(controls, p)}
                   />
                 ))}
               </View>
@@ -198,6 +207,9 @@ export default function VideoGrid({
               cornerRadius={12}
               onPress={() => onPinParticipant(p.userId)}
               showName
+              onToggleChrome={controls.onToggleChrome}
+              viewerPrefs={buildViewerPrefs(controls, p, { onPin: () => onPinParticipant(p.userId) })}
+              moderation={buildModerationProps(controls, p)}
             />
           ))}
         </ScrollView>
@@ -240,6 +252,11 @@ export default function VideoGrid({
               showName
               isPipSource={p.userId === pipParticipant?.userId}
               pipRef={pipRef}
+              onToggleChrome={controls.onToggleChrome}
+              viewerPrefs={buildViewerPrefs(controls, p, {
+                onPin: () => onPinParticipant(p.userId === pinnedUserId ? null : p.userId),
+              })}
+              moderation={buildModerationProps(controls, p)}
             />
           )}
         />

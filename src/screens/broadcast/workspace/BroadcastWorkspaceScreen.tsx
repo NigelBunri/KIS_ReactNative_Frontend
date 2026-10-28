@@ -111,7 +111,34 @@ export default function BroadcastWorkspaceScreen() {
         </View>
       </View>
 
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={[styles.body, { paddingBottom: insets.bottom + 90 }]}>
+      {/* Top nav - the 4 global destinations, right below the header
+          instead of floating at the bottom of the screen. */}
+      <View style={[styles.topNav, { backgroundColor: palette.bg, borderBottomColor: palette.border }]}>
+        {([
+          { id: 'overview', label: 'Overview', icon: 'home' },
+          { id: 'channels', label: 'Channels', icon: 'sub-channel' },
+          { id: 'content', label: 'Content', icon: 'layers' },
+          { id: 'analytics', label: 'Analytics', icon: 'bar-chart' },
+        ] as const).map(item => {
+          const active = tab === item.id;
+          return (
+            <Pressable
+              key={item.id}
+              onPress={() => setTab(item.id)}
+              style={styles.topNavItem}
+              accessibilityRole="tab"
+              accessibilityState={{ selected: active }}
+              accessibilityLabel={item.label}
+            >
+              <KISIcon name={item.icon as any} size={18} color={active ? palette.primaryStrong : palette.subtext} />
+              <Text style={[styles.topNavLabel, { color: active ? palette.primaryStrong : palette.subtext }]}>{item.label}</Text>
+              {active ? <View style={[styles.topNavIndicator, { backgroundColor: palette.primaryStrong }]} /> : null}
+            </Pressable>
+          );
+        })}
+      </View>
+
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={[styles.body, { paddingBottom: insets.bottom + 80 }]}>
         {tab === 'overview' ? (
           <OverviewTab
             loading={loading}
@@ -138,38 +165,11 @@ export default function BroadcastWorkspaceScreen() {
         ) : null}
       </ScrollView>
 
-      {/* Persistent bottom nav - the 4 global destinations stay reachable
-          regardless of which one is active, matching the brief's "compact,
-          persistent bottom navigation on mobile" requirement. */}
-      <View style={[styles.bottomNav, { paddingBottom: insets.bottom + 8, backgroundColor: palette.card, borderTopColor: palette.border }]}>
-        {([
-          { id: 'overview', label: 'Overview', icon: 'home' },
-          { id: 'channels', label: 'Channels', icon: 'sub-channel' },
-          { id: 'content', label: 'Content', icon: 'layers' },
-          { id: 'analytics', label: 'Analytics', icon: 'bar-chart' },
-        ] as const).map(item => {
-          const active = tab === item.id;
-          return (
-            <Pressable
-              key={item.id}
-              onPress={() => setTab(item.id)}
-              style={styles.bottomNavItem}
-              accessibilityRole="tab"
-              accessibilityState={{ selected: active }}
-              accessibilityLabel={item.label}
-            >
-              <KISIcon name={item.icon as any} size={20} color={active ? palette.primaryStrong : palette.subtext} />
-              <Text style={[styles.bottomNavLabel, { color: active ? palette.primaryStrong : palette.subtext }]}>{item.label}</Text>
-            </Pressable>
-          );
-        })}
-      </View>
-
-      {/* Persistent Create action - floats above the bottom nav so it's
+      {/* Persistent Create action - floats bottom-right so it's
           reachable from every tab without extra navigation. */}
       <Pressable
         onPress={handleCreatePress}
-        style={[styles.createFab, { backgroundColor: palette.primary, bottom: insets.bottom + 72 }]}
+        style={[styles.createFab, { backgroundColor: palette.primary, bottom: insets.bottom + 16 }]}
         accessibilityRole="button"
         accessibilityLabel="Create content"
       >
@@ -603,17 +603,20 @@ const styles = StyleSheet.create({
   liveBadgeText: { color: '#fff', fontSize: 9, fontWeight: '900' },
   contentRow: { flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1, borderRadius: 12, padding: 10, marginBottom: 8 },
   contentTypeIcon: { width: 32, height: 32, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
-  bottomNav: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
+  topNav: {
     flexDirection: 'row',
-    borderTopWidth: 1,
-    paddingTop: 8,
+    borderBottomWidth: 1,
+    paddingHorizontal: 4,
   },
-  bottomNavItem: { flex: 1, alignItems: 'center', gap: 3, paddingVertical: 2 },
-  bottomNavLabel: { fontSize: 10, fontWeight: '700' },
+  topNavItem: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    paddingVertical: 10,
+  },
+  topNavLabel: { fontSize: 11, fontWeight: '700' },
+  topNavIndicator: { marginTop: 2, width: 22, height: 3, borderRadius: 2 },
   createFab: {
     position: 'absolute',
     right: 16,

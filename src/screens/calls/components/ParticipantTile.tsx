@@ -1,12 +1,11 @@
 // src/screens/calls/components/ParticipantTile.tsx
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   Pressable,
   Image,
-  Animated,
 } from 'react-native';
 import type { CallParticipant } from '@/services/calls/callTypes';
 import NetworkQualityBars from './NetworkQualityBars';
@@ -14,6 +13,9 @@ import { KISIcon } from '@/constants/kisIcons';
 import { RTCView, RTCPIPView } from '@/services/calls/webRTCService';
 import { useKISTheme } from '@/theme/useTheme';
 import WorkStatusRing from '@/components/common/WorkStatusRing';
+import TileFrame from './TileFrame';
+import ParticipantMenu from './ParticipantMenu';
+import type { ModerationControls, ViewerPrefs } from './participantControls';
 
 type Props = {
   participant: CallParticipant;
@@ -26,12 +28,6 @@ type Props = {
   onLongPress?: () => void;
   isAudioOnly?: boolean;
   cornerRadius?: number;
-  // 'circle' forces a perfectly round tile (cornerRadius is ignored) and
-  // swaps the static speaking border for an animated pulsing ring — used by
-  // voice-call avatar tiles. Corner badges (network/pin/hand) are skipped in
-  // this shape since the circle mask would clip them; callers render that
-  // status themselves outside the tile instead.
-  shape?: 'rounded' | 'circle';
   // When true (iOS only) and this tile has video, renders RTCPIPView instead
   // of the plain RTCView and attaches pipRef to it, so useIOSCallPiP's
   // startIOSPIP/stopIOSPIP calls control THIS tile's video feed. Only one
@@ -39,6 +35,14 @@ type Props = {
   // single video source at a time. See VideoGrid/BroadcastLayout callers.
   isPipSource?: boolean;
   pipRef?: React.RefObject<any>;
+  // Tapping the tile's body also toggles the shared top/bottom chrome (same
+  // as tapping blank space elsewhere on the call screen) in addition to
+  // whatever `onPress` already does for this tile.
+  onToggleChrome?: () => void;
+  // Backs the 3-dot menu's "For you" section (local-only) and "Moderation"
+  // section (host/caller-only, see ParticipantMenu).
+  viewerPrefs?: ViewerPrefs;
+  moderation?: ModerationControls;
 };
 
 function initials(name: string): string {
@@ -48,6 +52,13 @@ function initials(name: string): string {
 
 // Avatar background pool — uses palette-adjacent semantic hues; updated at runtime via palette tokens where available.
 const AVATAR_COLORS = ['#6366F1', '#8B5CF6', '#EC4899', '#F59E0B', '#10B981', '#3B82F6'];
+
+// Centered-avatar diameter as a fraction of the tile's shorter side, same
+// proportions Google Meet/Zoom use for a camera-off/voice tile — clamped so
+// it never gets illegibly tiny on a dense grid page or absurdly huge on a
+// single big tile.
+const AVATAR_MIN = 40;
+const AVATAR_MAX = 112;
 
 export default React.memo(function ParticipantTile({
   participant,
@@ -60,34 +71,21 @@ export default React.memo(function ParticipantTile({
   onLongPress,
   isAudioOnly,
   cornerRadius = 16,
-  shape = 'rounded',
   isPipSource = false,
   pipRef,
+  onToggleChrome,
+  viewerPrefs,
+  moderation,
 }: Props) {
   const { palette } = useKISTheme();
-  const showVideo = !isAudioOnly && !participant.isVideoOff && participant.stream && RTCView;
+  const [menuOpen, setMenuOpen] = useState(false);
+  // A host/caller "turn off their video for everyone" lock always wins over
+  // the participant's own camera toggle, everywhere this tile is used.
+  const effectiveVideoOff = participant.isVideoOff || !!participant.isVideoLocked;
+  const showVideo = !isAudioOnly && !effectiveVideoOff && participant.stream && RTCView;
   const isSpeakingNow = isSpeaker || participant.isSpeaking;
+  const hasMenu = !!(viewerPrefs?.onPin || viewerPrefs?.onToggleAudioFocus || viewerPrefs?.onToggleHide || moderation?.canModerate);
 
-  // Animated pulsing ring for circular (voice-call) tiles, in place of the
-  // plain static border used by rounded/video tiles. Loops only while
-  // actually speaking; resets to a stable resting state otherwise so it
-  // never gets stuck mid-pulse when speaking stops.
-  const pulseAnim = useRef(new Animated.Value(0)).current;
-  useEffect(() => {
-    if (shape !== 'circle') return;
-    if (!isSpeakingNow) {
-      pulseAnim.setValue(0);
-      return;
-    }
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulseAnim, { toValue: 1, duration: 600, useNativeDriver: true }),
-        Animated.timing(pulseAnim, { toValue: 0, duration: 600, useNativeDriver: true }),
-      ]),
-    );
-    loop.start();
-    return () => loop.stop();
-  }, [shape, isSpeakingNow, pulseAnim]);
   // CallParticipant.avatarUrl has existed on the type since this screen was
   // first built, but nothing in the calling UI ever actually rendered it —
   // every tile (video-off, audio-only, voice calls) fell back to colored
@@ -107,13 +105,28 @@ export default React.memo(function ParticipantTile({
     return AVATAR_COLORS[idx];
   }, [participant.userId]);
 
+  // Scales directly off the tile's own width/height — every grid (gallery,
+  // broadcast panel, voice call) already resizes tiles automatically based
+  // on participant count (see callGridMath's computeGridColumns/
+  // computeTileCell), so the avatar inside shrinks/grows right along with
+  // the tile, with no extra wiring needed here.
+  const avatarDiameter = Math.max(AVATAR_MIN, Math.min(AVATAR_MAX, Math.min(width, height) * 0.46));
+
   const styles = useMemo(() => StyleSheet.create({
     tile: {
       overflow: 'hidden',
       backgroundColor: palette.royalInk,
     },
-    avatar: {
+    avatarWrap: {
       ...StyleSheet.absoluteFillObject,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    avatarCircle: {
+      width: '100%',
+      height: '100%',
+      borderRadius: 999,
+      overflow: 'hidden',
       alignItems: 'center',
       justifyContent: 'center',
     },
@@ -129,20 +142,24 @@ export default React.memo(function ParticipantTile({
       borderRadius: 6,
       padding: 3,
     },
-    topRight: {
+    topRightStack: {
       position: 'absolute',
       top: 8,
       right: 8,
+      alignItems: 'center',
+      gap: 6,
     },
     badge: {
       backgroundColor: palette.overlay,
       borderRadius: 12,
       padding: 4,
     },
+    dotsBadge: {
+      backgroundColor: palette.overlay,
+      borderRadius: 12,
+      padding: 5,
+    },
     handBadge: {
-      position: 'absolute',
-      top: 36,
-      right: 8,
       backgroundColor: palette.overlay,
       borderRadius: 12,
       padding: 4,
@@ -176,165 +193,158 @@ export default React.memo(function ParticipantTile({
       padding: 6,
       transform: [{ translateX: -13 }],
     },
-    speakRing: {
-      ...StyleSheet.absoluteFillObject,
-      borderWidth: 2.5,
-      borderColor: palette.success,
-    },
   }), [palette]);
 
   return (
-    <Pressable
-      onPress={onPress}
-      onLongPress={onLongPress}
-      accessibilityRole={onPress || onLongPress ? 'button' : undefined}
-      accessibilityLabel={
-        onPress || onLongPress
-          ? `${participant.isLocal ? 'You' : participant.displayName}${isPinned ? ', pinned' : ''}`
-          : undefined
-      }
-      style={[
-        styles.tile,
-        {
-          width,
-          height,
-          borderRadius: shape === 'circle' ? width / 2 : cornerRadius,
-          borderWidth: shape === 'circle' ? 0 : isSpeakingNow ? 2.5 : 0,
-          borderColor: palette.success,
-        },
-      ]}
-    >
-      {/* Video stream, then a real profile photo, then colored initials —
-          in that priority order. Nothing in this call UI rendered
-          avatarUrl before this, even though it's been on CallParticipant
-          since this screen was first built; every tile without a live
-          video frame fell back to initials regardless of whether the
-          participant has a real profile photo. */}
-      {showVideo && RTCView ? (
-        (() => {
-          // Only swap in RTCPIPView (iOS-only, adds the iosPIP prop) for the
-          // single tile the caller has designated as the PiP source - every
-          // other tile keeps using plain RTCView, matching VideoOneOnOneLayout's
-          // fallback-to-RTCView behavior on Android/when the module is absent.
-          const VideoView = isPipSource && RTCPIPView ? RTCPIPView : RTCView;
-          const pipExtraProps = isPipSource && RTCPIPView ? { iosPIP: { enabled: true } } : {};
-          return (
-            <VideoView
-              ref={isPipSource ? pipRef : undefined}
-              streamURL={participant.stream.toURL()}
-              style={StyleSheet.absoluteFill}
-              // "cover" crops/zooms a face feed, which is fine — but it does the
-              // same to a SHARED SCREEN, cutting off text/UI content, directly
-              // defeating "maintain readable shared content". "contain" fits
-              // the whole frame letterboxed/pillarboxed on the tile's own dark
-              // background (palette.royalInk, set on `styles.tile` above)
-              // instead. Automatic from the participant's own flag — no new
-              // prop needed, applies correctly everywhere this tile is used
-              // (1-on-1, group, broadcast, voice-call avatar tiles never show
-              // video at all so this branch doesn't apply there).
-              objectFit={participant.isScreenSharing ? 'contain' : 'cover'}
-              mirror={participant.isLocal}
-              zOrder={participant.isLocal ? 0 : 1}
-              {...pipExtraProps}
-            />
-          );
-        })()
-      ) : shape === 'circle' ? (
-        // Only the voice-call circular avatar tile gets the work-status
-        // ring — a rounded/video tile's fallback avatar fills a
-        // RECTANGULAR frame via absoluteFill, so forcing it through
-        // WorkStatusRing's circular clip would corrupt that shape.
-        <WorkStatusRing size={width} workStatus={participant.workStatus}>
-          {showAvatarPhoto ? (
-            <Image
-              source={{ uri: participant.avatarUrl! }}
-              style={StyleSheet.absoluteFill}
-              resizeMode="cover"
-              onError={() => setAvatarLoadFailed(true)}
-            />
-          ) : (
-            <View style={[styles.avatar, { backgroundColor: avatarColor }]}>
-              <Text style={[styles.initials, { fontSize: Math.max(16, width * 0.2) }]}>
-                {initials(participant.displayName)}
-              </Text>
-            </View>
-          )}
-        </WorkStatusRing>
-      ) : showAvatarPhoto ? (
-        <Image
-          source={{ uri: participant.avatarUrl! }}
-          style={StyleSheet.absoluteFill}
-          resizeMode="cover"
-          onError={() => setAvatarLoadFailed(true)}
-        />
-      ) : (
-        <View style={[styles.avatar, { backgroundColor: avatarColor }]}>
-          <Text style={[styles.initials, { fontSize: Math.max(16, width * 0.2) }]}>
-            {initials(participant.displayName)}
-          </Text>
-        </View>
-      )}
+    <TileFrame width={width} height={height} cornerRadius={cornerRadius} isAccent={isSpeakingNow}>
+      <Pressable
+        onPress={() => { onPress?.(); onToggleChrome?.(); }}
+        onLongPress={onLongPress}
+        accessibilityRole={onPress || onLongPress ? 'button' : undefined}
+        accessibilityLabel={
+          onPress || onLongPress
+            ? `${participant.isLocal ? 'You' : participant.displayName}${isPinned ? ', pinned' : ''}`
+            : undefined
+        }
+        style={[
+          styles.tile,
+          {
+            flex: 1,
+            borderRadius: cornerRadius,
+            borderWidth: isSpeakingNow ? 2.5 : 0,
+            borderColor: palette.success,
+          },
+        ]}
+      >
+        {/* Live video wins outright. Otherwise every participant — camera
+            off, audio-only, or a true voice call — gets the same rectangular
+            card with a centered circular avatar (photo, else colored
+            initials), name/mic/network/hand badges all living inside this
+            one bordered box, same shape Google Meet uses for a non-video
+            tile. */}
+        {showVideo && RTCView ? (
+          (() => {
+            // Only swap in RTCPIPView (iOS-only, adds the iosPIP prop) for the
+            // single tile the caller has designated as the PiP source - every
+            // other tile keeps using plain RTCView, matching VideoOneOnOneLayout's
+            // fallback-to-RTCView behavior on Android/when the module is absent.
+            const VideoView = isPipSource && RTCPIPView ? RTCPIPView : RTCView;
+            const pipExtraProps = isPipSource && RTCPIPView ? { iosPIP: { enabled: true } } : {};
+            return (
+              <VideoView
+                ref={isPipSource ? pipRef : undefined}
+                streamURL={participant.stream.toURL()}
+                style={StyleSheet.absoluteFill}
+                // "cover" crops/zooms a face feed, which is fine — but it does the
+                // same to a SHARED SCREEN, cutting off text/UI content, directly
+                // defeating "maintain readable shared content". "contain" fits
+                // the whole frame letterboxed/pillarboxed on the tile's own dark
+                // background (palette.royalInk, set on `styles.tile` above)
+                // instead. Automatic from the participant's own flag — no new
+                // prop needed, applies correctly everywhere this tile is used
+                // (1-on-1, group, broadcast, voice-call tiles never show video
+                // at all so this branch doesn't apply there).
+                objectFit={participant.isScreenSharing ? 'contain' : 'cover'}
+                mirror={participant.isLocal}
+                zOrder={participant.isLocal ? 0 : 1}
+                {...pipExtraProps}
+              />
+            );
+          })()
+        ) : (
+          <View style={styles.avatarWrap} pointerEvents="none">
+            <WorkStatusRing size={avatarDiameter} workStatus={participant.workStatus}>
+              {showAvatarPhoto ? (
+                <View style={[styles.avatarCircle, { backgroundColor: avatarColor }]}>
+                  <Image
+                    source={{ uri: participant.avatarUrl! }}
+                    style={StyleSheet.absoluteFill}
+                    resizeMode="cover"
+                    onError={() => setAvatarLoadFailed(true)}
+                  />
+                </View>
+              ) : (
+                <View style={[styles.avatarCircle, { backgroundColor: avatarColor }]}>
+                  <Text style={[styles.initials, { fontSize: avatarDiameter * 0.32 }]}>
+                    {initials(participant.displayName)}
+                  </Text>
+                </View>
+              )}
+            </WorkStatusRing>
+          </View>
+        )}
 
-      {/* Top-left badges — skipped for circle tiles: the round mask would
-          clip a square-corner badge, and VoiceCallGrid renders this status
-          itself below the avatar instead. */}
-      {shape !== 'circle' && (
+        {/* Top-left: network quality */}
         <View style={styles.topLeft}>
           <NetworkQualityBars quality={participant.networkQuality} size={14} />
         </View>
-      )}
 
-      {/* Top-right: pin indicator */}
-      {shape !== 'circle' && isPinned && (
-        <View style={styles.topRight}>
-          <View style={styles.badge}>
-            <KISIcon name="pin" size={10} color={palette.ivory} />
-          </View>
-        </View>
-      )}
-
-      {/* Raise hand */}
-      {shape !== 'circle' && participant.handRaised && (
-        <View style={styles.handBadge}>
-          <Text style={styles.handEmoji}>✋</Text>
-        </View>
-      )}
-
-      {/* Animated pulsing speaking ring (circle tiles only, while speaking) */}
-      {shape === 'circle' && isSpeakingNow && (
-        <Animated.View
-          pointerEvents="none"
-          style={[
-            styles.speakRing,
-            {
-              borderRadius: width / 2,
-              opacity: pulseAnim.interpolate({ inputRange: [0, 1], outputRange: [0.45, 1] }),
-              transform: [{ scale: pulseAnim.interpolate({ inputRange: [0, 1], outputRange: [1, 1.06] }) }],
-            },
-          ]}
-        />
-      )}
-
-      {/* Bottom bar: name + mic */}
-      {showName && (
-        <View style={styles.nameBar}>
-          <Text style={styles.nameText} numberOfLines={1}>
-            {participant.isLocal ? 'You' : participant.displayName}
-          </Text>
-          {participant.isMuted ? (
-            <KISIcon name="mic-off" size={13} color={palette.danger} />
-          ) : (
-            participant.isSpeaking && <KISIcon name="mic" size={13} color={palette.success} />
+        {/* Top-right stack: 3-dot menu, pin indicator, raised hand — grouped
+            so none of them collide regardless of which combination shows. */}
+        <View style={styles.topRightStack}>
+          {hasMenu && (
+            <Pressable
+              onPress={() => setMenuOpen(true)}
+              hitSlop={8}
+              accessibilityLabel={`Options for ${participant.isLocal ? 'you' : participant.displayName}`}
+              accessibilityRole="button"
+              style={styles.dotsBadge}
+            >
+              <KISIcon name="more-vert" size={14} color={palette.ivory} />
+            </Pressable>
+          )}
+          {isPinned && (
+            <View style={styles.badge}>
+              <KISIcon name="pin" size={10} color={palette.ivory} />
+            </View>
+          )}
+          {participant.handRaised && (
+            <View style={styles.handBadge}>
+              <Text style={styles.handEmoji}>✋</Text>
+            </View>
           )}
         </View>
-      )}
 
-      {/* Video off overlay */}
-      {!showVideo && participant.isVideoOff && !isAudioOnly && (
-        <View style={styles.videoOffBadge}>
-          <KISIcon name="video-off" size={13} color={palette.subtext} />
-        </View>
+        {/* Bottom bar: name + mic */}
+        {showName && (
+          <View style={styles.nameBar}>
+            <Text style={styles.nameText} numberOfLines={1}>
+              {participant.isLocal ? 'You' : participant.displayName}
+            </Text>
+            {participant.isMuteLocked ? (
+              <KISIcon name="lock" size={13} color={palette.danger} />
+            ) : participant.isMuted ? (
+              <KISIcon name="mic-off" size={13} color={palette.danger} />
+            ) : (
+              participant.isSpeaking && <KISIcon name="mic" size={13} color={palette.success} />
+            )}
+          </View>
+        )}
+
+        {/* Video off overlay — also covers a host-locked video, distinct
+            icon so it reads as "disabled by host", not "camera's just off". */}
+        {!showVideo && effectiveVideoOff && !isAudioOnly && (
+          <View style={styles.videoOffBadge}>
+            <KISIcon
+              name={participant.isVideoLocked ? 'lock' : 'video-off'}
+              size={13}
+              color={participant.isVideoLocked ? palette.danger : palette.subtext}
+            />
+          </View>
+        )}
+      </Pressable>
+
+      {hasMenu && (
+        <ParticipantMenu
+          visible={menuOpen}
+          onClose={() => setMenuOpen(false)}
+          displayName={participant.isLocal ? 'You' : participant.displayName}
+          isPinned={isPinned}
+          canViewLarge={!!showVideo}
+          viewerPrefs={viewerPrefs}
+          moderation={moderation}
+        />
       )}
-    </Pressable>
+    </TileFrame>
   );
 });

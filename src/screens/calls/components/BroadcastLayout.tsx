@@ -21,15 +21,15 @@ import {
   StyleSheet,
   LayoutChangeEvent,
   Pressable,
-  Modal,
 } from 'react-native';
 import type { CallParticipant } from '@/services/calls/callTypes';
 import ParticipantTile from './ParticipantTile';
 import CallTimer from './CallTimer';
 import { KISIcon } from '@/constants/kisIcons';
 import { useKISTheme } from '@/theme/useTheme';
-import { computeGridColumns, computeTileCell } from '../callGridMath';
+import { computeGridColumns } from '../callGridMath';
 import { useIOSCallPiP } from '../hooks/useIOSCallPiP';
+import { buildModerationProps, buildViewerPrefs, type ParticipantControls } from './participantControls';
 
 type Props = {
   participants: CallParticipant[];
@@ -43,15 +43,11 @@ type Props = {
   // See VideoGrid's identical prop - gates iOS PiP to an actually-live
   // broadcast, defaults true for callers that haven't been updated.
   callActive?: boolean;
-  // Host/co-host only — when present, tapping any tile opens the owner
-  // action sheet (mute, move panel/participant, promote, remove) instead
-  // of just onPressParticipant. All four are optional independently so a
-  // caller can offer a subset (matches ParticipantsSheet's own pattern).
-  isOwner?: boolean;
-  onMuteParticipant?: (userId: string) => void;
-  onRemoveParticipant?: (userId: string) => void;
-  onSetParticipantPanelist?: (userId: string, isPanelist: boolean) => void;
-  onPromoteParticipant?: (userId: string, role: string) => void;
+  // Every panelist tile's 3-dot menu (viewer prefs + moderation, including
+  // the broadcast-only "move to panel"/"promote" rows — see
+  // buildModerationProps) comes from here, same bundle every other call
+  // layout receives.
+  controls: ParticipantControls;
 };
 
 const TOP_BAR_H     = 44;  // LIVE indicator bar
@@ -72,18 +68,13 @@ export default function BroadcastLayout({
   liveStartedAt,
   onPressParticipant,
   callActive = true,
-  isOwner = false,
-  onMuteParticipant,
-  onRemoveParticipant,
-  onSetParticipantPanelist,
-  onPromoteParticipant,
+  controls,
 }: Props) {
   const { palette } = useKISTheme();
   const styles = useBroadcastStyles(palette);
 
   const [containerW, setContainerW] = useState(0);
   const [containerH, setContainerH] = useState(0);
-  const [actionTarget, setActionTarget] = useState<CallParticipant | null>(null);
 
   const onLayout = useCallback((e: LayoutChangeEvent) => {
     const { width, height } = e.nativeEvent.layout;
@@ -113,14 +104,6 @@ export default function BroadcastLayout({
   for (let i = 0; i < panelists.length; i += gridCols) {
     panelistRows.push(panelists.slice(i, i + gridCols));
   }
-
-  const handleTilePress = useCallback((participant: CallParticipant) => {
-    if (isOwner && (onMuteParticipant || onRemoveParticipant || onSetParticipantPanelist || onPromoteParticipant)) {
-      setActionTarget(participant);
-    } else {
-      onPressParticipant?.(participant.userId);
-    }
-  }, [isOwner, onMuteParticipant, onRemoveParticipant, onSetParticipantPanelist, onPromoteParticipant, onPressParticipant]);
 
   return (
     <View
@@ -182,9 +165,12 @@ export default function BroadcastLayout({
                     isSpeaker={p.userId === activeSpeakerId}
                     cornerRadius={14}
                     showName
-                    onPress={() => handleTilePress(p)}
+                    onPress={onPressParticipant ? () => onPressParticipant(p.userId) : undefined}
                     isPipSource={p.userId === pipParticipant?.userId}
                     pipRef={pipRef}
+                    onToggleChrome={controls.onToggleChrome}
+                    viewerPrefs={buildViewerPrefs(controls, p)}
+                    moderation={buildModerationProps(controls, p)}
                   />
                 ))}
                 {/* Pad the last row so tiles don't stretch to fill a
@@ -214,7 +200,7 @@ export default function BroadcastLayout({
               contentContainerStyle={styles.attendeeRow}
             >
               {attendees.map(p => (
-                <Pressable key={p.userId} onPress={() => handleTilePress(p)} style={[styles.attendeeChip, { backgroundColor: palette.surface, borderColor: palette.inputBorder }]}>
+                <Pressable key={p.userId} onPress={() => onPressParticipant?.(p.userId)} style={[styles.attendeeChip, { backgroundColor: palette.surface, borderColor: palette.inputBorder }]}>
                   <View style={[styles.attendeeAvatar, { backgroundColor: palette.goldDeep }]}>
                     <Text style={[styles.attendeeInitial, { color: palette.ivory }]}>
                       {(p.displayName || '?').charAt(0).toUpperCase()}
@@ -241,97 +227,7 @@ export default function BroadcastLayout({
             : 'No viewers yet'}
         </Text>
       </View>
-
-      {/* Owner action sheet — mute, move between panel/participants,
-          promote, remove. Only reachable when isOwner and at least one
-          action callback was actually provided (handleTilePress already
-          gates on this), so a non-host tap always falls through to
-          onPressParticipant/pin instead. */}
-      <Modal
-        visible={!!actionTarget}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setActionTarget(null)}
-      >
-        <Pressable style={styles.actionBackdrop} onPress={() => setActionTarget(null)}>
-          <Pressable style={[styles.actionSheet, { backgroundColor: palette.card }]} onPress={() => {}}>
-            <Text style={[styles.actionTitle, { color: palette.text }]} numberOfLines={1}>
-              {actionTarget?.displayName}
-            </Text>
-            {onMuteParticipant && actionTarget && (
-              <ActionRow
-                icon={actionTarget.isMuted ? 'mic' : 'mic-off'}
-                label={actionTarget.isMuted ? 'Unmute' : 'Mute'}
-                palette={palette}
-                onPress={() => { onMuteParticipant(actionTarget.userId); setActionTarget(null); }}
-              />
-            )}
-            {onSetParticipantPanelist && actionTarget && (
-              <ActionRow
-                icon={actionTarget.isPanelist ? 'arrow-down-left' : 'arrow-up-right'}
-                label={actionTarget.isPanelist ? 'Move to participants' : 'Move to panel'}
-                palette={palette}
-                onPress={() => { onSetParticipantPanelist(actionTarget.userId, !actionTarget.isPanelist); setActionTarget(null); }}
-              />
-            )}
-            {onPromoteParticipant && actionTarget && actionTarget.role !== 'co-host' && (
-              <ActionRow
-                icon="star"
-                label="Make co-host"
-                palette={palette}
-                onPress={() => { onPromoteParticipant(actionTarget.userId, 'co-host'); setActionTarget(null); }}
-              />
-            )}
-            {onRemoveParticipant && actionTarget && (
-              <ActionRow
-                icon="user-minus"
-                label="Remove from call"
-                palette={palette}
-                danger
-                onPress={() => { onRemoveParticipant(actionTarget.userId); setActionTarget(null); }}
-              />
-            )}
-            <ActionRow
-              icon="close"
-              label="Cancel"
-              palette={palette}
-              onPress={() => setActionTarget(null)}
-            />
-          </Pressable>
-        </Pressable>
-      </Modal>
     </View>
-  );
-}
-
-function ActionRow({ icon, label, palette, onPress, danger }: {
-  icon: string;
-  label: string;
-  palette: any;
-  onPress: () => void;
-  danger?: boolean;
-}) {
-  return (
-    <Pressable
-      onPress={onPress}
-      style={({ pressed }) => [
-        {
-          flexDirection: 'row',
-          alignItems: 'center',
-          gap: 12,
-          paddingVertical: 13,
-          paddingHorizontal: 4,
-          opacity: pressed ? 0.6 : 1,
-        },
-      ]}
-      accessibilityRole="button"
-      accessibilityLabel={label}
-    >
-      <KISIcon name={icon} size={18} color={danger ? palette.danger : palette.text} />
-      <Text style={{ color: danger ? palette.danger : palette.text, fontSize: 15, fontWeight: '600' }}>
-        {label}
-      </Text>
-    </Pressable>
   );
 }
 
@@ -421,18 +317,5 @@ function useBroadcastStyles(palette: any) {
       backgroundColor: `${palette.royalInk}80`,
     },
     audienceText: { fontSize: 12 },
-    actionBackdrop: {
-      flex: 1,
-      backgroundColor: 'rgba(0,0,0,0.5)',
-      justifyContent: 'flex-end',
-    },
-    actionSheet: {
-      borderTopLeftRadius: 20,
-      borderTopRightRadius: 20,
-      paddingHorizontal: 20,
-      paddingTop: 16,
-      paddingBottom: 32,
-    },
-    actionTitle: { fontSize: 15, fontWeight: '800', marginBottom: 8 },
   }), [palette]);
 }

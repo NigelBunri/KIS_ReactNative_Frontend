@@ -768,6 +768,7 @@ export function useChatPersistence(
           payload.event ||
           (payload as any).location ||
           payload.bibleVerse ||
+          (payload as any).bookPassage ||
           payload.attachments?.length ||
           payload.contacts?.length,
       );

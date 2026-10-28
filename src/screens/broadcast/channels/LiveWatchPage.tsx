@@ -192,32 +192,6 @@ function ScheduledOverlay({
   );
 }
 
-function EndedOverlay({
-  title,
-  palette,
-  styles,
-  onPlayReplay,
-}: {
-  title: string;
-  palette: any;
-  styles: any;
-  onPlayReplay: () => void;
-}) {
-  return (
-    <View style={[styles.endedOverlay, { backgroundColor: 'rgba(0,0,0,0.7)' }]}>
-      <KISIcon name="video" size={40} color={palette.ivory} />
-      <Text style={styles.endedTitle}>{title}</Text>
-      <Text style={styles.endedSub}>This stream has ended</Text>
-      <Pressable
-        onPress={onPlayReplay}
-        style={[styles.replayBtn, { backgroundColor: palette.primary }]}
-      >
-        <KISIcon name="play" size={16} color={palette.onPrimary} />
-        <Text style={styles.replayBtnText}>Watch Replay</Text>
-      </Pressable>
-    </View>
-  );
-}
 
 // ── Main component ────────────────────────────────────────────────────────────
 
@@ -238,7 +212,7 @@ export default function LiveWatchPage() {
 
   const streamId: string = route.params?.streamId ?? route.params?.stream?.id ?? '';
 
-  const { stream, loading, viewerCount, chatMessages, lastReaction, sendChatMessage, deleteChatMessage, reportChatMessage, sendReaction: emitReaction } =
+  const { stream, loading, viewerCount, chatMessages, lastReaction, sendChatMessage, sendStickerMessage, sendVoiceMessage, deleteChatMessage, reportChatMessage, pinChatMessage, sendReaction: emitReaction } =
     useLiveStream(streamId);
 
   // Reuses BroadcastChannelSummarySerializer.viewer_role (already computed
@@ -280,6 +254,17 @@ export default function LiveWatchPage() {
   const [buffering,     setBuffering]     = useState(false);
   const [videoError,    setVideoError]    = useState<string | null>(null);
   const [showReplay,    setShowReplay]    = useState(false);
+  // Auto-advance to replay the moment the stream ends - a viewer should
+  // never be left staring at a stale "still live" frame, or have to
+  // tap "Watch Replay" themselves to see what they were just watching.
+  // useLiveStream's polling keeps a bounded grace window open after
+  // status flips to "ended" specifically so replay_url (written a few
+  // seconds later, once archival finishes) still reaches this screen;
+  // until it arrives, a "Preparing replay…" state below shows instead
+  // of a dead end.
+  useEffect(() => {
+    if (stream?.status === 'ended') setShowReplay(true);
+  }, [stream?.status]);
   // The player used to be a single StyleSheet.absoluteFillObject layer
   // filling the entire device screen, with every control floating over
   // it - the "immersive by default" pattern this whole redesign moves
@@ -315,14 +300,6 @@ export default function LiveWatchPage() {
   const [superChatOpen, setSuperChatOpen] = useState(false);
   const [controlsVisible, setControlsVisible] = useState(true);
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // playPauseCenter (the invisible tap-to-pause Pressable rendered below,
-  // scoped to the player box) used to also need clamping against a FAB and
-  // a bottom overlay that both floated inside the player box - neither
-  // exists any more (every control that isn't playback chrome now lives
-  // below the player, in the normal page flow), so this only needs to
-  // avoid topOverlay's back/live-badge/viewer-count/fullscreen row.
-  const [topOverlayBottom, setTopOverlayBottom] = useState(90);
 
   const playbackUrl = useMemo(() => {
     if (stream?.status === 'live') return stream.playback_url ?? null;
@@ -502,6 +479,77 @@ export default function LiveWatchPage() {
     <View style={styles.root}>
       <StatusBar barStyle="light-content" backgroundColor={palette.royalInk} translucent />
 
+      {/* ── Header: back/title/live-badge/viewer-count/fullscreen, in
+          normal page flow above the player - not floating chrome on top
+          of the video anymore, so it never covers the top of the frame. ── */}
+      <View style={[styles.headerBar, { paddingTop: topInset + 8 }]}>
+        <View style={styles.topRow}>
+          {/* Back */}
+          <Pressable onPress={() => navigation.goBack()} style={styles.iconBtn} hitSlop={12} accessibilityRole="button" accessibilityLabel="Go back">
+            <KISIcon name="arrow-left" size={20} color={palette.ivory} />
+          </Pressable>
+
+          {/* Title + status */}
+          <View style={styles.topCenter}>
+            {isLive && (
+              <View style={styles.liveBadge}>
+                <Text style={styles.liveBadgeText}>LIVE</Text>
+              </View>
+            )}
+            {isEnded && showReplay && (
+              <View style={[styles.liveBadge, { backgroundColor: palette.surface }]}>
+                <Text style={styles.liveBadgeText}>REPLAY</Text>
+              </View>
+            )}
+            <Text style={styles.topTitle} numberOfLines={1}>
+              {stream?.title ?? ''}
+            </Text>
+          </View>
+
+          {/* Viewer count */}
+          {(isLive || isEnded) && (
+            <View style={styles.viewerPill}>
+              <KISIcon name="people" size={12} color={palette.ivory} />
+              <Text style={styles.viewerText}>
+                {viewerCount.toLocaleString()}
+              </Text>
+            </View>
+          )}
+
+          {/* Slow mode badge */}
+          {isLive && slowModeSecs > 0 && (
+            <View style={styles.slowModePill}>
+              <KISIcon name="call-history" size={11} color={palette.gold} />
+              <Text style={styles.slowModeText}>Slow {slowModeSecs}s</Text>
+            </View>
+          )}
+
+          {/* Members-only badge */}
+          {isLive && membersOnly && (
+            <View style={styles.membersOnlyPill}>
+              <KISIcon name="people" size={11} color={palette.primaryStrong} />
+              <Text style={styles.membersOnlyText}>Members</Text>
+            </View>
+          )}
+
+          {/* Explicit fullscreen control - the only way the video ever
+              goes fullscreen now; see handleEnterFullscreen's own
+              comment for why this hands off to the native player API
+              rather than anything that touches app-wide orientation. */}
+          {playbackUrl ? (
+            <Pressable
+              onPress={handleEnterFullscreen}
+              style={styles.iconBtn}
+              hitSlop={12}
+              accessibilityRole="button"
+              accessibilityLabel="Enter fullscreen"
+            >
+              <KISIcon name="fullscreen" size={18} color={palette.ivory} />
+            </Pressable>
+          ) : null}
+        </View>
+      </View>
+
       {/* ── Player box: bounded to the video's own aspect ratio, not the
           whole device screen - fullscreen is now the explicit button
           below, never the default presentation. ── */}
@@ -585,14 +633,17 @@ export default function LiveWatchPage() {
           </View>
         )}
 
-        {/* Ended state (no replay yet) */}
-        {isEnded && !showReplay && (
-          <EndedOverlay
-            title={stream?.title ?? 'Stream ended'}
-            palette={palette}
-            styles={styles}
-            onPlayReplay={() => setShowReplay(true)}
-          />
+        {/* Ended, replay not ready yet - showReplay auto-flips true the
+            instant the stream ends (see the effect above), so a viewer
+            is never asked to tap anything to see what they were just
+            watching; this only shows for the real gap between "ended"
+            and the recording actually finishing archival (seconds, not
+            the old indefinite "tap Watch Replay" dead end). */}
+        {isEnded && !playbackUrl && !videoError && (
+          <View style={styles.bufferWrap} pointerEvents="none">
+            <ActivityIndicator color={palette.ivory} size="large" />
+            <Text style={styles.errorText}>Preparing replay…</Text>
+          </View>
         )}
 
         {/* Failed / cancelled */}
@@ -609,96 +660,14 @@ export default function LiveWatchPage() {
         <FloatingReactions reactions={floaters} />
       </View>
 
-      {/* ── Top controls overlay ── */}
-      <Animated.View
-        style={[
-          styles.topOverlay,
-          { paddingTop: topInset + (Platform.OS === 'android' ? 28 : 8) },
-          { opacity: controlsVisible ? 1 : 0 },
-        ]}
-        pointerEvents={controlsVisible ? 'box-none' : 'none'}
-        onLayout={(e) => setTopOverlayBottom(e.nativeEvent.layout.y + e.nativeEvent.layout.height)}
-      >
-        <LinearGradient
-          colors={['rgba(0,0,0,0.65)', 'transparent']}
-          style={StyleSheet.absoluteFillObject}
-        />
 
-        <View style={styles.topRow}>
-          {/* Back */}
-          <Pressable onPress={() => navigation.goBack()} style={styles.iconBtn} hitSlop={12} accessibilityRole="button" accessibilityLabel="Go back">
-            <KISIcon name="arrow-left" size={20} color={palette.ivory} />
-          </Pressable>
-
-          {/* Title + status */}
-          <View style={styles.topCenter}>
-            {isLive && (
-              <View style={styles.liveBadge}>
-                <Text style={styles.liveBadgeText}>LIVE</Text>
-              </View>
-            )}
-            {isEnded && showReplay && (
-              <View style={[styles.liveBadge, { backgroundColor: palette.surface }]}>
-                <Text style={styles.liveBadgeText}>REPLAY</Text>
-              </View>
-            )}
-            <Text style={styles.topTitle} numberOfLines={1}>
-              {stream?.title ?? ''}
-            </Text>
-          </View>
-
-          {/* Viewer count */}
-          {(isLive || isEnded) && (
-            <View style={styles.viewerPill}>
-              <KISIcon name="people" size={12} color={palette.ivory} />
-              <Text style={styles.viewerText}>
-                {viewerCount.toLocaleString()}
-              </Text>
-            </View>
-          )}
-
-          {/* Slow mode badge */}
-          {isLive && slowModeSecs > 0 && (
-            <View style={styles.slowModePill}>
-              <KISIcon name="call-history" size={11} color={palette.gold} />
-              <Text style={styles.slowModeText}>Slow {slowModeSecs}s</Text>
-            </View>
-          )}
-
-          {/* Members-only badge */}
-          {isLive && membersOnly && (
-            <View style={styles.membersOnlyPill}>
-              <KISIcon name="people" size={11} color={palette.primaryStrong} />
-              <Text style={styles.membersOnlyText}>Members</Text>
-            </View>
-          )}
-
-          {/* Explicit fullscreen control - the only way the video ever
-              goes fullscreen now; see handleEnterFullscreen's own
-              comment for why this hands off to the native player API
-              rather than anything that touches app-wide orientation. */}
-          {playbackUrl ? (
-            <Pressable
-              onPress={handleEnterFullscreen}
-              style={styles.iconBtn}
-              hitSlop={12}
-              accessibilityRole="button"
-              accessibilityLabel="Enter fullscreen"
-            >
-              <KISIcon name="fullscreen" size={18} color={palette.ivory} />
-            </Pressable>
-          ) : null}
-        </View>
-      </Animated.View>
-
-      {/* ── Play/Pause center tap (live only) - only needs to avoid
-          topOverlay now; nothing else floats inside the player box. ── */}
+      {/* ── Play/Pause center tap (live only) - the header moved out of
+          the player box into its own normal-flow bar above, so this just
+          centers over the whole player now; nothing floats inside the
+          player box any more. ── */}
       {playbackUrl && controlsVisible && (
         <Pressable
-          style={[
-            styles.playPauseCenter,
-            { top: topOverlayBottom },
-          ]}
+          style={styles.playPauseCenter}
           onPress={() => { setPaused(p => !p); showControls(); }}
           hitSlop={20}
           accessibilityRole="button"
@@ -724,7 +693,11 @@ export default function LiveWatchPage() {
           <KISIcon name="pin" size={13} color={palette.gold} />
           <View style={{ flex: 1 }}>
             <Text style={styles.pinnedLabel}>Pinned message</Text>
-            <Text style={styles.pinnedText} numberOfLines={2}>{pinnedMessage.text}</Text>
+            <Text style={styles.pinnedText} numberOfLines={2}>
+              {pinnedMessage.messageType === 'sticker' ? '🏷️ Sticker'
+                : pinnedMessage.messageType === 'voice_note' ? '🎤 Voice note'
+                : pinnedMessage.text}
+            </Text>
           </View>
         </View>
       )}
@@ -907,17 +880,25 @@ export default function LiveWatchPage() {
                   <LiveChatPanel
                     messages={chatMessages}
                     onSend={sendChatMessage}
+                    onSendSticker={sendStickerMessage}
+                    onSendVoiceNote={sendVoiceMessage}
+                    streamTitle={stream?.title ?? 'Live chat'}
                     palette={palette}
+                    isDark={isDark}
                     disabled={!isLive}
-                    collapsed={false}
-                    onToggleCollapse={() => setInteractionPanelOpen(false)}
                     canModerate={canModerateChat}
                     onDeleteMessage={deleteChatMessage}
                     onReportMessage={reportChatMessage}
+                    onPinMessage={pinChatMessage}
                   />
                 )}
                 {activePanel === 'polls' ? (
-                  <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 16 }}>
+                  // flexShrink: 1, not flex: 1 - see interactionPanelBody's
+                  // own comment; this needs to report its natural content
+                  // size so the panel can grow with real polls, only
+                  // shrinking (and scrolling) once interactionPanelBody's
+                  // maxHeight caps it.
+                  <ScrollView style={{ flexShrink: 1 }} contentContainerStyle={{ paddingBottom: 16 }}>
                     <LivePollsPanel
                       streamId={streamId}
                       isManager={canModerateChat}
@@ -976,9 +957,19 @@ function makeStyles(p: any) {
     flex: 1,
     backgroundColor: p.bg,
   },
+  // Real header, in normal page flow above the player - not floating
+  // chrome on top of the video, so it never covers the top of the frame.
+  // Same dark/ivory treatment as the player's own chrome (not the page's
+  // light/dark theme) since it shows stream-specific info (live badge,
+  // viewer count) that reads the same way regardless of app theme.
+  headerBar: {
+    backgroundColor: p.royalInk,
+    paddingHorizontal: 12,
+    paddingBottom: 10,
+  },
   // Bounded to the video's own aspect ratio (set inline via
   // `aspectRatio`, not here) instead of filling the screen - every
-  // floating control (top bar, reactions, FAB, pinned banner) nests
+  // floating control (reactions, play/pause tap, pinned banner) nests
   // inside this box now, so their existing position:'absolute' styles
   // scope to it automatically rather than the whole device.
   playerBox: {
@@ -1011,14 +1002,6 @@ function makeStyles(p: any) {
   },
 
   // overlays
-  topOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    paddingHorizontal: 12,
-    paddingBottom: 28,
-  },
   topRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1194,8 +1177,17 @@ function makeStyles(p: any) {
     alignItems: 'center',
     justifyContent: 'center',
   },
+  // maxHeight, not a fixed height - with nothing happening (no messages,
+  // no polls, no Q&A session) this should barely take any space at all;
+  // as comments/polls/questions arrive it grows with that real content,
+  // only capping at 440 and switching to internal scrolling once there's
+  // enough content to actually need it. Every child panel (LiveChatPanel,
+  // LivePollsPanel's wrapping ScrollView, LiveQAPanel) already uses
+  // flex: 1 internally, which resolves to natural content size up until
+  // this maxHeight caps it - the same chain that pins each panel's own
+  // input row to the true bottom still holds once capped.
   interactionPanelBody: {
-    height: 440,
+    maxHeight: 440,
   },
 
   // play/pause center
@@ -1284,36 +1276,6 @@ function makeStyles(p: any) {
     fontWeight: '900',
     letterSpacing: 2,
   },
-
-  // ended
-  endedOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 12,
-  },
-  endedTitle: {
-    color: p.ivory,
-    fontSize: 18,
-    fontWeight: '900',
-    textAlign: 'center',
-    paddingHorizontal: 32,
-  },
-  endedSub: {
-    color: p.divider ?? p.ivory,
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  replayBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    borderRadius: 10,
-    paddingHorizontal: 22,
-    paddingVertical: 12,
-    marginTop: 8,
-  },
-  replayBtnText: { color: p.onPrimary, fontSize: 14, fontWeight: '900' },
 
   slowModePill: {
     flexDirection: 'row',

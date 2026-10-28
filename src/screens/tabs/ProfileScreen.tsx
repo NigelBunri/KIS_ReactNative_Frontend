@@ -1945,6 +1945,22 @@ export default function ProfileScreen() {
         tone: 'info' as const,
         onPress: canCreateShop ? openShopEditorForCreate : undefined,
       },
+      {
+        key: 'kis-books',
+        title: 'My Books',
+        subtitle: 'Your reading, downloads, and publishing',
+        icon: 'book' as const,
+        tone: 'success' as const,
+        onPress: () => rootNavigation?.navigate('MyBooksCenter'),
+      },
+      {
+        key: 'kis-books-moderation',
+        title: 'Books Moderation',
+        subtitle: 'GO/staff only — review queue',
+        icon: 'shield-checkmark' as const,
+        tone: 'warning' as const,
+        onPress: () => rootNavigation?.navigate('BookModerationQueue'),
+      },
     ],
     [
       c.openCreatePartner,

@@ -3569,6 +3569,84 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   };
 
   /* ─────────────────────────────────────────
+   * Book passage share card (controlled excerpt from KIS Books)
+   * ──────────────────────────────────────── */
+  const renderBookPassageCard = () => {
+    const bookPassage = (message as any).bookPassage as
+      | { bookId: string; bookTitle: string; authorName?: string; chapterStableId: string; blockId?: string; quotedText: string }
+      | undefined;
+    const isBookPassage = !!bookPassage || (message as any).kind === 'book_passage';
+    if (!isBookPassage || !bookPassage) return null;
+
+    return (
+      <Pressable
+        onPress={() => {
+          DeviceEventEmitter.emit('chat.close_all');
+          (navigation as any).navigate('BookReader', {
+            id: bookPassage.bookId,
+            chapterStableId: bookPassage.chapterStableId,
+            highlightBlockId: bookPassage.blockId,
+          });
+        }}
+        style={({ pressed }) => ({
+          marginTop: text ? 8 : 0,
+          borderRadius: 12,
+          borderWidth: 1,
+          borderColor: palette.divider,
+          overflow: 'hidden',
+          backgroundColor: isMe ? 'rgba(255,255,255,0.10)' : (palette.surface),
+          minWidth: 200,
+          opacity: pressed ? 0.85 : 1,
+        })}
+      >
+        <View style={{ padding: 12, gap: 6 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <KISIcon name="library" size={16} color={isMe ? outgoingTextColor : palette.primary} />
+            <Text
+              style={{
+                fontSize: 14,
+                fontWeight: '700',
+                color: isMe ? outgoingTextColor : palette.text,
+              }}
+              numberOfLines={1}
+            >
+              {bookPassage.bookTitle}
+            </Text>
+          </View>
+          {bookPassage.authorName ? (
+            <Text
+              style={{ fontSize: 11, color: isMe ? outgoingMetaColor : palette.subtext }}
+              numberOfLines={1}
+            >
+              {bookPassage.authorName}
+            </Text>
+          ) : null}
+          <Text
+            style={{
+              fontSize: 13,
+              fontStyle: 'italic',
+              color: isMe ? outgoingMetaColor : palette.subtext,
+            }}
+            numberOfLines={6}
+          >
+            “{bookPassage.quotedText}”
+          </Text>
+          <Text
+            style={{
+              fontSize: 12,
+              fontWeight: '600',
+              color: isMe ? outgoingMetaColor : palette.primary,
+              alignSelf: 'flex-end',
+            }}
+          >
+            Read in book →
+          </Text>
+        </View>
+      </Pressable>
+    );
+  };
+
+  /* ─────────────────────────────────────────
    * Bible games stats share card
    * ──────────────────────────────────────── */
   const renderBibleGameStatsCard = () => {
@@ -4734,6 +4812,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
             {renderLocationCard()}
             {renderProductCard()}
             {renderBibleVerseCard()}
+            {renderBookPassageCard()}
             {renderBibleGameStatsCard()}
             {renderBibleDiscipleshipStatsCard()}
             {renderPaymentCard()}

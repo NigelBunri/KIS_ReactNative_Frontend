@@ -331,7 +331,7 @@ function ReplayPanel({
   const isReady = recordingStatus === 'ready';
 
   return (
-    <View style={[recStyles.panel, { borderColor: palette.border, backgroundColor: palette.card }]}>
+    <View>
       <View style={recStyles.header}>
         <KISIcon name="video" size={15} color={palette.primaryStrong} />
         <Text style={[recStyles.title, { color: palette.text }]}>Replay</Text>
@@ -363,7 +363,7 @@ function ReplayPanel({
       )}
 
       {isReady && !loadingReplay && replay && (
-        <View style={[recStyles.row, { borderColor: palette.border }]}>
+        <View>
           <View style={recStyles.info}>
             <Text style={[recStyles.recTitle, { color: palette.text }]} numberOfLines={1}>
               {replay.title || 'Replay'}
@@ -440,7 +440,7 @@ const recStyles = StyleSheet.create({
   info: { flex: 1 },
   recTitle: { fontSize: 12, fontWeight: '800' },
   recMeta: { fontSize: 10, fontWeight: '600', marginTop: 2 },
-  actions: { flexDirection: 'row', gap: 6 },
+  actions: { flexDirection: 'row', gap: 6, marginTop: 16 },
 });
 
 // ── Broadcaster control panel ─────────────────────────────────────────────────

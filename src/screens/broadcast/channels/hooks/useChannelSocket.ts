@@ -47,11 +47,24 @@ type ChatMessagePayload = {
   text: string;
   sentAt: string;
   isMember?: boolean;
+  // Matches notify_live_chat_message's payload exactly (apps/broadcasts/
+  // realtime.py) - only one of stickerAssetId/(assetUrl+durationSeconds)
+  // is ever present, matching messageType.
+  messageType?: string;
+  stickerAssetId?: string;
+  assetUrl?: string;
+  durationSeconds?: number;
 };
 
 type ChatMessageDeletedPayload = {
   streamId: string;
   id: string;
+};
+
+type ChatMessagePinnedPayload = {
+  streamId: string;
+  id: string;
+  isPinned: boolean;
 };
 
 type LiveStatusChangedPayload = {
@@ -80,6 +93,7 @@ export type UseChannelSocketOptions = {
   onViewerCount?:       (count: number, streamId: string) => void;
   onChatMessage?:       (message: ChatMessagePayload) => void;
   onChatMessageDeleted?: (p: ChatMessageDeletedPayload) => void;
+  onChatMessagePinned?: (p: ChatMessagePinnedPayload) => void;
   onContentPublished?:  (p: ContentPublishedPayload) => void;
   onLiveStatusChanged?: (p: LiveStatusChangedPayload) => void;
   onLiveReaction?: (p: LiveReactionPayload) => void;
@@ -93,6 +107,7 @@ export function useChannelSocket({
   onViewerCount,
   onChatMessage,
   onChatMessageDeleted,
+  onChatMessagePinned,
   onContentPublished,
   onLiveStatusChanged,
   onLiveReaction,
@@ -103,6 +118,7 @@ export function useChannelSocket({
   const viewerCountRef    = useRef(onViewerCount);
   const chatMessageRef    = useRef(onChatMessage);
   const chatMessageDelRef = useRef(onChatMessageDeleted);
+  const chatMessagePinRef = useRef(onChatMessagePinned);
   const contentPubRef     = useRef(onContentPublished);
   const statusChangedRef  = useRef(onLiveStatusChanged);
   const reactionRef       = useRef(onLiveReaction);
@@ -114,6 +130,7 @@ export function useChannelSocket({
   useEffect(() => { viewerCountRef.current   = onViewerCount; });
   useEffect(() => { chatMessageRef.current   = onChatMessage; });
   useEffect(() => { chatMessageDelRef.current = onChatMessageDeleted; });
+  useEffect(() => { chatMessagePinRef.current = onChatMessagePinned; });
   useEffect(() => { contentPubRef.current    = onContentPublished; });
   useEffect(() => { statusChangedRef.current = onLiveStatusChanged; });
   useEffect(() => { reactionRef.current      = onLiveReaction; });
@@ -169,6 +186,14 @@ export function useChannelSocket({
       },
     );
 
+    const s9 = DeviceEventEmitter.addListener(
+      'channel.chat.message_pinned',
+      (p: ChatMessagePinnedPayload) => {
+        if (streamIdRef.current && p.streamId !== streamIdRef.current) return;
+        chatMessagePinRef.current?.(p);
+      },
+    );
+
     const s7 = DeviceEventEmitter.addListener(
       'channel.live.status_changed',
       (p: LiveStatusChangedPayload) => {
@@ -194,6 +219,7 @@ export function useChannelSocket({
       s6.remove();
       s7.remove();
       s8.remove();
+      s9.remove();
     };
   }, []); // intentionally empty — all logic uses stable refs
 }

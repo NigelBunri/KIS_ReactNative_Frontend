@@ -896,8 +896,10 @@ export const fetchLivePolls = async (streamId: string) => {
   return Array.isArray(response.data?.results) ? response.data.results : response.data ?? [];
 };
 export const createLivePoll = async (streamId: string, question: string, options: string[]) => {
-  const response = await postRequest(liveStreamPollsEndpoint(streamId), { question, options }, { errorMessage: 'Unable to create poll.' });
-  return response?.success ? response.data : null;
+  // Returns the full result (not just data-or-null) so the caller can show
+  // *why* creation failed instead of silently doing nothing on a falsy
+  // return — see LivePollsPanel's handleCreate.
+  return postRequest(liveStreamPollsEndpoint(streamId), { question, options }, { errorMessage: 'Unable to create poll.' });
 };
 export const voteLivePoll = async (pollId: string, optionIndex: number) => {
   const response = await postRequest(livePollVoteEndpoint(pollId), { option_index: optionIndex }, { errorMessage: 'Unable to vote.' });
@@ -927,8 +929,12 @@ export const fetchQAQuestions = async (sessionId: string) => {
   return Array.isArray(response.data?.results) ? response.data.results : response.data ?? [];
 };
 export const submitQAQuestion = async (sessionId: string, questionText: string) => {
-  const response = await postRequest(qaSessionQuestionsEndpoint(sessionId), { question_text: questionText }, { errorMessage: 'Unable to submit question.' });
-  return response?.success ? response.data : null;
+  // Returns the full result (not just data-or-null) so the caller can show
+  // *why* submission failed instead of silently doing nothing — a failed
+  // submit used to just discard postRequest's error message entirely,
+  // leaving the sender staring at a send button that appeared to do
+  // nothing. See LiveQAPanel's handleSubmitQuestion.
+  return postRequest(qaSessionQuestionsEndpoint(sessionId), { question_text: questionText }, { errorMessage: 'Unable to submit question.' });
 };
 export const upvoteQAQuestion = async (questionId: string) => {
   const response = await postRequest(qaQuestionUpvoteEndpoint(questionId), {}, { errorMessage: 'Unable to upvote.' });

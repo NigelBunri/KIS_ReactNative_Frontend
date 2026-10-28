@@ -497,29 +497,6 @@ export default function ChannelStudioScreen(props: Props) {
     }
   }, [channelBroadcasting, refresh, selectedChannel?.id, selectedChannel?.is_broadcast]);
 
-  // Turning broadcast ON is low-stakes (nothing changes for existing
-  // subscribers until there's something to see), but turning it OFF
-  // immediately hides the channel and all of its public content from
-  // subscribers — a channel-wide, high-visibility action with no prior
-  // confirmation. Gate only the "stop broadcasting" direction, matching
-  // the confirm-only-on-destructive pattern used for "End stream" in
-  // LiveControlRoom and "Remove" in ChannelModerationPanel.
-  const confirmToggleChannelBroadcast = useCallback(() => {
-    if (!selectedChannel) return;
-    if (!selectedChannel.is_broadcast) {
-      void handleToggleChannelBroadcast();
-      return;
-    }
-    Alert.alert(
-      'Stop broadcasting this channel?',
-      'Your channel and its public content will be hidden from subscribers until you broadcast again.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Stop broadcasting', style: 'destructive', onPress: () => void handleToggleChannelBroadcast() },
-      ],
-    );
-  }, [selectedChannel, handleToggleChannelBroadcast]);
-
   const handleToggleContentBroadcast = useCallback(async (content: BroadcastChannelContent, nextState: boolean) => {
     if (!content?.id) return;
     setContentBroadcastingId(content.id);
@@ -1057,19 +1034,14 @@ export default function ChannelStudioScreen(props: Props) {
             <Text style={[styles.subtitle, { color: palette.subtext }]} numberOfLines={compact ? 2 : 1}>{selectedChannel ? `@${selectedChannel.handle} · ${selectedChannel.subscriber_count || 0} subscribers` : 'Create a channel to start publishing channel-scoped feeds.'}</Text>
           </View>
           {selectedChannel ? (
-            <View style={[styles.headerActions, compact && { width: '100%', justifyContent: 'flex-start' }]}>
-              <KISButton
-                title={compact ? (selectedChannel.is_broadcast ? 'Stop broadcast' : 'Broadcast') : (selectedChannel.is_broadcast ? 'Stop broadcasting channel' : 'Broadcast channel')}
-                variant={selectedChannel.is_broadcast ? 'danger' : 'outline'}
-                onPress={confirmToggleChannelBroadcast}
-                disabled={channelBroadcasting}
-                loading={channelBroadcasting}
-              />
-              <KISButton
-                title={compact ? 'Create' : createLabel}
+            <View style={[styles.headerActions, compact && { width: '100%', justifyContent: 'flex-start',}]}>
+              <Pressable
                 onPress={() => setComposerVisible(true)}
-                left={<KISIcon name="add" size={16} color={palette.onPrimary} />}
-              />
+                disabled={channelBroadcasting}
+                style={{borderRadius: 8, padding: 6, backgroundColor: palette.primarySoft, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: palette.primaryStrong, marginRight: 5}}
+              >
+                <KISIcon name="add" size={34} color={palette.primaryStrong} />
+              </Pressable>
             </View>
           ) : null}
         </View>

@@ -20,13 +20,14 @@ import {
   useWindowDimensions,
   StatusBar,
   PanResponder,
+  LayoutChangeEvent,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useResponsiveLayout } from '@/theme/responsive';
 
 import type { CallSession, CallLayout } from '@/services/calls/callTypes';
 import { hasVideo, isGroupCall, REACTION_EMOJIS, callTypeLabel } from '@/services/calls/callTypes';
-import { RTCView, RTCPIPView } from '@/services/calls/webRTCService';
+import { RTCView } from '@/services/calls/webRTCService';
 import { audioRouteManager } from '@/services/calls/audioRouteManager';
 import { addCallPiPModeChangeListener } from '@/services/calls/callPiPService';
 import { useIOSCallPiP } from './hooks/useIOSCallPiP';
@@ -35,6 +36,10 @@ import CallControls from './components/CallControls';
 import VideoGrid from './components/VideoGrid';
 import BroadcastLayout from './components/BroadcastLayout';
 import VoiceCallGrid from './components/VoiceCallGrid';
+import TileFrame from './components/TileFrame';
+import ParticipantTile from './components/ParticipantTile';
+import ParticipantMenu from './components/ParticipantMenu';
+import { buildModerationProps, buildViewerPrefs, type ParticipantControls } from './components/participantControls';
 import ReactionsLayer from './components/ReactionsLayer';
 import InCallChatSheet from './components/InCallChatSheet';
 import ParticipantsSheet from './components/ParticipantsSheet';
@@ -61,8 +66,6 @@ import { fetchConversationsForCurrentUser } from '@/Module/ChatRoom/normalizeCon
 import { otherDirectParticipantUserId } from '@/Module/ChatRoom/messagesUtils';
 import { getCurrentAuthUserId } from '@/storage/userScopedProfileCache';
 
-const CONTROLS_HIDE_AFTER = 4000;
-
 type CallActions = {
   onEnd: () => void;
   onMinimize?: () => void;
@@ -78,6 +81,12 @@ type CallActions = {
   onSetLayout: (layout: CallLayout) => void;
   onMuteParticipant?: (userId: string) => void;
   onRemoveParticipant?: (userId: string) => void;
+  /** Forcibly ends that participant's own call, distinct from removing them from the roster above. */
+  onEndParticipantCall?: (userId: string) => void;
+  /** Locked mute: the participant can no longer unmute themselves until a moderator clears this. */
+  onSetParticipantMuteLock?: (userId: string, locked: boolean) => void;
+  /** Locked video: the participant's camera is disabled for everyone until a moderator clears this. */
+  onSetParticipantVideoLock?: (userId: string, locked: boolean) => void;
   onToggleScreenShare?: () => void;
   /** Invites users (by id) directly into the already-active call — pushes CALL_OFFER + a real incoming-call push notification to each. */
   onInviteToCall?: (userIds: string[]) => Promise<{ ok: boolean; error?: string }>;
@@ -161,7 +170,27 @@ export default function ActiveCallScreen({ session, actions }: Props) {
   const [addParticipantCurrentUserId, setAddParticipantCurrentUserId] = useState<string | null>(null);
   const [invitingParticipants, setInvitingParticipants] = useState(false);
   const controlsOpacity = useRef(new Animated.Value(1)).current;
-  const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Measured heights of the top HUD / bottom controls bar, so the content
+  // area's reserved padding below can match them exactly rather than a
+  // guessed constant — see the chrome-space-reclaim effect further down.
+  const [topChromeH, setTopChromeH] = useState(0);
+  const [bottomChromeH, setBottomChromeH] = useState(0);
+
+  // Per-viewer, local-only preferences — never touch session/actions, so
+  // they can never be mistaken for something that syncs to anyone else on
+  // the call (see ParticipantMenu's "For you" section).
+  const [hiddenUserIds, setHiddenUserIds] = useState<Set<string>>(new Set());
+  const [audioFocusUserId, setAudioFocusUserId] = useState<string | null>(null);
+  const toggleHidden = useCallback((userId: string) => {
+    setHiddenUserIds(prev => {
+      const next = new Set(prev);
+      if (next.has(userId)) next.delete(userId); else next.add(userId);
+      return next;
+    });
+  }, []);
+  const toggleAudioFocus = useCallback((userId: string) => {
+    setAudioFocusUserId(prev => (prev === userId ? null : userId));
+  }, []);
 
   // Self-preview drag state (video calls only).
   // We keep the animated values at 0 (delta) and bake the initial position into
@@ -172,8 +201,12 @@ export default function ActiveCallScreen({ session, actions }: Props) {
   useEffect(() => {
     // Default to bottom-right, like WhatsApp/FaceTime/Meet, clear of the
     // bottom control bar and respecting the bottom safe-area inset.
+    // selfPreview's coordinate space is relative to `content`, which
+    // styles.root now insets by topInset from the top of the device (see
+    // styles.root's paddingTop) — so its own usable height is
+    // screenH - topInset, not the full screenH.
     selfPanX.setOffset(screenW - PIP_W - 16);
-    selfPanY.setOffset(screenH - insets.bottom - CONTROLS_CLEARANCE - PIP_H);
+    selfPanY.setOffset((screenH - topInset) - insets.bottom - CONTROLS_CLEARANCE - PIP_H);
     selfPanX.flattenOffset();
     selfPanY.flattenOffset();
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -214,7 +247,10 @@ export default function ActiveCallScreen({ session, actions }: Props) {
         const rawX = (selfPanX as any)._value ?? 0;
         const rawY = (selfPanY as any)._value ?? 0;
         const clampedX = Math.max(0, Math.min(rawX, screenW - PIP_W));
-        const clampedY = Math.max(topInset + 8, Math.min(rawY, screenH - insets.bottom - PIP_H - 8));
+        // Lower bound is just a small gap now (not topInset + 8) — this
+        // coordinate space already starts topInset below the real device
+        // top, same reasoning as the initial-offset effect above.
+        const clampedY = Math.max(8, Math.min(rawY, (screenH - topInset) - insets.bottom - PIP_H - 8));
         if (clampedX !== rawX) Animated.spring(selfPanX, { toValue: clampedX, useNativeDriver: false, bounciness: 6 }).start();
         if (clampedY !== rawY) Animated.spring(selfPanY, { toValue: clampedY, useNativeDriver: false, bounciness: 6 }).start();
       },
@@ -250,24 +286,45 @@ export default function ActiveCallScreen({ session, actions }: Props) {
     audioRouteManager.stopRingback();
   }, [session?.state]);
 
-  const scheduleHide = useCallback(() => {
-    if (hideTimer.current) clearTimeout(hideTimer.current);
-    hideTimer.current = setTimeout(() => {
-      Animated.timing(controlsOpacity, { toValue: 0, duration: 300, useNativeDriver: true }).start();
-      setShowControls(false);
-    }, CONTROLS_HIDE_AFTER);
+  // Controls/chrome visibility is purely tap-driven — no auto-hide timer.
+  // Tapping the video/content area toggles it; pressing an actual control
+  // (mute, video, etc.) always brings it back rather than toggling, so a
+  // button press can never flip it off mid-interaction.
+  // useNativeDriver: false on both — this same Animated.Value also drives
+  // paddingTop/paddingBottom/translateY below (so hiding the chrome
+  // actually reclaims its screen space, not just fades it out), and
+  // padding isn't a native-animatable style property.
+  const showControlsNow = useCallback(() => {
+    setShowControls(true);
+    Animated.timing(controlsOpacity, { toValue: 1, duration: 200, useNativeDriver: false }).start();
   }, []);
 
-  const revealControls = useCallback(() => {
-    Animated.timing(controlsOpacity, { toValue: 1, duration: 200, useNativeDriver: true }).start();
-    setShowControls(true);
-    scheduleHide();
-  }, [scheduleHide]);
+  const toggleControls = useCallback(() => {
+    setShowControls(prev => {
+      const next = !prev;
+      Animated.timing(controlsOpacity, { toValue: next ? 1 : 0, duration: next ? 200 : 250, useNativeDriver: false }).start();
+      return next;
+    });
+  }, []);
 
-  useEffect(() => {
-    if (session?.state === 'active') scheduleHide();
-    return () => { if (hideTimer.current) clearTimeout(hideTimer.current); };
-  }, [session?.state]);
+  // Hiding the chrome doesn't just fade it out — it actually releases the
+  // screen space it was reserving (padding animates to 0 right alongside
+  // the opacity/slide), so the video grid underneath measures a taller
+  // container and its tiles grow into that space, same as the top/bottom
+  // bars sliding fully off-screen.
+  const contentPadTop = controlsOpacity.interpolate({ inputRange: [0, 1], outputRange: [0, topChromeH] });
+  const contentPadBottom = controlsOpacity.interpolate({ inputRange: [0, 1], outputRange: [0, bottomChromeH] });
+  const topHudTranslateY = controlsOpacity.interpolate({ inputRange: [0, 1], outputRange: [-topChromeH, 0] });
+  const bottomBarTranslateY = controlsOpacity.interpolate({ inputRange: [0, 1], outputRange: [bottomChromeH, 0] });
+
+  const onTopHudLayout = useCallback((e: LayoutChangeEvent) => {
+    const h = e.nativeEvent.layout.height;
+    if (h > 0) setTopChromeH(h);
+  }, []);
+  const onBottomChromeLayout = useCallback((e: LayoutChangeEvent) => {
+    const h = e.nativeEvent.layout.height;
+    if (h > 0) setBottomChromeH(h);
+  }, []);
 
   // Native PiP mode (Android auto-enter on background, iOS's automatic
   // video-call PiP, or the user tapping the PiP window to return to full
@@ -302,6 +359,30 @@ export default function ActiveCallScreen({ session, actions }: Props) {
     return out;
   }, [addParticipantChats, addParticipantCurrentUserId, session?.participants]);
   const isHostOrCoHost = localParticipant?.role === 'host' || localParticipant?.role === 'co-host';
+  // Moderation rights belong to the group's host/co-host AND, separately,
+  // to whoever actually placed this call — a plain member who started a
+  // 1:1/ad-hoc call has no special `role` but should still be able to
+  // remove/mute/lock participants on the call they started.
+  const canModerate = isHostOrCoHost
+    || (!!session?.initiatedBy && session.initiatedBy === localParticipant?.userId);
+  const visibleParticipants = useMemo(
+    () => (session?.participants ?? []).filter(p => p.isLocal || !hiddenUserIds.has(p.userId)),
+    [session?.participants, hiddenUserIds],
+  );
+  const participantControls: ParticipantControls = useMemo(() => ({
+    canModerate,
+    onMuteParticipant: actions.onMuteParticipant,
+    onRemoveParticipant: actions.onRemoveParticipant,
+    onEndParticipantCall: actions.onEndParticipantCall,
+    onSetParticipantMuteLock: actions.onSetParticipantMuteLock,
+    onSetParticipantVideoLock: actions.onSetParticipantVideoLock,
+    onSetParticipantPanelist: actions.onSetParticipantPanelist,
+    onPromoteParticipant: actions.onPromoteParticipant,
+    audioFocusUserId,
+    onToggleAudioFocus: toggleAudioFocus,
+    onToggleHidden: toggleHidden,
+    onToggleChrome: toggleControls,
+  }), [canModerate, actions, audioFocusUserId, toggleAudioFocus, toggleHidden, toggleControls]);
   const withVideo = session ? hasVideo(session.callType) : false;
   // A 1:1 call that picks up a 3rd participant via the add-participant
   // sheet is genuinely a group call now even though callType (set once at
@@ -315,10 +396,22 @@ export default function ActiveCallScreen({ session, actions }: Props) {
   const isConnecting = session?.state === 'connecting' || session?.state === 'dialing' || session?.state === 'ringing' || session?.state === 'reconnecting';
 
   const handleControlAction = useCallback((action: string) => {
-    revealControls();
+    showControlsNow();
     switch (action) {
-      case 'mute': actions.onToggleMute(); break;
-      case 'video': actions.onToggleVideo(); break;
+      case 'mute':
+        if (localParticipant?.isMuteLocked) {
+          Alert.alert('Muted by host', 'The host or caller has muted you — only they can unmute you.');
+          break;
+        }
+        actions.onToggleMute();
+        break;
+      case 'video':
+        if (localParticipant?.isVideoLocked) {
+          Alert.alert('Video turned off', 'The host or caller has turned off your video for everyone — only they can turn it back on.');
+          break;
+        }
+        actions.onToggleVideo();
+        break;
       case 'speaker': actions.onToggleSpeaker(); break;
       case 'flip': actions.onFlipCamera(); break;
       case 'end': actions.onEnd(); break;
@@ -403,12 +496,17 @@ export default function ActiveCallScreen({ session, actions }: Props) {
         setShowWhiteboard(true);
         break;
     }
-  }, [actions, session?.layout, revealControls, openAddParticipantSheet]);
+  }, [actions, session?.layout, showControlsNow, openAddParticipantSheet, localParticipant]);
 
   const styles = useMemo(() => StyleSheet.create({
     root: {
       flex: 1,
       backgroundColor: palette.royalInk,
+      // The call room used to bleed all the way up under the status bar/
+      // notch (statusBarTranslucent + full-bleed content) — inset it below
+      // that instead, so the room's actual height is screen height minus
+      // the safe-area top rather than the full device height.
+      paddingTop: Math.max(topInset, 12),
     },
     // Native OS Picture-in-Picture window content — deliberately plain
     // (no palette-driven chrome, no safe-area padding) since the PiP window
@@ -421,6 +519,9 @@ export default function ActiveCallScreen({ session, actions }: Props) {
       flex: 1,
     },
     content: {
+      flex: 1,
+    },
+    fill1to1: {
       flex: 1,
     },
     topHud: {
@@ -460,6 +561,15 @@ export default function ActiveCallScreen({ session, actions }: Props) {
       gap: 16,
       paddingBottom: 40,
     },
+    voiceDotsBtn: {
+      position: 'absolute',
+      top: 8,
+      right: 8,
+      backgroundColor: palette.overlay,
+      borderRadius: 16,
+      padding: 7,
+      zIndex: 5,
+    },
     voiceAvatar: {
       width: 126,
       height: 126,
@@ -490,21 +600,11 @@ export default function ActiveCallScreen({ session, actions }: Props) {
     },
     mutedText: { color: palette.danger, fontSize: 13, fontWeight: '600' },
 
-    // Self preview
+    // Self preview — sizing/border/shadow now live in TileFrame; this
+    // positions the draggable PiP, nothing else.
     selfPreview: {
       position: 'absolute',
-      width: PIP_W,
-      height: PIP_H,
-      borderRadius: 16,
-      overflow: 'hidden',
-      borderWidth: 2,
-      borderColor: `${palette.gold}80`,
       zIndex: 5,
-      shadowColor: palette.gold,
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 0.3,
-      shadowRadius: 10,
-      elevation: 10,
     },
     selfMutedBadge: {
       position: 'absolute',
@@ -593,7 +693,7 @@ export default function ActiveCallScreen({ session, actions }: Props) {
       borderColor: `${palette.gold}59`,
     },
     endedCloseTxt: { color: palette.gold, fontSize: 15, fontWeight: '800', letterSpacing: 0.3 },
-  }), [palette, PIP_W, PIP_H]);
+  }), [palette, topInset]);
 
   if (!session) return null;
 
@@ -682,8 +782,8 @@ export default function ActiveCallScreen({ session, actions }: Props) {
         <IOSScreenSharePicker />
 
         {/* ── CONTENT AREA ── */}
-        <TouchableWithoutFeedback onPress={revealControls}>
-          <View style={styles.content}>
+        <TouchableWithoutFeedback onPress={toggleControls}>
+          <Animated.View style={[styles.content, { paddingTop: contentPadTop, paddingBottom: contentPadBottom }]}>
 
             {/* ── VOICE 1:1 Layout ── */}
             {!isGroup && !withVideo && (
@@ -693,6 +793,7 @@ export default function ActiveCallScreen({ session, actions }: Props) {
                 isConnecting={isConnecting}
                 styles={styles}
                 palette={palette}
+                controls={participantControls}
               />
             )}
 
@@ -711,6 +812,9 @@ export default function ActiveCallScreen({ session, actions }: Props) {
                 virtualBgOption={virtualBg}
                 styles={styles}
                 palette={palette}
+                pipW={PIP_W}
+                pipH={PIP_H}
+                controls={participantControls}
               />
             )}
 
@@ -724,8 +828,9 @@ export default function ActiveCallScreen({ session, actions }: Props) {
                 VideoGrid's isAudioOnly branch. */}
             {isGroup && !isBroadcast && !withVideo && (
               <VoiceCallGrid
-                participants={session.participants}
+                participants={visibleParticipants}
                 activeSpeakerId={session.activeSpeakerId}
+                controls={participantControls}
               />
             )}
 
@@ -736,38 +841,35 @@ export default function ActiveCallScreen({ session, actions }: Props) {
                 for the newly-multi-party case. */}
             {isGroup && !isBroadcast && withVideo && (
               <VideoGrid
-                participants={session.participants}
+                participants={visibleParticipants}
                 layout={session.layout}
                 pinnedUserId={session.pinnedUserId}
                 activeSpeakerId={session.activeSpeakerId}
                 isAudioOnly={!withVideo}
                 onPinParticipant={actions.onPinParticipant}
                 callActive={session.state === 'active'}
+                controls={participantControls}
               />
             )}
 
             {/* ── BROADCAST ── */}
             {isBroadcast && (
               <BroadcastLayout
-                participants={session.participants}
+                participants={visibleParticipants}
                 viewerCount={session.viewerCount ?? 0}
                 isRecording={session.isRecording ?? false}
                 activeSpeakerId={session.activeSpeakerId}
                 liveStartedAt={session.liveStartedAt}
                 onPressParticipant={uid => actions.onPinParticipant(uid)}
                 callActive={session.state === 'active'}
-                isOwner={isHostOrCoHost}
-                onMuteParticipant={isHostOrCoHost ? actions.onMuteParticipant : undefined}
-                onRemoveParticipant={isHostOrCoHost ? actions.onRemoveParticipant : undefined}
-                onSetParticipantPanelist={isHostOrCoHost ? actions.onSetParticipantPanelist : undefined}
-                onPromoteParticipant={isHostOrCoHost ? actions.onPromoteParticipant : undefined}
+                controls={participantControls}
               />
             )}
 
             {/* ── Reactions floating layer ── */}
             <ReactionsLayer reactions={session.reactions} width={screenW} height={screenH} />
 
-          </View>
+          </Animated.View>
         </TouchableWithoutFeedback>
 
         {/* ── Network Quality Banner ── */}
@@ -775,7 +877,20 @@ export default function ActiveCallScreen({ session, actions }: Props) {
 
         {/* ── TOP HUD ── */}
         <Animated.View
-          style={[styles.topHud, { paddingTop: topInset + 8, opacity: controlsOpacity }]}
+          onLayout={onTopHudLayout}
+          style={[
+            styles.topHud,
+            // topHud is positioned absolutely against `root`'s outer edge —
+            // React Native does NOT reliably shift an absolutely-positioned
+            // child by its parent's padding, so root's own paddingTop (see
+            // styles.root) does nothing for topHud. It needs its own
+            // explicit topInset offset, same pattern NetworkQualityBanner
+            // already uses. (A previous pass here assumed the padding would
+            // cascade and dropped this to a bare `8`, which pushed the
+            // minimize/PiP button up under the status bar/notch where it
+            // couldn't be tapped — this restores the real offset.)
+            { paddingTop: topInset + 8, opacity: controlsOpacity, transform: [{ translateY: topHudTranslateY }] },
+          ]}
           pointerEvents="box-none"
         >
           <View style={styles.topLeft}>
@@ -836,7 +951,10 @@ export default function ActiveCallScreen({ session, actions }: Props) {
         </Animated.View>
 
         {/* ── BOTTOM: Controls ── */}
-        <Animated.View style={{ opacity: controlsOpacity }}>
+        <Animated.View
+          onLayout={onBottomChromeLayout}
+          style={{ opacity: controlsOpacity, transform: [{ translateY: bottomBarTranslateY }] }}
+        >
           <CallControls
             session={session}
             onAction={handleControlAction}
@@ -861,11 +979,13 @@ export default function ActiveCallScreen({ session, actions }: Props) {
           visible={showParticipants}
           onClose={() => setShowParticipants(false)}
           localUserId={session.localUserId}
-          isHost={isHostOrCoHost}
-          onMute={isHostOrCoHost ? actions.onMuteParticipant : undefined}
-          onRemove={isHostOrCoHost ? actions.onRemoveParticipant : undefined}
+          isHost={canModerate}
+          onMute={canModerate ? actions.onMuteParticipant : undefined}
+          onRemove={canModerate ? actions.onRemoveParticipant : undefined}
           onAddParticipant={isGroup ? openAddParticipantSheet : undefined}
-          onPromote={isHostOrCoHost ? actions.onPromoteParticipant : undefined}
+          onPromote={canModerate ? actions.onPromoteParticipant : undefined}
+          hiddenUserIds={hiddenUserIds}
+          onToggleHidden={toggleHidden}
         />
 
       </View>
@@ -1009,19 +1129,35 @@ export default function ActiveCallScreen({ session, actions }: Props) {
 
 // ── Voice 1:1 Layout ─────────────────────────────────────────────────────────
 
-function VoiceOneOnOneLayout({ session, pulseAnim, isConnecting, styles, palette }: {
+function VoiceOneOnOneLayout({ session, pulseAnim, isConnecting, styles, palette, controls }: {
   session: CallSession;
   pulseAnim: Animated.Value;
   isConnecting: boolean;
   styles: any;
   palette: any;
+  controls: ParticipantControls;
 }) {
+  const [menuOpen, setMenuOpen] = useState(false);
   const other = session.participants.find(p => !p.isLocal);
   const initials = (other?.displayName ?? session.title)
     .trim().split(/\s+/).slice(0, 2).map(w => w[0]).join('').toUpperCase();
+  const viewerPrefs = other ? buildViewerPrefs(controls, other) : undefined;
+  const moderation = other ? buildModerationProps(controls, other) : undefined;
+  const hasMenu = !!other && !!(viewerPrefs?.onToggleAudioFocus || viewerPrefs?.onToggleHide || moderation?.canModerate);
 
   return (
     <View style={styles.voiceLayout}>
+      {hasMenu && (
+        <Pressable
+          onPress={() => setMenuOpen(true)}
+          hitSlop={8}
+          accessibilityLabel={`Options for ${other!.displayName}`}
+          accessibilityRole="button"
+          style={styles.voiceDotsBtn}
+        >
+          <KISIcon name="more-vert" size={18} color={palette.subtext} />
+        </Pressable>
+      )}
       <Animated.View style={[styles.voiceAvatar, isConnecting && { transform: [{ scale: pulseAnim }] }]}>
         <Text style={styles.voiceInitials}>{initials}</Text>
       </Animated.View>
@@ -1034,9 +1170,18 @@ function VoiceOneOnOneLayout({ session, pulseAnim, isConnecting, styles, palette
       )}
       {other?.isMuted && (
         <View style={styles.mutedBadge}>
-          <KISIcon name="mic-off" size={14} color={palette.danger} />
-          <Text style={styles.mutedText}>Muted</Text>
+          <KISIcon name={other.isMuteLocked ? 'lock' : 'mic-off'} size={14} color={palette.danger} />
+          <Text style={styles.mutedText}>{other.isMuteLocked ? 'Muted by host' : 'Muted'}</Text>
         </View>
+      )}
+      {other && hasMenu && (
+        <ParticipantMenu
+          visible={menuOpen}
+          onClose={() => setMenuOpen(false)}
+          displayName={other.displayName}
+          viewerPrefs={viewerPrefs}
+          moderation={moderation}
+        />
       )}
     </View>
   );
@@ -1067,7 +1212,7 @@ function SpeakingWave({ palette }: { palette: any }) {
 
 // ── Video 1:1 Layout ─────────────────────────────────────────────────────────
 
-function VideoOneOnOneLayout({ session, remoteParticipants, isConnecting, localStream, selfPanX, selfPanY, selfPan, selfPreviewRef, virtualBgFrameUri, virtualBgOption, styles, palette }: {
+function VideoOneOnOneLayout({ session, remoteParticipants, isConnecting, localStream, selfPanX, selfPanY, selfPan, selfPreviewRef, virtualBgFrameUri, virtualBgOption, styles, palette, pipW, pipH, controls }: {
   session: CallSession;
   remoteParticipants: any[];
   isConnecting: boolean;
@@ -1080,8 +1225,24 @@ function VideoOneOnOneLayout({ session, remoteParticipants, isConnecting, localS
   virtualBgOption?: VirtualBgOption;
   styles: any;
   palette: any;
+  pipW: number;
+  pipH: number;
+  controls: ParticipantControls;
 }) {
   const remote = remoteParticipants[0] ?? null;
+
+  // Self-measures its own box (rather than assuming full window dimensions)
+  // so it correctly tracks both the root-level top-inset fix and the
+  // chrome-hide space-reclaim padding on `content` — same pattern every
+  // other call layout (VideoGrid etc.) already uses.
+  const [containerW, setContainerW] = useState(0);
+  const [containerH, setContainerH] = useState(0);
+  const onLayout = useCallback((e: LayoutChangeEvent) => {
+    const { width, height } = e.nativeEvent.layout;
+    if (width > 0) setContainerW(Math.floor(width));
+    if (height > 0) setContainerH(Math.floor(height));
+  }, []);
+  const ready = containerW > 0 && containerH > 0;
 
   // iOS Picture-in-Picture: react-native-webrtc ships this fully built
   // (RTCPIPView + startIOSPIP/stopIOSPIP, backed by its own PIPController +
@@ -1095,34 +1256,48 @@ function VideoOneOnOneLayout({ session, remoteParticipants, isConnecting, localS
   // call type gets the same background/foreground behavior, not just 1:1.
   const pipRef = useIOSCallPiP(session.state === 'active');
 
-  const RemoteVideoView = RTCPIPView ?? RTCView;
-  // Only RTCPIPView (iOS) understands iosPIP - spreading it onto the plain
-  // RTCView fallback (Android, or any build without RTCPIPView) would hand
-  // an unrecognized prop to a native component that isn't expecting it.
-  const remoteVideoExtraProps = RTCPIPView ? { iosPIP: { enabled: true } } : {};
-
   return (
-    <View style={[StyleSheet.absoluteFill, { backgroundColor: palette.royalInk }]}>
-      {/* Remote video — full screen. "contain" for a screen share so shared
-          text/UI content isn't cropped by "cover"'s zoom-to-fill — the
-          explicit background above is what shows through the resulting
-          letterbox/pillarbox bars, same dark tone ParticipantTile's tiles
-          already use elsewhere in this call UI. */}
-      {remote?.stream && RemoteVideoView ? (
-        <RemoteVideoView
-          ref={pipRef}
-          streamURL={remote.stream.toURL()}
-          style={StyleSheet.absoluteFill}
-          objectFit={remote?.isScreenSharing ? 'contain' : 'cover'}
-          zOrder={1}
-          {...remoteVideoExtraProps}
-        />
-      ) : (
-        <View style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center' }]}>
-          <Text style={{ color: palette.subtext, fontSize: 16 }}>
-            {isConnecting ? 'Connecting…' : 'Camera off'}
-          </Text>
-        </View>
+    // flex:1, not absoluteFill — this is `content`'s normal-flow child, so
+    // its onLayout measurement correctly tracks content's animated
+    // chrome-reclaim padding (see toggleControls). An absolutely-positioned
+    // child here would always measure content's full border-box size and
+    // ignore that padding entirely, same root cause as the topHud fix
+    // above — so the remote tile would never actually grow when the
+    // controls hide.
+    <View style={[styles.fill1to1, { backgroundColor: palette.royalInk }]} onLayout={onLayout}>
+      {/* Remote video — fills the screen. ParticipantTile already handles
+          the "contain" vs "cover" objectFit split, the camera-off avatar
+          fallback, name/mic/network badges, and the RTCPIPView swap for iOS
+          PiP (isPipSource/pipRef) — same single tile component every other
+          call layout uses, so the 1:1 remote view gets the same luxurious
+          frame AND the same 3-dot menu (view large is skipped here — there's
+          only one tile to view — but hide/audio-focus/moderation all work).
+          Falls back to plain "Connecting…" text only while the call hasn't
+          connected yet (no participant to render a tile for in that case
+          reads better than a camera-off-looking tile). */}
+      {ready && (
+        !isConnecting && remote ? (
+          <ParticipantTile
+            participant={remote}
+            width={containerW}
+            height={containerH}
+            cornerRadius={0}
+            showName
+            isPipSource
+            pipRef={pipRef}
+            onToggleChrome={controls.onToggleChrome}
+            viewerPrefs={buildViewerPrefs(controls, remote)}
+            moderation={buildModerationProps(controls, remote)}
+          />
+        ) : (
+          <TileFrame width={containerW} height={containerH} cornerRadius={0}>
+            <View style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center' }]}>
+              <Text style={{ color: palette.subtext, fontSize: 16 }}>
+                {isConnecting ? 'Connecting…' : 'Camera off'}
+              </Text>
+            </View>
+          </TileFrame>
+        )
       )}
 
       {/* "Sharing screen" indicator — a small top-centered pill matching this
@@ -1139,7 +1314,8 @@ function VideoOneOnOneLayout({ session, remoteParticipants, isConnecting, localS
         </View>
       )}
 
-      {/* Self preview — draggable corner tile */}
+      {/* Self preview — draggable corner tile, in the same luxurious frame
+          every other tile uses. */}
       {localStream && RTCView && (
         <Animated.View
           ref={selfPreviewRef}
@@ -1149,34 +1325,36 @@ function VideoOneOnOneLayout({ session, remoteParticipants, isConnecting, localS
           ]}
           {...selfPan.panHandlers}
         >
-          {/* Show processed virtual-bg frame, or raw stream */}
-          {virtualBgOption && virtualBgOption.mode !== 'none' && virtualBgFrameUri ? (
-            <VirtualBgPreview
-              frameUri={virtualBgFrameUri}
-              option={virtualBgOption}
-              width={92}
-              height={132}
-              style={StyleSheet.absoluteFill}
-            />
-          ) : (
-            <RTCView
-              streamURL={localStream.toURL()}
-              style={StyleSheet.absoluteFill}
-              objectFit="cover"
-              mirror
-              zOrder={2}
-            />
-          )}
-          {session.isMuted && (
-            <View style={styles.selfMutedBadge}>
-              <KISIcon name="mic-off" size={11} color={palette.danger} />
-            </View>
-          )}
-          {virtualBgOption && virtualBgOption.mode !== 'none' && (
-            <View style={styles.selfVbgBadge}>
-              <Text style={styles.selfVbgBadgeText}>You only</Text>
-            </View>
-          )}
+          <TileFrame width={pipW} height={pipH} cornerRadius={16}>
+            {/* Show processed virtual-bg frame, or raw stream */}
+            {virtualBgOption && virtualBgOption.mode !== 'none' && virtualBgFrameUri ? (
+              <VirtualBgPreview
+                frameUri={virtualBgFrameUri}
+                option={virtualBgOption}
+                width={92}
+                height={132}
+                style={StyleSheet.absoluteFill}
+              />
+            ) : (
+              <RTCView
+                streamURL={localStream.toURL()}
+                style={StyleSheet.absoluteFill}
+                objectFit="cover"
+                mirror
+                zOrder={2}
+              />
+            )}
+            {session.isMuted && (
+              <View style={styles.selfMutedBadge}>
+                <KISIcon name="mic-off" size={11} color={palette.danger} />
+              </View>
+            )}
+            {virtualBgOption && virtualBgOption.mode !== 'none' && (
+              <View style={styles.selfVbgBadge}>
+                <Text style={styles.selfVbgBadgeText}>You only</Text>
+              </View>
+            )}
+          </TileFrame>
         </Animated.View>
       )}
     </View>

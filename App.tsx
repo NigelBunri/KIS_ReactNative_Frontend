@@ -345,9 +345,22 @@ import SymptomCheckerScreen from '@/screens/health/symptoms/SymptomCheckerScreen
 import CreatorAnalyticsScreen from '@/screens/broadcast/media_extended/CreatorAnalyticsScreen';
 import KingdomNewsScreen from '@/screens/broadcast/media_extended/KingdomNewsScreen';
 import KingdomMusicScreen from '@/screens/broadcast/media_extended/KingdomMusicScreen';
-import EbooksScreen from '@/screens/broadcast/media_extended/EbooksScreen';
 import PodcastsScreen from '@/screens/broadcast/media_extended/PodcastsScreen';
 import PPVEventsScreen from '@/screens/broadcast/media_extended/PPVEventsScreen';
+import BooksMarketplaceScreen from '@/screens/books/BooksMarketplaceScreen';
+import BookDetailScreen from '@/screens/books/BookDetailScreen';
+import BookReaderScreen from '@/screens/books/BookReaderScreen';
+import AuthorStudioScreen from '@/screens/books/AuthorStudioScreen';
+import CreateBookScreen from '@/screens/books/CreateBookScreen';
+import EditBookScreen from '@/screens/books/EditBookScreen';
+import MyEarningsScreen from '@/screens/books/MyEarningsScreen';
+import ManuscriptUploadScreen from '@/screens/books/ManuscriptUploadScreen';
+import BookModerationQueueScreen from '@/screens/books/moderation/BookModerationQueueScreen';
+import MyLibraryScreen from '@/screens/books/MyLibraryScreen';
+import MyBooksCenterScreen from '@/screens/books/MyBooksCenterScreen';
+import HighlightsCommentsScreen from '@/screens/books/HighlightsCommentsScreen';
+import ImagePlacementsReviewScreen from '@/screens/books/ImagePlacementsReviewScreen';
+import BookModerationReaderScreen from '@/screens/books/moderation/BookModerationReaderScreen';
 import { GoldenSectionProvider, useGoldenSection } from '@/contexts/GoldenSectionContext';
 import { GoldHeaderShell } from '@/components/common/GoldHeaderShell';
 import { useKISTheme } from '@/theme/useTheme';
@@ -2062,9 +2075,24 @@ function AppContent() {
                     <RootStack.Screen name="CreatorAnalytics" getComponent={() => CreatorAnalyticsScreen} options={{ headerShown: false }} />
                     <RootStack.Screen name="KingdomNews" getComponent={() => KingdomNewsScreen} options={{ headerShown: false }} />
                     <RootStack.Screen name="KingdomMusic" getComponent={() => KingdomMusicScreen} options={{ headerShown: false }} />
-                    <RootStack.Screen name="Ebooks" getComponent={() => EbooksScreen} options={{ headerShown: false }} />
                     <RootStack.Screen name="Podcasts" getComponent={() => PodcastsScreen} options={{ headerShown: false }} />
                     <RootStack.Screen name="PPVEvents" getComponent={() => PPVEventsScreen} options={{ headerShown: false }} />
+
+                    {/* ── KIS Books Marketplace ── */}
+                    <RootStack.Screen name="BooksMarketplace" getComponent={() => BooksMarketplaceScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="BookDetail" getComponent={() => BookDetailScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="BookReader" getComponent={() => BookReaderScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="AuthorStudio" getComponent={() => AuthorStudioScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="CreateBook" getComponent={() => CreateBookScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="EditBook" getComponent={() => EditBookScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="MyEarnings" getComponent={() => MyEarningsScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="ManuscriptUpload" getComponent={() => ManuscriptUploadScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="BookModerationQueue" getComponent={() => BookModerationQueueScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="MyLibrary" getComponent={() => MyLibraryScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="MyBooksCenter" getComponent={() => MyBooksCenterScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="HighlightsComments" getComponent={() => HighlightsCommentsScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="ImagePlacementsReview" getComponent={() => ImagePlacementsReviewScreen} options={{ headerShown: false }} />
+                    <RootStack.Screen name="BookModerationReader" getComponent={() => BookModerationReaderScreen} options={{ headerShown: false }} />
                   </>
                 ) : (
                   <>

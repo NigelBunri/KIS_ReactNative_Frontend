@@ -9,8 +9,6 @@ const mediaExtendedRoutes = {
     musicTracks: API_BASE_URL + "/api/v1/media/extended/music/",
     musicTrackPlay: (id: string) => API_BASE_URL + "/api/v1/media/extended/music/" + id + "/play/",
     playlists: API_BASE_URL + "/api/v1/media/extended/playlists/",
-    ebooks: API_BASE_URL + "/api/v1/media/extended/ebooks/",
-    ebookPurchase: (id: string) => API_BASE_URL + "/api/v1/media/extended/ebooks/" + id + "/purchase/",
     ppvEvents: API_BASE_URL + "/api/v1/media/extended/ppv/",
     ppvPurchase: (id: string) => API_BASE_URL + "/api/v1/media/extended/ppv/" + id + "/purchase/",
     ppvStream: (id: string) => API_BASE_URL + "/api/v1/media/extended/ppv/" + id + "/stream/",

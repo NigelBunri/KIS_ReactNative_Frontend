@@ -13,6 +13,7 @@ import { DeviceEventEmitter } from 'react-native';
 import { getRequest }  from '@/network/get';
 import { postRequest } from '@/network/post';
 import { deleteRequest } from '@/network/delete';
+import { patchRequest } from '@/network/patch';
 import ROUTES from '@/network';
 import { normalizeLiveStream } from './useChannelsData';
 import type { BroadcastChannelLiveStream } from '../api/channels.types';
@@ -20,6 +21,8 @@ import type { CameraSource } from '@/services/liveStreamingService';
 import { useChannelSocket } from './useChannelSocket';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
+
+export type LiveChatMessageType = 'text' | 'emoji' | 'sticker' | 'voice_note';
 
 export type LiveChatMessage = {
   id: string;
@@ -31,6 +34,17 @@ export type LiveChatMessage = {
   is_pinned?: boolean;
   is_moderator?: boolean;
   is_member?: boolean;
+  messageType?: LiveChatMessageType;
+  // Only set when messageType === 'sticker' - the Sticker's underlying
+  // MediaAsset id, never a baked image URL (see
+  // apps/broadcasts/realtime.py's notify_live_chat_message comment on
+  // the Django side for why: private bucket, real access-control
+  // chokepoint, ~1h presigned expiry). Resolve a displayable URL via
+  // GET /api/v1/media/assets/<assetId>/signed-url/ at render time.
+  stickerAssetId?: string;
+  // Only set when messageType === 'voice_note'.
+  assetUrl?: string;
+  durationSeconds?: number;
 };
 
 export type IncomingReaction = { id: number; emoji: string; userId: string };
@@ -48,7 +62,10 @@ export type UseLiveStreamResult = {
   // the same way a toast is consumed once, not appended to a feed.
   lastReaction:    IncomingReaction | null;
   sendChatMessage: (text: string) => Promise<void>;
+  sendStickerMessage: (stickerId: string) => Promise<void>;
+  sendVoiceMessage: (mediaId: string, durationSeconds: number) => Promise<void>;
   deleteChatMessage: (messageId: string) => Promise<void>;
+  pinChatMessage: (messageId: string, isPinned: boolean) => Promise<void>;
   reportChatMessage: (messageId: string, reason?: string) => Promise<void>;
   sendReaction:    (emoji: string) => void;
   switchCamera:    (sourceId: string) => Promise<void>;
@@ -59,6 +76,18 @@ export type UseLiveStreamResult = {
 
 const POLL_LIVE_MS    = 10_000; // while live — viewer count + status
 const POLL_PENDING_MS = 30_000; // while scheduled
+// Recording archival (MP4 upload + Django's replay_url write) finishes a
+// few seconds AFTER the broadcaster disconnects, not at the same instant
+// status flips to "ended" - polling used to stop dead the moment status
+// became "ended", so a viewer already on the page would never pick up
+// replay_url even though it showed up moments later: they'd be stuck on
+// "stream ended" forever unless they left and reopened the screen. This
+// keeps polling a bounded number of times specifically to catch that,
+// then gives up for good (e.g. a genuinely failed recording, matching
+// the "No recording was captured for this stream" case seen in Channel
+// Studio) rather than polling forever.
+const POLL_ENDED_GRACE_MS = 5_000;
+const POLL_ENDED_MAX_ATTEMPTS = 12; // 60s of grace total
 
 // ── Hook ──────────────────────────────────────────────────────────────────────
 
@@ -155,6 +184,10 @@ export function useLiveStream(
       is_pinned:    Boolean(r.is_pinned),
       is_moderator: Boolean(r.is_moderator),
       is_member:    Boolean(r.is_member),
+      messageType:    (r.message_type ?? 'text') as LiveChatMessageType,
+      stickerAssetId: r.sticker_asset_id ? String(r.sticker_asset_id) : undefined,
+      assetUrl:       r.asset_url ? String(r.asset_url) : undefined,
+      durationSeconds: typeof r.duration_seconds === 'number' ? r.duration_seconds : undefined,
     }));
     setChatMessages(messages);
   }, [streamId, currentUserId]);
@@ -173,13 +206,28 @@ export function useLiveStream(
 
   // ── Auto-polling ────────────────────────────────────────────────────────────
 
+  const endedGraceAttemptsRef = useRef(0);
+
   useEffect(() => {
     if (!streamId) return;
+    if (stream?.status !== 'ended') endedGraceAttemptsRef.current = 0;
 
     const schedule = () => {
       if (!mountedRef.current) return;
       const status = stream?.status ?? '';
-      if (status === 'ended' || status === 'cancelled') return; // stop polling
+      if (status === 'cancelled') return; // stop polling
+      if (status === 'ended') {
+        // Already have a replay, or genuinely gave up after the grace
+        // window - either way, nothing left to poll for.
+        if (stream?.replay_url || endedGraceAttemptsRef.current >= POLL_ENDED_MAX_ATTEMPTS) return;
+        pollTimerRef.current = setTimeout(async () => {
+          if (!mountedRef.current) return;
+          endedGraceAttemptsRef.current += 1;
+          await fetchStream();
+          if (mountedRef.current) schedule();
+        }, POLL_ENDED_GRACE_MS);
+        return;
+      }
 
       const ms = status === 'live' ? POLL_LIVE_MS : POLL_PENDING_MS;
       pollTimerRef.current = setTimeout(async () => {
@@ -205,7 +253,7 @@ export function useLiveStream(
 
     schedule();
     return () => { if (pollTimerRef.current) clearTimeout(pollTimerRef.current); };
-  }, [streamId, stream?.status, fetchStream, fetchChatHistory]);
+  }, [streamId, stream?.status, stream?.replay_url, fetchStream, fetchChatHistory]);
 
   // ── Realtime socket events ──────────────────────────────────────────────────
 
@@ -235,6 +283,10 @@ export function useLiveStream(
         // realtime.py), unlike the snake_case REST response fetchChatHistory
         // reads above it.
         is_member:    msg.isMember ?? false,
+        messageType:    ((msg as any).messageType ?? 'text') as LiveChatMessageType,
+        stickerAssetId: (msg as any).stickerAssetId,
+        assetUrl:       (msg as any).assetUrl,
+        durationSeconds: (msg as any).durationSeconds,
       };
       setChatMessages(prev => {
         if (prev.some(m => m.id === message.id)) return prev;
@@ -253,6 +305,14 @@ export function useLiveStream(
     onChatMessageDeleted: ({ id }) => {
       if (!mountedRef.current) return;
       setChatMessages(prev => prev.filter(m => m.id !== id));
+    },
+
+    onChatMessagePinned: ({ id, isPinned }) => {
+      if (!mountedRef.current) return;
+      setChatMessages(prev => prev.map(m => ({
+        ...m,
+        is_pinned: m.id === id ? isPinned : (isPinned ? false : m.is_pinned),
+      })));
     },
 
     // C6 of the YouTube-parity batch: updates status immediately from the
@@ -347,9 +407,22 @@ export function useLiveStream(
         isMine:      true,
         is_member:   Boolean(res.data.is_member),
       };
-      setChatMessages(prev =>
-        prev.map(m => m.id === optimisticId ? saved : m),
-      );
+      // The socket's onChatMessage echo of this same message can arrive
+      // before this POST resolves (it's a separate round trip, raced
+      // against this one, not sequenced after it) - when that happens its
+      // dedup check (prev.some(m => m.id === message.id)) passes cleanly
+      // (the optimistic bubble's id doesn't match the real one yet), so
+      // the real message is already in the array by the time this runs.
+      // A plain .map() replacing only the optimistic entry would then
+      // leave BOTH that socket-added copy and this one with the same real
+      // id - a real duplicate-key crash caught live (React: "Encountered
+      // two children with the same key"), not a hypothetical one. Filtering
+      // out any existing entry with the real id first, in addition to the
+      // optimistic one, makes this correct regardless of which arrives first.
+      setChatMessages(prev => [
+        ...prev.filter(m => m.id !== optimisticId && m.id !== saved.id),
+        saved,
+      ]);
     } else {
       // Remove optimistic on failure, and throw so the caller (LiveChatPanel)
       // can tell the viewer their message didn't actually go out and restore
@@ -359,6 +432,53 @@ export function useLiveStream(
       throw new Error(res?.message || 'Unable to send message.');
     }
   }, [streamId, currentUserId]);
+
+  // Shared by sendStickerMessage/sendVoiceMessage below - both just POST a
+  // different message_type to the exact same endpoint sendChatMessage
+  // uses, then append the server's confirmed row. No optimistic bubble
+  // here (unlike sendChatMessage) - a sticker/voice note isn't typed
+  // character-by-character, so there's no "instant feedback while you
+  // type" need to optimistically render ahead of the real send; the
+  // socket's own echo of this same message is still deduped by id below,
+  // same race this file's sendChatMessage comment already documents.
+  const postRichChatMessage = useCallback(async (body: Record<string, unknown>): Promise<void> => {
+    if (!streamId) return;
+    const res = await postRequest(
+      ROUTES.broadcasts.liveStreamChat(streamId),
+      body,
+      { errorMessage: 'Unable to send.' },
+    );
+    if (!res?.success || !res.data) {
+      throw new Error(res?.message || 'Unable to send.');
+    }
+    const d = res.data;
+    const saved: LiveChatMessage = {
+      id:           String(d.id ?? ''),
+      userId:       String(d.user_id ?? currentUserId ?? ''),
+      displayName:  String(d.display_name ?? 'You'),
+      text:         String(d.message ?? ''),
+      sentAt:       String(d.created_at ?? new Date().toISOString()),
+      isMine:       true,
+      is_member:    Boolean(d.is_member),
+      messageType:    (d.message_type ?? body.message_type ?? 'text') as LiveChatMessageType,
+      stickerAssetId: d.sticker_asset_id ? String(d.sticker_asset_id) : undefined,
+      assetUrl:       d.asset_url ? String(d.asset_url) : undefined,
+      durationSeconds: typeof d.duration_seconds === 'number' ? d.duration_seconds : undefined,
+    };
+    setChatMessages(prev => [...prev.filter(m => m.id !== saved.id), saved]);
+  }, [streamId, currentUserId]);
+
+  const sendStickerMessage = useCallback(async (stickerId: string) => {
+    await postRichChatMessage({ message_type: 'sticker', sticker_id: stickerId });
+  }, [postRichChatMessage]);
+
+  const sendVoiceMessage = useCallback(async (mediaId: string, durationSeconds: number) => {
+    await postRichChatMessage({
+      message_type: 'voice_note',
+      media_id: mediaId,
+      duration_seconds: durationSeconds,
+    });
+  }, [postRichChatMessage]);
 
   const deleteChatMessage = useCallback(async (messageId: string) => {
     if (!streamId) return;
@@ -389,6 +509,30 @@ export function useLiveStream(
     }
   }, [streamId]);
 
+  // Manager-only - same endpoint delete/report already use, a different
+  // HTTP verb (see ChannelLiveChatMessageModerationView.patch on the
+  // Django side). At most one pinned message per stream server-side
+  // (pinning a second one there un-pins whatever was pinned first), so
+  // the optimistic local update mirrors that: pinning clears is_pinned on
+  // every other message, not just sets it on this one.
+  const pinChatMessage = useCallback(async (messageId: string, isPinned: boolean) => {
+    if (!streamId) return;
+    const previous = chatMessages;
+    setChatMessages(prev => prev.map(m => ({
+      ...m,
+      is_pinned: m.id === messageId ? isPinned : (isPinned ? false : m.is_pinned),
+    })));
+    const res = await patchRequest(
+      ROUTES.broadcasts.liveStreamChatMessageModerate(streamId, messageId),
+      { is_pinned: isPinned },
+      { errorMessage: 'Unable to update pinned message.' },
+    );
+    if (!res?.success) {
+      setChatMessages(previous);
+      throw new Error(res?.message || 'Unable to update pinned message.');
+    }
+  }, [streamId, chatMessages]);
+
   const switchCamera = useCallback(async (sourceId: string) => {
     if (!streamId) return;
     // Optimistic
@@ -415,7 +559,10 @@ export function useLiveStream(
     activeCameraId,
     lastReaction,
     sendChatMessage,
+    sendStickerMessage,
+    sendVoiceMessage,
     deleteChatMessage,
+    pinChatMessage,
     reportChatMessage,
     sendReaction,
     switchCamera,

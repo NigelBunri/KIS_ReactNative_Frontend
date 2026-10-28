@@ -11,6 +11,10 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useNavigation } from '@react-navigation/native';
+import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import type { MainTabsParamList, RootStackParamList } from '@/navigation/types';
 import { useRawTopInset } from '@/hooks/useSafeTopInset';
 import { useKISTheme } from '../../theme/useTheme';
 import { useStatusBarStyle } from '../../theme/useStatusBarStyle';
@@ -26,7 +30,6 @@ import PrayerPanel from '../../components/Bible/PrayerPanel';
 import BibleLessonsPanel from '../../components/Bible/BibleLessonsPanel';
 import TwelvePillarsPanel from '../../components/Bible/TwelvePillarsPanel';
 import BibleSettingsPanel from '../../components/Bible/BibleSettingsPanel';
-import BibleBooksPanel from '../../components/Bible/BibleBooksPanel';
 import BibleMessagesPanel from '../../components/Bible/BibleMessagesPanel';
 import BibleGamesPanel from '../../components/Bible/BibleGamesPanel';
 import { KISIcon } from '../../constants/kisIcons';
@@ -76,6 +79,8 @@ export default function BibleScreen() {
   const bibleGoldGradient = [...gradients.header];
   const [activeTab, setActiveTab] = useState('read');
   const [openReadFilters, setOpenReadFilters] = useState<(() => void) | null>(null);
+  const tabsNavigation = useNavigation<BottomTabNavigationProp<MainTabsParamList, 'Bible'>>();
+  const rootNavigation = tabsNavigation.getParent<NativeStackNavigationProp<RootStackParamList>>();
 
   const tabs = useMemo(
     () => [
@@ -196,8 +201,6 @@ export default function BibleScreen() {
         return <TwelvePillarsPanel />;
       case 'lessons':
         return <BibleLessonsPanel />;
-      case 'books':
-        return <BibleBooksPanel />;
       case 'games':
         return <BibleGamesPanel />;
       case 'messages':
@@ -354,7 +357,19 @@ export default function BibleScreen() {
               return (
                 <KISButton
                   key={tab.key}
-                  onPress={() => setActiveTab(tab.key)}
+                  onPress={() => {
+                    if (tab.key === 'books') {
+                      // Navigates OUT to the one real KIS Books
+                      // Marketplace (apps.books) rather than selecting an
+                      // inline tab — deliberately does not touch
+                      // activeTab, so returning via the back button lands
+                      // the user back on whichever Bible tab they were
+                      // actually on, not a blank "books" tab.
+                      rootNavigation?.navigate('BooksMarketplace');
+                      return;
+                    }
+                    setActiveTab(tab.key);
+                  }}
                   variant={isActive ? 'primary' : 'outline'}
                   size="sm"
                   style={{

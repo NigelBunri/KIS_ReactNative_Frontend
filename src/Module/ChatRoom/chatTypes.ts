@@ -54,7 +54,8 @@ export type MessageKind =
   | 'call_event'
   | 'bible_verse'
   | 'bible_game_stats'
-  | 'bible_discipleship_stats';
+  | 'bible_discipleship_stats'
+  | 'book_passage';
 
 /* ============================================================================
  * MESSAGE STATUS (STATE MACHINE)
@@ -272,6 +273,19 @@ export type BibleVerseMessage = {
   text?: string;
 };
 
+/** A controlled book-passage share from BookReaderScreen — a reader's own
+ * saved highlight, server-capped (apps.books.services.MAX_HIGHLIGHT_CHARS)
+ * so this can never carry a whole chapter/book, only a short excerpt. */
+export type BookPassageMessage = {
+  bookId: string;
+  bookTitle: string;
+  authorName?: string;
+  chapterStableId: string;
+  blockId?: string;
+  /** Already-capped highlight text — see BookHighlight.highlighted_text. */
+  quotedText: string;
+};
+
 /** A point-in-time snapshot of Bible-games progress shared into chat — see
  * src/components/Bible/games/bibleGameShare.ts. Games run fully offline
  * (AsyncStorage only), so this embeds the actual numbers at share time
@@ -455,6 +469,8 @@ export type ChatMessage = {
   payment?: PaymentMessage;
 
   bibleVerse?: BibleVerseMessage;
+
+  bookPassage?: BookPassageMessage;
 
   bibleGameStats?: BibleGameStatsMessage;
 

@@ -42,6 +42,13 @@ export type CallParticipant = {
   isLocal: boolean;
   isMuted: boolean;
   isVideoOff: boolean;
+  // Host/caller-enforced locks, distinct from the participant's own
+  // isMuted/isVideoOff toggles above: when set, the LOCAL device's own
+  // mute/video controls must refuse to flip isMuted/isVideoOff back off for
+  // this participant — only someone with moderation rights can clear it
+  // (see ActiveCallScreen's canModerate + handleControlAction).
+  isMuteLocked?: boolean;
+  isVideoLocked?: boolean;
   isScreenSharing: boolean;
   isSpeaking: boolean;
   networkQuality: NetworkQuality;

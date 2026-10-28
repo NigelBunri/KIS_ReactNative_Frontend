@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -45,17 +45,42 @@ export default function LivePollsPanel({ streamId, isManager, palette }: Props) 
   const [options, setOptions] = useState<string[]>(['', '', '', '']);
   const [creating, setCreating] = useState(false);
 
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; };
+  }, []);
+
   const load = useCallback(async () => {
     setLoading(true);
     try {
       const rows = await fetchLivePolls(streamId);
-      setPolls(rows);
+      if (mountedRef.current) setPolls(rows);
     } finally {
-      setLoading(false);
+      if (mountedRef.current) setLoading(false);
     }
   }, [streamId]);
 
   useEffect(() => { void load(); }, [load]);
+
+  // This had no live-update path at all before - a poll vote from another
+  // viewer, or a manager creating/ending a poll, never appeared for anyone
+  // already viewing the panel; only remounting it (switching tabs away and
+  // back) ever re-fetched. No per-poll-vote socket event exists on the
+  // backend to push this instead, so this mirrors the same REST-poll
+  // fallback useLiveStream.ts already uses for chat (10s, while live) -
+  // not instant, but no longer stuck until a manual remount. Silent (no
+  // `loading` toggle) so it doesn't flash a spinner over the panel every
+  // tick; only the initial `load()` above shows one.
+  useEffect(() => {
+    if (!streamId) return;
+    const id = setInterval(() => {
+      void fetchLivePolls(streamId).then(rows => {
+        if (mountedRef.current) setPolls(rows);
+      });
+    }, 10_000);
+    return () => clearInterval(id);
+  }, [streamId]);
 
   const handleVote = useCallback(async (pollId: string, optionIndex: number) => {
     const previous = polls;
@@ -95,12 +120,16 @@ export default function LivePollsPanel({ streamId, isManager, palette }: Props) 
     }
     setCreating(true);
     try {
-      const newPoll = await createLivePoll(streamId, q, opts);
-      if (newPoll) {
-        setPolls(prev => [newPoll, ...prev]);
+      const result = await createLivePoll(streamId, q, opts);
+      if (result?.success && result.data) {
+        setPolls(prev => [result.data, ...prev]);
         setQuestion('');
         setOptions(['', '', '', '']);
         setShowCreate(false);
+      } else {
+        // Previously fell through silently on any failure, leaving
+        // "Launch Poll" looking like it did nothing.
+        Alert.alert('Poll not created', result?.message || 'Could not create the poll. Please try again.');
       }
     } finally {
       setCreating(false);
@@ -171,7 +200,15 @@ export default function LivePollsPanel({ streamId, isManager, palette }: Props) 
       )}
 
       {polls.map(poll => {
-        const totalVotes = poll.total_votes ?? poll.options.reduce((s, o) => s + (o.vote_count ?? 0), 0);
+        // Always derive the total from the options' own vote_count sum —
+        // never trust poll.total_votes on its own. That field has been
+        // observed out of sync with the actual tally (e.g. reflecting
+        // viewer/watch count rather than votes cast), which let an
+        // option's count/total_votes ratio exceed 100%. Summing the
+        // options themselves is mathematically guaranteed to keep every
+        // option's percentage at or under 100%, and is explicitly "how
+        // many people voted," not "how many are watching."
+        const totalVotes = poll.options.reduce((s, o) => s + (o.vote_count ?? 0), 0);
         const voted = poll.user_vote_index != null;
         return (
           <View key={poll.id} style={[styles.pollCard, { backgroundColor: palette.surface, borderColor: palette.border }]}>

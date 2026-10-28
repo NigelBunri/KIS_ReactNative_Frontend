@@ -184,6 +184,14 @@ export const clearAuthSession = async (): Promise<void> => {
   await Promise.all([
     clearAuthTokens(),
     clearCacheByKey('AUTH_CACHE', 'USER_KEY'),
+    // A downloaded offline book's decryption key must not remain usable
+    // once this account signs out — a different account could sign in
+    // next on the same device. Dynamic import: offlineDownloadManager
+    // depends on src/network/*, which itself depends on this file, so a
+    // static import here would be circular.
+    import('@/services/books/offlineDownloadManager')
+      .then((m) => m.clearAllOfflineDownloadsForSignOut())
+      .catch(() => {}),
   ]);
   DeviceEventEmitter.emit(AUTH_SESSION_EXPIRED_EVENT);
 };
