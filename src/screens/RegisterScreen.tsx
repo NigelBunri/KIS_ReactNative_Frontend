@@ -32,6 +32,7 @@ import KISText from '@/components/common/KISText';
 import KISDateTimeInput from '@/constants/KISDateTimeInput';
 import { KIS_TOKENS } from '@/theme/constants';
 import { readReferralCodeFromClipboard } from '@/utils/referralAttribution';
+import { readReferralCodeFromInstallReferrer } from '@/utils/installReferrer';
 
 const createStyles = (tokens: typeof KIS_TOKENS, contentMaxWidth: number) =>
   StyleSheet.create({
@@ -176,12 +177,19 @@ export default function RegisterScreen({ navigation, route }: any) {
   useEffect(() => {
     if (route?.params?.referralCode) return; // deep link already provided one
     let cancelled = false;
-    readReferralCodeFromClipboard().then((code) => {
+    (async () => {
+      // Android: the Install Referrer is authoritative (it comes from
+      // Google Play's own install record, not anything the installing
+      // user could edit) — only fall back to the clipboard heuristic when
+      // it has nothing (older device, no Play Store, feature not
+      // supported, or this install didn't come from a referral link).
+      const installReferrerCode = await readReferralCodeFromInstallReferrer();
+      const code = installReferrerCode || (await readReferralCodeFromClipboard());
       if (!cancelled && code) {
         setReferralCode(code);
         setReferralFieldExpanded(true);
       }
-    });
+    })();
     return () => {
       cancelled = true;
     };

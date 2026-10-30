@@ -107,6 +107,7 @@ export default function BookReaderScreen({ navigation, route }: Props) {
   } | null>(null);
   const [highlightNoteText, setHighlightNoteText] = useState('');
   const [imageUrls, setImageUrls] = useState<Record<string, string>>({});
+  const [failedImageIds, setFailedImageIds] = useState<Set<string>>(new Set());
   const [showListenSettings, setShowListenSettings] = useState(false);
   const [bookMeta, setBookMeta] = useState<{ title: string; author_name: string } | null>(null);
   const [shareSheetVisible, setShareSheetVisible] = useState(false);
@@ -316,45 +317,68 @@ export default function BookReaderScreen({ navigation, route }: Props) {
     }
   }, [targetHighlightId, loading, blocks, highlights]);
 
-  // Resolves each "image" block's asset to a renderable URI. Offline: a
-  // data: URI decoded straight out of the encrypted package (see
-  // offlineCrypto.decryptOfflinePackage) — no network involved, no
-  // plaintext file on disk. Online: a short-lived signed URL, never a
-  // permanent public link (see BookImageAssetDownloadView).
+  // Resolves each "image" block's asset to a renderable URI — a data:
+  // URI decoded straight out of the locally downloaded encrypted
+  // package when one exists (no network involved, no plaintext file on
+  // disk), or a short-lived signed URL otherwise (never a permanent
+  // public link; see BookImageAssetDownloadView).
+  //
+  // Deliberately checked independent of `isOfflineCopy`: that flag
+  // reflects whether the CHAPTER TEXT fetch fell back to the offline
+  // package, but src/network/get's own generic auto-cache can separately
+  // serve a stale-but-"successful" cached response for the chapter/book
+  // endpoints on a flaky connection — leaving `isOfflineCopy` false even
+  // though the network is genuinely unreachable for a fresh signed image
+  // URL. A reader with a valid local download should never get stuck
+  // spinning on a network image it already has decrypted on-device.
   useEffect(() => {
-    if (isOfflineCopy) {
-      const offlineImages = offlineBookRef.current?.images;
-      if (!offlineImages) return;
-      const assetIds = Array.from(new Set(
-        blocks.filter((b) => b.type === 'image' && b.asset_id).map((b) => b.asset_id as string),
-      )).filter((aid) => !imageUrls[aid] && offlineImages[aid]);
-      if (assetIds.length === 0) return;
-      setImageUrls((prev) => {
-        const next = { ...prev };
-        for (const aid of assetIds) next[aid] = offlineImages[aid].dataUri;
-        return next;
-      });
-      return;
-    }
     const assetIds = Array.from(new Set(
       blocks.filter((b) => b.type === 'image' && b.asset_id).map((b) => b.asset_id as string),
-    )).filter((aid) => !imageUrls[aid]);
+    )).filter((aid) => !imageUrls[aid] && !failedImageIds.has(aid));
     if (assetIds.length === 0) return;
     let cancelled = false;
     (async () => {
-      const results = await Promise.all(assetIds.map(async (aid) => {
+      const offlineBook = await loadOfflineFallback();
+      const offlineImages = offlineBook?.images;
+      const stillNeeded: string[] = [];
+      if (offlineImages) {
+        const resolved: Record<string, string> = {};
+        for (const aid of assetIds) {
+          if (offlineImages[aid]) resolved[aid] = offlineImages[aid].dataUri;
+          else stillNeeded.push(aid);
+        }
+        if (!cancelled && Object.keys(resolved).length > 0) {
+          setImageUrls((prev) => ({ ...prev, ...resolved }));
+        }
+      } else {
+        stillNeeded.push(...assetIds);
+      }
+      if (stillNeeded.length === 0 || cancelled) return;
+
+      const results = await Promise.all(stillNeeded.map(async (aid) => {
         const res: any = await getRequest(ROUTES.books.imageDownload(aid)).catch(() => null);
         return [aid, res?.success ? res.data?.url : null] as const;
       }));
       if (cancelled) return;
-      setImageUrls((prev) => {
-        const next = { ...prev };
-        for (const [aid, url] of results) if (url) next[aid] = url;
-        return next;
-      });
+      const resolvedUrls: Record<string, string> = {};
+      const failed: string[] = [];
+      for (const [aid, url] of results) {
+        if (url) resolvedUrls[aid] = url;
+        else failed.push(aid);
+      }
+      if (Object.keys(resolvedUrls).length > 0) {
+        setImageUrls((prev) => ({ ...prev, ...resolvedUrls }));
+      }
+      if (failed.length > 0) {
+        // A genuine fetch failure (no local copy, network/signed-URL
+        // request failed) — stop showing a loading spinner forever;
+        // renderImageBlock falls back to its honest "couldn't load"
+        // state for these instead.
+        setFailedImageIds((prev) => new Set([...prev, ...failed]));
+      }
     })();
     return () => { cancelled = true; };
-  }, [blocks, isOfflineCopy, imageUrls]);
+  }, [blocks, imageUrls, failedImageIds, loadOfflineFallback]);
 
   const saveProgress = useCallback((percent: number, blockIndex = 0) => {
     if (progressSaveTimer.current) clearTimeout(progressSaveTimer.current);
@@ -707,6 +731,7 @@ export default function BookReaderScreen({ navigation, route }: Props) {
 
   const renderImageBlock = (block: ContentBlock, idx: number) => {
     const url = block.asset_id ? imageUrls[block.asset_id] : null;
+    const failed = !!block.asset_id && failedImageIds.has(block.asset_id);
     const aspect = block.width && block.height ? block.width / block.height : 16 / 10;
     return (
       <View key={block.id || idx} style={styles.imageBlockWrap} onLayout={captureBlockOffset(block.id)}>
@@ -719,15 +744,17 @@ export default function BookReaderScreen({ navigation, route }: Props) {
           />
         ) : (
           <View style={styles.imageMissing}>
-            {block.extraction_status === 'extracted' && !isOfflineCopy ? (
+            {block.extraction_status === 'extracted' && block.asset_id && !failed ? (
               <ActivityIndicator color={palette.primary} />
             ) : (
               <>
                 <KISIcon name="book" size={24} color={palette.subtext} />
                 <Text style={styles.imageMissingText}>
-                  {isOfflineCopy
-                    ? 'This image was not included in your offline download — reconnect and redownload to get it'
-                    : 'Image not yet provided by the author'}
+                  {failed
+                    ? 'Could not load this image — check your connection and reopen the chapter'
+                    : !block.asset_id
+                      ? 'Image not yet provided by the author'
+                      : 'This image is not available right now'}
                 </Text>
               </>
             )}

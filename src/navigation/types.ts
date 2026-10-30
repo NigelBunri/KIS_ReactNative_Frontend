@@ -364,6 +364,9 @@ export type RootStackParamList = {
   TransactionHistory: undefined;
   Loyalty: undefined;
   Referrals: undefined;
+  ReferralCommissions: undefined;
+  PrayerCalendarHome: undefined;
+  PrayerWatchRoom: { hour: number };
   ContactShareLink: undefined;
   HowRewardsWork: undefined;
   PromoCode: undefined;

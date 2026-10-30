@@ -26,7 +26,7 @@ import DailyDevotionsPanel from '../../components/Bible/DailyDevotionsPanel';
 import BibleReaderPanel from '../../components/Bible/BibleReaderPanel';
 import MeditationPanel from '../../components/Bible/MeditationPanel';
 import BiblePlansPanel from '../../components/Bible/BiblePlansPanel';
-import PrayerPanel from '../../components/Bible/PrayerPanel';
+import PrayerCalendarIntroPanel from '../../components/Bible/PrayerCalendarIntroPanel';
 import BibleLessonsPanel from '../../components/Bible/BibleLessonsPanel';
 import TwelvePillarsPanel from '../../components/Bible/TwelvePillarsPanel';
 import BibleSettingsPanel from '../../components/Bible/BibleSettingsPanel';
@@ -194,7 +194,7 @@ export default function BibleScreen() {
       case 'meditations':
         return <MeditationPanel meditations={meditations} loading={loadingMeditations} />;
       case 'prayer-calendar':
-        return <PrayerPanel />;
+        return <PrayerCalendarIntroPanel onEnter={() => rootNavigation?.navigate('PrayerCalendarHome')} />;
       case 'reading-planner':
         return <BiblePlansPanel />;
       case 'discipleship':

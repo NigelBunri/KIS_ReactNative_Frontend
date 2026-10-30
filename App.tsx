@@ -228,6 +228,9 @@ import InvoiceListScreen from '@/screens/market/InvoiceListScreen';
 import TransactionHistoryScreen from '@/screens/market/TransactionHistoryScreen';
 import LoyaltyScreen from '@/screens/market/LoyaltyScreen';
 import ReferralScreen from '@/screens/market/ReferralScreen';
+import ReferralCommissionsScreen from '@/screens/profile/ReferralCommissionsScreen';
+import PrayerCalendarHomeScreen from '@/screens/prayer/PrayerCalendarHomeScreen';
+import PrayerWatchRoomScreen from '@/screens/prayer/PrayerWatchRoomScreen';
 import ContactShareLinkScreen from '@/screens/chat/ContactShareLinkScreen';
 import HowRewardsWorkScreen from '@/screens/market/HowRewardsWorkScreen';
 import PromoCodeScreen from '@/screens/market/PromoCodeScreen';
@@ -1787,6 +1790,21 @@ function AppContent() {
                       name="Referrals"
                       getComponent={() => ReferralScreen}
                       options={{ presentation: 'modal' }}
+                    />
+                    <RootStack.Screen
+                      name="ReferralCommissions"
+                      getComponent={() => ReferralCommissionsScreen}
+                      options={{ presentation: 'modal' }}
+                    />
+                    <RootStack.Screen
+                      name="PrayerCalendarHome"
+                      getComponent={() => PrayerCalendarHomeScreen}
+                      options={{ headerShown: false }}
+                    />
+                    <RootStack.Screen
+                      name="PrayerWatchRoom"
+                      getComponent={() => PrayerWatchRoomScreen}
+                      options={{ headerShown: false }}
                     />
                     <RootStack.Screen
                       name="ContactShareLink"

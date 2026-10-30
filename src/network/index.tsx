@@ -22,6 +22,7 @@ import mediaExtendedRoutes from './routes/mediaExtendedRoutes';
 import healthExtendedRoutes from './routes/healthExtendedRoutes';
 import localizationRoutes from './routes/localizationRoutes';
 import bibleRoutes from './routes/bibleRoutes';
+import prayerRoutes from './routes/prayerRoutes';
 import { booksRoutes } from './routes/booksRoutes';
 import {
   API_BASE_URL,
@@ -50,6 +51,7 @@ const ROUTES: any = {
   billing: billingRoutes,
   rewards: rewardsRoutes,
   referrals: referralsRoutes,
+  prayer: prayerRoutes,
   ...testimonyRoutes,
   ...churchRoutes,
   ...familyRoutes,

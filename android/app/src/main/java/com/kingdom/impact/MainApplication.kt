@@ -18,6 +18,7 @@ class MainApplication : Application(), ReactApplication {
           add(ShortcutPackage())
           add(SimInfoPackage())
           add(DeviceIdPackage())
+          add(InstallReferrerPackage())
           add(RestoreCredentialPackage())
           add(CallPiPPackage())
           add(TranslationPackage())

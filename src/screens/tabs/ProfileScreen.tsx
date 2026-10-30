@@ -2061,6 +2061,14 @@ export default function ProfileScreen() {
         tone: 'primary' as const,
         onPress: () => rootNavigation?.navigate('ContactShareLink'),
       },
+      {
+        key: 'referral-commissions',
+        title: 'Referrals',
+        subtitle: 'Earn 24% for life on every account you refer',
+        icon: 'wallet' as const,
+        tone: 'primary' as const,
+        onPress: () => rootNavigation?.navigate('ReferralCommissions'),
+      },
     ],
     [rootNavigation],
   );
