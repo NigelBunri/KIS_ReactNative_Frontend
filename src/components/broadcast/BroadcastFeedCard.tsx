@@ -189,10 +189,12 @@ export default function BroadcastFeedCard({
   contextLabel,
 }: Props) {
   const { palette, tokens, gradients, tone } = useKISTheme();
-  // Explicit white in light mode (palette.card there is a warm cream, not
-  // pure white) - but dark mode needs its own dark card color, not white,
-  // or it looks jarringly out of place against the dark page background.
-  const cardBackgroundColor = tone === 'dark' ? palette.card : '#FFFFFF';
+  // Dark mode keeps its own dark card color (palette.card), or the card
+  // looks jarringly out of place against the dark page background. Light
+  // mode is transparent so the card blends into the screen's own
+  // background instead of sitting on a stark white tile (AND-rooted fix:
+  // a hardcoded '#FFFFFF' here clashed with the warm-cream light palette).
+  const cardBackgroundColor = tone === 'dark' ? palette.card : 'transparent';
   const responsive = useResponsiveLayout();
   const compact = responsive.isWatch || responsive.isCompactPhone;
   const styles = useMemo(() => makeStyles(tokens), [tokens]);

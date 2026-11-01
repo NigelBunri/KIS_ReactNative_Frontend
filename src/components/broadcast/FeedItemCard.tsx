@@ -40,9 +40,10 @@ type Props = {
 
 export default function FeedItemCard({ item, onPress, onReact, isSubscribed, onSubscribe }: Props) {
   const { palette, tone } = useKISTheme();
-  // Explicit white in light mode (palette.card there is a warm cream, not
-  // pure white) - dark mode keeps its own dark card color instead.
-  const cardBackgroundColor = tone === 'dark' ? palette.card : '#FFFFFF';
+  // Dark mode keeps its own dark card color (palette.card); light mode is
+  // transparent so the card blends into the screen's background instead
+  // of sitting on a stark white tile.
+  const cardBackgroundColor = tone === 'dark' ? palette.card : 'transparent';
   const richTextValue = getFeedRichTextValue(item);
   const plainText = getFeedPlainText(item);
 

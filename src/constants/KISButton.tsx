@@ -87,14 +87,32 @@ export default function KISButton({
       ]}
     >
       {shouldUseGoldGradient ? (
-        <LinearGradient
-          colors={metallicGoldGradient}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={StyleSheet.absoluteFillObject}
-        />
+        // Wrapped in its own absolutely-positioned, pointerEvents="none"
+        // container (matching AnimatedKISTabBar's identical gold-gradient
+        // pattern in AppNavigator.tsx, which never showed this symptom) -
+        // on Android, a bare LinearGradient sibling rendered before the
+        // label Text could still end up painted on top of it rather than
+        // behind, because that native view sits in the same flattened
+        // layer as the Text instead of its own subtree. Giving the
+        // gradient+sheen their own wrapper View forces Android to
+        // composite them as a separate layer underneath the label, same
+        // as iOS's layer-order-respecting default already did - this is
+        // the CONFIRMED ROOT CAUSE of "selected tab turns solid gold,
+        // label unreadable" on Android, every KISButton-based tab row
+        // (Bible/Health/Broadcast/Partner tabs - see HealthTabBar's own
+        // "one standard KISButton" doc) except the Messages section,
+        // which uses react-navigation's material-top-tabs instead of
+        // KISButton and so never hit this.
+        <View pointerEvents="none" style={StyleSheet.absoluteFillObject}>
+          <LinearGradient
+            colors={metallicGoldGradient}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={StyleSheet.absoluteFillObject}
+          />
+          <View style={styles.goldSheen} />
+        </View>
       ) : null}
-      {shouldUseGoldGradient ? <View pointerEvents="none" style={styles.goldSheen} /> : null}
       {left ? <View style={{ marginRight: 6 }}>{left}</View> : null}
 
       {title ? <Text style={titleStyles} numberOfLines={1}>{title}</Text> : children}
