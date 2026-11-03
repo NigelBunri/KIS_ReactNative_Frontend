@@ -2,7 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { DeviceEventEmitter } from 'react-native';
 import RNFS from 'react-native-fs';
 
-import { API_BASE_URL } from '@/network';
+import { API_BASE_URL, urlRequiresAuthHeaders } from '@/network';
 import { getAccessToken } from '@/security/authStorage';
 import { isOnline, onNetworkRecovery } from '@/services/networkMonitor';
 import { computeRetryDelayMs } from '@/services/performanceOfflineService';
@@ -271,9 +271,16 @@ const runUpload = async (job: MediaTransferJob) => {
 
 const runDownload = async (job: MediaTransferJob) => {
   if (!job.remoteUrl) throw new Error('Download URL is missing.');
-  const token = await getAccessToken().catch(() => null);
   const headers: Record<string, string> = { Accept: '*/*' };
-  if (token) headers.Authorization = `Bearer ${token}`;
+  // See src/network/index.tsx's urlRequiresAuthHeaders doc - a direct S3/
+  // CDN URL (public or presigned) rejects the whole request outright if
+  // an Authorization header is present at all (confirmed empirically via
+  // curl against production), it doesn't just ignore an unrecognized one.
+  // Only this app's own authenticated API surface actually needs it.
+  if (urlRequiresAuthHeaders(job.remoteUrl)) {
+    const token = await getAccessToken().catch(() => null);
+    if (token) headers.Authorization = `Bearer ${token}`;
+  }
   const download = RNFS.downloadFile({
     fromUrl: job.remoteUrl,
     toFile: stripFileScheme(job.localPath),

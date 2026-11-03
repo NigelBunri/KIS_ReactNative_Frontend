@@ -134,8 +134,12 @@ export const buildMediaSource = (
   headers?: MediaHeaders,
 ): MediaSource | undefined => {
   if (!uri) return undefined;
-  if (headers && Object.keys(headers).length > 0) {
-    return { uri, headers };
+  // See urlRequiresAuthHeaders' doc further below - never attaches
+  // Authorization/X-Device-Id to a direct S3/CDN media URL, public or
+  // presigned, only to this app's own authenticated API surface.
+  const filtered = filterMediaHeaders(uri, headers);
+  if (filtered) {
+    return { uri, headers: filtered };
   }
   return { uri };
 };
@@ -195,6 +199,66 @@ const NEST_API_HOST = (() => {
     return undefined;
   }
 })();
+
+const BACKEND_API_HOSTS = new Set(
+  [API_BASE_URL, NEST_API_BASE_URL]
+    .map((base) => {
+      try {
+        return new URL(base).host.toLowerCase();
+      } catch {
+        return null;
+      }
+    })
+    .filter(Boolean) as string[],
+);
+
+// CONFIRMED ROOT CAUSE ("posted an image in a community/partner/channel
+// feed, it shows a blank placeholder instead") of attaching useMediaHeaders'
+// Authorization/X-Device-Id to every remote media fetch unconditionally
+// (as PermanentRemoteImage.tsx and several direct <Image>/<Video>
+// source={{ uri, headers }} call sites used to): verified live against
+// production S3 with curl - a genuinely public object returns 200 with NO
+// Authorization header, then 403 "AWS authentication requires a valid Date
+// or x-amz-date header" the instant one is added; a presigned S3 URL goes
+// from 200 to 400 "Only one auth mechanism allowed; only the
+// X-Amz-Algorithm query parameter, Signature query string parameter or the
+// Authorization header should be specified" the same way. S3 does not
+// silently ignore an Authorization header it doesn't recognize - any
+// Authorization header at all makes it assume AWS SigV4/SigV2 auth is
+// being attempted and rejects the whole request when that doesn't parse.
+// Profile/cover avatars (plain <Image source={{uri}}>, no headers) never
+// showed this symptom for exactly that reason - this mirrors that same
+// "don't attach headers to a direct media URL" shape, generalized from the
+// nearly-identical, independently-discovered isApiPath gate already proven
+// correct for video playback (see feedVideoPlayback.ts's parseVideoUrl -
+// "Django middleware can reject auth headers on /media/ URLs (causing
+// -11850 in AVFoundation)", the same class of bug for a different reason).
+// Only our own backend's authenticated API surface, plus Nest's one
+// legitimately-protected legacy proxy (/uploads/file?key=... - the only
+// endpoint PermanentRemoteImage.tsx's original fix was ever actually
+// written for), need these headers at all - never a direct S3/CDN URL,
+// public or presigned.
+export const urlRequiresAuthHeaders = (uri?: string | null): boolean => {
+  if (!uri) return false;
+  try {
+    const parsed = new URL(uri);
+    if (!BACKEND_API_HOSTS.has(parsed.host.toLowerCase())) return false;
+    return parsed.pathname.startsWith('/api/') || parsed.pathname.startsWith('/uploads/file');
+  } catch {
+    return false;
+  }
+};
+
+// Shared gate every direct source={{ uri, headers }} call site should pass
+// its headers through, instead of spreading useMediaHeaders()'s result
+// unconditionally - see urlRequiresAuthHeaders' doc above for why.
+export const filterMediaHeaders = (
+  uri: string | null | undefined,
+  headers: MediaHeaders | undefined,
+): MediaHeaders | undefined => {
+  if (!headers || !Object.keys(headers).length) return undefined;
+  return urlRequiresAuthHeaders(uri) ? headers : undefined;
+};
 
 export const resolveBackendAssetUrl = (value?: string | null): string | undefined => {
   if (!value) return undefined;

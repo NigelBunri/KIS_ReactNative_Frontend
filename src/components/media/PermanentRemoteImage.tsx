@@ -22,25 +22,36 @@ import {
   type PermanentMediaDomain,
 } from '@/storage/permanentMediaStorage';
 import { getMediaTransferQueue, queueMediaDownload } from '@/services/mediaTransferQueue';
-import { useMediaHeaders } from '@/network';
+import { filterMediaHeaders, useMediaHeaders } from '@/network';
 
-// CONFIRMED ROOT CAUSE of "posted an image, feed shows nothing but the
-// download button, just dark": when a backend isn't configured for public
-// object storage, Nest's upload-intent.service.ts (buildAttachment) returns
-// `url`/`displayUrl` as its OWN protected `/uploads/file?key=...` endpoint,
-// not a public/presigned S3 URL - fetching it requires the same
-// Authorization/X-Device-Id headers mediaTransferQueue.ts's download path
-// already attaches, and that react-native-video playback (FeedScreen.tsx's
-// video modal, via useMediaHeaders + buildMediaSource) already attaches
-// too. A bare `<Image source={{uri}}>` sent neither, so the fetch 401s/
-// 403s silently (RN's Image onError fires, but nothing here ever showed an
-// error state) - the Download overlay still renders fine since it's wired
-// to that same already-authenticated queue, making it look like only the
-// preview is "missing" rather than the whole fetch failing. Mirrors
-// useMediaHeaders' own established convention of always attaching these
-// (video playback elsewhere already does this unconditionally, including
-// against genuine public S3/CDN URLs, with no reported breakage) rather
-// than trying to guess which URLs need it.
+// Two, opposite-direction confirmed root causes have lived here:
+//
+// 1. (original fix) "posted an image, feed shows nothing but the download
+//    button, just dark": when a backend isn't configured for public object
+//    storage, Nest's upload-intent.service.ts (buildAttachment) returns
+//    `url`/`displayUrl` as its OWN protected `/uploads/file?key=...`
+//    endpoint, not a public/presigned S3 URL - fetching it requires the
+//    same Authorization/X-Device-Id headers mediaTransferQueue.ts's
+//    download path already attaches. A bare `<Image source={{uri}}>` sent
+//    neither, so the fetch 401s/403s silently.
+//
+// 2. (this fix, 2026-11-03) "posted an image in a community/partner/
+//    channel feed, shows a blank placeholder instead": the fix for #1 -
+//    attaching Authorization/X-Device-Id to EVERY remote image
+//    unconditionally - breaks the opposite case just as badly. Verified
+//    live against production S3 with curl: a genuinely public object
+//    returns 200 with no Authorization header, then 403 "AWS
+//    authentication requires a valid Date or x-amz-date header" the
+//    instant one is added; a presigned S3 URL goes from 200 to 400 "Only
+//    one auth mechanism allowed" the same way. S3 does not silently ignore
+//    an unrecognized Authorization header - any Authorization header at
+//    all makes it assume AWS auth is being attempted and rejects the whole
+//    request when that doesn't parse. filterMediaHeaders (src/network/
+//    index.tsx) resolves both: it only passes these headers through for
+//    this app's own authenticated API surface (and Nest's one genuinely
+//    protected /uploads/file proxy from #1), never a direct S3/CDN URL,
+//    public or presigned - the same isApiPath-shaped gate already proven
+//    correct for video playback in feedVideoPlayback.ts.
 
 type Props = {
   uri?: string | null;
@@ -169,7 +180,7 @@ export default function PermanentRemoteImage({
     <View style={[styles.container, containerStyle]}>
       {hasImage ? (
         <Image
-          source={{ uri: sourceUri, headers: imageHeaders }}
+          source={{ uri: sourceUri, headers: filterMediaHeaders(sourceUri, imageHeaders) }}
           style={[StyleSheet.absoluteFillObject, style]}
           resizeMode={resizeMode}
           onLoadStart={() => setImageLoading(true)}

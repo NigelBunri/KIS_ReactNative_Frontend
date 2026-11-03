@@ -24,7 +24,7 @@ import { useLanguage, useTranslation } from '@/languages';
 import { getAccessToken } from '@/security/authStorage';
 import { buildChatMediaPath, fileUriForPath, sanitizeChatMediaFileName, stripFileScheme } from '../chatMediaStorage';
 import { normalizeChatDisplayText } from '../safeChatText';
-import { API_BASE_URL, NEST_API_BASE_URL, resolveBackendAssetUrl, useMediaHeaders } from '@/network';
+import { API_BASE_URL, NEST_API_BASE_URL, filterMediaHeaders, resolveBackendAssetUrl, useMediaHeaders } from '@/network';
 import { AttachmentDownloadError, requestAttachmentDownloadUrl } from '../attachmentDownload';
 import { classifyVoicePlaybackReadiness, resolveEmbeddedVoicePlaybackUri } from '../voiceAttachment';
 import { cachedVoicePlaybackUrl, describeVoicePlaybackError, resolveFreshVoicePlaybackUrl } from '../voicePlaybackResolver';
@@ -1580,7 +1580,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
                   </Pressable>
                 ) : (
                   <Image
-                    source={{ uri: openableUri || uri, headers: mediaHeaders }}
+                    source={{ uri: openableUri || uri, headers: filterMediaHeaders(openableUri || uri, mediaHeaders) }}
                     style={{ width: '100%', height: '100%' }}
                     resizeMode="cover"
                     // Android only: decode the bitmap at roughly this
@@ -1638,7 +1638,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
                 {/* First page as preview */}
                 <View style={{ flex: 1 }}>
                   <Pdf
-                    source={{ uri: openableUri || uri, cache: true, headers: mediaHeaders }}
+                    source={{ uri: openableUri || uri, cache: true, headers: filterMediaHeaders(openableUri || uri, mediaHeaders) }}
                     page={1}
                     singlePage
                     style={{ flex: 1, opacity: shouldBlurUntilDownloaded ? 0.45 : 1 }}
@@ -4103,7 +4103,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
             accessibilityLabel="Sticker — long-press to save to your library"
           >
             <Image
-              source={{ uri: sticker.uri, headers: mediaHeaders }}
+              source={{ uri: sticker.uri, headers: filterMediaHeaders(sticker.uri, mediaHeaders) }}
               style={{ width: stickerWidth, height: stickerHeight }}
               resizeMode="contain"
               resizeMethod="resize"
@@ -4945,7 +4945,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
         >
           <SafeAreaView style={{ flex: 1, backgroundColor: '#000' }} edges={['top']}>
             <Pdf
-              source={{ uri: pdfFullscreenUri, cache: true, headers: mediaHeaders }}
+              source={{ uri: pdfFullscreenUri, cache: true, headers: filterMediaHeaders(pdfFullscreenUri, mediaHeaders) }}
               style={{ flex: 1 }}
             />
             <Pressable
