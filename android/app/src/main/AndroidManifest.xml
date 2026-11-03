@@ -136,9 +136,20 @@
             <data android:scheme="kis" />
         </intent-filter>
         <!-- Universal link: https://kis.app (content sharing — broadcasts,
-             channels, shorts, posts, market, etc. Domain ownership/hosting
-             is a separate, unresolved issue, out of scope here.) -->
-        <intent-filter android:autoVerify="true">
+             channels, shorts, posts, market, etc.) - kis.app is a parked,
+             unowned domain (confirmed 2026-11: it 302-redirects to a
+             domain-marketplace listing, not our infrastructure), so
+             autoVerify is deliberately NOT set here - Google Play's domain
+             verification would just fail forever trying to verify a host
+             we don't control (CONFIRMED ROOT CAUSE of "2 domains not
+             verified" / "2 links not working" in Play Console's Deep
+             Links report). The intent-filter itself is kept (zero cost,
+             no functional loss today since no real kis.app page exists to
+             link from anyway) so this reactivates with autoVerify the
+             moment the domain is actually acquired and pointed at our
+             infrastructure - no rebuild-and-resubmit needed for anything
+             else if that happens later. -->
+        <intent-filter>
             <action android:name="android.intent.action.VIEW" />
             <category android:name="android.intent.category.DEFAULT" />
             <category android:name="android.intent.category.BROWSABLE" />
