@@ -26,6 +26,7 @@ import {
   AppState,
   DeviceEventEmitter,
   FlatList,
+  Image,
   Linking,
   Modal,
   Platform,
@@ -1213,6 +1214,57 @@ function AppContent() {
     // A same-colored, contentless bridge means the native screen reads
     // as continuing uninterrupted until the real app is ready, instead of
     // being replaced by another loading screen.
+    //
+    // CONFIRMED ROOT CAUSE of "the powered-by page doesn't come up on
+    // Android, only iOS": Android's windowBackground is a plain
+    // layer-list drawable (icon-on-background only — the OS gives it no
+    // TextView), so launch_screen.xml could never carry the logo title/
+    // subtitle/"Powered by KIV" footer the iOS storyboard has baked in
+    // natively. This is the one platform difference where the two native
+    // screens are NOT equivalent, so (Android only) this bridge isn't
+    // contentless — it reproduces the iOS storyboard's exact copy and
+    // layout at the same bg color/same icon position as Android's own
+    // native drawable, so the transition still reads as a continuation,
+    // not a second splash. iOS keeps the plain bridge since its native
+    // storyboard already shows all of this.
+    if (Platform.OS === 'android') {
+      const isDarkBoot = scheme === 'dark';
+      return (
+        <View style={{ flex: 1, backgroundColor: palette.bg, alignItems: 'center', justifyContent: 'center' }}>
+          <Image
+            source={isDarkBoot ? require('@/assets/logo-dark.png') : require('@/assets/logo-light.png')}
+            style={{ width: 120, height: 120, resizeMode: 'contain' }}
+          />
+          <Text
+            style={{
+              marginTop: 24,
+              fontSize: 26,
+              fontWeight: '700',
+              textAlign: 'center',
+              color: palette.text,
+            }}
+          >
+            {'kingdom\nimpact social'}
+          </Text>
+          <Text style={{ marginTop: 10, fontSize: 15, textAlign: 'center', color: palette.subtext }}>
+            Connecting Communities in Faith
+          </Text>
+          <Text
+            style={{
+              position: 'absolute',
+              bottom: 32,
+              left: 20,
+              right: 20,
+              fontSize: 13,
+              textAlign: 'center',
+              color: palette.subtext,
+            }}
+          >
+            Powered by KIV (Kingdom Impact Ventures)
+          </Text>
+        </View>
+      );
+    }
     return <View style={{ flex: 1, backgroundColor: palette.bg }} />;
   }
 
