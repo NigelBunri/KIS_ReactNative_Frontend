@@ -2757,7 +2757,7 @@ export default function ProfileScreen() {
               contentContainerStyle={{
                 flexDirection: 'row',
                 gap: 8,
-                paddingHorizontal: compactProfile ? 12 : 18,
+                paddingHorizontal: compactProfile ? 12 : responsive.pageGutter,
               }}
               style={{ marginTop: 4 }}
             >
@@ -2783,8 +2783,8 @@ export default function ProfileScreen() {
             <View
               style={{
                 marginTop: 10,
-                paddingHorizontal: compactProfile ? 0 : 18,
-                paddingBottom: compactProfile ? 12 : 18,
+                paddingHorizontal: compactProfile ? 0 : responsive.pageGutter,
+                paddingBottom: compactProfile ? 12 : responsive.pageGutter,
                 gap: responsive.cardGap,
                 display: activeProfileTab === 'overview' ? 'flex' : 'none',
               }}
@@ -3018,8 +3018,8 @@ export default function ProfileScreen() {
             <View
               style={{
                 marginTop: 10,
-                paddingHorizontal: compactProfile ? 0 : 18,
-                paddingBottom: compactProfile ? 12 : 18,
+                paddingHorizontal: compactProfile ? 0 : responsive.pageGutter,
+                paddingBottom: compactProfile ? 12 : responsive.pageGutter,
                 gap: responsive.cardGap,
                 display: activeProfileTab === 'business' ? 'flex' : 'none',
               }}
@@ -3068,8 +3068,8 @@ export default function ProfileScreen() {
             <View
               style={{
                 marginTop: 10,
-                paddingHorizontal: compactProfile ? 0 : 18,
-                paddingBottom: compactProfile ? 12 : 18,
+                paddingHorizontal: compactProfile ? 0 : responsive.pageGutter,
+                paddingBottom: compactProfile ? 12 : responsive.pageGutter,
                 gap: responsive.cardGap,
                 display: activeProfileTab === 'wallet' ? 'flex' : 'none',
               }}
@@ -3247,8 +3247,8 @@ export default function ProfileScreen() {
               <View
                 style={{
                   marginTop: 10,
-                  paddingHorizontal: compactProfile ? 0 : 18,
-                  paddingBottom: compactProfile ? 12 : 18,
+                  paddingHorizontal: compactProfile ? 0 : responsive.pageGutter,
+                  paddingBottom: compactProfile ? 12 : responsive.pageGutter,
                   gap: responsive.cardGap,
                   display: activeProfileTab === 'admin' ? 'flex' : 'none',
                 }}
@@ -3310,8 +3310,8 @@ export default function ProfileScreen() {
             <View
               style={{
                 marginTop: 10,
-                paddingHorizontal: compactProfile ? 0 : 18,
-                paddingBottom: compactProfile ? 12 : 18,
+                paddingHorizontal: compactProfile ? 0 : responsive.pageGutter,
+                paddingBottom: compactProfile ? 12 : responsive.pageGutter,
                 gap: responsive.cardGap,
                 display: activeProfileTab === 'account' ? 'flex' : 'none',
               }}

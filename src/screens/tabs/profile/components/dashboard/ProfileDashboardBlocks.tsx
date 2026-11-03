@@ -162,7 +162,7 @@ const DashboardCard = ({
         dashboardStyles.cardBase,
         getProfileDashboardCardStyle(dashboardTheme, variant),
         {
-          padding: compact ? 14 : 20,
+          padding: compact ? 14 : responsive.isTablet ? 24 : 20,
           gap: responsive.cardGap,
         },
         style,
@@ -216,6 +216,7 @@ const SectionHeader = ({
 export const HERO_COLLAPSE_DISTANCE = 130;
 const BIG_AVATAR_SIZE_COMPACT = 84;
 const BIG_AVATAR_SIZE_REGULAR = 100;
+const BIG_AVATAR_SIZE_TABLET = 128;
 
 /**
  * Cover photo / decorative-gradient layer for the Profile gold section —
@@ -324,7 +325,7 @@ export const ProfileHeroCard = ({
   topInset: number;
   scrollY: SharedValue<number>;
 }) => {
-  const { palette, dashboardTheme, isDark, compact } = useDashboardTheme();
+  const { palette, dashboardTheme, isDark, compact, responsive } = useDashboardTheme();
   const tierBadgeTextColor = isDark ? palette.goldReadable : palette.royalInk;
   // Starting guess for the hero's expanded height, corrected up via onLayout
   // below on first real measurement — seeded from topInset (not a flat
@@ -347,7 +348,11 @@ export const ProfileHeroCard = ({
   useEffect(() => () => {
     if (pendingLayoutTimer.current) clearTimeout(pendingLayoutTimer.current);
   }, []);
-  const bigAvatarSize = compact ? BIG_AVATAR_SIZE_COMPACT : BIG_AVATAR_SIZE_REGULAR;
+  const bigAvatarSize = compact
+    ? BIG_AVATAR_SIZE_COMPACT
+    : responsive.isTablet
+      ? BIG_AVATAR_SIZE_TABLET
+      : BIG_AVATAR_SIZE_REGULAR;
   const collapseStyle = useAnimatedStyle(() => ({
     maxHeight: interpolate(
       scrollY.value,
@@ -447,7 +452,7 @@ export const ProfileHeroCard = ({
               on the outer container (see that View's own comment) - this
               row is CONTENT, so it's the right place for the inset to push
               things down, while the cover backdrop itself stays full-bleed. */}
-          <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingTop: topInset + 44, gap: 14 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: responsive.pageGutter, paddingTop: topInset + 44, gap: 14 }}>
             {/* Outer wrapper has NO overflow:hidden — only the inner circle
                 clips the image, so the edit badge (positioned partly outside
                 the circle) doesn't get clipped along with it. */}
@@ -549,7 +554,7 @@ export const ProfileHeroCard = ({
             </Pressable>
           </View>
 
-          <View style={[dashboardStyles.heroContent, { paddingTop: 10 }]}>
+          <View style={[dashboardStyles.heroContent, { paddingTop: 10, paddingHorizontal: responsive.pageGutter }]}>
             {headline ? (
               <Text style={dashboardStyles.heroHeadline} numberOfLines={2}>
                 {headline}
@@ -592,7 +597,7 @@ export const ProfileHeroCard = ({
         style={[
           dashboardStyles.stickyRow,
           stickyBarStyle,
-          { position: 'absolute', top: 0, left: 0, right: 0, paddingTop: topInset, paddingHorizontal: 16 },
+          { position: 'absolute', top: 0, left: 0, right: 0, paddingTop: topInset, paddingHorizontal: responsive.pageGutter },
         ]}
       >
         <View style={dashboardStyles.stickyAvatarWrap}>
