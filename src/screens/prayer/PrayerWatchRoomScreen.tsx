@@ -153,15 +153,44 @@ export default function PrayerWatchRoomScreen() {
     void runAction(ROUTES.prayer.claimLeadership(hour));
   }, [detail, hour, runAction]);
 
-  const openTextDiscussion = useCallback(() => {
+  // CONFIRMED ROOT CAUSE (production logs, 2026-11-03) of "I tap Join
+  // Voice/Video and get an error, the call just ends": nothing on this
+  // screen ever actually joins the watch's underlying Group — viewing
+  // the watch (WatchDetailView) never does, and neither action below
+  // used to. The group's join_policy is OPEN (see apps.prayer.provisioning),
+  // so any authenticated user is ENTITLED to be a member, but entitled
+  // isn't the same as IS - Nest's assertMember rejects the call offer
+  // with "Not a conversation member" (apps.chat.views.ws_perms's
+  // auto-repair only auto-admits an OPEN-join GROUP conversation via an
+  // existing GroupMembership row; it has no "this group's join_policy is
+  // OPEN" fallback the way POST/THREAD conversations do) until a real
+  // GroupMembership row exists - which, before this fix, only ever got
+  // created by some unrelated later action on a completely different
+  // screen. Self-joining here first (same best-effort, silently-no-ops-
+  // if-already-a-member pattern as joinCourseGroupChat) closes that gap
+  // for both entry points, not just the one that happened to trigger it.
+  const ensureWatchGroupMembership = useCallback(async () => {
     if (!detail) return;
-    DeviceEventEmitter.emit('chat.open', { conversationId: detail.conversation_id, name: detail.name, kind: 'group' });
+    try {
+      await postRequest(ROUTES.groups.join(detail.group_id), {});
+    } catch {
+      // Non-fatal - already a member (the common case) or some other
+      // reason this no-ops server-side; worst case the call/chat attempt
+      // right after this still surfaces its own real error.
+    }
   }, [detail]);
 
-  const joinCall = useCallback((media: 'voice' | 'video') => {
+  const openTextDiscussion = useCallback(() => {
+    if (!detail) return;
+    void ensureWatchGroupMembership();
+    DeviceEventEmitter.emit('chat.open', { conversationId: detail.conversation_id, name: detail.name, kind: 'group' });
+  }, [detail, ensureWatchGroupMembership]);
+
+  const joinCall = useCallback(async (media: 'voice' | 'video') => {
     if (!detail || !startCall) return;
+    await ensureWatchGroupMembership();
     void startCall({ conversationId: detail.conversation_id, title: detail.name, media });
-  }, [detail, startCall]);
+  }, [detail, startCall, ensureWatchGroupMembership]);
 
   const isLeaderOrSharing = detail && (detail.my_leadership_state === 'leading');
   const canStartOfficialCall = !!isLeaderOrSharing || !!detail?.is_group_admin;
