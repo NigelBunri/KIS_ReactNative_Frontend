@@ -197,6 +197,8 @@ export default function WorkflowBuilderScreen() {
   const [rules, setRules] = useState<Rule[]>([]);
   const [thenActions, setThenActions] = useState<ActionRow[]>([{ type: 'send_message', text: '' }]);
   const [elseActions, setElseActions] = useState<ActionRow[]>([]);
+  const [aiDecisionEnabled, setAiDecisionEnabled] = useState(false);
+  const [aiInstructions, setAiInstructions] = useState('');
 
   useEffect(() => {
     void (async () => {
@@ -228,6 +230,8 @@ export default function WorkflowBuilderScreen() {
         setRules((w.definition?.conditions?.rules ?? []).map((r: any) => ({ field: r.field, op: r.op, value: String(r.value) })));
         setThenActions(actionsFromServer(w.definition?.then_actions ?? []));
         setElseActions(actionsFromServer(w.definition?.else_actions ?? []));
+        setAiDecisionEnabled(Boolean(w.definition?.ai_decision?.enabled));
+        setAiInstructions(w.definition?.ai_decision?.instructions ?? '');
       }
       setLoading(false);
     })();
@@ -242,6 +246,7 @@ export default function WorkflowBuilderScreen() {
       : {},
     then_actions: thenActions.map(actionToServer).filter(Boolean),
     else_actions: elseActions.map(actionToServer).filter(Boolean),
+    ai_decision: { enabled: aiDecisionEnabled, instructions: aiInstructions.trim() },
   });
 
   const handleSave = async () => {
@@ -436,6 +441,28 @@ export default function WorkflowBuilderScreen() {
             />
           ))}
           <KISButton title="Add an action" size="sm" variant="outline" onPress={() => addAction(setThenActions)} />
+        </View>
+
+        <View style={{ gap: 8 }}>
+          <Text style={{ fontSize: 13, fontWeight: '800', color: palette.text }}>AI-assisted action selection</Text>
+          <Text style={{ fontSize: 12, color: palette.subtext }}>
+            Optional. Instead of always running every action above, let this bot's connected AI provider decide
+            which of them (if any) fits each event. The AI can only choose from the actions you've already
+            configured — it can never run anything else. Requires an AI provider connected on this bot's detail
+            screen.
+          </Text>
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            <Chip label="Always run the actions above" selected={!aiDecisionEnabled} onPress={() => setAiDecisionEnabled(false)} palette={palette} />
+            <Chip label="Let AI decide" selected={aiDecisionEnabled} onPress={() => setAiDecisionEnabled(true)} palette={palette} />
+          </View>
+          {aiDecisionEnabled ? (
+            <KISTextInput
+              placeholder="Optional guidance for the AI (e.g. 'Only welcome members who mention a specific interest')"
+              value={aiInstructions}
+              onChangeText={setAiInstructions}
+              multiline
+            />
+          ) : null}
         </View>
 
         {rules.length ? (
