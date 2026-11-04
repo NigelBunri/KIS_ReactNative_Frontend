@@ -236,6 +236,8 @@ import BotDetailScreen from '@/screens/bots/BotDetailScreen';
 import WorkflowsListScreen from '@/screens/bots/WorkflowsListScreen';
 import WorkflowBuilderScreen from '@/screens/bots/WorkflowBuilderScreen';
 import WorkflowDetailScreen from '@/screens/bots/WorkflowDetailScreen';
+import BotKnowledgeScreen from '@/screens/bots/BotKnowledgeScreen';
+import BotMemoryScreen from '@/screens/bots/BotMemoryScreen';
 import PrayerCalendarHomeScreen from '@/screens/prayer/PrayerCalendarHomeScreen';
 import PrayerWatchRoomScreen from '@/screens/prayer/PrayerWatchRoomScreen';
 import ContactShareLinkScreen from '@/screens/chat/ContactShareLinkScreen';
@@ -1882,6 +1884,16 @@ function AppContent() {
                     <RootStack.Screen
                       name="WorkflowDetail"
                       getComponent={() => WorkflowDetailScreen}
+                      options={{ headerShown: false }}
+                    />
+                    <RootStack.Screen
+                      name="BotKnowledge"
+                      getComponent={() => BotKnowledgeScreen}
+                      options={{ headerShown: false }}
+                    />
+                    <RootStack.Screen
+                      name="BotMemory"
+                      getComponent={() => BotMemoryScreen}
                       options={{ headerShown: false }}
                     />
                     <RootStack.Screen

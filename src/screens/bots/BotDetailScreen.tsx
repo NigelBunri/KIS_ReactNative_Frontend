@@ -584,6 +584,22 @@ export default function BotDetailScreen() {
           />
         </SectionCard>
 
+        <SectionCard title="Knowledge and memory" palette={palette}>
+          <Text style={{ fontSize: 12, color: palette.subtext }}>
+            Give this bot its own documents and notes to refer to, and let it keep short-term memory between events.
+          </Text>
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            <KISButton
+              title="Knowledge" size="sm" variant="outline"
+              onPress={() => navigation.navigate('BotKnowledge', { botId, botName: bot?.name })}
+            />
+            <KISButton
+              title="Memory" size="sm" variant="outline"
+              onPress={() => navigation.navigate('BotMemory', { botId, botName: bot?.name })}
+            />
+          </View>
+        </SectionCard>
+
         <SectionCard title="Recent activity" palette={palette}>
           {activity.length === 0 ? (
             <Text style={{ fontSize: 12, color: palette.subtext }}>No activity yet.</Text>

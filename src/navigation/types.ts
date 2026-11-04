@@ -371,6 +371,8 @@ export type RootStackParamList = {
   WorkflowsList: { botId: string; botName?: string };
   WorkflowBuilder: { botId: string; botName?: string; workflowId?: string };
   WorkflowDetail: { botId: string; workflowId: string; name?: string };
+  BotKnowledge: { botId: string; botName?: string };
+  BotMemory: { botId: string; botName?: string };
   PrayerCalendarHome: undefined;
   PrayerWatchRoom: { hour: number };
   ContactShareLink: undefined;

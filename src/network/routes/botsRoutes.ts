@@ -34,6 +34,15 @@ const botsRoutes = {
   workflowResume: (id: string, workflowId: string) => `${API_BASE_URL}/api/v1/bots/${id}/workflows/${workflowId}/resume/`,
   workflowVersions: (id: string, workflowId: string) => `${API_BASE_URL}/api/v1/bots/${id}/workflows/${workflowId}/versions/`,
   workflowRuns: (id: string, workflowId: string) => `${API_BASE_URL}/api/v1/bots/${id}/workflows/${workflowId}/runs/`,
+  // Phase 4 — Knowledge and Memory
+  knowledgeSources: (id: string) => `${API_BASE_URL}/api/v1/bots/${id}/knowledge/`,
+  knowledgeSourceDetail: (id: string, sourceId: string) => `${API_BASE_URL}/api/v1/bots/${id}/knowledge/${sourceId}/`,
+  knowledgeSourceDeactivate: (id: string, sourceId: string) => `${API_BASE_URL}/api/v1/bots/${id}/knowledge/${sourceId}/deactivate/`,
+  knowledgeSourceReactivate: (id: string, sourceId: string) => `${API_BASE_URL}/api/v1/bots/${id}/knowledge/${sourceId}/reactivate/`,
+  knowledgeTestRetrieval: (id: string) => `${API_BASE_URL}/api/v1/bots/${id}/knowledge/test-retrieval/`,
+  memoryConfig: (id: string) => `${API_BASE_URL}/api/v1/bots/${id}/memory-config/`,
+  memoryEntries: (id: string) => `${API_BASE_URL}/api/v1/bots/${id}/memory/`,
+  memoryEntryDetail: (id: string, entryId: string) => `${API_BASE_URL}/api/v1/bots/${id}/memory/${entryId}/`,
 };
 
 export default botsRoutes;
