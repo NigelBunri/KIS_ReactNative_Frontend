@@ -13,6 +13,7 @@ import personalizationRoutes from './routes/personalizationRoutes';
 import billingRoutes from './routes/billingRoutes';
 import rewardsRoutes from './routes/rewardsRoutes';
 import referralsRoutes from './routes/referralsRoutes';
+import botsRoutes from './routes/botsRoutes';
 import testimonyRoutes from './routes/testimonyRoutes';
 import churchRoutes from './routes/churchRoutes';
 import familyRoutes from './routes/familyRoutes';
@@ -51,6 +52,7 @@ const ROUTES: any = {
   billing: billingRoutes,
   rewards: rewardsRoutes,
   referrals: referralsRoutes,
+  bots: botsRoutes,
   prayer: prayerRoutes,
   ...testimonyRoutes,
   ...churchRoutes,

@@ -230,6 +230,12 @@ import TransactionHistoryScreen from '@/screens/market/TransactionHistoryScreen'
 import LoyaltyScreen from '@/screens/market/LoyaltyScreen';
 import ReferralScreen from '@/screens/market/ReferralScreen';
 import ReferralCommissionsScreen from '@/screens/profile/ReferralCommissionsScreen';
+import BotsHomeScreen from '@/screens/bots/BotsHomeScreen';
+import CreateBotScreen from '@/screens/bots/CreateBotScreen';
+import BotDetailScreen from '@/screens/bots/BotDetailScreen';
+import WorkflowsListScreen from '@/screens/bots/WorkflowsListScreen';
+import WorkflowBuilderScreen from '@/screens/bots/WorkflowBuilderScreen';
+import WorkflowDetailScreen from '@/screens/bots/WorkflowDetailScreen';
 import PrayerCalendarHomeScreen from '@/screens/prayer/PrayerCalendarHomeScreen';
 import PrayerWatchRoomScreen from '@/screens/prayer/PrayerWatchRoomScreen';
 import ContactShareLinkScreen from '@/screens/chat/ContactShareLinkScreen';
@@ -1847,6 +1853,36 @@ function AppContent() {
                       name="ReferralCommissions"
                       getComponent={() => ReferralCommissionsScreen}
                       options={{ presentation: 'modal' }}
+                    />
+                    <RootStack.Screen
+                      name="BotsHome"
+                      getComponent={() => BotsHomeScreen}
+                      options={{ headerShown: false }}
+                    />
+                    <RootStack.Screen
+                      name="CreateBot"
+                      getComponent={() => CreateBotScreen}
+                      options={{ headerShown: false, presentation: 'modal' }}
+                    />
+                    <RootStack.Screen
+                      name="BotDetail"
+                      getComponent={() => BotDetailScreen}
+                      options={{ headerShown: false }}
+                    />
+                    <RootStack.Screen
+                      name="WorkflowsList"
+                      getComponent={() => WorkflowsListScreen}
+                      options={{ headerShown: false }}
+                    />
+                    <RootStack.Screen
+                      name="WorkflowBuilder"
+                      getComponent={() => WorkflowBuilderScreen}
+                      options={{ headerShown: false, presentation: 'modal' }}
+                    />
+                    <RootStack.Screen
+                      name="WorkflowDetail"
+                      getComponent={() => WorkflowDetailScreen}
+                      options={{ headerShown: false }}
                     />
                     <RootStack.Screen
                       name="PrayerCalendarHome"

@@ -2069,6 +2069,14 @@ export default function ProfileScreen() {
         tone: 'primary' as const,
         onPress: () => rootNavigation?.navigate('ReferralCommissions'),
       },
+      {
+        key: 'bot-platform',
+        title: 'Bot Platform',
+        subtitle: 'Create and manage bots for your groups, channels, and communities',
+        icon: 'sparkles' as const,
+        tone: 'primary' as const,
+        onPress: () => rootNavigation?.navigate('BotsHome'),
+      },
     ],
     [rootNavigation],
   );
