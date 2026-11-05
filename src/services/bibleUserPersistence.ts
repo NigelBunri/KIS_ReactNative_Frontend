@@ -32,6 +32,17 @@ export type LocalBibleEvent = {
   sync_status?: 'synced' | 'local_pending';
   created_at?: string;
   updated_at?: string;
+  // The exact verse/chapter ids the original create call used - stored so a
+  // 'local_pending' placeholder (its POST appeared to fail) can be safely
+  // replayed later with the identical payload, instead of only ever being
+  // reconciled by guessing from passage_ref/start_at (see
+  // isSameLocalReading below for why that guess alone isn't reliable).
+  raw_verse_ids?: string[];
+  raw_chapter_id?: string | null;
+  // How many times a replay POST for this placeholder has already failed -
+  // caps retries so a permanently-broken placeholder (e.g. the server
+  // rejects it outright) doesn't get hammered on every planner refresh.
+  retry_count?: number;
 };
 
 export type LocalBibleLibraryItem = {
@@ -93,6 +104,32 @@ export const deleteLocalBibleEvent = async (eventId: string | number) => {
   });
 };
 
+const normalizePassageRef = (value: unknown) =>
+  String(value || '').trim().toLowerCase().replace(/\s+/g, ' ');
+
+// Previously this required passage_ref and start_at to match as EXACT
+// strings. That's brittle: the server can return/store a slightly
+// different serialization of the same moment (different timezone-offset
+// formatting, truncated seconds, trailing "Z") or the same reference with
+// different whitespace/case, and a single byte of difference meant the
+// match silently failed FOREVER - the local placeholder never got
+// reconciled and stayed as a visible duplicate. Compare on meaning
+// instead: the reference normalized for whitespace/case, and the instant
+// in time within a tolerance window (a few minutes covers any formatting
+// drift without being loose enough to match a genuinely different
+// reading scheduled nearby).
+const START_AT_MATCH_TOLERANCE_MS = 5 * 60 * 1000;
+export const isSameLocalReading = (
+  a: { passage_ref: unknown; start_at: unknown },
+  b: { passage_ref: unknown; start_at: unknown },
+): boolean => {
+  if (normalizePassageRef(a.passage_ref) !== normalizePassageRef(b.passage_ref)) return false;
+  const aTime = new Date(String(a.start_at)).getTime();
+  const bTime = new Date(String(b.start_at)).getTime();
+  if (!Number.isFinite(aTime) || !Number.isFinite(bTime)) return false;
+  return Math.abs(aTime - bTime) <= START_AT_MATCH_TOLERANCE_MS;
+};
+
 export const mergeBibleEventsWithLocal = async <T extends LocalBibleEvent>(
   serverItems: T[],
   dateFrom: string,
@@ -114,22 +151,19 @@ export const mergeBibleEventsWithLocal = async <T extends LocalBibleEvent>(
   // can just as easily mean the request actually reached the server and
   // only the response was lost (timeout, connection dropped after the
   // server already wrote the row), not that nothing was ever created. If a
-  // server event with the same passage_ref + start_at has since shown up,
-  // that's what happened: the local placeholder is a stale duplicate of a
-  // real synced event, not a second real reading, so evict it here rather
-  // than let it merge in as its own entry. Without this the same reading
-  // (e.g. "Genesis 1-3") would keep appearing twice, permanently, since
-  // nothing else ever reconciles or clears these placeholders.
+  // server event matching the same reading has since shown up, that's what
+  // happened: the local placeholder is a stale duplicate of a real synced
+  // event, not a second real reading, so evict it here rather than let it
+  // merge in as its own entry. Without this the same reading (e.g.
+  // "Genesis 1-3") would keep appearing twice, permanently, since nothing
+  // else ever reconciles or clears these placeholders. See
+  // isSameLocalReading for why this is a tolerant match, not exact.
   const staleLocalIds: string[] = [];
   scopedLocal.forEach((item) => {
     if (merged.has(String(item.id))) return;
     const supersededByServer =
       item.sync_status === 'local_pending' &&
-      normalizedServer.some(
-        (serverItem) =>
-          String(serverItem.passage_ref) === String(item.passage_ref) &&
-          String(serverItem.start_at) === String(item.start_at),
-      );
+      normalizedServer.some((serverItem) => isSameLocalReading(serverItem, item));
     if (supersededByServer) {
       staleLocalIds.push(item.id);
       return;
@@ -141,6 +175,66 @@ export const mergeBibleEventsWithLocal = async <T extends LocalBibleEvent>(
   }
 
   return Array.from(merged.values()).sort((a, b) => String(a.start_at).localeCompare(String(b.start_at)));
+};
+
+/**
+ * Which currently-pending local placeholders are actually safe to retry
+ * creating on the server right now. "Safe" specifically excludes anything
+ * mergeBibleEventsWithLocal hasn't just had a chance to check against a
+ * fresh server fetch for its own date - retrying one of those blindly
+ * risks genuinely double-creating it server-side if the original POST had
+ * in fact already succeeded. Callers must pass the post-merge result for
+ * the date range they just fetched; anything that survived that merge as
+ * 'local_pending' was already checked and NOT found on the server, so a
+ * replay for it cannot create a second server-side row for the same
+ * reading - at worst it creates the first one, late.
+ */
+export const pendingLocalEventsSafeToFlush = (
+  mergedForFetchedRange: LocalBibleEvent[],
+  maxAttempts = 3,
+): LocalBibleEvent[] =>
+  mergedForFetchedRange.filter(
+    (item) =>
+      item.sync_status === 'local_pending' &&
+      Boolean(item.raw_chapter_id || (item.raw_verse_ids && item.raw_verse_ids.length)) &&
+      (item.retry_count ?? 0) < maxAttempts,
+  );
+
+// Actually attempts to create the given still-unsynced local placeholders
+// on the server, rather than only ever passively waiting for
+// mergeBibleEventsWithLocal to notice a matching server row by luck. This
+// is what makes a genuinely offline-created reading eventually become a
+// single real synced event instead of a permanent local-only duplicate:
+// once the retry succeeds the placeholder is deleted and replaced by the
+// server's own row, so there is nothing left to (mis)match later. A
+// placeholder with no raw_verse_ids/raw_chapter_id (created before this
+// field existed, or from a path that never captured them) can't be
+// replayed and is left for the user to remove manually via the delete
+// control - see pendingLocalEventsSafeToFlush, which already excludes
+// those before this ever runs.
+export const flushPendingLocalBibleEvents = async (
+  candidates: LocalBibleEvent[],
+  createOnServer: (event: LocalBibleEvent) => Promise<{ success: boolean; data?: any }>,
+): Promise<{ flushedIds: string[]; failedIds: string[] }> => {
+  const flushedIds: string[] = [];
+  const failedIds: string[] = [];
+  for (const item of candidates) {
+    let result: { success: boolean; data?: any };
+    try {
+      result = await createOnServer(item);
+    } catch {
+      result = { success: false };
+    }
+    if (result?.success && result.data?.id) {
+      await deleteLocalBibleEvent(item.id);
+      await upsertLocalBibleEvent({ ...item, id: String(result.data.id), sync_status: 'synced', retry_count: 0 });
+      flushedIds.push(item.id);
+    } else {
+      await upsertLocalBibleEvent({ ...item, retry_count: (item.retry_count ?? 0) + 1 });
+      failedIds.push(item.id);
+    }
+  }
+  return { flushedIds, failedIds };
 };
 
 export const buildLocalBibleEvent = (input: {
@@ -157,6 +251,12 @@ export const buildLocalBibleEvent = (input: {
   status?: LocalBibleEvent['status'];
   source?: string;
   pending?: boolean;
+  // The exact ids the create POST used, if this came from createEvent() -
+  // carried through so a pending placeholder can be replayed verbatim
+  // later. Omit (or leave undefined) for events built from an update/
+  // status-change, which never need to be replayed as a NEW create.
+  rawVerseIds?: string[];
+  rawChapterId?: string | null;
 }): LocalBibleEvent => {
   const server = input.serverEvent || {};
   const translationCode = typeof input.translation === 'string' ? input.translation : input.translation?.code;
@@ -176,6 +276,8 @@ export const buildLocalBibleEvent = (input: {
     sync_status: input.pending ? 'local_pending' : 'synced',
     created_at: server.created_at ?? nowIso(),
     updated_at: server.updated_at ?? nowIso(),
+    raw_verse_ids: input.rawVerseIds,
+    raw_chapter_id: input.rawChapterId,
   };
 };
 

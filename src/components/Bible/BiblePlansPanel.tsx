@@ -29,8 +29,11 @@ import type {
 import {
   buildLocalBibleEvent,
   deleteLocalBibleEvent,
+  flushPendingLocalBibleEvents,
   mergeBibleEventsWithLocal,
+  pendingLocalEventsSafeToFlush,
   upsertLocalBibleEvent,
+  type LocalBibleEvent,
 } from '@/services/bibleUserPersistence';
 import {
   deleteBibleReadingEventReminders,
@@ -185,6 +188,36 @@ export default function BiblePlansPanel() {
     setSelectedTranslation(current => current ?? payload[0]?.code);
   }, []);
 
+  // Actually create a still-pending local placeholder on the server, using
+  // the exact ids its original create call would have used. Called only
+  // for placeholders mergeBibleEventsWithLocal just checked against a
+  // fresh fetch for this date range and did NOT find a matching server
+  // row for - see pendingLocalEventsSafeToFlush's docstring for why that
+  // ordering is what makes this safe from ever double-creating the same
+  // reading on the server.
+  const createPendingEventOnServer = useCallback(
+    async (item: LocalBibleEvent) => {
+      const res = await postRequest(
+        ROUTES.bible.readingEventFromSelection,
+        {
+          translation: item.translation,
+          verses: item.raw_verse_ids ?? [],
+          chapters: item.raw_verse_ids?.length ? [] : [item.raw_chapter_id],
+          passage_ref: item.passage_ref,
+          start_at: item.start_at,
+          end_at: item.end_at ?? null,
+          recurrence: item.recurrence,
+          reminder_offsets: item.reminder_offsets,
+          reminder_channels: item.reminder_channels,
+          source: item.source ?? 'planner',
+        },
+        { errorMessage: '' },
+      );
+      return { success: Boolean(res?.success), data: res?.data };
+    },
+    [],
+  );
+
   const loadEvents = useCallback(async () => {
     setLoading(true);
     const res = await getRequest(ROUTES.bible.readingEvents, {
@@ -192,16 +225,25 @@ export default function BiblePlansPanel() {
       errorMessage: 'Unable to load reading planner.',
       forceNetwork: true,
     });
-    const merged = await mergeBibleEventsWithLocal(
-      res?.success ? listFromResponse(res?.data) : [],
-      dateRange.from,
-      dateRange.to,
-    );
+    const serverItems = res?.success ? listFromResponse(res?.data) : [];
+    let merged = await mergeBibleEventsWithLocal(serverItems, dateRange.from, dateRange.to);
+
+    const flushCandidates = pendingLocalEventsSafeToFlush(merged);
+    if (flushCandidates.length) {
+      const { flushedIds } = await flushPendingLocalBibleEvents(flushCandidates, createPendingEventOnServer);
+      if (flushedIds.length) {
+        // Re-merge so the just-synced items show their real server id and
+        // 'synced' status immediately, instead of waiting for the next
+        // planner refresh.
+        merged = await mergeBibleEventsWithLocal(serverItems, dateRange.from, dateRange.to);
+      }
+    }
+
     setEvents(merged as PlannerEvent[]);
     if (!res?.success)
       setMessage(res?.message || 'Showing saved local reading events.');
     setLoading(false);
-  }, [dateRange.from, dateRange.to]);
+  }, [dateRange.from, dateRange.to, createPendingEventOnServer]);
 
   useEffect(() => {
     loadTranslations();
@@ -319,6 +361,12 @@ export default function BiblePlansPanel() {
       reminderChannels,
       source: 'planner',
       pending: !res?.success,
+      // Captured regardless of whether this POST just succeeded, so a
+      // pending placeholder can be replayed with this exact payload later
+      // (see createPendingEventOnServer) instead of only ever being
+      // reconciled by guessing from passage_ref/start_at.
+      rawVerseIds: selectedVerseIds,
+      rawChapterId: selectedVerseIds.length ? null : chapterId,
     });
     await upsertLocalBibleEvent(localEvent);
     await scheduleBibleReadingEventReminders(localEvent);
@@ -809,34 +857,61 @@ export default function BiblePlansPanel() {
             Upcoming in this {view}
           </Text>
           <View style={styles.stack}>
-            {visibleRangeEvents.slice(0, 12).map(event => (
-              <TouchableOpacity
-                key={`range-${event.id}`}
-                onPress={() => setCursor(startOfDay(new Date(event.start_at)))}
-                style={[
-                  styles.compactEventRow,
-                  {
-                    borderColor: palette.divider,
-                    backgroundColor: palette.surface,
-                  },
-                ]}
-              >
-                <View style={{ flex: 1 }}>
-                  <Text style={{ color: palette.text, fontWeight: '900' }}>
-                    {event.passage_ref}
-                  </Text>
-                  <Text style={{ color: palette.subtext, marginTop: 3 }}>
-                    {readableDateTime(event.start_at)} · {event.status}
-                    {event.sync_status === 'local_pending' ? ' · local' : ''}
-                  </Text>
+            {visibleRangeEvents.slice(0, 12).map(event => {
+              const isLocalOnly = event.sync_status === 'local_pending';
+              return (
+                <View
+                  key={`range-${event.id}`}
+                  style={[
+                    styles.compactEventRow,
+                    {
+                      borderColor: isLocalOnly ? palette.primaryStrong : palette.divider,
+                      backgroundColor: palette.surface,
+                    },
+                  ]}
+                >
+                  <TouchableOpacity
+                    style={{ flex: 1 }}
+                    onPress={() => setCursor(startOfDay(new Date(event.start_at)))}
+                  >
+                    <Text style={{ color: palette.text, fontWeight: '900' }}>
+                      {event.passage_ref}
+                    </Text>
+                    <Text style={{ color: palette.subtext, marginTop: 3 }}>
+                      {readableDateTime(event.start_at)} · {event.status}
+                    </Text>
+                    {isLocalOnly ? (
+                      <Text
+                        style={{
+                          color: palette.primaryStrong,
+                          marginTop: 3,
+                          fontWeight: '800',
+                          fontSize: 12,
+                        }}
+                      >
+                        Saved on this device only - not synced
+                      </Text>
+                    ) : null}
+                  </TouchableOpacity>
+                  {isLocalOnly ? (
+                    <TouchableOpacity
+                      onPress={() => confirmDeleteEvent(event)}
+                      hitSlop={8}
+                      style={{ paddingHorizontal: 4 }}
+                      accessibilityLabel="Delete this device-only reading"
+                    >
+                      <KISIcon name="trash" size={18} color={palette.danger} />
+                    </TouchableOpacity>
+                  ) : (
+                    <KISIcon
+                      name="chevron-right"
+                      size={18}
+                      color={palette.subtext}
+                    />
+                  )}
                 </View>
-                <KISIcon
-                  name="chevron-right"
-                  size={18}
-                  color={palette.subtext}
-                />
-              </TouchableOpacity>
-            ))}
+              );
+            })}
           </View>
         </BibleSectionCard>
       ) : null}
