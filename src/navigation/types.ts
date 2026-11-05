@@ -373,6 +373,9 @@ export type RootStackParamList = {
   WorkflowDetail: { botId: string; workflowId: string; name?: string };
   BotKnowledge: { botId: string; botName?: string };
   BotMemory: { botId: string; botName?: string };
+  BotOverview: undefined;
+  BotAnalytics: undefined;
+  BotWebhookDeliveries: { botId: string; botName?: string };
   PrayerCalendarHome: undefined;
   PrayerWatchRoom: { hour: number };
   ContactShareLink: undefined;

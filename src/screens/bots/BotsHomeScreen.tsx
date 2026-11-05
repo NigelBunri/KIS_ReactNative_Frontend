@@ -94,7 +94,9 @@ export default function BotsHomeScreen() {
         <Text style={{ flex: 1, textAlign: 'center', fontSize: 18, fontWeight: '900', color: palette.text }}>
           Bot Platform
         </Text>
-        <View style={{ width: 28 }} />
+        <Pressable onPress={() => navigation.navigate('BotOverview')} hitSlop={10} style={{ padding: 4 }}>
+          <KISIcon name="bar-chart" size={20} color={palette.text} />
+        </Pressable>
       </View>
 
       {loading && bots === null ? (

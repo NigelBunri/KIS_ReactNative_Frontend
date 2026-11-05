@@ -54,7 +54,11 @@ type Grant = {
   id: string;
   resource_type: string;
   resource_id: string;
+  resource_display_name: string;
   scopes: string[];
+  is_currently_valid: boolean;
+  granted_by_display_name: string | null;
+  created_at: string;
 };
 
 type ActivityItem = {
@@ -423,9 +427,17 @@ export default function BotDetailScreen() {
             >
               <View style={{ flex: 1 }}>
                 <Text style={{ fontSize: 13, fontWeight: '700', color: palette.text }}>
-                  {grant.resource_type}: {grant.resource_id.slice(0, 8)}…
+                  {grant.resource_display_name || `${grant.resource_type}: ${grant.resource_id.slice(0, 8)}…`}
                 </Text>
                 <Text style={{ fontSize: 11, color: palette.subtext }}>{grant.scopes.join(', ')}</Text>
+                {grant.granted_by_display_name ? (
+                  <Text style={{ fontSize: 11, color: palette.subtext }}>
+                    Granted by {grant.granted_by_display_name} on {new Date(grant.created_at).toLocaleDateString()}
+                  </Text>
+                ) : null}
+                {!grant.is_currently_valid ? (
+                  <Text style={{ fontSize: 11, color: palette.danger, fontWeight: '700' }}>No longer valid</Text>
+                ) : null}
               </View>
               <Pressable onPress={() => handleRevokeGrant(grant.id)} hitSlop={8}>
                 <KISIcon name="trash" size={16} color={palette.danger} />
@@ -495,7 +507,15 @@ export default function BotDetailScreen() {
             Receive signed event notifications (e.g. message.created) at your own endpoint.
           </Text>
           <KISTextInput value={webhookUrl} onChangeText={setWebhookUrl} placeholder="https://your-server.com/webhook" autoCapitalize="none" />
-          <KISButton title={bot?.has_webhook ? 'Update webhook' : 'Save webhook'} size="sm" onPress={handleSaveWebhook} disabled={busy} />
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            <KISButton title={bot?.has_webhook ? 'Update webhook' : 'Save webhook'} size="sm" onPress={handleSaveWebhook} disabled={busy} />
+            {bot?.has_webhook ? (
+              <KISButton
+                title="Delivery history" size="sm" variant="outline"
+                onPress={() => navigation.navigate('BotWebhookDeliveries', { botId, botName: bot?.name })}
+              />
+            ) : null}
+          </View>
         </SectionCard>
 
         <SectionCard title="AI provider" palette={palette}>

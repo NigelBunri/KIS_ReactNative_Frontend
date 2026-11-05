@@ -10,6 +10,11 @@ import { API_BASE_URL } from '../config';
 // allowed to do.
 const botsRoutes = {
   list: `${API_BASE_URL}/api/v1/bots/`,
+  // Phase 5 — owner dashboard overview and analytics, scoped across
+  // every bot this user owns (not a single-bot-id path).
+  overview: `${API_BASE_URL}/api/v1/bots/overview/`,
+  analytics: `${API_BASE_URL}/api/v1/bots/analytics/`,
+  analyticsExport: `${API_BASE_URL}/api/v1/bots/analytics/export/`,
   detail: (id: string) => `${API_BASE_URL}/api/v1/bots/${id}/`,
   activate: (id: string) => `${API_BASE_URL}/api/v1/bots/${id}/activate/`,
   pause: (id: string) => `${API_BASE_URL}/api/v1/bots/${id}/pause/`,
@@ -21,6 +26,9 @@ const botsRoutes = {
     `${API_BASE_URL}/api/v1/bots/${id}/resource-grants/${grantId}/`,
   webhook: (id: string) => `${API_BASE_URL}/api/v1/bots/${id}/webhook/`,
   webhookRotateSecret: (id: string) => `${API_BASE_URL}/api/v1/bots/${id}/webhook/rotate-secret/`,
+  webhookDeliveries: (id: string) => `${API_BASE_URL}/api/v1/bots/${id}/webhook/deliveries/`,
+  webhookDeliveryRetry: (id: string, deliveryId: string) =>
+    `${API_BASE_URL}/api/v1/bots/${id}/webhook/deliveries/${deliveryId}/retry/`,
   aiConnection: (id: string) => `${API_BASE_URL}/api/v1/bots/${id}/ai-connection/`,
   activity: (id: string) => `${API_BASE_URL}/api/v1/bots/${id}/activity/`,
   approvals: (id: string) => `${API_BASE_URL}/api/v1/bots/${id}/approvals/`,
