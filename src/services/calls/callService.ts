@@ -28,6 +28,74 @@ const _screenShareState: Record<string, boolean> = {};
 let _activeShareSocket: any = null;
 let _activeShareSessionId: string | null = null;
 
+/** Thrown by toggleScreenShare's TOGGLE ON path when the server rejects
+ * ownership (another participant is already sharing) or the request times
+ * out/errors before an ack arrives. Callers must treat both the same way:
+ * never show this device as sharing, and surface a clear message - see
+ * this error's own `code` for which case it was. */
+export class ScreenShareRejectedError extends Error {
+  code: 'SCREEN_SHARE_IN_USE' | 'SCREEN_SHARE_ACK_TIMEOUT' | 'SCREEN_SHARE_ACK_ERROR';
+  constructor(code: ScreenShareRejectedError['code'], message: string) {
+    super(message);
+    this.name = 'ScreenShareRejectedError';
+    this.code = code;
+  }
+}
+
+/**
+ * Asks the server for permission to start sharing BEFORE this device
+ * touches a single peer connection, SFU producer, or local screen-share
+ * state.
+ *
+ * Root-cause fix for "the losing participant may not receive a clear
+ * client-side error": the previous code captured the screen, mutated
+ * every peer connection/SFU producer, THEN fire-and-forget emitted
+ * call.screen_share with no ack - so a server-side SCREEN_SHARE_IN_USE
+ * rejection (the real backstop for two people tapping "Share" in the same
+ * instant) was silently dropped on the floor. The loser's local state had
+ * already been changed to "sharing" with no way to find out it wasn't
+ * actually accepted, and nothing ever told the user why.
+ *
+ * Ordering this call BEFORE any local mutation means a rejection has
+ * NOTHING to undo - the local track just gets stopped and the function
+ * throws, and the caller (toggleScreenShare) never sets _screenShareState,
+ * never touches a peer connection, and never calls setActiveCall with
+ * isScreenSharing: true. The winning participant's path is unaffected -
+ * they get `{ ok: true }` and proceed exactly as before.
+ *
+ * A timeout (8s - generous for a simple signaling round trip, short enough
+ * not to leave the user staring at a stuck permission dialog) is treated
+ * the same as an explicit rejection: fail safe rather than risk this
+ * device appearing to share when the server never actually confirmed it.
+ */
+async function requestScreenShareOwnership(
+  sessionId: string,
+  socket: any | null,
+): Promise<void> {
+  if (!socket) {
+    // No socket at all (e.g. offline) - nothing to ask permission from.
+    // Fail safe rather than silently granting local-only "sharing" with no
+    // server-side record and no way for anyone else to ever see it.
+    throw new ScreenShareRejectedError('SCREEN_SHARE_ACK_ERROR', 'No active connection to the call server.');
+  }
+  await new Promise<void>((resolve, reject) => {
+    socket
+      .timeout(8000)
+      .emit('call.screen_share', { conversationId: sessionId, enabled: true }, (timeoutErr: any, ack: any) => {
+        if (timeoutErr) {
+          reject(new ScreenShareRejectedError('SCREEN_SHARE_ACK_TIMEOUT', 'Timed out waiting for the server to confirm screen sharing.'));
+          return;
+        }
+        if (!ack || ack.ok !== true) {
+          const code = ack?.code === 'SCREEN_SHARE_IN_USE' ? 'SCREEN_SHARE_IN_USE' : 'SCREEN_SHARE_ACK_ERROR';
+          reject(new ScreenShareRejectedError(code, ack?.error ?? 'The server rejected the screen-share request.'));
+          return;
+        }
+        resolve();
+      });
+  });
+}
+
 type ScreenShareEndedHandler = (sessionId: string, reason: 'manual' | 'track-ended') => void;
 /** Mirrors webRTCService's setCallbacks convention (a settable handler,
  * no-op by default) - fired any time sharing stops, whether via an explicit
@@ -154,8 +222,16 @@ async function stopScreenShareInternal(sessionId: string, socket: any | null, re
  *   2. Throws `Error('SCREEN_SHARE_UNAVAILABLE')` if getDisplayMedia is unavailable
  *      or fails - callers must surface this to the user rather than silently
  *      swapping in the camera, which would misrepresent what's being shared.
- *   3. Replaces the video sender track in all active peer connections.
- *   4. Emits `call.screen_share` with `{ conversationId, enabled: true }` via the socket.
+ *   3. Asks the server for ownership via an ACKED `call.screen_share`
+ *      (`{ conversationId, enabled: true }`) BEFORE touching any peer
+ *      connection/SFU state. Throws `ScreenShareRejectedError` (code
+ *      `SCREEN_SHARE_IN_USE`, `SCREEN_SHARE_ACK_TIMEOUT`, or
+ *      `SCREEN_SHARE_ACK_ERROR`) and stops the just-captured track if the
+ *      server rejects it or the ack times out - callers must surface this
+ *      distinctly from `SCREEN_SHARE_UNAVAILABLE`. See
+ *      requestScreenShareOwnership for why this ordering matters.
+ *   4. Replaces (or, for a call with no pre-existing video sender, adds) the
+ *      video sender track in all active peer connections.
  *   5. Attaches an 'ended' listener to the screen track so stopping sharing via
  *      the OS-level control (the status-bar "Stop" button on iOS, the persistent
  *      "Stop sharing" notification on Android) is detected and cleaned up too -
@@ -238,6 +314,21 @@ export async function toggleScreenShare(
     if (screenStream) {
       const screenVideoTrack = screenStream.getVideoTracks?.()?.[0];
       if (screenVideoTrack) {
+        // Ask the server for ownership BEFORE touching any peer connection,
+        // SFU producer, or local screen-share state - see
+        // requestScreenShareOwnership's own comment for why this ordering
+        // is the actual fix (a rejection here has nothing to undo). On
+        // rejection/timeout, stop the OS-level capture immediately so the
+        // user isn't left with a dangling "Stop sharing" notification for
+        // a share that was never actually granted, then rethrow for the
+        // caller to surface.
+        try {
+          await requestScreenShareOwnership(sessionId, socket);
+        } catch (ownershipErr) {
+          try { screenVideoTrack.stop(); } catch { /* ignore */ }
+          throw ownershipErr;
+        }
+
         // Remember the screen track so toggle-off can stop exactly this one.
         _screenTrack = screenVideoTrack;
         _activeShareSocket = socket;
@@ -328,7 +419,12 @@ export async function toggleScreenShare(
     throw err;
   }
 
-  socket?.emit('call.screen_share', { conversationId: sessionId, enabled: true });
+  // call.screen_share was already sent (and acked) by requestScreenShareOwnership
+  // above, BEFORE any peer connection/SFU mutation - no second emit here. Sending
+  // it again post-hoc would be redundant at best and, since the ownership check
+  // on the server treats a repeat enabled:true from the current sharer as a
+  // same-user no-op, harmless either way - but there is nothing left for a
+  // second emit to usefully confirm, so it's simply removed instead of kept.
   _screenShareState[sessionId] = true;
   return true;
 }

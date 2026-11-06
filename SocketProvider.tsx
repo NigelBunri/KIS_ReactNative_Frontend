@@ -2183,6 +2183,23 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           'Screen sharing unavailable',
           "Screen sharing isn't available on this device or OS version.",
         );
+      } else if (e?.code === 'SCREEN_SHARE_IN_USE') {
+        // The authoritative, server-confirmed rejection path - closes the
+        // race the local participants.find(isScreenSharing) check above
+        // can't: two people tapping "Share" within the same instant, before
+        // either device's local state has heard about the other's attempt.
+        // callService already stopped the local capture before throwing, so
+        // this device never appeared to share and there is nothing to revert
+        // here - only the message to show.
+        Alert.alert(
+          'Someone else is sharing',
+          'Another participant started sharing their screen first. Ask them to stop before you try again.',
+        );
+      } else if (e?.code === 'SCREEN_SHARE_ACK_TIMEOUT' || e?.code === 'SCREEN_SHARE_ACK_ERROR') {
+        Alert.alert(
+          'Couldn’t start screen sharing',
+          'The call server didn’t confirm screen sharing in time. Check your connection and try again.',
+        );
       }
       return;
     }

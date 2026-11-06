@@ -57,7 +57,18 @@ describe('toggleScreenShare — SFU dual-path', () => {
     (webRTCService.getLocalStream as jest.Mock).mockReturnValue(localStream);
     (webRTCService as any).peers = new Map(); // no P2P peers — isolates the SFU path
 
-    socket = { emit: jest.fn() };
+    // toggleScreenShare now requests server ownership (an acked
+    // call.screen_share via socket.timeout(ms).emit(...)) before touching
+    // any peer/SFU state - see callService.ts's requestScreenShareOwnership.
+    // Auto-ack as granted; this suite isn't exercising the ownership policy
+    // itself (see callService.screen-share-ownership.test.ts for that).
+    socket = {
+      emit: jest.fn(),
+      timeout: jest.fn(() => ({
+        emit: jest.fn((_event: string, _payload: any, cb?: (err: any, ack: any) => void) =>
+          cb?.(null, { ok: true, data: { delivered: true } })),
+      })),
+    };
     mockGetDisplayMedia.mockReset();
     mockGetDisplayMedia.mockResolvedValue({ getVideoTracks: () => [screenTrack] });
   });

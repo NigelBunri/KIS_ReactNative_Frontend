@@ -61,7 +61,17 @@ describe('toggleScreenShare — iOS broadcast-picker gate (AND-098)', () => {
     const ref = { current: {} };
     registerIOSScreenCapturePickerRef(ref);
 
-    const result = await toggleScreenShare('session-ok', { emit: jest.fn() }, []);
+    // toggleScreenShare now requests server ownership (an acked
+    // call.screen_share via socket.timeout(ms).emit(...)) before touching
+    // any peer state - auto-ack as granted; this test isn't exercising the
+    // ownership policy itself (see callService.screen-share-ownership.test.ts).
+    const result = await toggleScreenShare('session-ok', {
+      emit: jest.fn(),
+      timeout: jest.fn(() => ({
+        emit: jest.fn((_event: string, _payload: any, cb?: (err: any, ack: any) => void) =>
+          cb?.(null, { ok: true, data: { delivered: true } })),
+      })),
+    }, []);
 
     expect(result).toBe(true);
     expect(presentIOSScreenCapturePicker).toHaveBeenCalledWith(ref);

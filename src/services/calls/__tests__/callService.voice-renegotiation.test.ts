@@ -49,6 +49,25 @@ function makeFakeTrack(kind: 'video' | 'audio' = 'video') {
   return { kind, enabled: true, stop: jest.fn(), addEventListener: jest.fn() };
 }
 
+// toggleScreenShare now requests server ownership (an acked call.screen_share
+// via socket.timeout(ms).emit(...)) BEFORE touching any peer connection - see
+// callService.ts's requestScreenShareOwnership. These tests aren't exercising
+// that ownership policy itself (see callService.screen-share-ownership.test.ts
+// for that), so this fake socket auto-acks every ownership request as granted.
+function makeAckingSocket() {
+  const ownershipEmit = jest.fn((_event: string, _payload: any, cb?: (err: any, ack: any) => void) =>
+    cb?.(null, { ok: true, data: { delivered: true } }));
+  return {
+    emit: jest.fn(),
+    timeout: jest.fn(() => ({ emit: ownershipEmit })),
+    // Exposed for assertions - the real ownership-request emit now goes
+    // through socket.timeout(ms).emit(...), not the plain socket.emit(...)
+    // used here only as a legacy no-op (toggleScreenShare's own trailing
+    // emit was removed since the ownership request already covers it).
+    ownershipEmit,
+  };
+}
+
 describe('toggleScreenShare — voice-call addTrack+renegotiation fallback', () => {
   let sessionCounter = 0;
   let sessionId: string;
@@ -78,7 +97,7 @@ describe('toggleScreenShare — voice-call addTrack+renegotiation fallback', () 
 
     mockCreateOffer.mockResolvedValue({ type: 'offer', sdp: 'v=0...offer-sdp' });
 
-    socket = { emit: jest.fn() };
+    socket = makeAckingSocket();
     mockGetDisplayMedia.mockReset();
     mockGetDisplayMedia.mockResolvedValue({ getVideoTracks: () => [screenTrack] });
   });
@@ -101,10 +120,14 @@ describe('toggleScreenShare — voice-call addTrack+renegotiation fallback', () 
     );
   });
 
-  it('still emits call.screen_share enabled:true even though the P2P track had to be added rather than replaced', async () => {
+  it('still requests ownership for enabled:true even though the P2P track had to be added rather than replaced', async () => {
     const result = await toggleScreenShare(sessionId, socket, []);
     expect(result).toBe(true);
-    expect(socket.emit).toHaveBeenCalledWith('call.screen_share', { conversationId: sessionId, enabled: true });
+    expect(socket.ownershipEmit).toHaveBeenCalledWith(
+      'call.screen_share',
+      { conversationId: sessionId, enabled: true },
+      expect.any(Function),
+    );
   });
 
   it('on stop, nulls out the dynamically-added video sender instead of leaving it transmitting a stopped track forever', async () => {
@@ -145,7 +168,7 @@ describe('applyActiveScreenShareToPeer — late joiner receives the in-progress 
     (webRTCService.getLocalStream as jest.Mock).mockReturnValue({ getVideoTracks: jest.fn(() => []) });
     (webRTCService as any).peers = new Map();
     mockCreateOffer.mockResolvedValue({ type: 'offer', sdp: 'sdp' });
-    socket = { emit: jest.fn() };
+    socket = makeAckingSocket();
     mockGetDisplayMedia.mockReset();
     mockGetDisplayMedia.mockResolvedValue({ getVideoTracks: () => [screenTrack] });
   });

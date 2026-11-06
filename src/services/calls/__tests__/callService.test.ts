@@ -53,6 +53,24 @@ function makeFakeSender(track: any) {
   return { track, replaceTrack: jest.fn() };
 }
 
+// toggleScreenShare now requests server ownership (an acked call.screen_share
+// via socket.timeout(ms).emit(...)) BEFORE touching any peer connection - see
+// callService.ts's requestScreenShareOwnership. This suite isn't exercising
+// that ownership policy itself (see callService.screen-share-ownership.test.ts
+// for that), so this fake socket auto-acks every ownership request as
+// granted; ownershipEmit is exposed separately from the plain `emit` mock
+// (which the TOGGLE OFF path still uses directly, unchanged) so ON/OFF
+// assertions below don't need to be told apart by clearing one shared mock.
+function makeAckingSocket() {
+  const ownershipEmit = jest.fn((_event: string, _payload: any, cb?: (err: any, ack: any) => void) =>
+    cb?.(null, { ok: true, data: { delivered: true } }));
+  return {
+    emit: jest.fn(),
+    timeout: jest.fn(() => ({ emit: ownershipEmit })),
+    ownershipEmit,
+  };
+}
+
 describe('toggleScreenShare — screen track ended handling', () => {
   // callService.ts keeps its screen-share state in module-level variables
   // (_screenShareState, _screenTrack, etc.) with no exported reset hook, so
@@ -83,7 +101,7 @@ describe('toggleScreenShare — screen track ended handling', () => {
     const pc = { getSenders: jest.fn(() => [sender]) };
     (webRTCService as any).peers = new Map([['peer-1', pc]]);
 
-    socket = { emit: jest.fn() };
+    socket = makeAckingSocket();
 
     // toggleScreenShare resolves react-native-webrtc via a dynamic
     // require() at call time (not a static import) specifically so the
@@ -103,7 +121,11 @@ describe('toggleScreenShare — screen track ended handling', () => {
     expect(result).toBe(true);
     expect(screenTrack.addEventListener).toHaveBeenCalledWith('ended', expect.any(Function));
     expect(sender.replaceTrack).toHaveBeenCalledWith(screenTrack);
-    expect(socket.emit).toHaveBeenCalledWith('call.screen_share', { conversationId: sessionId, enabled: true });
+    expect(socket.ownershipEmit).toHaveBeenCalledWith(
+      'call.screen_share',
+      { conversationId: sessionId, enabled: true },
+      expect.any(Function),
+    );
   });
 
   it('cleans up and restores the camera when the track ends spontaneously (OS-level stop)', async () => {
@@ -120,9 +142,14 @@ describe('toggleScreenShare — screen track ended handling', () => {
     // State must actually flip — a subsequent toggle should start a NEW
     // share (TOGGLE ON path), not attempt to toggle an already-off share.
     socket.emit.mockClear();
+    socket.ownershipEmit.mockClear();
     const resumed = await toggleScreenShare(sessionId, socket, []);
     expect(resumed).toBe(true);
-    expect(socket.emit).toHaveBeenCalledWith('call.screen_share', { conversationId: sessionId, enabled: true });
+    expect(socket.ownershipEmit).toHaveBeenCalledWith(
+      'call.screen_share',
+      { conversationId: sessionId, enabled: true },
+      expect.any(Function),
+    );
   });
 
   it('notifies onScreenShareEnded with reason "track-ended" on a spontaneous stop', async () => {
