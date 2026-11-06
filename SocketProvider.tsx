@@ -55,7 +55,11 @@ import {
 } from '@/services/calls/callKitService';
 import { sfuService, sfuAvailable } from '@/services/calls/sfuService';
 import { setCallPiPActive } from '@/services/calls/callPiPService';
-import { toggleScreenShare as callServiceToggleScreenShare } from '@/services/calls/callService';
+import {
+  toggleScreenShare as callServiceToggleScreenShare,
+  setScreenShareCallbacks,
+  applyActiveScreenShareToPeer,
+} from '@/services/calls/callService';
 import { saveConversationCallHistory, loadConversationCallHistory } from '@/services/calls/callHistoryStorage';
 import { logCallDiagnostic } from '@/services/calls/callDiagnostics';
 import { getPendingCallPayload, clearPendingCallPayload } from '@/services/calls/pendingCallPayload';
@@ -513,6 +517,21 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   // user-room emit to the creator), and creating a second offer on a peer that
   // is already in have-local-offer state causes WebRTC glare. Deduplicate here.
   const _offeredPeersRef = useRef<Set<string>>(new Set());
+  // Tracks the callId that has already been registered with native
+  // CallKit/ConnectionService (via displayIncomingCall or startOutgoingCall)
+  // for THIS device. Several join paths — the 'waiting-for-host' auto-answer
+  // branch in the call.offer handler, call.host.joined's fallback, and
+  // call.knock.admitted — never go through displayIncomingCall() at all
+  // (same root cause the AND-100 comments elsewhere in this file already
+  // fixed for joinExistingCall/startVoiceChannel: a call that's never
+  // registered with the OS call system has no foreground-service/CallKit
+  // protection, so Android/iOS background-execution limits can and will
+  // kill the call shortly after the app backgrounds, even though nothing
+  // about the call itself ended). registerNativeCallIfNeeded (below) is the
+  // single choke point that closes this gap for all three without
+  // double-registering a call the normal incoming-ring path already
+  // registered.
+  const _nativeCallRegisteredIdRef = useRef<string | null>(null);
   // Active reaction timeout IDs — cancelled when the call ends to prevent stale setState
   const reactionTimeoutsRef = useRef<ReturnType<typeof setTimeout>[]>([]);
   // Tracks whether the in-call chat sheet is open so unread count isn't incremented unnecessarily
@@ -523,6 +542,25 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   useEffect(() => { activeCallRef.current = activeCall; }, [activeCall]);
   useEffect(() => { currentUserIdRef.current = currentUserId; }, [currentUserId]);
+
+  /**
+   * Registers this call with native CallKit/ConnectionService exactly once,
+   * for call-join paths that don't already go through displayIncomingCall()
+   * (see _nativeCallRegisteredIdRef's comment above for why that matters).
+   * Mirrors the existing AND-100 pattern (joinExistingCall/startVoiceChannel):
+   * register "as if" it were an outgoing call, since this device is
+   * establishing its own local leg into a call it didn't itself ring for —
+   * startOutgoingCall (RNCallKeep.startCall) doesn't pop a native incoming-
+   * ring UI the way displayIncomingCall does, which matters here because
+   * these are all "I already decided to join" paths (auto-answer after
+   * waiting for the host, admission after knocking), not a fresh ring the
+   * user is being asked to accept.
+   */
+  const registerNativeCallIfNeeded = useCallback((params: { callId: string; callerName: string; callType: CallType }) => {
+    if (_nativeCallRegisteredIdRef.current === params.callId) return;
+    _nativeCallRegisteredIdRef.current = params.callId;
+    startOutgoingCall({ callUUID: params.callId, callerName: params.callerName, callType: params.callType });
+  }, []);
 
   const requestSocketRecovery = useCallback((reason: string) => {
     if (!mountedRef.current || !isAuth) return;
@@ -683,6 +721,48 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         setActiveCall(prev => prev ? { ...prev, isAudioOnly: on } : prev);
       },
     });
+
+    // Screen-share lifecycle callbacks - previously never registered at all
+    // (setScreenShareCallbacks existed in callService.ts but had no caller
+    // anywhere in the app), so:
+    //  - onScreenShareEnded (fired when the OS-level "Stop sharing" control
+    //    ends the track out from under us, not via our own toggle button)
+    //    never updated this device's own UI - the sharer's own screen stayed
+    //    showing "Sharing" indefinitely even though the camera/track was
+    //    already correctly restored and the server was already correctly
+    //    told sharing stopped. Other participants' UI updated fine (via the
+    //    call.screen_share broadcast below), only the sharer's own was stale.
+    //  - onRenegotiationNeeded is the new signaling half of the addTrack
+    //    fallback in callService's toggleScreenShare: adding a screen-share
+    //    video sender to a peer connection that never had one (a voice/
+    //    voice-group call) changes the SDP shape and needs a fresh
+    //    offer/answer exchange, exactly like an ICE restart's offer above.
+    setScreenShareCallbacks({
+      onScreenShareEnded: (sessionId, _reason) => {
+        setActiveCall(prev => {
+          if (!prev || prev.conversationId !== sessionId) return prev;
+          return {
+            ...prev,
+            isScreenSharing: false,
+            participants: prev.participants.map(p =>
+              p.isLocal ? { ...p, isScreenSharing: false } : p,
+            ),
+          };
+        });
+      },
+      onRenegotiationNeeded: (peerId, offer) => {
+        const session = activeCallRef.current;
+        if (!session || !socketRef.current) return;
+        const sdpString = typeof offer === 'string' ? offer : (offer?.sdp ?? offer);
+        socketRef.current.emit('call.sdp.offer', {
+          callId: session.callId,
+          conversationId: session.conversationId,
+          targetUserId: peerId,
+          sdp: sdpString,
+          sdpType: 'offer',
+        });
+      },
+    });
   }, []);
 
   const startWebRTCOffer = useCallback(async (peerId: string) => {
@@ -691,6 +771,15 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     // a peer already mid-negotiation (WebRTC glare).
     if (_offeredPeersRef.current.has(peerId)) return;
     _offeredPeersRef.current.add(peerId);
+    // Root-cause fix for "a viewer joining an already-in-progress share
+    // doesn't receive it": this peer connection doesn't exist yet, so
+    // webRTCService.createOffer() below would build it (buildPeer) straight
+    // from the local camera/mic stream, which never includes the screen
+    // track. Attaching it here, BEFORE the offer is created, means this
+    // peer's one and only initial offer already carries the shared screen -
+    // no separate renegotiation needed for a peer that never negotiated
+    // before. No-op if nobody is currently sharing.
+    applyActiveScreenShareToPeer(peerId);
     const offer = await webRTCService.createOffer(peerId);
     const session = activeCallRef.current;
     if (!offer || !session || !socketRef.current) return;
@@ -2057,6 +2146,27 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const session = activeCallRef.current;
     const s = socketRef.current;
     if (!session || !s) return;
+
+    // Screen-share ownership policy: only one participant may share at a
+    // time. No such policy existed anywhere (client or backend) before this
+    // fix - any participant could start sharing while someone else already
+    // was, silently replacing/colliding with the existing share on every
+    // other peer connection. Block locally with a clear message instead.
+    // (The backend's call.screen_share handler enforces the same rule
+    // server-side as a backstop for the race where two people tap "Share"
+    // within the same instant - this client-side check only short-circuits
+    // the common, non-racing case without a network round trip.)
+    if (!session.isScreenSharing) {
+      const otherSharer = session.participants.find(p => !p.isLocal && p.isScreenSharing);
+      if (otherSharer) {
+        Alert.alert(
+          'Someone else is sharing',
+          `${otherSharer.displayName || 'Another participant'} is already sharing their screen. Ask them to stop before you start.`,
+        );
+        return;
+      }
+    }
+
     // Actually capture the screen (or fall back to camera) and replace the video
     // sender track in every peer connection. callServiceToggleScreenShare also
     // emits call.screen_share with the correct { conversationId, enabled } shape,
@@ -2654,6 +2764,17 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
         // If local user was waiting for this host, auto-answer immediately.
         if (wasWaiting) {
+          // This path never reaches displayIncomingCall() below (deliberately
+          // — a participant who was already sitting on the waiting-room
+          // screen shouldn't suddenly get a native incoming-ring UI for a
+          // call they already chose to join). Without ANY native
+          // registration, though, this device's call has no CallKit/
+          // ConnectionService session backing it at all — see
+          // _nativeCallRegisteredIdRef's comment for why that means the OS
+          // kills it shortly after backgrounding. registerNativeCallIfNeeded
+          // closes that gap the same way joinExistingCall/startVoiceChannel
+          // already do for their own no-native-ring paths.
+          registerNativeCallIfNeeded({ callId, callerName: incomingTitle, callType });
           void answerCall();
           return;
         }
@@ -2666,6 +2787,10 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           callerName: safeDisplayName(payload?.title ?? payload?.callerName, 'Incoming call'),
           callType: callType,
         });
+        // Mark registered so registerNativeCallIfNeeded's fallback (used by
+        // call.knock.admitted/call.host.joined) never double-registers a
+        // call the normal incoming-ring path already handled.
+        _nativeCallRegisteredIdRef.current = callId;
         void logCallDiagnostic({
           stage: displayed ? 'CALLKEEP_DISPLAYED_OK' : 'CALLKEEP_DISPLAYED_FAILED',
           callId,
@@ -3284,6 +3409,12 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         // Kick off the answer
         const session = activeCallRef.current;
         if (session) {
+          // This knock→admit path never went through displayIncomingCall()
+          // (it only ever emitted call.knock, not a ring) — same no-native-
+          // registration gap as the wasWaiting branch above. Register now,
+          // right before committing to the join, so the OS treats this call
+          // as real before any media/signaling starts.
+          registerNativeCallIfNeeded({ callId: session.callId, callerName: session.title, callType: session.callType });
           const granted = await requestCallPermissions(session.callType);
           if (!granted) return;
           const needsVideo = hasVideo(session.callType);
@@ -3292,6 +3423,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           await webRTCService.startLocalStream(needsVideo);
           _offeredPeersRef.current.clear();
           setupWebRTC(session.callType);
+          reportCallAnswered(session.callId);
           s.emit('call.answer', {
             conversationId: session.conversationId,
             callId: session.callId,
@@ -3323,6 +3455,13 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           // The call.offer event already arrived (backend emits both together).
           // If answerCall hasn't been triggered yet by the call.offer handler,
           // trigger it now as a fallback.
+          // Same no-native-registration gap as the wasWaiting branch in the
+          // call.offer handler — if THIS fallback is what actually ends up
+          // triggering the join (call.offer's own wasWaiting branch hasn't
+          // run yet), nothing else will have registered the call with
+          // CallKit/ConnectionService. registerNativeCallIfNeeded is a no-op
+          // if that branch already won the race.
+          registerNativeCallIfNeeded({ callId: session.callId, callerName: session.title, callType: session.callType });
           void answerCall();
         }
       });

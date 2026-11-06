@@ -11,7 +11,6 @@ import {
   FlatList,
   ScrollView,
 } from 'react-native';
-import { useKeyboardState } from 'react-native-keyboard-controller';
 import RNFS from 'react-native-fs';
 import { postRequest } from '@/network/post';
 import ROUTES from '@/network';
@@ -456,6 +455,15 @@ type MessageComposerProps = {
 
   bottomInset?: number;
 
+  /**
+   * Whether the keyboard is currently visible. Sourced from a single
+   * subscription owned by the parent screen (ChatRoomBody) - next to the
+   * KeyboardAvoidingView that actually performs the resize - rather than
+   * this component subscribing independently. See ChatRoomBody's
+   * isKeyboardVisible comment for why that consolidation matters.
+   */
+  isKeyboardVisible?: boolean;
+
   /** Called whenever the detected link preview changes (or clears). Parent stores this and attaches it to the message on send. */
   onLinkPreviewChange?: (preview: { title?: string; description?: string; image?: string; site_name?: string; url: string } | null) => void;
 };
@@ -494,6 +502,7 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
   onSendScannedDocument,
   onViewOnceChange,
   bottomInset = 0,
+  isKeyboardVisible = false,
 }) => {
   /* ----------------------------- VIEW ONCE -------------------------------- */
   const [viewOnce, setViewOnce] = useState(false);
@@ -606,7 +615,9 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
   // bottomInset reserves space for the device's nav bar, but only while the
   // keyboard is closed — once it's open the keyboard already covers that
   // area, so keeping the padding leaves a dead gap above the keyboard.
-  const isKeyboardVisible = useKeyboardState((state) => state.isVisible);
+  // isKeyboardVisible is now provided by the parent (ChatRoomBody) as a
+  // prop - see MessageComposerProps.isKeyboardVisible for why this is no
+  // longer a local subscription.
 
   // Android quirk: dismissing the keyboard (e.g. the back button) hides it
   // without blurring the TextInput, so the OS still considers it focused and

@@ -187,6 +187,13 @@ class SfuService {
     }
     if (newTrack) {
       await producer.replaceTrack({ track: newTrack });
+      // A voice-group call that previously stopped sharing (see
+      // callService's stopScreenShareInternal) paused this producer rather
+      // than closing it, since there's no camera track to fall back to.
+      // Resuming here makes re-sharing on the SAME call work without this
+      // producer staying silently paused forever. No-op/safe if it was
+      // already resumed.
+      if (producer.paused) producer.resume();
     } else {
       producer.pause();
     }

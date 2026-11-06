@@ -37,8 +37,56 @@ type ScreenShareEndedHandler = (sessionId: string, reason: 'manual' | 'track-end
  * caller to return a value to. */
 let onScreenShareEnded: ScreenShareEndedHandler = () => {};
 
-export function setScreenShareCallbacks(cb: { onScreenShareEnded?: ScreenShareEndedHandler }) {
+/** Fired when adding the screen track to a peer connection required a brand
+ * new video sender (true whenever that peer had no pre-existing video m-line
+ * - i.e. a voice/voice-group call, which never negotiated video at all).
+ * Unlike replaceTrack (reuses an already-negotiated m-line, no signaling
+ * needed), a NEW sender changes the SDP shape and the remote side cannot
+ * decode anything until a fresh offer/answer round trip happens. The caller
+ * (SocketProvider, which owns the socket + callId) must send this offer via
+ * 'call.sdp.offer' the same way it already does for ICE restarts. */
+type RenegotiationHandler = (peerId: string, offer: any) => void;
+let onRenegotiationNeeded: RenegotiationHandler = () => {};
+
+export function setScreenShareCallbacks(cb: {
+  onScreenShareEnded?: ScreenShareEndedHandler;
+  onRenegotiationNeeded?: RenegotiationHandler;
+}) {
   if (cb.onScreenShareEnded) onScreenShareEnded = cb.onScreenShareEnded;
+  if (cb.onRenegotiationNeeded) onRenegotiationNeeded = cb.onRenegotiationNeeded;
+}
+
+/**
+ * Attach the currently-active screen-share track (if any) to one specific
+ * peer connection, creating it first if it doesn't exist yet.
+ *
+ * Root-cause fix for "a viewer joining an already-in-progress share doesn't
+ * see it": webRTCService.buildPeer() seeds a brand-new peer connection's
+ * senders strictly from the local camera/mic MediaStream - it has no idea a
+ * screen share is active, because the screen track is deliberately kept out
+ * of that stream (see the comment on `_screenTrack` above). A late joiner's
+ * peer connection was therefore always built with the camera track (or no
+ * video track at all), never the screen.
+ *
+ * Calling this BEFORE the initial offer is created for a new peer (see
+ * SocketProvider's startWebRTCOffer) means the very first SDP offer/answer
+ * with that peer already carries the screen content - no extra renegotiation
+ * round trip is needed for a peer that has never negotiated before.
+ */
+export function applyActiveScreenShareToPeer(peerId: string): void {
+  if (!_screenTrack) return; // no share in progress
+  try {
+    const ensure = (webRTCService as any).ensurePeerConnection as ((id: string) => any) | undefined;
+    const pc = ensure ? ensure.call(webRTCService, peerId) : (webRTCService as any).peers?.get?.(peerId);
+    if (!pc) return;
+    const senders: any[] = pc.getSenders?.() ?? [];
+    const videoSender = senders.find((s: any) => s.track?.kind === 'video');
+    if (videoSender) {
+      videoSender.replaceTrack(_screenTrack);
+    } else {
+      pc.addTrack(_screenTrack);
+    }
+  } catch { /* ignore - best effort */ }
 }
 
 /** Shared by the explicit toggle-off path and the screen track's own 'ended'
@@ -48,8 +96,6 @@ export function setScreenShareCallbacks(cb: { onScreenShareEnded?: ScreenShareEn
  * UI's button/badge state resyncs even when nothing called toggleScreenShare
  * to trigger this. */
 async function stopScreenShareInternal(sessionId: string, socket: any | null, reason: 'manual' | 'track-ended') {
-  const localStream = webRTCService.getLocalStream();
-
   // Stop ONLY the screen-capture track. Previously this stopped EVERY video
   // track on the local stream - which includes the camera track (it is never
   // removed from the local stream during screen share). That killed the camera
@@ -60,27 +106,36 @@ async function stopScreenShareInternal(sessionId: string, socket: any | null, re
     _screenTrack = null;
   }
 
-  // Restore original camera track across all peer connections
-  if (_originalVideoTrack && localStream) {
-    try {
-      _originalVideoTrack.enabled = true;
-      const peerConns = (webRTCService as any).peers as Map<string, any>;
-      peerConns?.forEach((pc: any) => {
-        try {
-          const senders: any[] = pc.getSenders?.() ?? [];
-          const videoSender = senders.find((s: any) => s.track?.kind === 'video');
-          if (videoSender) videoSender.replaceTrack(_originalVideoTrack);
-        } catch { /* ignore */ }
-      });
-      // Same restore on the SFU side for a call that's upgraded to group
-      // media — see the matching comment in the toggle-on path below for
-      // why this is required, not optional.
-      if (sfuService.isJoined) {
-        await sfuService.replaceTrack('video', _originalVideoTrack);
-      }
-    } catch { /* ignore */ }
-    _originalVideoTrack = null;
-  }
+  // Restore the original camera track (video calls) OR, for a voice call that
+  // had NO camera track to begin with, replace with `null` to stop sending on
+  // the video sender/producer that was freshly created for the screen share
+  // (see the TOGGLE ON path below) rather than leaving it transmitting a
+  // stopped/frozen track forever. Previously this whole block was gated on
+  // `_originalVideoTrack` being truthy, so a voice call's dynamically-added
+  // video sender/producer was NEVER cleaned up on stop - every other
+  // participant kept decoding a dead, stopped MediaStreamTrack indefinitely.
+  // `sender.replaceTrack(null)` and `producer.pause()` (inside
+  // sfuService.replaceTrack) are both well-defined no-renegotiation
+  // operations, so this is safe to run unconditionally whenever a video
+  // sender/producer exists at all.
+  try {
+    if (_originalVideoTrack) _originalVideoTrack.enabled = true;
+    const peerConns = (webRTCService as any).peers as Map<string, any>;
+    peerConns?.forEach((pc: any) => {
+      try {
+        const senders: any[] = pc.getSenders?.() ?? [];
+        const videoSender = senders.find((s: any) => s.track?.kind === 'video');
+        if (videoSender) videoSender.replaceTrack(_originalVideoTrack);
+      } catch { /* ignore */ }
+    });
+    // Same restore on the SFU side for a call that's upgraded to group
+    // media — see the matching comment in the toggle-on path below for
+    // why this is required, not optional.
+    if (sfuService.isJoined) {
+      await sfuService.replaceTrack('video', _originalVideoTrack);
+    }
+  } catch { /* ignore */ }
+  _originalVideoTrack = null;
 
   socket?.emit('call.screen_share', { conversationId: sessionId, enabled: false });
   _screenShareState[sessionId] = false;
@@ -218,13 +273,39 @@ export async function toggleScreenShare(
         } catch { /* ignore - best effort, the explicit toggle still works without it */ }
 
         const peerConns = (webRTCService as any).peers as Map<string, any>;
-        peerConns?.forEach((pc: any) => {
+        // Root-cause fix: a voice/voice-group call's peer connections never
+        // negotiated a video m-line in the first place (buildPeer() only
+        // adds tracks present in the local camera/mic stream, and a voice
+        // call's local stream has no video track at all - see
+        // webRTCService.ts's buildPeer()). `senders.find(video)` then finds
+        // NOTHING, so replaceTrack() was silently a no-op and the screen
+        // track never reached these peers - the single most common "sender
+        // sees local preview, receiver sees nothing" bug. replaceTrack only
+        // works when a video sender ALREADY exists (video/video-group
+        // calls); when none exists, a brand new sender must be added via
+        // addTrack(), which changes the SDP shape and REQUIRES a fresh
+        // offer/answer round trip - collected into peersNeedingRenegotiation
+        // and signaled via onRenegotiationNeeded below, after every peer
+        // connection has been mutated.
+        const peersNeedingRenegotiation: string[] = [];
+        peerConns?.forEach((pc: any, peerId: string) => {
           try {
             const senders: any[] = pc.getSenders?.() ?? [];
             const videoSender = senders.find((s: any) => s.track?.kind === 'video');
-            if (videoSender) videoSender.replaceTrack(screenVideoTrack);
+            if (videoSender) {
+              videoSender.replaceTrack(screenVideoTrack);
+            } else {
+              pc.addTrack(screenVideoTrack);
+              peersNeedingRenegotiation.push(peerId);
+            }
           } catch { /* ignore */ }
         });
+        for (const peerId of peersNeedingRenegotiation) {
+          try {
+            const offer = await webRTCService.createOffer(peerId);
+            if (offer) onRenegotiationNeeded(peerId, offer);
+          } catch { /* ignore */ }
+        }
         // A group call that's upgraded to the SFU sends video through a
         // mediasoup producer, not direct peer connections — without this,
         // starting screen share only ever reached the P2P mesh (empty/

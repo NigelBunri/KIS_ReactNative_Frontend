@@ -590,6 +590,20 @@ class WebRTCService {
     return this.peers.get(peerId) ?? this.buildPeer(peerId);
   }
 
+  /**
+   * Public wrapper around ensurePeer() — lets callService attach/replace a
+   * screen-share track onto a brand-new peer connection (e.g. for a
+   * participant who joins while a screen share is already in progress)
+   * BEFORE the initial offer/answer is negotiated, so the very first SDP
+   * exchange with that peer already reflects the shared screen instead of
+   * the camera. Without a public accessor, callService had no way to reach
+   * (or force-create) a specific RTCPeerConnection without duplicating
+   * buildPeer's logic.
+   */
+  ensurePeerConnection(peerId: string): any {
+    return this.ensurePeer(peerId);
+  }
+
   async createOffer(peerId: string): Promise<any | null> {
     if (!webRTCAvailable) return null;
     const pc = this.ensurePeer(peerId);

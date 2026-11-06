@@ -46,3 +46,38 @@ export function useRawTopInset(): number {
 export function useSafeTopInset(): number {
   return useRawTopInset() + GLOBAL_TOP_PADDING;
 }
+
+// Last-known-good non-zero Android bottom inset observed this app session.
+// Module-level (not per-hook-instance) so any screen that has ever seen a
+// real value primes the fallback for every other screen too - e.g. the chat
+// composer mounting before the gesture-nav/3-button-nav inset has settled.
+let lastKnownGoodAndroidBottomInset = 0;
+
+/**
+ * The device's real bottom safe-area inset (gesture-nav pill / 3-button nav
+ * bar / iOS home indicator), defensive against the same class of bug
+ * documented above for the top inset: MainActivity's enableEdgeToEdge() runs
+ * on every supported Android version (not just API 35+), and
+ * react-native-safe-area-context can intermittently report a stale/garbage
+ * 0 for `insets.bottom` on Android under edge-to-edge - most visibly right
+ * after mount or around a keyboard/orientation transition, before the first
+ * real WindowInsets dispatch lands. A bare 0 is indistinguishable from "this
+ * device genuinely has no bottom inset", so once a non-zero value has been
+ * observed this session, a later 0 reading on Android is treated as stale
+ * and the last good value is returned instead - this is what prevents
+ * bottom-anchored UI (e.g. the chat message composer) from ever rendering
+ * flush against, or behind, the system nav bar. Use this anywhere raw
+ * useSafeAreaInsets().bottom would otherwise be read for bottom-anchored,
+ * must-stay-tappable UI.
+ */
+export function useRawBottomInset(): number {
+  const insetsBottom = useSafeAreaInsets().bottom;
+  if (Platform.OS === 'android') {
+    if (insetsBottom > 0) {
+      lastKnownGoodAndroidBottomInset = insetsBottom;
+      return insetsBottom;
+    }
+    return lastKnownGoodAndroidBottomInset;
+  }
+  return insetsBottom;
+}

@@ -9,11 +9,14 @@
 // is never used to encrypt anything new.
 const E2EE_ENABLED = true;
 const STALE_SIGNAL_DECRYPTS_KEY = 'kis.chat.stale_signal_decrypts.v1';
-// Flipped on for the "initial messages arrive garbled in a brand-new
-// conversation" investigation — this was silencing exactly the failure mode
-// (a stale/mismatched Signal session) most consistent with that symptom.
-// Flip back to false once root-caused; it's noisy in a long-running app.
-const DEBUG_STALE_DECRYPTS = true;
+// Was flipped on for the "initial messages arrive garbled in a brand-new
+// conversation, permanently" investigation. ROOT-CAUSED 2026-11-06: the
+// bad-MAC catch branch below was silently swallowing a real, unrecovered
+// session-desync failure with no placeholder and no session recovery (see
+// that branch's own comment). Now that it recovers and surfaces an honest
+// placeholder instead, this flag is back to false — flip to true only for
+// a future investigation; it's noisy in a long-running app.
+const DEBUG_STALE_DECRYPTS = false;
 
 import {
   useCallback,
@@ -1018,12 +1021,51 @@ export function useChatMessaging({
           }
           return;
         } else if (isBadMacDecryptError(error)) {
+          // CONFIRMED ROOT CAUSE (2026-11-06) of "some messages remain
+          // encrypted-looking forever": a bad-MAC failure means the
+          // authentication tag didn't match the key this device derived -
+          // i.e. a desynced/stale local session, the SAME underlying
+          // condition the generic branch below already recovers from. This
+          // branch used to just log-and-return with NO placeholder and NO
+          // session recovery, so the message stayed stuck on the server's
+          // raw "Encrypted message" previewText forever: every later retry
+          // re-ran decryptFromUser against the identical stale session and
+          // failed the identical way, the 5s decryptFailedAtRef cooldown
+          // just repeated it indefinitely, and nothing ever told the user
+          // or gave the session a chance to self-heal. This is distinct
+          // from isSignalMessageCounterError (decrypting an already-
+          // decrypted message a second time, genuinely harmless to ignore
+          // once we know existing content is good) - a bad MAC is a real,
+          // unrecovered failure, so it gets the same honest placeholder +
+          // stale-session drop as isNoSignalSessionError/the generic branch
+          // below, not silence.
+          const messageId = String(mapped.serverId ?? mapped.id ?? mapped.clientId ?? '');
+          const senderDeviceId = encMeta?.senderDeviceId ?? encMeta?.deviceId ?? '';
+          const existing = messageId
+            ? messagesRef.current.find((m) => m.serverId === messageId || m.id === messageId || m.clientId === messageId)
+            : null;
+          if (existing && hasDecryptedContent(existing)) {
+            return;
+          }
+          const UNDECRYPTABLE_TEXT = '🔒 This message could not be decrypted. Ask them to send it again.';
+          const alreadyPatched = messagesRef.current.find(
+            (m) => (m.serverId === messageId || m.id === messageId) &&
+              typeof m.text === 'string' && m.text === UNDECRYPTABLE_TEXT,
+          );
           if (__DEV__ && DEBUG_STALE_DECRYPTS) {
-            console.warn('[useChatMessaging] stale encrypted message skipped', {
-              messageId: mapped.serverId ?? mapped.id ?? mapped.clientId,
-              senderId: mapped.senderId,
+            console.warn('[useChatMessaging] bad-MAC decrypt failure — dropping stale session and showing placeholder', {
+              messageId, senderId: mapped.senderId, senderDeviceId,
+              alreadyPatched: !!alreadyPatched,
               error: serializeErrorForDiagnostics(error),
             });
+          }
+          if (mapped.senderId && senderDeviceId) {
+            await dropStaleSession(String(mapped.senderId), String(senderDeviceId)).catch(() => {});
+          }
+          if (!alreadyPatched) {
+            const patch = { text: UNDECRYPTABLE_TEXT };
+            await saveDecryptedMessage(String(currentUserId), mapped, patch);
+            await patchDecryptedMessage(messageId, patch);
           }
           return;
         } else {

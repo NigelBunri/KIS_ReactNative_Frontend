@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { Platform, Pressable, Text, View } from 'react-native';
-import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { KeyboardAvoidingView, useKeyboardState } from 'react-native-keyboard-controller';
+import { useRawBottomInset } from '@/hooks/useSafeTopInset';
 import { chatRoomStyles as styles } from './chatRoomStyles';
 import { MessageList } from './componets/main/MessageList';
 import type { CallHistoryEntry } from './componets/CallHistoryRow';
@@ -177,7 +177,25 @@ export default function ChatRoomBody({
   callHistory = [],
   onCallHistoryCallback,
 }: Props) {
-  const insets = useSafeAreaInsets();
+  const bottomInset = useRawBottomInset();
+
+  // Single source of truth for "is the keyboard currently open" in this
+  // screen. Previously MessageComposer subscribed to this same keyboard
+  // state independently via its own useKeyboardState() call, several
+  // component layers below this one - two separate JS-thread listeners
+  // tracking the same keyboard, each updating on its own React commit, racing
+  // against the UI-thread reanimated worklet that actually drives
+  // KeyboardAvoidingView's resize below. That's the "multiple layout
+  // mechanisms competing" failure mode: on Android, where native
+  // keyboard show/hide timing is inherently less reliable than iOS, the two
+  // listeners could disagree for a frame (or more) around an open/close
+  // transition, intermittently leaving the composer's bottom padding and the
+  // KeyboardAvoidingView's resize out of sync - sometimes stranding the
+  // composer below the visible/tappable area. Subscribing once, here, next
+  // to the KeyboardAvoidingView that owns the actual resize, and passing the
+  // result down as a prop collapses this to a single listener for the whole
+  // screen.
+  const isKeyboardVisible = useKeyboardState((state) => state.isVisible);
 
   const mentionMap = useMemo(() => {
     const map: Record<string, string> = {};
@@ -316,7 +334,8 @@ export default function ChatRoomBody({
           onSendGif={onSendGif}
           onSendLocation={onSendLocation}
           onScheduleSend={onScheduleSend}
-          bottomInset={insets.bottom}
+          bottomInset={bottomInset}
+          isKeyboardVisible={isKeyboardVisible}
         />
       )}
 
